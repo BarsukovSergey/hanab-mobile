@@ -18,6 +18,7 @@ import {
   countArrayPayload,
   observeWireMessage,
 } from './src/diagnostics/wireObservation';
+import { runGameCoreProbe } from './src/game/c2/gameCoreProbe';
 import { HanabNetworkSession } from './src/network/NetworkSession';
 import type { NetworkSocket } from './src/network/types';
 
@@ -37,6 +38,7 @@ function readyStateLabel(socket: NetworkSocket | null): string {
 }
 
 export default function App() {
+  const [gameCoreProbe] = useState(runGameCoreProbe);
   const [probe, setProbe] = useState<ProbeStatus>('UNKNOWN');
   const [probeNote, setProbeNote] = useState('');
   const [login, setLogin] = useState<LoginStatus>('NOT_ATTEMPTED');
@@ -202,7 +204,31 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C1 Network Proof</Text>
+        <Text style={styles.title}>Hanab C1 + C2 Proofs</Text>
+
+        <View style={styles.section}>
+          <Text style={styles.heading}>C2 pinned game core</Text>
+          <Text>Game core import: {gameCoreProbe.gameCoreImport ? 'PASS' : 'FAIL'}</Text>
+          <Text>Reducer sequence: {gameCoreProbe.reducerSequence ? 'PASS' : 'FAIL'}</Text>
+          <Text>Action outcome failures: {gameCoreProbe.actionOutcomeFailures}</Text>
+          <Text>Actions applied: {gameCoreProbe.actionCount}</Text>
+          <Text>Final score: {gameCoreProbe.finalScore}</Text>
+          <Text>Clue tokens: {gameCoreProbe.clueTokens}</Text>
+          <Text>Turn: {gameCoreProbe.turnNumber}</Text>
+          <Text>
+            Previous-state mutation: {gameCoreProbe.previousStateMutationDetected ? 'DETECTED' : 'NONE'}
+          </Text>
+          <Text>
+            Non-plain serializability findings:{' '}
+            {gameCoreProbe.initialStateNonPlainFindings.length
+              + gameCoreProbe.sequenceStateNonPlainFindings.length
+              + gameCoreProbe.metadataNonPlainFindings.length}
+          </Text>
+          <Text>JSON-lossy numeric findings: {gameCoreProbe.jsonLossyNumericFindings.length}</Text>
+          <Text>Redux ownership: {gameCoreProbe.recommendation}</Text>
+          <Text>Hermes runtime: {gameCoreProbe.hermes ? 'YES' : 'NO'}</Text>
+          <Text>Probe: {gameCoreProbe.deviceProbePassed ? 'PASS' : 'FAIL'}</Text>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Session</Text>
