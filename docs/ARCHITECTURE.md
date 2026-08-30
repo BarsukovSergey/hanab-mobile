@@ -29,7 +29,7 @@ Not planned until proven necessary:
 
 ## Risk-first implementation order
 
-1. Physical Android `NetworkSession` proof
+1. Physical Android `NetworkSession` proof — **GO, completed 2026-08-30**
 2. Upstream game-core compatibility / containment
 3. Deterministic protocol + lobby runtime
 4. Spectate vertical slice, then join/leave/pregame
@@ -40,6 +40,26 @@ Not planned until proven necessary:
 9. Reconnect / reattend / background lifecycle
 10. Create / Start table
 11. Chat / polish / Android build cleanup
+
+See `docs/C1_RESULTS.md` for the physical-device evidence behind the C1 decision.
+
+## C1 Android evidence
+
+C1 proved on a physical Samsung Galaxy A55 (`SM-A556E`) that the minimal built-in React Native networking path works against production hanab.live:
+
+```text
+POST /login
+→ /test-cookie VALID
+→ built-in WebSocket OPEN
+→ valid welcome
+→ tableList
+```
+
+The session also survived a true Android force-stop/cold launch and authenticated a fresh WebSocket without another login.
+
+Therefore the preferred Android path is the built-in React Native `fetch` + built-in `WebSocket` with the platform-owned HttpOnly session. Do not add a cookie-management library or custom native cookie bridge unless future evidence proves the built-in path insufficient.
+
+C1 also observed that the existing socket closed while the app was backgrounded on the test device. A fresh socket after foreground authenticated successfully without re-login. Treat this as evidence that lifecycle/reconnect handling is required later; do not assume a socket survives backgrounding.
 
 ## Network ownership
 
@@ -226,7 +246,9 @@ Loading states have watchdogs; do not allow indefinite `waitingInit` / `waitingH
 
 Reconnect is authoritative resynchronization, not continuation of trusted stale client state.
 
-After a significant background interval, a locally OPEN socket may be considered suspect until real-device behavior is characterized. Exact lifecycle policy is deferred until physical Android evidence exists.
+Physical Android C1 evidence showed that the old WebSocket may close while the app is backgrounded, while the underlying authenticated HTTP session remains reusable. A fresh socket after foreground authenticated successfully without re-login.
+
+Therefore later lifecycle handling must treat background/foreground as a possible connection-boundary transition. The exact reconnect policy remains deferred to the reconnect milestone, but it must use the documented epoch/single-flight/disposal rules and must never replay gameplay commands.
 
 ## Diagnostics and fixtures
 
