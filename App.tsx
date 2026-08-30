@@ -1,8 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  AppState,
-  type AppStateStatus,
   Button,
   KeyboardAvoidingView,
   Platform,
@@ -13,29 +11,18 @@ import {
   View,
 } from 'react-native';
 
-import { RawInboundCapture } from './src/diagnostics/rawCapture';
-import {
-  countArrayPayload,
-  observeWireMessage,
-} from './src/diagnostics/wireObservation';
 import { runGameCoreProbe } from './src/game/c2/gameCoreProbe';
-import { HanabNetworkSession } from './src/network/NetworkSession';
-import type { NetworkSocket } from './src/network/types';
+import { lobbyRuntime, networkSession } from './src/runtime/application';
+import { useAppSelector } from './src/store/hooks';
+import {
+  selectAuthReady,
+  selectLobbyHydrated,
+  tableSelectors,
+  userSelectors,
+} from './src/store/store';
 
 type ProbeStatus = 'UNKNOWN' | 'VALID' | 'MISSING' | 'INDETERMINATE';
 type LoginStatus = 'NOT_ATTEMPTED' | 'SUCCESS' | 'FAILED';
-type SocketStatus = 'IDLE' | 'CONNECTING' | 'OPEN' | 'CLOSED' | 'ERROR';
-
-const session = new HanabNetworkSession();
-
-function timestamp(): string {
-  return new Date().toISOString();
-}
-
-function readyStateLabel(socket: NetworkSocket | null): string {
-  if (socket === null) return 'NONE';
-  return ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][socket.readyState] ?? 'UNKNOWN';
-}
 
 export default function App() {
   const [gameCoreProbe] = useState(runGameCoreProbe);
@@ -44,29 +31,18 @@ export default function App() {
   const [login, setLogin] = useState<LoginStatus>('NOT_ATTEMPTED');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [socketStatus, setSocketStatus] = useState<SocketStatus>('IDLE');
-  const [welcome, setWelcome] = useState(false);
-  const [users, setUsers] = useState<number | null>(null);
-  const [tables, setTables] = useState<number | null>(null);
-  const [lastCommand, setLastCommand] = useState('none');
-  const [lastPayloadBytes, setLastPayloadBytes] = useState(0);
-  const [observations, setObservations] = useState<string[]>([]);
-  const [captureStarted, setCaptureStarted] = useState(false);
-  const [captureFrameCount, setCaptureFrameCount] = useState(0);
-  const [captureComplete, setCaptureComplete] = useState(false);
-  const socketRef = useRef<NetworkSocket | null>(null);
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
-  const backgroundAtRef = useRef<string | null>(null);
-  const captureRef = useRef(new RawInboundCapture());
-
-  const addObservation = useCallback((message: string) => {
-    setObservations((current) => [`${timestamp()} ${message}`, ...current].slice(0, 20));
-  }, []);
+  const session = useAppSelector((state) => state.session);
+  const lobby = useAppSelector((state) => state.lobby);
+  const authReady = useAppSelector(selectAuthReady);
+  const hydrated = useAppSelector(selectLobbyHydrated);
+  const usersCount = useAppSelector(userSelectors.selectTotal);
+  const tablesCount = useAppSelector(tableSelectors.selectTotal);
+  const tables = useAppSelector(tableSelectors.selectAll);
 
   const runProbe = useCallback(async () => {
     setProbe('UNKNOWN');
     setProbeNote('Checking...');
-    const result = await session.checkSession();
+    const result = await networkSession.checkSession();
     if (result.kind === 'valid') {
       setProbe('VALID');
       setProbeNote('HTTP 200');
@@ -83,39 +59,14 @@ export default function App() {
     void runProbe();
   }, [runProbe]);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      const socket = socketRef.current;
-      if (nextState === 'background') {
-        backgroundAtRef.current = timestamp();
-        addObservation(`BACKGROUND; socket=${readyStateLabel(socket)}`);
-      } else if (
-        nextState === 'active' &&
-        appStateRef.current !== 'active'
-      ) {
-        addObservation(
-          `FOREGROUND; backgroundAt=${backgroundAtRef.current ?? 'unknown'}; socket=${readyStateLabel(socket)}`,
-        );
-      }
-      appStateRef.current = nextState;
-    });
-    return () => subscription.remove();
-  }, [addObservation]);
-
-  useEffect(
-    () => () => {
-      socketRef.current?.close(1000, 'C1 app unmounted');
-      socketRef.current = null;
-    },
-    [],
-  );
+  useEffect(() => () => lobbyRuntime.disconnect(), []);
 
   const submitLogin = async () => {
     setLogin('NOT_ATTEMPTED');
     try {
-      await session.submitLogin(username, password);
+      await networkSession.submitLogin(username, password);
       setPassword('');
-      const result = await session.checkSession();
+      const result = await networkSession.checkSession();
       if (result.kind === 'valid') {
         setLogin('SUCCESS');
         setProbe('VALID');
@@ -136,67 +87,8 @@ export default function App() {
     }
   };
 
-  const openSocket = async () => {
-    setSocketStatus('CONNECTING');
-    setWelcome(false);
-    setUsers(null);
-    setTables(null);
-    try {
-      const socket = await session.openSocket();
-      socketRef.current = socket;
-      socket.addEventListener('open', () => {
-        if (socketRef.current !== socket) return;
-        setSocketStatus('OPEN');
-        addObservation('WebSocket OPEN');
-      });
-      socket.addEventListener('message', (event) => {
-        if (socketRef.current !== socket || typeof event.data !== 'string') return;
-        const observed = observeWireMessage(event.data);
-        if (observed === null) return;
-        setLastCommand(observed.command);
-        setLastPayloadBytes(observed.payloadByteCount);
-        captureRef.current.append(observed.command, event.data);
-        setCaptureComplete(captureRef.current.isComplete);
-        setCaptureFrameCount(captureRef.current.frameCount);
-        if (appStateRef.current !== 'active') {
-          addObservation(`MESSAGE while ${appStateRef.current}: ${observed.command} (${observed.payloadByteCount} bytes)`);
-        }
-        if (observed.command === 'welcome' && observed.parsedPayload !== undefined) {
-          setWelcome(true);
-        } else if (observed.command === 'userList') {
-          setUsers(countArrayPayload(observed.parsedPayload));
-        } else if (observed.command === 'tableList') {
-          setTables(countArrayPayload(observed.parsedPayload));
-        }
-      });
-      socket.addEventListener('error', () => {
-        if (socketRef.current !== socket) return;
-        setSocketStatus('ERROR');
-        addObservation('WebSocket ERROR');
-      });
-      socket.addEventListener('close', (event) => {
-        if (socketRef.current !== socket) return;
-        setSocketStatus('CLOSED');
-        addObservation(`WebSocket CLOSED code=${event.code}`);
-      });
-    } catch (error) {
-      setSocketStatus('ERROR');
-      addObservation(error instanceof Error ? error.message : 'WebSocket creation failed');
-    }
-  };
-
-  const closeSocket = () => {
-    socketRef.current?.close(1000, 'C1 manual close');
-  };
-
-  const startCapture = () => {
-    captureRef.current.start();
-    setCaptureStarted(true);
-    setCaptureFrameCount(0);
-    setCaptureComplete(false);
-  };
-
-  const socketCanOpen = socketStatus === 'IDLE' || socketStatus === 'CLOSED' || socketStatus === 'ERROR';
+  const canConnect = probe === 'VALID'
+    && !['connecting', 'openAwaitingWelcome', 'ready'].includes(session.phase);
 
   return (
     <KeyboardAvoidingView
@@ -204,31 +96,44 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C1 + C2 Proofs</Text>
+        <Text style={styles.title}>Hanab C3 Proof</Text>
 
         <View style={styles.section}>
-          <Text style={styles.heading}>C2 pinned game core</Text>
-          <Text>Game core import: {gameCoreProbe.gameCoreImport ? 'PASS' : 'FAIL'}</Text>
-          <Text>Reducer sequence: {gameCoreProbe.reducerSequence ? 'PASS' : 'FAIL'}</Text>
-          <Text>Action outcome failures: {gameCoreProbe.actionOutcomeFailures}</Text>
-          <Text>Actions applied: {gameCoreProbe.actionCount}</Text>
-          <Text>Final score: {gameCoreProbe.finalScore}</Text>
-          <Text>Clue tokens: {gameCoreProbe.clueTokens}</Text>
-          <Text>Turn: {gameCoreProbe.turnNumber}</Text>
-          <Text>
-            Previous-state mutation: {gameCoreProbe.previousStateMutationDetected ? 'DETECTED' : 'NONE'}
-          </Text>
-          <Text>
-            Non-plain serializability findings:{' '}
-            {gameCoreProbe.initialStateNonPlainFindings.length
-              + gameCoreProbe.sequenceStateNonPlainFindings.length
-              + gameCoreProbe.metadataNonPlainFindings.length}
-          </Text>
-          <Text>JSON-lossy numeric findings: {gameCoreProbe.jsonLossyNumericFindings.length}</Text>
-          <Text>Redux ownership: {gameCoreProbe.recommendation}</Text>
-          <Text>Hermes runtime: {gameCoreProbe.hermes ? 'YES' : 'NO'}</Text>
-          <Text>Probe: {gameCoreProbe.deviceProbePassed ? 'PASS' : 'FAIL'}</Text>
+          <Text style={styles.heading}>Typed lobby runtime</Text>
+          <Text>Connection epoch: {session.connectionEpoch}</Text>
+          <Text>Connection phase: {session.phase}</Text>
+          <Text>Welcome: {authReady ? 'YES' : 'NO'}</Text>
+          <Text>User list: {lobby.userListReceived ? 'YES' : 'NO'}</Text>
+          <Text>Table list: {lobby.tableListReceived ? 'YES' : 'NO'}</Text>
+          <Text>Lobby hydrated: {hydrated ? 'YES' : 'NO'}</Text>
+          <Text>Users count: {usersCount}</Text>
+          <Text>Tables count: {tablesCount}</Text>
+          <Text>Protocol issue count: {session.protocolIssueCount}</Text>
+          {session.error !== null && <Text selectable>Error: {session.error}</Text>}
+          {session.lastProtocolIssue !== null && (
+            <Text selectable>Last protocol issue: {session.lastProtocolIssue}</Text>
+          )}
+          {lobby.notice !== null && (
+            <Text selectable>{lobby.notice.kind}: {lobby.notice.message}</Text>
+          )}
+          <Button
+            disabled={!canConnect}
+            title="Connect realtime"
+            onPress={() => void lobbyRuntime.connect()}
+          />
+          <Button
+            disabled={session.phase === 'idle' || session.phase === 'closed'}
+            title="Disconnect"
+            onPress={() => lobbyRuntime.disconnect()}
+          />
         </View>
+
+        {tables.slice(0, 5).map((table) => (
+          <View style={styles.tableRow} key={table.id}>
+            <Text style={styles.tableName}>{table.name}</Text>
+            <Text>{table.variant} · {table.numPlayers}/{table.maxPlayers}</Text>
+          </View>
+        ))}
 
         <View style={styles.section}>
           <Text style={styles.heading}>Session</Text>
@@ -241,55 +146,21 @@ export default function App() {
         {probe !== 'VALID' && (
           <View style={styles.section}>
             <Text style={styles.heading}>Login</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setUsername}
-              placeholder="username"
-              style={styles.input}
-              value={username}
-            />
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setPassword}
-              placeholder="password"
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
-            <Button
-              disabled={username.length === 0 || password.length === 0}
-              title="Login and verify"
-              onPress={() => void submitLogin()}
-            />
+            <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setUsername}
+              placeholder="username" style={styles.input} value={username} />
+            <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setPassword}
+              placeholder="password" secureTextEntry style={styles.input} value={password} />
+            <Button disabled={username.length === 0 || password.length === 0}
+              title="Login and verify" onPress={() => void submitLogin()} />
           </View>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.heading}>WebSocket</Text>
-          <Text>Socket: {socketStatus}</Text>
-          <Text>Welcome: {welcome ? 'YES' : 'NO'}</Text>
-          <Text>Users: {users ?? 'unknown'}</Text>
-          <Text>Tables: {tables ?? 'unknown'}</Text>
-          <Text>Last command: {lastCommand}</Text>
-          <Text>Last payload bytes: {lastPayloadBytes}</Text>
-          <Button disabled={!socketCanOpen || probe !== 'VALID'} title="Open socket" onPress={() => void openSocket()} />
-          <Button disabled={socketStatus !== 'OPEN'} title="Close socket" onPress={closeSocket} />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.heading}>Raw in-memory capture</Text>
-          <Text style={styles.warning}>Sensitive and process-local. It is never displayed or logged, and a process restart clears it.</Text>
-          <Button title="Start new capture" onPress={startCapture} />
-          <Text>Capture: {captureStarted ? 'ACTIVE' : 'NOT STARTED'}</Text>
-          <Text>Required frames held: {captureFrameCount}</Text>
-          <Text>Contains welcome + userList + tableList: {captureComplete ? 'YES' : 'NO'}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.heading}>Lifecycle observations</Text>
-          {observations.length === 0 ? <Text>none</Text> : observations.map((item) => <Text key={item}>{item}</Text>)}
+          <Text style={styles.heading}>C2 pinned game core</Text>
+          <Text>Game core import: {gameCoreProbe.gameCoreImport ? 'PASS' : 'FAIL'}</Text>
+          <Text>Reducer sequence: {gameCoreProbe.reducerSequence ? 'PASS' : 'FAIL'}</Text>
+          <Text>Hermes runtime: {gameCoreProbe.hermes ? 'YES' : 'NO'}</Text>
+          <Text>Probe: {gameCoreProbe.deviceProbePassed ? 'PASS' : 'FAIL'}</Text>
         </View>
         <StatusBar style="auto" />
       </ScrollView>
@@ -304,5 +175,6 @@ const styles = StyleSheet.create({
   section: { borderColor: '#999', borderWidth: 1, gap: 8, padding: 12 },
   heading: { fontSize: 18, fontWeight: '600' },
   input: { borderColor: '#777', borderWidth: 1, padding: 10 },
-  warning: { color: '#9a3412', fontWeight: '600' },
+  tableRow: { borderColor: '#bbb', borderWidth: 1, gap: 3, padding: 10 },
+  tableName: { fontWeight: '600' },
 });

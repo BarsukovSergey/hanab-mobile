@@ -1,0 +1,113 @@
+import { z } from 'zod';
+
+const idSchema = z.number().int().nonnegative();
+
+export const lobbyUserSchema = z.object({
+  userID: idSchema,
+  name: z.string().min(1),
+  status: z.number().int().min(0).max(5),
+  tableID: idSchema.optional(),
+  hyphenated: z.boolean(),
+  inactive: z.boolean(),
+});
+
+export type LobbyUser = z.infer<typeof lobbyUserSchema>;
+
+export const lobbyTableSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1),
+  numPlayers: z.number().int().nonnegative(),
+  maxPlayers: z.number().int().positive(),
+  running: z.boolean(),
+  variant: z.string().min(1),
+  passwordProtected: z.boolean(),
+  joined: z.boolean(),
+  progress: z.number().int().nonnegative(),
+  players: z.array(z.string().min(1)),
+  sharedReplay: z.boolean(),
+});
+
+export type LobbyTable = z.infer<typeof lobbyTableSchema>;
+
+export const welcomeSchema = z.object({
+  userID: idSchema,
+  username: z.string().min(1),
+  playingAtTables: z.array(idSchema),
+  disconSpectatingTable: idSchema.optional(),
+  disconShadowingSeat: z.number().int().optional(),
+});
+
+export type Welcome = z.infer<typeof welcomeSchema>;
+
+const schemas = {
+  welcome: welcomeSchema,
+  userList: z.array(lobbyUserSchema),
+  user: lobbyUserSchema,
+  userLeft: z.object({ userID: idSchema }),
+  tableList: z.array(lobbyTableSchema),
+  table: lobbyTableSchema,
+  tableGone: z.object({ tableID: idSchema }),
+  warning: z.object({ warning: z.string().min(1) }),
+  error: z.object({ error: z.string().min(1) }),
+} as const;
+
+export type KnownServerCommand = keyof typeof schemas;
+
+export type ServerEvent = {
+  [Command in KnownServerCommand]: {
+    command: Command;
+    data: z.infer<(typeof schemas)[Command]>;
+  };
+}[KnownServerCommand];
+
+export type DecodeResult =
+  | { kind: 'event'; event: ServerEvent }
+  | { kind: 'unknown'; command: string }
+  | {
+      kind: 'malformed';
+      command: string | null;
+      issue: 'empty-command' | 'missing-payload' | 'malformed-json' | 'invalid-payload';
+    };
+
+function isKnownCommand(command: string): command is KnownServerCommand {
+  return Object.prototype.hasOwnProperty.call(schemas, command);
+}
+
+/** Decode one hanab.live frame by splitting on the first ASCII space only. */
+export function decodeServerFrame(frame: string): DecodeResult {
+  const firstSpace = frame.indexOf(' ');
+  const command = firstSpace === -1 ? frame : frame.slice(0, firstSpace);
+
+  if (command.length === 0 || /\s/.test(command)) {
+    return { kind: 'malformed', command: null, issue: 'empty-command' };
+  }
+
+  if (!isKnownCommand(command)) {
+    return { kind: 'unknown', command };
+  }
+
+  if (firstSpace === -1 || firstSpace === frame.length - 1) {
+    return { kind: 'malformed', command, issue: 'missing-payload' };
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(frame.slice(firstSpace + 1)) as unknown;
+  } catch {
+    return { kind: 'malformed', command, issue: 'malformed-json' };
+  }
+
+  const result = schemas[command].safeParse(payload);
+  if (!result.success) {
+    return { kind: 'malformed', command, issue: 'invalid-payload' };
+  }
+
+  return {
+    kind: 'event',
+    event: { command, data: result.data } as ServerEvent,
+  };
+}
+
+export function encodeClientFrame(command: string, payload?: unknown): string {
+  return payload === undefined ? command : `${command} ${JSON.stringify(payload)}`;
+}

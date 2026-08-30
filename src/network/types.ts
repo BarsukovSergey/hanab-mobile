@@ -15,6 +15,11 @@ export interface NetworkSocket {
   addEventListener(type: 'message', listener: (event: WebSocketMessageEvent) => void): void;
   addEventListener(type: 'error', listener: () => void): void;
   addEventListener(type: 'close', listener: (event: WebSocketCloseEvent) => void): void;
+  removeEventListener(type: 'open', listener: () => void): void;
+  removeEventListener(type: 'message', listener: (event: WebSocketMessageEvent) => void): void;
+  removeEventListener(type: 'error', listener: () => void): void;
+  removeEventListener(type: 'close', listener: (event: WebSocketCloseEvent) => void): void;
+  send(data: string): void;
   close(code?: number, reason?: string): void;
 }
 
