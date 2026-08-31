@@ -1,0 +1,100 @@
+import { describe, expect, test } from '@jest/globals';
+
+import { getCardKnowledgeViewModel } from './cardKnowledge';
+import { getDefaultVariant } from '../upstream/gameData';
+import type { CardState } from '../upstream/interfaces/CardState';
+import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
+import { cardPossibilitiesReducer } from '../upstream/reducers/cardPossibilitiesReducer';
+import { getInitialCardState } from '../upstream/reducers/initialStates/initialCardState';
+import { cardOrder } from '../upstream/types/CardOrder';
+import type { Clue } from '../upstream/types/Clue';
+import { newColorClue, newRankClue } from '../upstream/types/Clue';
+
+const variant = getDefaultVariant();
+const metadata = {
+  options: { variantName: variant.name },
+} as GameMetadata;
+
+function freshCard(order: number): CardState {
+  return getInitialCardState(cardOrder.parse(order), variant, 2);
+}
+
+function applyClue(card: CardState, clue: Clue, positive: boolean): CardState {
+  return cardPossibilitiesReducer(
+    { ...card, hasClueApplied: true },
+    clue,
+    positive,
+    metadata,
+  );
+}
+
+describe('card knowledge view model', () => {
+  test('represents an untouched fresh card with full clue-only possibilities', () => {
+    const knowledge = getCardKnowledgeViewModel(variant.name, freshCard(7));
+
+    expect(knowledge).toEqual({
+      order: 7,
+      hasClueApplied: false,
+      positiveColorLabels: [],
+      positiveRanks: [],
+      possibleSuitLabels: variant.suits.map((suit) => suit.name),
+      possibleRanks: [...variant.ranks],
+      suitDetermined: false,
+      rankDetermined: false,
+    });
+  });
+
+  test('retains a rank clue when a color clue is added to the same card', () => {
+    const color = variant.clueColors[0];
+    expect(color).toBeDefined();
+    if (color === undefined) return;
+
+    const rankClued = applyClue(freshCard(8), newRankClue(2), true);
+    const rankKnowledge = getCardKnowledgeViewModel(variant.name, rankClued);
+    expect(rankKnowledge.positiveRanks).toEqual([2]);
+    expect(rankKnowledge.possibleRanks).toEqual([2]);
+    expect(rankKnowledge.possibleSuitLabels).toEqual(
+      variant.suits.map((suit) => suit.name),
+    );
+
+    const colorAndRankClued = applyClue(rankClued, newColorClue(color), true);
+    const accumulated = getCardKnowledgeViewModel(variant.name, colorAndRankClued);
+    expect(accumulated.positiveRanks).toEqual([2]);
+    expect(accumulated.positiveColorLabels).toEqual([color.name]);
+    expect(accumulated.possibleRanks).toEqual([2]);
+    expect(accumulated.possibleSuitLabels).toEqual([color.name]);
+    expect(colorAndRankClued.possibleCardsFromClues).toHaveLength(1);
+  });
+
+  test('narrows an untouched target-hand card for a negative clue without a positive marker', () => {
+    const color = variant.clueColors[0];
+    expect(color).toBeDefined();
+    if (color === undefined) return;
+
+    const negativelyClued = applyClue(freshCard(9), newColorClue(color), false);
+    const knowledge = getCardKnowledgeViewModel(variant.name, negativelyClued);
+
+    expect(knowledge.hasClueApplied).toBe(true);
+    expect(knowledge.positiveColorLabels).toEqual([]);
+    expect(knowledge.positiveRanks).toEqual([]);
+    expect(knowledge.possibleSuitLabels).toEqual(
+      variant.suits.map((suit) => suit.name).filter((name) => name !== color.name),
+    );
+    expect(knowledge.possibleRanks).toEqual([...variant.ranks]);
+  });
+
+  test('gives a freshly drawn order fresh knowledge instead of inheriting the old card', () => {
+    const oldCard = applyClue(freshCard(10), newRankClue(3), true);
+    const drawnCard = freshCard(11);
+
+    expect(getCardKnowledgeViewModel(variant.name, oldCard).positiveRanks).toEqual([3]);
+    expect(getCardKnowledgeViewModel(variant.name, drawnCard)).toMatchObject({
+      order: 11,
+      hasClueApplied: false,
+      positiveColorLabels: [],
+      positiveRanks: [],
+      possibleSuitLabels: variant.suits.map((suit) => suit.name),
+      possibleRanks: [...variant.ranks],
+    });
+  });
+});
