@@ -3,6 +3,7 @@ import { Button, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import {
+  getGameTableSuits,
   getGameplayClueChoices,
   getVisibleCardIdentityLabel,
 } from '../../game/selectors/gameplay';
@@ -104,6 +105,10 @@ export function GameScreen() {
   const clueActionsEnabled = gameplayControlsEnabled
     && liveRoom.game.clueTokens > 0
     && selectedClueTarget !== null;
+  const tableSuits = getGameTableSuits(
+    liveRoom.metadata.options.variantName,
+    liveRoom.game,
+  );
 
   return (
     <View style={styles.screen}>
@@ -127,6 +132,33 @@ export function GameScreen() {
         <Stat label="Clues" value={liveRoom.game.clueTokens} />
         <Stat label="Strikes" value={liveRoom.game.strikes.length} />
         <Stat label="Deck" value={liveRoom.game.cardsRemainingInTheDeck} />
+      </View>
+
+      <View style={styles.tableArea}>
+        <Text style={styles.subheading}>Table</Text>
+        <Text style={styles.tableLabel}>Play stacks</Text>
+        <View style={styles.playStacks}>
+          {tableSuits.map((suit) => (
+            <View key={suit.suitIndex} style={styles.playStack}>
+              <Text style={styles.stackSuit}>{suit.suitName}</Text>
+              <Text style={styles.stackTop}>{suit.topCardLabel ?? 'Empty'}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.tableLabel}>Discards</Text>
+        <View style={styles.discardList}>
+          {tableSuits.map((suit) => (
+            <View key={suit.suitIndex} style={styles.discardRow}>
+              <Text style={styles.discardSuit}>{suit.suitName}</Text>
+              <Text style={styles.discardCards}>
+                {suit.discardCardLabels.length === 0
+                  ? '—'
+                  : suit.discardCardLabels.join(', ')}
+              </Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {pendingLabel !== null && (
@@ -327,6 +359,23 @@ const styles = StyleSheet.create({
   gameLog: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 8, padding: 12 },
   logEntry: { color: '#303840' },
   subheading: { fontSize: 18, fontWeight: '700', marginTop: 6 },
+  tableArea: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 8, padding: 12 },
+  tableLabel: { color: '#46515c', fontSize: 12, fontWeight: '700' },
+  playStacks: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  playStack: {
+    backgroundColor: '#fff',
+    borderColor: '#c7ccd1',
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 96,
+    padding: 10,
+  },
+  stackSuit: { color: '#46515c', fontSize: 12, fontWeight: '600' },
+  stackTop: { fontSize: 16, fontWeight: '700', marginTop: 2 },
+  discardList: { gap: 4 },
+  discardRow: { flexDirection: 'row', gap: 8 },
+  discardSuit: { fontWeight: '600', width: 72 },
+  discardCards: { color: '#303840', flex: 1 },
   helper: { color: '#626b73' },
   cardList: { gap: 8 },
   actionArea: { backgroundColor: '#eef4ff', borderRadius: 10, gap: 8, padding: 12 },
