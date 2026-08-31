@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "Hanab C1 Network Proof",
-    "slug": "hanab-mobile-c1",
+    "name": "Hanab Mobile",
+    "slug": "hanab-mobile",
+    "scheme": "hanab-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "live.hanab.mobile.c1"
+      "bundleIdentifier": "live.hanab.mobile"
     },
     "android": {
-      "package": "live.hanab.mobile.c1",
+      "package": "live.hanab.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
