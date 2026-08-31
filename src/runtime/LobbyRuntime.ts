@@ -273,6 +273,9 @@ export class LobbyRuntime {
     }
     if (decoded.kind === 'malformed') {
       const command = decoded.command ?? 'frame';
+      if (command === 'gameAction') {
+        this.store.dispatch(sessionActions.gameActionFrameSeen({ epoch: owned.epoch }));
+      }
       this.recordInboundDiagnostic(owned.epoch, {
         command,
         classification: 'malformed',
@@ -299,6 +302,15 @@ export class LobbyRuntime {
           rejectionReason: result.rejectionReason,
         },
       });
+      this.store.dispatch(sessionActions.gameActionDiagnosticRecorded({
+        epoch: owned.epoch,
+        diagnostic: {
+          tableID: decoded.event.data.tableID,
+          actionType: decoded.event.data.action.type,
+          accepted: result.accepted,
+          rejectionReason: result.rejectionReason,
+        },
+      }));
       return;
     }
 

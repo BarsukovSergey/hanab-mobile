@@ -130,6 +130,19 @@ export default function App() {
           {session.lastProtocolIssue !== null && (
             <Text selectable>Last protocol issue: {session.lastProtocolIssue}</Text>
           )}
+          <Text style={styles.subheading}>Current-connection gameAction diagnostics</Text>
+          <Text>Total gameAction frames seen: {session.gameActionFramesSeen}</Text>
+          {session.gameActionDiagnostics.length === 0 && (
+            <Text>No schema-valid gameAction details.</Text>
+          )}
+          {session.gameActionDiagnostics.map((diagnostic, index) => (
+            <Text key={`${index}-${diagnostic.tableID}-${diagnostic.actionType}`} selectable>
+              tableID {diagnostic.tableID}
+              {' | '}action.type {diagnostic.actionType}
+              {' | '}accepted {diagnostic.accepted ? 'YES' : 'NO'}
+              {' | '}rejection reason {diagnostic.rejectionReason ?? 'NONE'}
+            </Text>
+          ))}
           <Text style={styles.subheading}>Recent inbound diagnostics</Text>
           {session.inboundDiagnostics.length === 0 && <Text>None</Text>}
           {session.inboundDiagnostics.map((diagnostic, index) => (

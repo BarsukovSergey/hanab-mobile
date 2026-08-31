@@ -718,6 +718,8 @@ describe('deterministic lobby runtime', () => {
       { command: 'gameAction', classification: 'malformed' },
     ]);
     expect(store.getState().session.protocolIssueCount).toBe(1);
+    expect(store.getState().session.gameActionFramesSeen).toBe(1);
+    expect(store.getState().session.gameActionDiagnostics).toEqual([]);
 
     for (let index = 0; index < 12; index += 1) {
       socket.emitMessage(`unknownDiagnostic${index} {}`);
@@ -758,6 +760,50 @@ describe('deterministic lobby runtime', () => {
         rejectionReason: 'wrong-room-table',
       },
     });
+    expect(store.getState().session.gameActionFramesSeen).toBe(1);
+    expect(store.getState().session.gameActionDiagnostics).toEqual([{
+      tableID: 123,
+      actionType: 'turn',
+      accepted: false,
+      rejectionReason: 'wrong-room-table',
+    }]);
+  });
+
+  test('heavy lobby traffic cannot evict bounded current-connection gameAction diagnostics', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+
+    for (let actionIndex = 0; actionIndex < 12; actionIndex += 1) {
+      socket.emitMessage(
+        `gameAction {"tableID":${200 + actionIndex},`
+        + `"action":{"type":"turn","num":${actionIndex},"currentPlayerIndex":1}}`,
+      );
+      for (let lobbyIndex = 0; lobbyIndex < 20; lobbyIndex += 1) {
+        socket.emitMessage(userFrame);
+        socket.emitMessage(`tableGone {"tableID":${1000 + lobbyIndex}}`);
+      }
+    }
+
+    const state = store.getState().session;
+    expect(state.gameActionFramesSeen).toBe(12);
+    expect(state.gameActionDiagnostics).toHaveLength(10);
+    expect(state.gameActionDiagnostics.map((diagnostic) => diagnostic.tableID)).toEqual(
+      Array.from({ length: 10 }, (_, index) => 202 + index),
+    );
+    expect(state.gameActionDiagnostics.every((diagnostic) => (
+      diagnostic.actionType === 'turn'
+      && !diagnostic.accepted
+      && diagnostic.rejectionReason === 'wrong-room-table'
+    ))).toBe(true);
+    expect(state.inboundDiagnostics.every((diagnostic) => (
+      diagnostic.command !== 'gameAction'
+    ))).toBe(true);
   });
 
   test('new connection clears prior inbound diagnostics and stale frames cannot restore them', async () => {
@@ -774,13 +820,25 @@ describe('deterministic lobby runtime', () => {
     const staleMessages = first.snapshotMessageListeners();
     expect(store.getState().session.inboundDiagnostics).toHaveLength(2);
 
+    first.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}',
+    );
+    expect(store.getState().session.gameActionFramesSeen).toBe(1);
+
     runtime.disconnect();
     await runtime.connect();
     expect(store.getState().session.inboundDiagnostics).toEqual([]);
+    expect(store.getState().session.gameActionFramesSeen).toBe(0);
+    expect(store.getState().session.gameActionDiagnostics).toEqual([]);
     for (const listener of staleMessages) {
       listener({ data: 'lateUnknown {}' } as WebSocketMessageEvent);
+      listener({
+        data: 'gameAction {"tableID":123,"action":{"type":"turn","num":2,"currentPlayerIndex":0}}',
+      } as WebSocketMessageEvent);
     }
     expect(store.getState().session.inboundDiagnostics).toEqual([]);
+    expect(store.getState().session.gameActionFramesSeen).toBe(0);
+    expect(store.getState().session.gameActionDiagnostics).toEqual([]);
     second.emitOpen();
     second.emitMessage(welcomeFrame);
     expect(store.getState().session.inboundDiagnostics).toEqual([
@@ -837,5 +895,12 @@ describe('deterministic lobby runtime', () => {
         rejectionReason: null,
       },
     });
+    expect(store.getState().session.gameActionFramesSeen).toBe(1);
+    expect(store.getState().session.gameActionDiagnostics).toEqual([{
+      tableID: 123,
+      actionType: 'draw',
+      accepted: true,
+      rejectionReason: null,
+    }]);
   });
 });

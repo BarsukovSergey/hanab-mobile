@@ -38,6 +38,13 @@ export type InboundDiagnostic = {
   };
 };
 
+export type GameActionDiagnostic = {
+  tableID: number;
+  actionType: string;
+  accepted: boolean;
+  rejectionReason: IncrementalRejectionReason | null;
+};
+
 export type SessionState = {
   connectionEpoch: number;
   phase: ConnectionPhase;
@@ -47,9 +54,12 @@ export type SessionState = {
   protocolIssueCount: number;
   lastProtocolIssue: string | null;
   inboundDiagnostics: InboundDiagnostic[];
+  gameActionFramesSeen: number;
+  gameActionDiagnostics: GameActionDiagnostic[];
 };
 
 const MAX_INBOUND_DIAGNOSTICS = 10;
+const MAX_GAME_ACTION_DIAGNOSTICS = 10;
 const MAX_DIAGNOSTIC_COMMAND_LENGTH = 64;
 const MAX_DIAGNOSTIC_ACTION_TYPE_LENGTH = 32;
 
@@ -62,6 +72,8 @@ const initialState: SessionState = {
   protocolIssueCount: 0,
   lastProtocolIssue: null,
   inboundDiagnostics: [],
+  gameActionFramesSeen: 0,
+  gameActionDiagnostics: [],
 };
 
 type EpochPayload = { epoch: number };
@@ -79,6 +91,8 @@ export const sessionSlice = createSlice({
       state.protocolIssueCount = 0;
       state.lastProtocolIssue = null;
       state.inboundDiagnostics = [];
+      state.gameActionFramesSeen = 0;
+      state.gameActionDiagnostics = [];
     },
     socketOpened(state, action: PayloadAction<EpochPayload>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -138,6 +152,28 @@ export const sessionSlice = createSlice({
         state.inboundDiagnostics.splice(
           0,
           state.inboundDiagnostics.length - MAX_INBOUND_DIAGNOSTICS,
+        );
+      }
+    },
+    gameActionFrameSeen(state, action: PayloadAction<EpochPayload>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      state.gameActionFramesSeen += 1;
+    },
+    gameActionDiagnosticRecorded(
+      state,
+      action: PayloadAction<{ epoch: number; diagnostic: GameActionDiagnostic }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      const { diagnostic } = action.payload;
+      state.gameActionFramesSeen += 1;
+      state.gameActionDiagnostics.push({
+        ...diagnostic,
+        actionType: diagnostic.actionType.slice(0, MAX_DIAGNOSTIC_ACTION_TYPE_LENGTH),
+      });
+      if (state.gameActionDiagnostics.length > MAX_GAME_ACTION_DIAGNOSTICS) {
+        state.gameActionDiagnostics.splice(
+          0,
+          state.gameActionDiagnostics.length - MAX_GAME_ACTION_DIAGNOSTICS,
         );
       }
     },
