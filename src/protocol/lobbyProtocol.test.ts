@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 
 import {
   decodeServerFrame,
+  encodeTableReattendFrame,
   encodeTableJoinFrame,
   encodeTableLeaveFrame,
   encodeTableSpectateFrame,
@@ -73,6 +74,13 @@ describe('lobby protocol decoder', () => {
     expect(encodeTableSpectateFrame(123)).toBe(
       'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
     );
+  });
+
+  test('encodes exact spectator recovery and player reattend commands', () => {
+    expect(encodeTableSpectateFrame(123, 1)).toBe(
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":1}',
+    );
+    expect(encodeTableReattendFrame(123)).toBe('tableReattend {"tableID":123}');
   });
 
   test('encodes the exact join and leave commands', () => {

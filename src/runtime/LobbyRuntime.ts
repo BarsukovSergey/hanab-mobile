@@ -15,6 +15,7 @@ import {
 import {
   decodeServerFrame,
   encodeClientFrame,
+  encodeTableReattendFrame,
   encodeTableJoinFrame,
   encodeTableLeaveFrame,
   encodeTableSpectateFrame,
@@ -29,6 +30,7 @@ import type { AppStore } from '../store/store';
 const SOCKET_OPEN = 1;
 const SOCKET_CLOSING = 2;
 const DEFAULT_WELCOME_TIMEOUT_MS = 10_000;
+const DEFAULT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000] as const;
 const MAX_STATUS_LENGTH = 240;
 
 export type RuntimeTimers = {
@@ -59,6 +61,10 @@ export class LobbyRuntime {
   private current: OwnedConnection | null = null;
   private connectionEpoch: number;
   private connectPromise: Promise<void> | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryAttempt = 0;
+  private appActive = true;
+  private maintainConnection = false;
   private readonly gameBootstrap: GameBootstrapCoordinator;
 
   constructor(
@@ -69,6 +75,7 @@ export class LobbyRuntime {
       clearTimeout: (timer) => clearTimeout(timer),
     },
     private readonly welcomeTimeoutMs = DEFAULT_WELCOME_TIMEOUT_MS,
+    private readonly retryDelaysMs: readonly number[] = DEFAULT_RETRY_DELAYS_MS,
   ) {
     this.connectionEpoch = store.getState().session.connectionEpoch;
     this.gameBootstrap = new GameBootstrapCoordinator(
@@ -79,6 +86,13 @@ export class LobbyRuntime {
   }
 
   connect(): Promise<void> {
+    this.maintainConnection = true;
+    if (!this.appActive) return Promise.resolve();
+    this.cancelRetry();
+    return this.startConnectionAttempt();
+  }
+
+  private startConnectionAttempt(): Promise<void> {
     const phase = this.store.getState().session.phase;
     if (
       this.current !== null
@@ -119,14 +133,38 @@ export class LobbyRuntime {
   }
 
   disconnect(): void {
+    this.maintainConnection = false;
+    this.retryAttempt = 0;
+    this.cancelRetry();
     const owned = this.current;
-    if (owned === null) return;
     this.current = null;
     this.gameBootstrap.invalidate();
-    this.dispose(owned, true);
+    if (owned !== null) this.dispose(owned, true);
     this.store.dispatch(
-      sessionActions.connectionClosed({ epoch: owned.epoch, error: null }),
+      sessionActions.connectionClosed({ epoch: this.connectionEpoch, error: null }),
     );
+  }
+
+  setAppActive(active: boolean): void {
+    if (this.appActive === active) return;
+    this.appActive = active;
+    if (!active) {
+      this.cancelRetry();
+      const owned = this.current;
+      this.current = null;
+      this.gameBootstrap.invalidate();
+      if (owned !== null) {
+        this.dispose(owned, true);
+        this.store.dispatch(
+          sessionActions.connectionClosed({ epoch: owned.epoch, error: null }),
+        );
+      }
+      return;
+    }
+    if (this.maintainConnection) {
+      this.cancelRetry();
+      void this.startConnectionAttempt();
+    }
   }
 
   /** Internal no-queue send gate for later typed client commands. */
@@ -141,6 +179,7 @@ export class LobbyRuntime {
       table === undefined
       || !isSpectateEligible(table)
       || state.room.room.kind !== 'none'
+      || state.room.pendingRecovery !== null
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
     ) {
@@ -164,6 +203,7 @@ export class LobbyRuntime {
       table === undefined
       || !isJoinEligible(table)
       || state.room.room.kind !== 'none'
+      || state.room.pendingRecovery !== null
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
     ) {
@@ -330,7 +370,9 @@ export class LobbyRuntime {
           this.timers.clearTimeout(owned.timer);
           owned.timer = null;
         }
+        this.retryAttempt = 0;
         this.store.dispatch(sessionActions.welcomeReceived({ epoch, welcome: event.data }));
+        this.resumeAuthoritativeRoom(epoch, event.data);
         break;
       case 'userList':
         this.store.dispatch(lobbyActions.userListReceived({ epoch, users: event.data }));
@@ -406,6 +448,7 @@ export class LobbyRuntime {
       epoch: owned.epoch,
       error: event.code === 1000 ? null : `WebSocket closed (${event.code})`,
     }));
+    this.scheduleRetry();
   }
 
   private failCurrent(owned: OwnedConnection, error: string): void {
@@ -417,6 +460,72 @@ export class LobbyRuntime {
       epoch: owned.epoch,
       error,
     }));
+    this.scheduleRetry();
+  }
+
+  private resumeAuthoritativeRoom(
+    epoch: number,
+    welcome: Extract<ServerEvent, { command: 'welcome' }>['data'],
+  ): void {
+    const playerTableID = welcome.playingAtTables[0];
+    if (playerTableID !== undefined) {
+      if (this.sendEncoded(encodeTableReattendFrame(playerTableID))) {
+        this.store.dispatch(roomActions.recoveryRequested({
+          epoch,
+          tableID: playerTableID,
+          role: 'player',
+        }));
+      }
+      return;
+    }
+
+    const spectatorTableID = welcome.disconSpectatingTable;
+    if (spectatorTableID === undefined || spectatorTableID <= 0) return;
+    const shadowingPlayerIndex = welcome.disconShadowingSeat;
+    if (shadowingPlayerIndex === undefined) {
+      this.store.dispatch(sessionActions.protocolIssue({
+        epoch,
+        issue: 'welcome: missing disconShadowingSeat for spectator recovery',
+      }));
+      return;
+    }
+    if (this.sendEncoded(encodeTableSpectateFrame(
+      spectatorTableID,
+      shadowingPlayerIndex,
+    ))) {
+      this.store.dispatch(roomActions.recoveryRequested({
+        epoch,
+        tableID: spectatorTableID,
+        role: 'spectator',
+      }));
+    }
+  }
+
+  private scheduleRetry(): void {
+    if (
+      !this.maintainConnection
+      || !this.appActive
+      || this.retryTimer !== null
+      || this.retryDelaysMs.length === 0
+    ) return;
+    const delayIndex = Math.min(this.retryAttempt, this.retryDelaysMs.length - 1);
+    const delayMs = this.retryDelaysMs[delayIndex];
+    if (delayMs === undefined) return;
+    this.retryAttempt += 1;
+    let timer!: ReturnType<typeof setTimeout>;
+    timer = this.timers.setTimeout(() => {
+      if (this.retryTimer !== timer) return;
+      this.retryTimer = null;
+      if (!this.maintainConnection || !this.appActive) return;
+      void this.startConnectionAttempt();
+    }, delayMs);
+    this.retryTimer = timer;
+  }
+
+  private cancelRetry(): void {
+    if (this.retryTimer === null) return;
+    this.timers.clearTimeout(this.retryTimer);
+    this.retryTimer = null;
   }
 
   private isCurrent(owned: OwnedConnection): boolean {

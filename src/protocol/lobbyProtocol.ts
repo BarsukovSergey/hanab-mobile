@@ -20,10 +20,13 @@ export type TableLeaveCommand = z.infer<typeof tableLeaveCommandSchema>;
 
 export const tableSpectateCommandSchema = z.object({
   tableID: idSchema,
-  shadowingPlayerIndex: z.literal(-1),
+  shadowingPlayerIndex: z.number().int(),
 });
 
 export type TableSpectateCommand = z.infer<typeof tableSpectateCommandSchema>;
+
+export const tableReattendCommandSchema = tableIDCommandSchema;
+export type TableReattendCommand = z.infer<typeof tableReattendCommandSchema>;
 
 export const tableStartSchema = z.object({
   tableID: idSchema,
@@ -184,12 +187,20 @@ export function encodeClientFrame(command: string, payload?: unknown): string {
   return payload === undefined ? command : `${command} ${JSON.stringify(payload)}`;
 }
 
-export function encodeTableSpectateFrame(tableID: number): string {
+export function encodeTableSpectateFrame(
+  tableID: number,
+  shadowingPlayerIndex = -1,
+): string {
   const payload = tableSpectateCommandSchema.parse({
     tableID,
-    shadowingPlayerIndex: -1,
+    shadowingPlayerIndex,
   });
   return encodeClientFrame('tableSpectate', payload);
+}
+
+export function encodeTableReattendFrame(tableID: number): string {
+  const payload = tableReattendCommandSchema.parse({ tableID });
+  return encodeClientFrame('tableReattend', payload);
 }
 
 export function encodeTableJoinFrame(tableID: number): string {

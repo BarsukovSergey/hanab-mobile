@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 import type {
   NetworkSession,
@@ -54,6 +54,12 @@ class FakeSocket implements NetworkSocket {
       listener({ data } as WebSocketMessageEvent);
     }
   }
+  emitClose(code = 1006): void {
+    this.readyState = 3;
+    for (const listener of [...this.closeListeners]) {
+      listener({ code } as WebSocketCloseEvent);
+    }
+  }
   snapshotMessages(): MessageListener[] { return [...this.messageListeners]; }
 }
 
@@ -83,6 +89,9 @@ const playerTable = {
   players: ['Bob'],
   sharedReplay: false,
 };
+
+beforeEach(() => { jest.useFakeTimers(); });
+afterEach(() => { jest.useRealTimers(); });
 
 function initialHistory(currentPlayerIndex = 0) {
   return {
@@ -247,14 +256,15 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(store.getState().room.pendingGameplayAction).not.toBeNull();
   });
 
-  test('a new connection clears intent and never replays a gameplay command', async () => {
+  test('connection recovery clears intent and never replays a gameplay command', async () => {
     const { session, runtime, socket: first, store } = await makeLive();
     expect(runtime.play(0)).toBe(true);
     const staleMessages = first.snapshotMessages();
     const second = new FakeSocket();
     session.sockets.push(second);
-    runtime.disconnect();
-    await runtime.connect();
+    first.emitClose();
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
     second.emitOpen();
     second.emitMessage(welcomeFrame);
     for (const listener of staleMessages) {

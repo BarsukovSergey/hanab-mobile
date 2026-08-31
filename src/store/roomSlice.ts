@@ -53,6 +53,10 @@ type PendingJoin = {
 export type RoomSliceState = {
   connectionEpoch: number;
   pendingSpectateTableID: number | null;
+  pendingRecovery: {
+    tableID: number;
+    role: 'player' | 'spectator';
+  } | null;
   pendingJoin: PendingJoin | null;
   pendingLeaveTableID: number | null;
   pendingGameplayAction: {
@@ -67,6 +71,7 @@ export type RoomSliceState = {
 const initialState: RoomSliceState = {
   connectionEpoch: 0,
   pendingSpectateTableID: null,
+  pendingRecovery: null,
   pendingJoin: null,
   pendingLeaveTableID: null,
   pendingGameplayAction: null,
@@ -82,6 +87,26 @@ export const roomSlice = createSlice({
   name: 'room',
   initialState,
   reducers: {
+    recoveryRequested(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        role: 'player' | 'spectator';
+      }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      if (
+        state.room.kind !== 'none'
+        || state.pendingRecovery !== null
+        || state.pendingSpectateTableID !== null
+        || state.pendingJoin !== null
+      ) return;
+      state.pendingRecovery = {
+        tableID: action.payload.tableID,
+        role: action.payload.role,
+      };
+    },
     spectateRequested(
       state,
       action: PayloadAction<{ epoch: number; tableID: number }>,
@@ -89,6 +114,7 @@ export const roomSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (
         state.room.kind !== 'none'
+        || state.pendingRecovery !== null
         || state.pendingSpectateTableID !== null
         || state.pendingJoin !== null
       ) return;
@@ -101,6 +127,7 @@ export const roomSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (
         state.room.kind !== 'none'
+        || state.pendingRecovery !== null
         || state.pendingSpectateTableID !== null
         || state.pendingJoin !== null
       ) return;
@@ -207,6 +234,11 @@ export const roomSlice = createSlice({
         role = state.room.role;
       } else if (
         state.room.kind === 'none'
+        && state.pendingRecovery?.tableID === tableStart.tableID
+      ) {
+        role = state.pendingRecovery.role;
+      } else if (
+        state.room.kind === 'none'
         && state.pendingSpectateTableID === tableStart.tableID
       ) {
         role = 'spectator';
@@ -224,6 +256,7 @@ export const roomSlice = createSlice({
       if (role === null) return;
 
       state.pendingSpectateTableID = null;
+      state.pendingRecovery = null;
       clearC4BState(state);
       state.pendingGameplayAction = null;
       state.room = {
@@ -401,6 +434,7 @@ export const roomSlice = createSlice({
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
       state.connectionEpoch = action.payload.epoch;
       state.pendingSpectateTableID = null;
+      state.pendingRecovery = null;
       state.pendingGameplayAction = null;
       clearC4BState(state);
       state.room = { kind: 'none' };

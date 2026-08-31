@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  AppState,
   Button,
   KeyboardAvoidingView,
   Platform,
@@ -50,6 +51,7 @@ export default function App() {
     if (result.kind === 'valid') {
       setProbe('VALID');
       setProbeNote('HTTP 200');
+      void lobbyRuntime.connect();
     } else if (result.kind === 'missing') {
       setProbe('MISSING');
       setProbeNote('HTTP 204');
@@ -63,7 +65,16 @@ export default function App() {
     void runProbe();
   }, [runProbe]);
 
-  useEffect(() => () => lobbyRuntime.disconnect(), []);
+  useEffect(() => {
+    lobbyRuntime.setAppActive(AppState.currentState === 'active');
+    const subscription = AppState.addEventListener('change', (state) => {
+      lobbyRuntime.setAppActive(state === 'active');
+    });
+    return () => {
+      subscription.remove();
+      lobbyRuntime.disconnect();
+    };
+  }, []);
 
   const submitLogin = async () => {
     setLogin('NOT_ATTEMPTED');
@@ -75,6 +86,7 @@ export default function App() {
         setLogin('SUCCESS');
         setProbe('VALID');
         setProbeNote('HTTP 200 after login');
+        void lobbyRuntime.connect();
       } else {
         setLogin('FAILED');
         setProbe(result.kind === 'missing' ? 'MISSING' : 'INDETERMINATE');
@@ -181,6 +193,7 @@ export default function App() {
               <Button
                 disabled={session.phase !== 'ready'
                   || roomState.pendingSpectateTableID !== null
+                  || roomState.pendingRecovery !== null
                   || roomState.pendingJoin !== null
                   || roomState.room.kind !== 'none'}
                 title={roomState.pendingSpectateTableID === table.id
@@ -202,6 +215,7 @@ export default function App() {
               <Button
                 disabled={session.phase !== 'ready'
                   || roomState.pendingSpectateTableID !== null
+                  || roomState.pendingRecovery !== null
                   || roomState.pendingJoin !== null
                   || roomState.room.kind !== 'none'}
                 title={roomState.pendingJoin?.tableID === table.id

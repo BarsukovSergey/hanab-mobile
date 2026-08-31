@@ -164,6 +164,168 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().session.phase).toBe('openAwaitingWelcome');
     socket.emitMessage(welcomeFrame);
     expect(store.getState().session.phase).toBe('ready');
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('player welcome reattends and matching tableStart enters shared bootstrap', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(
+      'welcome {"userID":1,"username":"Ada","playingAtTables":[123],'
+      + '"disconSpectatingTable":999,"disconShadowingSeat":2}',
+    );
+
+    expect(socket.sent).toEqual(['tableReattend {"tableID":123}']);
+    expect(store.getState().room.pendingRecovery).toEqual({
+      tableID: 123,
+      role: 'player',
+    });
+
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 123,
+      role: 'player',
+      bootstrap: { phase: 'waiting_init' },
+    });
+    expect(socket.sent).toEqual([
+      'tableReattend {"tableID":123}',
+      'getGameInfo1 {"tableID":123}',
+    ]);
+
+    socket.emitMessage(`init ${JSON.stringify(makeInit())}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify({
+      tableID: 123,
+      list: [
+        ...Array.from({ length: 5 }, (_, order) => ({
+          type: 'draw', playerIndex: 0, order, suitIndex: -1, rank: -1,
+        })),
+        ...Array.from({ length: 5 }, (_, index) => ({
+          type: 'draw', playerIndex: 1, order: index + 5,
+          suitIndex: index, rank: index + 1,
+        })),
+        { type: 'status', clues: 8, score: 0, maxScore: 25 },
+        { type: 'turn', num: 0, currentPlayerIndex: 0 },
+      ],
+    })}`);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game',
+      tableID: 123,
+      role: 'player',
+      historyActionCount: 12,
+    });
+    expect(socket.sent).toEqual([
+      'tableReattend {"tableID":123}',
+      'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+      'loaded {"tableID":123}',
+    ]);
+  });
+
+  test('spectator welcome resumes with the server-provided shadowing seat', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(
+      'welcome {"userID":1,"username":"Ada","playingAtTables":[],'
+      + '"disconSpectatingTable":123,"disconShadowingSeat":1}',
+    );
+
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":1}',
+    ]);
+    expect(store.getState().room.pendingRecovery).toEqual({
+      tableID: 123,
+      role: 'spectator',
+    });
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 123,
+      role: 'spectator',
+      bootstrap: { phase: 'waiting_init' },
+    });
+  });
+
+  test('unexpected close retries with backoff and welcome resets the delay', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    const third = new FakeSocket();
+    session.sockets.push(
+      Promise.resolve(first),
+      Promise.resolve(second),
+      Promise.resolve(third),
+    );
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+
+    first.emitClose();
+    jest.advanceTimersByTime(999);
+    expect(session.openCalls).toBe(1);
+    jest.advanceTimersByTime(1);
+    await Promise.resolve();
+    expect(session.openCalls).toBe(2);
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+
+    second.emitClose();
+    jest.advanceTimersByTime(999);
+    expect(session.openCalls).toBe(2);
+    jest.advanceTimersByTime(1);
+    await Promise.resolve();
+    expect(session.openCalls).toBe(3);
+  });
+
+  test('foreground reconnects immediately without waiting for backoff', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(first), Promise.resolve(second));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+
+    runtime.setAppActive(false);
+    expect(first.closeCalls).toHaveLength(1);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    runtime.setAppActive(true);
+    await Promise.resolve();
+    expect(session.openCalls).toBe(2);
+    expect(store.getState().session.connectionEpoch).toBe(2);
+    expect(store.getState().session.phase).toBe('connecting');
+  });
+
+  test('explicit disconnect cancels an already scheduled retry', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    socket.emitClose();
+
+    runtime.disconnect();
+    jest.advanceTimersByTime(60_000);
+    expect(session.openCalls).toBe(1);
+    expect(store.getState().session.phase).toBe('closed');
   });
 
   test('stale messages and closes cannot mutate current state', async () => {
@@ -278,6 +440,7 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room).toEqual({
       connectionEpoch: 1,
       pendingSpectateTableID: null,
+      pendingRecovery: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
       pendingGameplayAction: null,
@@ -345,6 +508,7 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
       pendingSpectateTableID: null,
+      pendingRecovery: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
       pendingGameplayAction: null,
@@ -535,6 +699,7 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
       pendingSpectateTableID: null,
+      pendingRecovery: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
       pendingGameplayAction: null,
@@ -569,6 +734,7 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
       pendingSpectateTableID: null,
+      pendingRecovery: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
       pendingGameplayAction: null,
