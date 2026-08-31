@@ -22,6 +22,7 @@ import {
 } from '../../protocol/gameProtocol';
 import { roomActions } from '../../store/roomSlice';
 import type { AppStore } from '../../store/store';
+import type { IncrementalRejectionReason } from '../../store/sessionSlice';
 
 type Role = 'player' | 'spectator';
 
@@ -38,6 +39,10 @@ type ActiveLoad = {
 };
 
 type SendFrame = (frame: string) => boolean;
+
+export type IncrementalReceiveResult =
+  | { accepted: true; rejectionReason: null }
+  | { accepted: false; rejectionReason: IncrementalRejectionReason };
 
 export type BootstrapTimers = {
   setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
@@ -276,9 +281,18 @@ export class GameBootstrapCoordinator {
     connectionEpoch: number,
     event: IncrementalGameAction,
   ): boolean {
+    return this.receiveIncrementalDetailed(connectionEpoch, event).accepted;
+  }
+
+  receiveIncrementalDetailed(
+    connectionEpoch: number,
+    event: IncrementalGameAction,
+  ): IncrementalReceiveResult {
     // Preserve the pinned C5 bootstrap behavior: loading traffic is discarded,
     // never buffered or merged into the authoritative gameActionList.
-    if (this.active !== null) return false;
+    if (this.active !== null) {
+      return { accepted: false, rejectionReason: 'active-bootstrap' };
+    }
 
     const state = this.store.getState();
     const room = state.room.room;
@@ -286,15 +300,18 @@ export class GameBootstrapCoordinator {
       state.session.connectionEpoch !== connectionEpoch
       || state.session.phase !== 'ready'
       || state.room.connectionEpoch !== connectionEpoch
-      || room.kind !== 'live_game'
-      || room.tableID !== event.tableID
-    ) return false;
+    ) {
+      return { accepted: false, rejectionReason: 'stale-connection-session' };
+    }
+    if (room.kind !== 'live_game' || room.tableID !== event.tableID) {
+      return { accepted: false, rejectionReason: 'wrong-room-table' };
+    }
 
     let game;
     try {
       game = reduceAuthoritativeAction(room.game, room.metadata, room.role, event.action);
     } catch {
-      return false;
+      return { accepted: false, rejectionReason: 'reducer-failure' };
     }
 
     this.store.dispatch(roomActions.liveActionAccepted({
@@ -306,9 +323,13 @@ export class GameBootstrapCoordinator {
       game,
     }));
     const updated = this.store.getState().room.room;
-    return updated.kind === 'live_game'
+    const accepted = updated.kind === 'live_game'
+      && updated.tableID === room.tableID
       && updated.gameLoadEpoch === room.gameLoadEpoch
       && updated.liveActionCount === room.liveActionCount + 1;
+    return accepted
+      ? { accepted: true, rejectionReason: null }
+      : { accepted: false, rejectionReason: 'reducer-store-acceptance-failure' };
   }
 
   private match(

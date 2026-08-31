@@ -20,6 +20,24 @@ export type ResumeHints = Pick<
   'playingAtTables' | 'disconSpectatingTable' | 'disconShadowingSeat'
 >;
 
+export type IncrementalRejectionReason =
+  | 'active-bootstrap'
+  | 'stale-connection-session'
+  | 'wrong-room-table'
+  | 'reducer-failure'
+  | 'reducer-store-acceptance-failure';
+
+export type InboundDiagnostic = {
+  command: string;
+  classification: 'known' | 'unknown' | 'malformed';
+  gameAction?: {
+    tableID: number;
+    actionType: string;
+    accepted: boolean;
+    rejectionReason: IncrementalRejectionReason | null;
+  };
+};
+
 export type SessionState = {
   connectionEpoch: number;
   phase: ConnectionPhase;
@@ -28,7 +46,12 @@ export type SessionState = {
   error: string | null;
   protocolIssueCount: number;
   lastProtocolIssue: string | null;
+  inboundDiagnostics: InboundDiagnostic[];
 };
+
+const MAX_INBOUND_DIAGNOSTICS = 10;
+const MAX_DIAGNOSTIC_COMMAND_LENGTH = 64;
+const MAX_DIAGNOSTIC_ACTION_TYPE_LENGTH = 32;
 
 const initialState: SessionState = {
   connectionEpoch: 0,
@@ -38,6 +61,7 @@ const initialState: SessionState = {
   error: null,
   protocolIssueCount: 0,
   lastProtocolIssue: null,
+  inboundDiagnostics: [],
 };
 
 type EpochPayload = { epoch: number };
@@ -54,6 +78,7 @@ export const sessionSlice = createSlice({
       state.error = null;
       state.protocolIssueCount = 0;
       state.lastProtocolIssue = null;
+      state.inboundDiagnostics = [];
     },
     socketOpened(state, action: PayloadAction<EpochPayload>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -89,6 +114,32 @@ export const sessionSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.protocolIssueCount += 1;
       state.lastProtocolIssue = action.payload.issue;
+    },
+    inboundDiagnosticRecorded(
+      state,
+      action: PayloadAction<{ epoch: number; diagnostic: InboundDiagnostic }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      const { diagnostic } = action.payload;
+      state.inboundDiagnostics.push({
+        command: diagnostic.command.slice(0, MAX_DIAGNOSTIC_COMMAND_LENGTH),
+        classification: diagnostic.classification,
+        ...(diagnostic.gameAction === undefined ? {} : {
+          gameAction: {
+            ...diagnostic.gameAction,
+            actionType: diagnostic.gameAction.actionType.slice(
+              0,
+              MAX_DIAGNOSTIC_ACTION_TYPE_LENGTH,
+            ),
+          },
+        }),
+      });
+      if (state.inboundDiagnostics.length > MAX_INBOUND_DIAGNOSTICS) {
+        state.inboundDiagnostics.splice(
+          0,
+          state.inboundDiagnostics.length - MAX_INBOUND_DIAGNOSTICS,
+        );
+      }
     },
   },
 });

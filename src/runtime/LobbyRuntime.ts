@@ -264,15 +264,48 @@ export class LobbyRuntime {
     if (!this.isCurrent(owned) || typeof event.data !== 'string') return;
     const decoded = decodeServerFrame(event.data);
 
-    if (decoded.kind === 'unknown') return;
+    if (decoded.kind === 'unknown') {
+      this.recordInboundDiagnostic(owned.epoch, {
+        command: decoded.command,
+        classification: 'unknown',
+      });
+      return;
+    }
     if (decoded.kind === 'malformed') {
       const command = decoded.command ?? 'frame';
+      this.recordInboundDiagnostic(owned.epoch, {
+        command,
+        classification: 'malformed',
+      });
       this.store.dispatch(sessionActions.protocolIssue({
         epoch: owned.epoch,
         issue: `${command}: ${decoded.issue}`,
       }));
       return;
     }
+
+    if (decoded.event.command === 'gameAction') {
+      const result = this.gameBootstrap.receiveIncrementalDetailed(
+        owned.epoch,
+        decoded.event.data,
+      );
+      this.recordInboundDiagnostic(owned.epoch, {
+        command: decoded.event.command,
+        classification: 'known',
+        gameAction: {
+          tableID: decoded.event.data.tableID,
+          actionType: decoded.event.data.action.type,
+          accepted: result.accepted,
+          rejectionReason: result.rejectionReason,
+        },
+      });
+      return;
+    }
+
+    this.recordInboundDiagnostic(owned.epoch, {
+      command: decoded.event.command,
+      classification: 'known',
+    });
 
     this.applyEvent(owned, decoded.event);
   }
@@ -333,10 +366,6 @@ export class LobbyRuntime {
         if (gameLoadEpoch !== null) {
           this.gameBootstrap.receiveHistory(epoch, gameLoadEpoch, event.data);
         }
-        break;
-      }
-      case 'gameAction': {
-        this.gameBootstrap.receiveIncremental(epoch, event.data);
         break;
       }
       case 'warning':
@@ -463,6 +492,18 @@ export class LobbyRuntime {
       connectionEpoch,
       tableID: pending.tableID,
       gameLoadEpoch: pending.gameLoadEpoch,
+    }));
+  }
+
+  private recordInboundDiagnostic(
+    epoch: number,
+    diagnostic: Parameters<
+      typeof sessionActions.inboundDiagnosticRecorded
+    >[0]['diagnostic'],
+  ): void {
+    this.store.dispatch(sessionActions.inboundDiagnosticRecorded({
+      epoch,
+      diagnostic,
     }));
   }
 

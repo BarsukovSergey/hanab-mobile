@@ -700,6 +700,94 @@ describe('deterministic lobby runtime', () => {
     expect(userSelectors.selectTotal(store.getState())).toBe(0);
   });
 
+  test('records bounded sanitized known, unknown, and malformed inbound diagnostics', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    socket.emitMessage('clock {"tableID":123,"times":[1000,1000]}');
+    socket.emitMessage('gameAction {"tableID":123}');
+
+    expect(store.getState().session.inboundDiagnostics).toEqual([
+      { command: 'welcome', classification: 'known' },
+      { command: 'clock', classification: 'unknown' },
+      { command: 'gameAction', classification: 'malformed' },
+    ]);
+    expect(store.getState().session.protocolIssueCount).toBe(1);
+
+    for (let index = 0; index < 12; index += 1) {
+      socket.emitMessage(`unknownDiagnostic${index} {}`);
+    }
+    const diagnostics = store.getState().session.inboundDiagnostics;
+    expect(diagnostics).toHaveLength(10);
+    expect(diagnostics[0]).toEqual({
+      command: 'unknownDiagnostic2',
+      classification: 'unknown',
+    });
+    expect(diagnostics[9]).toEqual({
+      command: 'unknownDiagnostic11',
+      classification: 'unknown',
+    });
+  });
+
+  test('records a sanitized gameAction coordinator rejection reason', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}',
+    );
+
+    expect(store.getState().session.inboundDiagnostics.at(-1)).toEqual({
+      command: 'gameAction',
+      classification: 'known',
+      gameAction: {
+        tableID: 123,
+        actionType: 'turn',
+        accepted: false,
+        rejectionReason: 'wrong-room-table',
+      },
+    });
+  });
+
+  test('new connection clears prior inbound diagnostics and stale frames cannot restore them', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(first), Promise.resolve(second));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+    first.emitMessage('clock {}');
+    const staleMessages = first.snapshotMessageListeners();
+    expect(store.getState().session.inboundDiagnostics).toHaveLength(2);
+
+    runtime.disconnect();
+    await runtime.connect();
+    expect(store.getState().session.inboundDiagnostics).toEqual([]);
+    for (const listener of staleMessages) {
+      listener({ data: 'lateUnknown {}' } as WebSocketMessageEvent);
+    }
+    expect(store.getState().session.inboundDiagnostics).toEqual([]);
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+    expect(store.getState().session.inboundDiagnostics).toEqual([
+      { command: 'welcome', classification: 'known' },
+    ]);
+  });
+
   test('matching spectator LIVE gameAction reduces state without sending an outbound frame', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
@@ -739,5 +827,15 @@ describe('deterministic lobby runtime', () => {
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.game.hands[0]).toEqual([0, 1, 2, 3, 4, 10]);
     expect(socket.sent).toEqual(sentBeforeLiveAction);
+    expect(store.getState().session.inboundDiagnostics.at(-1)).toEqual({
+      command: 'gameAction',
+      classification: 'known',
+      gameAction: {
+        tableID: 123,
+        actionType: 'draw',
+        accepted: true,
+        rejectionReason: null,
+      },
+    });
   });
 });

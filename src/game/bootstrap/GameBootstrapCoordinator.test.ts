@@ -148,7 +148,10 @@ describe('authoritative game bootstrap coordinator', () => {
       tableID: 123,
       action: { type: 'draw', playerIndex: 0, order: 0, suitIndex: -1, rank: -1 },
     });
-    expect(coordinator.receiveIncremental(1, incremental)).toBe(false);
+    expect(coordinator.receiveIncrementalDetailed(1, incremental)).toEqual({
+      accepted: false,
+      rejectionReason: 'active-bootstrap',
+    });
     coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
     expect(coordinator.receiveIncremental(1, incremental)).toBe(false);
     expect(frames).toEqual([
@@ -198,8 +201,14 @@ describe('authoritative game bootstrap coordinator', () => {
 
     const spectator = makeLive('spectator');
     const before = spectator.store.getState().room.room;
-    expect(spectator.coordinator.receiveIncremental(1, { ...event, tableID: 999 })).toBe(false);
-    expect(spectator.coordinator.receiveIncremental(2, event)).toBe(false);
+    expect(spectator.coordinator.receiveIncrementalDetailed(
+      1,
+      { ...event, tableID: 999 },
+    )).toEqual({ accepted: false, rejectionReason: 'wrong-room-table' });
+    expect(spectator.coordinator.receiveIncrementalDetailed(2, event)).toEqual({
+      accepted: false,
+      rejectionReason: 'stale-connection-session',
+    });
     const metadataMismatch = incrementalGameActionSchema.parse({
       tableID: 123,
       action: { type: 'turn', num: 1, currentPlayerIndex: 2 },
@@ -209,7 +218,10 @@ describe('authoritative game bootstrap coordinator', () => {
       tableID: 123,
       action: { type: 'play', playerIndex: 0, order: 0, suitIndex: -1, rank: 1 },
     });
-    expect(spectator.coordinator.receiveIncremental(1, reducerFailure)).toBe(false);
+    expect(spectator.coordinator.receiveIncrementalDetailed(1, reducerFailure)).toEqual({
+      accepted: false,
+      rejectionReason: 'reducer-failure',
+    });
     expect(spectator.store.getState().room.room).toBe(before);
 
     const player = makeLive('player');

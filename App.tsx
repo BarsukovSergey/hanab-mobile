@@ -130,6 +130,21 @@ export default function App() {
           {session.lastProtocolIssue !== null && (
             <Text selectable>Last protocol issue: {session.lastProtocolIssue}</Text>
           )}
+          <Text style={styles.subheading}>Recent inbound diagnostics</Text>
+          {session.inboundDiagnostics.length === 0 && <Text>None</Text>}
+          {session.inboundDiagnostics.map((diagnostic, index) => (
+            <Text key={`${index}-${diagnostic.command}`} selectable>
+              {diagnostic.command}: {diagnostic.classification}
+              {diagnostic.gameAction === undefined
+                ? ''
+                : ` · tableID ${diagnostic.gameAction.tableID}`
+                  + ` · ${diagnostic.gameAction.actionType}`
+                  + ` · accepted ${diagnostic.gameAction.accepted ? 'YES' : 'NO'}`
+                  + (diagnostic.gameAction.rejectionReason === null
+                    ? ''
+                    : ` · ${diagnostic.gameAction.rejectionReason}`)}
+            </Text>
+          ))}
           {lobby.notice !== null && (
             <Text selectable>{lobby.notice.kind}: {lobby.notice.message}</Text>
           )}
