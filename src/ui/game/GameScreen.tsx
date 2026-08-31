@@ -48,6 +48,37 @@ export function GameScreen() {
 
   if (liveRoom === null) return null;
 
+  const isFinished = liveRoom.game.turn.currentPlayerIndex === null;
+
+  if (isFinished) {
+    const recentLog = liveRoom.game.log.slice(-5);
+
+    return (
+      <View style={styles.screen}>
+        <View style={styles.finishedHeader}>
+          <Text style={styles.gameOver}>GAME OVER</Text>
+          <Text style={styles.finalScore}>{liveRoom.game.score}</Text>
+          <Text style={styles.scoreLabel}>FINAL SCORE</Text>
+        </View>
+
+        <View style={styles.statRow}>
+          <Stat label="Strikes" value={liveRoom.game.strikes.length} />
+          <Stat label="Clues" value={liveRoom.game.clueTokens} />
+          <Stat label="Cards remaining" value={liveRoom.game.cardsRemainingInTheDeck} />
+        </View>
+
+        <View style={styles.gameLog}>
+          <Text style={styles.subheading}>Recent game log</Text>
+          {recentLog.map((entry, index) => (
+            <Text key={`${entry.turn}-${index}`} style={styles.logEntry}>
+              {entry.text}
+            </Text>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   const isOurTurn = playerLiveRoom !== null
     && liveRoom.game.turn.currentPlayerIndex === ourPlayerIndex;
   const gameplayControlsEnabled = sessionPhase === 'ready'
@@ -278,6 +309,9 @@ const styles = StyleSheet.create({
   scoreBlock: { alignItems: 'center', minWidth: 64 },
   scoreValue: { fontSize: 28, fontWeight: '700' },
   scoreLabel: { color: '#626b73', fontSize: 11, fontWeight: '700' },
+  finishedHeader: { alignItems: 'center', gap: 2, paddingVertical: 12 },
+  gameOver: { color: '#9e2a2b', fontSize: 28, fontWeight: '800', letterSpacing: 1 },
+  finalScore: { fontSize: 40, fontWeight: '800' },
   statRow: { flexDirection: 'row', gap: 8 },
   stat: {
     alignItems: 'center',
@@ -290,6 +324,8 @@ const styles = StyleSheet.create({
   statLabel: { color: '#626b73', fontSize: 12 },
   pendingBanner: { backgroundColor: '#fff0c2', borderRadius: 8, padding: 12 },
   pendingText: { color: '#654a00', fontWeight: '600' },
+  gameLog: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 8, padding: 12 },
+  logEntry: { color: '#303840' },
   subheading: { fontSize: 18, fontWeight: '700', marginTop: 6 },
   helper: { color: '#626b73' },
   cardList: { gap: 8 },
