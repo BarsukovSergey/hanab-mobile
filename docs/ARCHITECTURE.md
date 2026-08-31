@@ -33,8 +33,8 @@ Not planned until proven necessary:
 2. Upstream game-core compatibility / containment
 3. Deterministic protocol + lobby runtime
 4. Table-entry vertical slices — **C4-A spectate GO and C4-B join/pregame/leave GO, completed 2026-08-31**
-5. Game bootstrap — **C5 next**
-6. Live spectator
+5. Game bootstrap — **C5 GO, completed 2026-08-31**
+6. Read-only live spectator — **C6 next**
 7. Play / Discard / Clues
 8. Finished-game proof
 9. Reconnect / reattend / background lifecycle
@@ -43,7 +43,8 @@ Not planned until proven necessary:
 
 See `docs/C1_RESULTS.md` for the physical-device evidence behind the C1 decision,
 `docs/C4A_RESULTS.md` for the physical Android running-table spectate proof, and
-`docs/C4B_RESULTS.md` for the physical Android join/pregame/leave proof.
+`docs/C4B_RESULTS.md` for the physical Android join/pregame/leave proof. See
+`docs/C5_RESULTS.md` for the physical Android player and spectator game-bootstrap proof.
 
 ## C1 Android evidence
 
