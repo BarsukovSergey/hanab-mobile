@@ -19,6 +19,7 @@ const tableIDCommandSchema = z.object({ tableID: idSchema });
 
 export const getGameInfo1CommandSchema = tableIDCommandSchema;
 export const getGameInfo2CommandSchema = tableIDCommandSchema;
+export const loadedCommandSchema = tableIDCommandSchema;
 
 export const playGameplayActionSchema = z.object({
   tableID: idSchema,
@@ -228,11 +229,11 @@ export const incrementalGameActionSchema = z.object({
 
 export type IncrementalGameAction = z.infer<typeof incrementalGameActionSchema>;
 
-function encodeTableCommand(command: 'getGameInfo1' | 'getGameInfo2', tableID: number): string {
-  const schema = command === 'getGameInfo1'
-    ? getGameInfo1CommandSchema
-    : getGameInfo2CommandSchema;
-  return `${command} ${JSON.stringify(schema.parse({ tableID }))}`;
+function encodeTableCommand(
+  command: 'getGameInfo1' | 'getGameInfo2' | 'loaded',
+  tableID: number,
+): string {
+  return `${command} ${JSON.stringify(tableIDCommandSchema.parse({ tableID }))}`;
 }
 
 export function encodeGetGameInfo1Frame(tableID: number): string {
@@ -241,6 +242,10 @@ export function encodeGetGameInfo1Frame(tableID: number): string {
 
 export function encodeGetGameInfo2Frame(tableID: number): string {
   return encodeTableCommand('getGameInfo2', tableID);
+}
+
+export function encodeLoadedFrame(tableID: number): string {
+  return encodeTableCommand('loaded', tableID);
 }
 
 function encodeGameplayAction(action: unknown): string {

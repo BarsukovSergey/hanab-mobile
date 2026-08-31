@@ -237,6 +237,7 @@ client → getGameInfo1
 server → init
 client → getGameInfo2
 server → gameActionList
+client → loaded                  # players become present after history is applied
 server → gameAction ...
 ```
 

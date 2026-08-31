@@ -15,6 +15,7 @@ import type { GameAction } from '../upstream/types/gameActions';
 import {
   encodeGetGameInfo1Frame,
   encodeGetGameInfo2Frame,
+  encodeLoadedFrame,
   type GameActionList,
   type GameInit,
   type IncrementalGameAction,
@@ -260,6 +261,15 @@ export class GameBootstrapCoordinator {
     try {
       game = replayAuthoritativeHistory(load.metadata, load.role, history.list);
     } catch {
+      return false;
+    }
+    if (this.active !== load || load.phase !== 'waiting_history') return false;
+
+    // The pinned server marks players present only when it receives `loaded`.
+    // Send it after the authoritative history has reduced successfully, matching
+    // the official client's post-initialization handshake, and before exposing LIVE.
+    if (load.role === 'player' && !this.sendFrame(encodeLoadedFrame(load.tableID))) {
+      this.fail(load);
       return false;
     }
     if (this.active !== load || load.phase !== 'waiting_history') return false;

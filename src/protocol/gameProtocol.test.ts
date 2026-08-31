@@ -4,6 +4,7 @@ import { decodeServerFrame } from './lobbyProtocol';
 import {
   encodeGetGameInfo1Frame,
   encodeGetGameInfo2Frame,
+  encodeLoadedFrame,
   encodePlayFrame,
   encodeDiscardFrame,
   encodeColorClueFrame,
@@ -13,9 +14,10 @@ import {
 import { makeInit } from './gameProtocol.fixtures';
 
 describe('pinned game bootstrap protocol', () => {
-  test('encodes the exact info1 and info2 wire frames', () => {
+  test('encodes the exact info and player-presence handshake frames', () => {
     expect(encodeGetGameInfo1Frame(123)).toBe('getGameInfo1 {"tableID":123}');
     expect(encodeGetGameInfo2Frame(123)).toBe('getGameInfo2 {"tableID":123}');
+    expect(encodeLoadedFrame(123)).toBe('loaded {"tableID":123}');
   });
 
   test('encodes exact typed Play, Discard, Color Clue, and Rank Clue action frames', () => {

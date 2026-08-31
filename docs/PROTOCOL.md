@@ -232,6 +232,7 @@ client → getGameInfo1 {tableID}
 server → init {...}
 client → getGameInfo2 {tableID}
 server → gameActionList {tableID, list:[...]}
+client → loaded {tableID}
 server → gameAction {...}
 server → gameAction {...}
 ...
@@ -268,6 +269,15 @@ therefore applies normal negative clues. `status` records are retained in author
 and are intentional no-ops in the pinned game reducer.
 
 `gameAction` represents subsequent live changes.
+
+At the pinned commit, `getGameInfo2` does **not** mark a player present. It emits the authoritative
+`gameActionList` and related game data. The official client sends `loaded {tableID}` only after the
+history dispatch has initialized its visible game state. The Go `commandLoaded` handler then sets
+`t.Players[playerIndex].Present = true` and notifies connection state. Game start initially sets all
+players absent, and `Table.NotifyGameAction()` sends incremental actions only to players whose
+`Present` flag is true; active spectators receive them through a separate path without that flag.
+Accordingly, a player bootstrap must successfully reduce history and send `loaded` before mobile
+exposes LIVE player state. Spectator bootstrap does not need this player-presence handshake.
 
 The pinned official client ignores every game command other than `init` and `gameActionList` while
 its game UI is loading. The server builds and emits `gameActionList` while holding the table lock;

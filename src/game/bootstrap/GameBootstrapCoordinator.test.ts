@@ -79,10 +79,13 @@ describe('authoritative game bootstrap coordinator', () => {
     },
   );
 
-  test('does not send info2 before matching init and does not go LIVE before full history', () => {
+  test('player sends loaded only after full history reduces and only then reaches LIVE', () => {
     const store = readyStore('player');
     const frames: string[] = [];
     const coordinator = new GameBootstrapCoordinator(store, (frame) => {
+      if (frame.startsWith('loaded ')) {
+        expect(store.getState().room.room.kind).toBe('awaiting_game_bootstrap');
+      }
       frames.push(frame);
       return true;
     });
@@ -95,9 +98,19 @@ describe('authoritative game bootstrap coordinator', () => {
     const init = gameInitSchema.parse(makeInit());
     expect(coordinator.receiveInit(1, 1, init)).toBe(true);
     expect(store.getState().room.room.kind).toBe('awaiting_game_bootstrap');
+    expect(frames).toEqual([
+      'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+    ]);
     expect(coordinator.receiveHistory(1, 1, { ...initialHistory(), tableID: 999 })).toBe(false);
     expect(store.getState().room.room.kind).toBe('awaiting_game_bootstrap');
+    expect(frames).toHaveLength(2);
     expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(true);
+    expect(frames).toEqual([
+      'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+      'loaded {"tableID":123}',
+    ]);
 
     const room = store.getState().room.room;
     expect(room.kind).toBe('live_game');
@@ -109,6 +122,50 @@ describe('authoritative game bootstrap coordinator', () => {
         card?.suitIndex === null && card.rank === null
       ))).toBe(true);
     }
+  });
+
+  test('player cannot reach LIVE when the post-history loaded handshake cannot be sent', () => {
+    const store = readyStore('player');
+    const frames: string[] = [];
+    const coordinator = new GameBootstrapCoordinator(store, (frame) => {
+      frames.push(frame);
+      return !frame.startsWith('loaded ');
+    });
+    coordinator.startFromAuthoritativeRoom(1);
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
+
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(false);
+    expect(frames).toEqual([
+      'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+      'loaded {"tableID":123}',
+    ]);
+    const room = store.getState().room.room;
+    expect(room.kind).toBe('awaiting_game_bootstrap');
+    if (room.kind === 'awaiting_game_bootstrap' && room.bootstrap !== 'pending_c5') {
+      expect(room.bootstrap.phase).toBe('failed');
+    }
+  });
+
+  test('spectator bootstrap remains unchanged and sends no loaded handshake', () => {
+    const store = readyStore('spectator');
+    const frames: string[] = [];
+    const coordinator = new GameBootstrapCoordinator(store, (frame) => {
+      frames.push(frame);
+      return true;
+    });
+    coordinator.startFromAuthoritativeRoom(1);
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({ spectating: true })));
+
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(true);
+    expect(frames).toEqual([
+      'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+    ]);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game',
+      role: 'spectator',
+    });
   });
 
   test('full-history replay is deterministic and preserves hidden source actions', () => {
@@ -258,6 +315,7 @@ describe('authoritative game bootstrap coordinator', () => {
       'getGameInfo1 {"tableID":123}',
       'getGameInfo1 {"tableID":123}',
       'getGameInfo2 {"tableID":123}',
+      'loaded {"tableID":123}',
     ]);
   });
 
