@@ -99,6 +99,29 @@ function actionMatchesMetadata(action: WireGameAction, metadata: GameMetadata): 
   }
 }
 
+export function reduceAuthoritativeAction(
+  game: ReturnType<typeof getInitialGameState>,
+  metadata: GameMetadata,
+  role: Role,
+  action: WireGameAction,
+) {
+  if (!actionMatchesMetadata(action, metadata)) {
+    throw new Error(`Action ${action.type} does not match init metadata`);
+  }
+  // The pinned Go stream also contains "status" no-op records and clue records
+  // whose legacy `turn` field is ignored. The pinned reducer intentionally no-ops
+  // unknown status records, matching the official client runtime behavior.
+  return gameReducer(
+    game,
+    action as GameAction,
+    role === 'player',
+    false,
+    false,
+    false,
+    metadata,
+  );
+}
+
 export function replayAuthoritativeHistory(
   metadata: GameMetadata,
   role: Role,
@@ -106,21 +129,7 @@ export function replayAuthoritativeHistory(
 ) {
   let game = getInitialGameState(metadata);
   for (const action of actions) {
-    if (!actionMatchesMetadata(action, metadata)) {
-      throw new Error(`Action ${action.type} does not match init metadata`);
-    }
-    // The pinned Go stream also contains "status" no-op records and clue records
-    // whose legacy `turn` field is ignored. The pinned reducer intentionally no-ops
-    // unknown status records, matching the official client runtime behavior.
-    game = gameReducer(
-      game,
-      action as GameAction,
-      role === 'player',
-      false,
-      false,
-      false,
-      metadata,
-    );
+    game = reduceAuthoritativeAction(game, metadata, role, action);
   }
   return game;
 }
@@ -264,13 +273,42 @@ export class GameBootstrapCoordinator {
   }
 
   receiveIncremental(
-    _connectionEpoch: number,
-    _gameLoadEpoch: number,
-    _event: IncrementalGameAction,
-  ): false {
-    // C5 deliberately has no incremental path. Loading traffic is discarded,
+    connectionEpoch: number,
+    event: IncrementalGameAction,
+  ): boolean {
+    // Preserve the pinned C5 bootstrap behavior: loading traffic is discarded,
     // never buffered or merged into the authoritative gameActionList.
-    return false;
+    if (this.active !== null) return false;
+
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      state.session.connectionEpoch !== connectionEpoch
+      || state.session.phase !== 'ready'
+      || state.room.connectionEpoch !== connectionEpoch
+      || room.kind !== 'live_game'
+      || room.role !== 'spectator'
+      || room.tableID !== event.tableID
+    ) return false;
+
+    let game;
+    try {
+      game = reduceAuthoritativeAction(room.game, room.metadata, room.role, event.action);
+    } catch {
+      return false;
+    }
+
+    this.store.dispatch(roomActions.liveActionAccepted({
+      connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      expectedLiveActionCount: room.liveActionCount,
+      game,
+    }));
+    const updated = this.store.getState().room.room;
+    return updated.kind === 'live_game'
+      && updated.gameLoadEpoch === room.gameLoadEpoch
+      && updated.liveActionCount === room.liveActionCount + 1;
   }
 
   private match(

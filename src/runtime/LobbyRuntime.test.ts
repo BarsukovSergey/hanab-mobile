@@ -6,6 +6,7 @@ import type {
   SessionCheckResult,
 } from '../network/types';
 import type { LobbyTable } from '../protocol/lobbyProtocol';
+import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { lobbyActions } from '../store/lobbySlice';
 import { createAppStore, userSelectors } from '../store/store';
 import { isJoinEligible, isSpectateEligible, LobbyRuntime } from './LobbyRuntime';
@@ -693,5 +694,46 @@ describe('deterministic lobby runtime', () => {
     socket.emitMessage('user {"userID":1}');
     expect(store.getState().session.protocolIssueCount).toBe(1);
     expect(userSelectors.selectTotal(store.getState())).toBe(0);
+  });
+
+  test('matching spectator LIVE gameAction reduces state without sending an outbound frame', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addRunningTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({ spectating: true }))}`);
+    const history = {
+      tableID: 123,
+      list: [
+        ...Array.from({ length: 5 }, (_, order) => ({
+          type: 'draw', playerIndex: 0, order, suitIndex: -1, rank: -1,
+        })),
+        ...Array.from({ length: 5 }, (_, index) => ({
+          type: 'draw', playerIndex: 1, order: index + 5, suitIndex: index, rank: index + 1,
+        })),
+        { type: 'status', clues: 8, score: 0, maxScore: 25 },
+        { type: 'turn', num: 0, currentPlayerIndex: 0 },
+      ],
+    };
+    socket.emitMessage(`gameActionList ${JSON.stringify(history)}`);
+    const sentBeforeLiveAction = [...socket.sent];
+
+    socket.emitMessage('gameAction {"tableID":123,"action":{"type":"draw","playerIndex":0,"order":10,"suitIndex":-1,"rank":-1}}');
+
+    const room = store.getState().room.room;
+    expect(room).toMatchObject({
+      kind: 'live_game', role: 'spectator', liveActionCount: 1,
+      game: { cardsRemainingInTheDeck: 39 },
+    });
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.game.hands[0]).toEqual([0, 1, 2, 3, 4, 10]);
+    expect(socket.sent).toEqual(sentBeforeLiveAction);
   });
 });

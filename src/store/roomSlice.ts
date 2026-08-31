@@ -38,6 +38,7 @@ export type RoomState =
       gameLoadEpoch: number;
       bootstrapPhase: 'live';
       historyActionCount: number;
+      liveActionCount: number;
       metadata: GameMetadata;
       game: GameState;
     };
@@ -310,9 +311,34 @@ export const roomSlice = createSlice({
         gameLoadEpoch,
         bootstrapPhase: 'live',
         historyActionCount,
+        liveActionCount: 0,
         metadata: castDraft(metadata),
         game: castDraft(game),
       };
+    },
+    liveActionAccepted(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        expectedLiveActionCount: number;
+        game: GameState;
+      }>,
+    ) {
+      const {
+        connectionEpoch, tableID, gameLoadEpoch, expectedLiveActionCount, game,
+      } = action.payload;
+      if (state.connectionEpoch !== connectionEpoch) return;
+      if (
+        state.room.kind !== 'live_game'
+        || state.room.role !== 'spectator'
+        || state.room.tableID !== tableID
+        || state.room.gameLoadEpoch !== gameLoadEpoch
+        || state.room.liveActionCount !== expectedLiveActionCount
+      ) return;
+      state.room.game = castDraft(game);
+      state.room.liveActionCount += 1;
     },
   },
   extraReducers: (builder) => {

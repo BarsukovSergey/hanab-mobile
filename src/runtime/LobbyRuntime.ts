@@ -300,10 +300,7 @@ export class LobbyRuntime {
         break;
       }
       case 'gameAction': {
-        const gameLoadEpoch = this.gameBootstrap.currentGameLoadEpoch;
-        if (gameLoadEpoch !== null) {
-          this.gameBootstrap.receiveIncremental(epoch, gameLoadEpoch, event.data);
-        }
+        this.gameBootstrap.receiveIncremental(epoch, event.data);
         break;
       }
       case 'warning':

@@ -148,13 +148,74 @@ describe('authoritative game bootstrap coordinator', () => {
       tableID: 123,
       action: { type: 'draw', playerIndex: 0, order: 0, suitIndex: -1, rank: -1 },
     });
-    expect(coordinator.receiveIncremental(1, 1, incremental)).toBe(false);
+    expect(coordinator.receiveIncremental(1, incremental)).toBe(false);
     coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
-    expect(coordinator.receiveIncremental(1, 1, incremental)).toBe(false);
+    expect(coordinator.receiveIncremental(1, incremental)).toBe(false);
     expect(frames).toEqual([
       'getGameInfo1 {"tableID":123}',
       'getGameInfo2 {"tableID":123}',
     ]);
+  });
+
+  test('spectator LIVE reduction matches replay with the same appended action', () => {
+    const store = readyStore('spectator');
+    const coordinator = new GameBootstrapCoordinator(store, () => true);
+    coordinator.startFromAuthoritativeRoom(1);
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({ spectating: true })));
+    const history = initialHistory();
+    coordinator.receiveHistory(1, 1, history);
+    const event = incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'draw', playerIndex: 0, order: 10, suitIndex: -1, rank: -1 },
+    });
+
+    expect(coordinator.receiveIncremental(1, event)).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.liveActionCount).toBe(1);
+    expect(room.game).toEqual(replayAuthoritativeHistory(
+      room.metadata,
+      'spectator',
+      [...history.list, event.action],
+    ));
+  });
+
+  test('wrong-table, stale, player, and failed live actions cannot corrupt game state', () => {
+    const makeLive = (role: 'player' | 'spectator') => {
+      const store = readyStore(role);
+      const coordinator = new GameBootstrapCoordinator(store, () => true);
+      coordinator.startFromAuthoritativeRoom(1);
+      coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({
+        spectating: role === 'spectator',
+      })));
+      coordinator.receiveHistory(1, 1, initialHistory());
+      return { store, coordinator };
+    };
+    const event = incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'turn', num: 1, currentPlayerIndex: 1 },
+    });
+
+    const spectator = makeLive('spectator');
+    const before = spectator.store.getState().room.room;
+    expect(spectator.coordinator.receiveIncremental(1, { ...event, tableID: 999 })).toBe(false);
+    expect(spectator.coordinator.receiveIncremental(2, event)).toBe(false);
+    const metadataMismatch = incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'turn', num: 1, currentPlayerIndex: 2 },
+    });
+    expect(spectator.coordinator.receiveIncremental(1, metadataMismatch)).toBe(false);
+    const reducerFailure = incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'play', playerIndex: 0, order: 0, suitIndex: -1, rank: 1 },
+    });
+    expect(spectator.coordinator.receiveIncremental(1, reducerFailure)).toBe(false);
+    expect(spectator.store.getState().room.room).toBe(before);
+
+    const player = makeLive('player');
+    const playerBefore = player.store.getState().room.room;
+    expect(player.coordinator.receiveIncremental(1, event)).toBe(false);
+    expect(player.store.getState().room.room).toBe(playerBefore);
   });
 
   test('stale connection/load epochs cannot advance and a second load invalidates the first', () => {

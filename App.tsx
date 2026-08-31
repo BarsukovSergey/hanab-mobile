@@ -99,7 +99,7 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C5 Proof</Text>
+        <Text style={styles.title}>Hanab C6 Proof</Text>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Typed lobby runtime</Text>
@@ -226,6 +226,25 @@ export default function App() {
             <Text>gameLoadEpoch: {roomState.room.gameLoadEpoch}</Text>
             <Text>bootstrap phase: LIVE</Text>
             <Text>authoritative history actions: {roomState.room.historyActionCount}</Text>
+            {roomState.room.role === 'spectator' && (
+              <>
+                <Text>live actions: {roomState.room.liveActionCount}</Text>
+                <Text>turn number: {roomState.room.game.turn.turnNum}</Text>
+                <Text>
+                  current player: {roomState.room.game.turn.currentPlayerIndex === null
+                    ? 'none'
+                    : `${roomState.room.game.turn.currentPlayerIndex}: ${
+                      roomState.room.metadata.playerNames[
+                        roomState.room.game.turn.currentPlayerIndex
+                      ]
+                    }`}
+                </Text>
+                <Text>score: {roomState.room.game.score}</Text>
+                <Text>clue tokens: {roomState.room.game.clueTokens}</Text>
+                <Text>strikes: {roomState.room.game.strikes.length}</Text>
+                <Text>cards remaining: {roomState.room.game.cardsRemainingInTheDeck}</Text>
+              </>
+            )}
           </View>
         )}
 
