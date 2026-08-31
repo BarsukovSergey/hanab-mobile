@@ -11,8 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { runGameCoreProbe } from './src/game/c2/gameCoreProbe';
-import { isSpectateEligible } from './src/runtime/LobbyRuntime';
+import { isJoinEligible, isSpectateEligible } from './src/runtime/LobbyRuntime';
 import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
 import {
@@ -26,7 +25,6 @@ type ProbeStatus = 'UNKNOWN' | 'VALID' | 'MISSING' | 'INDETERMINATE';
 type LoginStatus = 'NOT_ATTEMPTED' | 'SUCCESS' | 'FAILED';
 
 export default function App() {
-  const [gameCoreProbe] = useState(runGameCoreProbe);
   const [probe, setProbe] = useState<ProbeStatus>('UNKNOWN');
   const [probeNote, setProbeNote] = useState('');
   const [login, setLogin] = useState<LoginStatus>('NOT_ATTEMPTED');
@@ -41,6 +39,8 @@ export default function App() {
   const tables = useAppSelector(tableSelectors.selectAll);
   const roomState = useAppSelector((state) => state.room);
   const spectateTables = tables.filter(isSpectateEligible);
+  const joinTables = tables.filter(isJoinEligible);
+  const pregameRoom = roomState.room.kind === 'pregame' ? roomState.room : null;
 
   const runProbe = useCallback(async () => {
     setProbe('UNKNOWN');
@@ -99,7 +99,7 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C4-A Proof</Text>
+        <Text style={styles.title}>Hanab C4-B Proof</Text>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Typed lobby runtime</Text>
@@ -141,6 +141,7 @@ export default function App() {
               <Button
                 disabled={session.phase !== 'ready'
                   || roomState.pendingSpectateTableID !== null
+                  || roomState.pendingJoin !== null
                   || roomState.room.kind !== 'none'}
                 title={roomState.pendingSpectateTableID === table.id
                   ? 'Awaiting tableStart'
@@ -151,11 +152,58 @@ export default function App() {
           ))}
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.heading}>Joinable pregame tables</Text>
+          {joinTables.length === 0 && <Text>No eligible unprotected pregame tables.</Text>}
+          {joinTables.map((table) => (
+            <View style={styles.tableRow} key={table.id}>
+              <Text style={styles.tableName}>{table.name}</Text>
+              <Text>{table.variant} · {table.numPlayers}/{table.maxPlayers}</Text>
+              <Button
+                disabled={session.phase !== 'ready'
+                  || roomState.pendingSpectateTableID !== null
+                  || roomState.pendingJoin !== null
+                  || roomState.room.kind !== 'none'}
+                title={roomState.pendingJoin?.tableID === table.id
+                  ? 'Awaiting authoritative join'
+                  : 'Join'}
+                onPress={() => lobbyRuntime.join(table.id)}
+              />
+            </View>
+          ))}
+        </View>
+
+        {pregameRoom !== null && (
+          <View style={styles.section}>
+            <Text style={styles.heading}>Authoritative pregame room</Text>
+            <Text>tableID: {pregameRoom.tableID}</Text>
+            <Text>name: {pregameRoom.data.name}</Text>
+            <Text>variant: {pregameRoom.data.options.variantName}</Text>
+            <Text>
+              players: {pregameRoom.data.players.length}/{pregameRoom.data.maxPlayers}
+            </Text>
+            {pregameRoom.data.players.map((player) => (
+              <Text key={player.index}>
+                {player.index + 1}. {player.name}{player.you ? ' (you)' : ''}
+                {player.present ? '' : ' (away)'}
+              </Text>
+            ))}
+            <Button
+              disabled={session.phase !== 'ready'
+                || roomState.pendingLeaveTableID !== null}
+              title={roomState.pendingLeaveTableID === pregameRoom.tableID
+                ? 'Awaiting authoritative left'
+                : 'Leave'}
+              onPress={() => lobbyRuntime.leave(pregameRoom.tableID)}
+            />
+          </View>
+        )}
+
         {roomState.room.kind === 'awaiting_game_bootstrap' && (
           <View style={styles.section}>
-            <Text style={styles.heading}>C4-A authoritative room</Text>
+            <Text style={styles.heading}>Authoritative started room</Text>
             <Text>tableID: {roomState.room.tableID}</Text>
-            <Text>role: spectator</Text>
+            <Text>role: {roomState.room.role}</Text>
             <Text>tableStart: YES</Text>
             <Text>bootstrap: PENDING C5</Text>
           </View>
@@ -181,13 +229,6 @@ export default function App() {
           </View>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.heading}>C2 pinned game core</Text>
-          <Text>Game core import: {gameCoreProbe.gameCoreImport ? 'PASS' : 'FAIL'}</Text>
-          <Text>Reducer sequence: {gameCoreProbe.reducerSequence ? 'PASS' : 'FAIL'}</Text>
-          <Text>Hermes runtime: {gameCoreProbe.hermes ? 'YES' : 'NO'}</Text>
-          <Text>Probe: {gameCoreProbe.deviceProbePassed ? 'PASS' : 'FAIL'}</Text>
-        </View>
         <StatusBar style="auto" />
       </ScrollView>
     </KeyboardAvoidingView>

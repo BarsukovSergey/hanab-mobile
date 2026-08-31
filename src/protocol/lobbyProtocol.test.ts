@@ -1,6 +1,11 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { decodeServerFrame, encodeTableSpectateFrame } from './lobbyProtocol';
+import {
+  decodeServerFrame,
+  encodeTableJoinFrame,
+  encodeTableLeaveFrame,
+  encodeTableSpectateFrame,
+} from './lobbyProtocol';
 
 const user = {
   userID: 7,
@@ -68,6 +73,53 @@ describe('lobby protocol decoder', () => {
     expect(encodeTableSpectateFrame(123)).toBe(
       'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
     );
+  });
+
+  test('encodes the exact join and leave commands', () => {
+    expect(encodeTableJoinFrame(123)).toBe('tableJoin {"tableID":123}');
+    expect(encodeTableLeaveFrame(123)).toBe('tableLeave {"tableID":123}');
+  });
+
+  test('validates exact joined, left, and minimal pregame payloads', () => {
+    expect(decodeServerFrame('joined {"tableID":123}')).toEqual({
+      kind: 'event',
+      event: { command: 'joined', data: { tableID: 123 } },
+    });
+    expect(decodeServerFrame('left {"TableID":123}')).toEqual({
+      kind: 'event',
+      event: { command: 'left', data: { TableID: 123 } },
+    });
+    expect(decodeServerFrame(
+      'game {"tableID":123,"name":"Table","owner":7,'
+      + '"players":[{"index":0,"name":"Ada","you":true,"present":true,"stats":{}}],'
+      + '"options":{"variantName":"No Variant","future":true},'
+      + '"passwordProtected":false,"maxPlayers":5}',
+    )).toEqual({
+      kind: 'event',
+      event: {
+        command: 'game',
+        data: {
+          tableID: 123,
+          name: 'Table',
+          owner: 7,
+          players: [{ index: 0, name: 'Ada', you: true, present: true }],
+          options: { variantName: 'No Variant' },
+          passwordProtected: false,
+          maxPlayers: 5,
+        },
+      },
+    });
+
+    for (const frame of [
+      'joined {"tableID":"123"}',
+      'left {"tableID":123}',
+      'game {"tableID":123}',
+    ]) {
+      expect(decodeServerFrame(frame)).toMatchObject({
+        kind: 'malformed',
+        issue: 'invalid-payload',
+      });
+    }
   });
 
   test('validates the pinned tableStart payload', () => {

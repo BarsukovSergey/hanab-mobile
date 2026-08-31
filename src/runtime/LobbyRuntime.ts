@@ -2,6 +2,8 @@ import type { NetworkSession, NetworkSocket } from '../network/types';
 import {
   decodeServerFrame,
   encodeClientFrame,
+  encodeTableJoinFrame,
+  encodeTableLeaveFrame,
   encodeTableSpectateFrame,
   type LobbyTable,
   type ServerEvent,
@@ -119,6 +121,7 @@ export class LobbyRuntime {
       || !isSpectateEligible(table)
       || state.room.room.kind !== 'none'
       || state.room.pendingSpectateTableID !== null
+      || state.room.pendingJoin !== null
     ) {
       return false;
     }
@@ -127,6 +130,49 @@ export class LobbyRuntime {
     if (!sent) return false;
 
     this.store.dispatch(roomActions.spectateRequested({
+      epoch: state.session.connectionEpoch,
+      tableID,
+    }));
+    return true;
+  }
+
+  join(tableID: number): boolean {
+    const state = this.store.getState();
+    const table = state.lobby.tables.entities[tableID];
+    if (
+      table === undefined
+      || !isJoinEligible(table)
+      || state.room.room.kind !== 'none'
+      || state.room.pendingSpectateTableID !== null
+      || state.room.pendingJoin !== null
+    ) {
+      return false;
+    }
+
+    const sent = this.sendEncoded(encodeTableJoinFrame(tableID));
+    if (!sent) return false;
+
+    this.store.dispatch(roomActions.joinRequested({
+      epoch: state.session.connectionEpoch,
+      tableID,
+    }));
+    return true;
+  }
+
+  leave(tableID: number): boolean {
+    const state = this.store.getState();
+    if (
+      state.room.room.kind !== 'pregame'
+      || state.room.room.tableID !== tableID
+      || state.room.pendingLeaveTableID !== null
+    ) {
+      return false;
+    }
+
+    const sent = this.sendEncoded(encodeTableLeaveFrame(tableID));
+    if (!sent) return false;
+
+    this.store.dispatch(roomActions.leaveRequested({
       epoch: state.session.connectionEpoch,
       tableID,
     }));
@@ -214,6 +260,15 @@ export class LobbyRuntime {
       case 'tableGone':
         this.store.dispatch(lobbyActions.tableGone({ epoch, tableID: event.data.tableID }));
         break;
+      case 'game':
+        this.store.dispatch(roomActions.gameReceived({ epoch, game: event.data }));
+        break;
+      case 'joined':
+        this.store.dispatch(roomActions.joinedReceived({ epoch, joined: event.data }));
+        break;
+      case 'left':
+        this.store.dispatch(roomActions.leftReceived({ epoch, left: event.data }));
+        break;
       case 'tableStart':
         this.store.dispatch(roomActions.tableStartReceived({
           epoch,
@@ -296,4 +351,12 @@ export class LobbyRuntime {
 
 export function isSpectateEligible(table: LobbyTable): boolean {
   return table.running && !table.sharedReplay && !table.joined;
+}
+
+export function isJoinEligible(table: LobbyTable): boolean {
+  return !table.running
+    && !table.sharedReplay
+    && !table.joined
+    && !table.passwordProtected
+    && table.numPlayers < table.maxPlayers;
 }

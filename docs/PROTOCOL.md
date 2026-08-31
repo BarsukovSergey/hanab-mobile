@@ -184,6 +184,44 @@ At the pinned commit, the exact server payload is:
 For the ordinary running-table spectate path, `replay` is `false`. The client must use the
 matching `tableID`; replay tables are outside C4-A.
 
+## Join / pregame / leave
+
+At the pinned commit, an unprotected pregame join sends:
+
+```text
+tableJoin {"tableID":123}
+```
+
+The server appends the player and calls `NotifyPlayerChange()` before it calls
+`NotifyTableJoined()`. For the joining session, the normal server order is therefore:
+
+```text
+game {"tableID":123,...}
+joined {"tableID":123}
+```
+
+`game` is the authoritative pregame snapshot. The C4-B subset consumes its `tableID`, table
+name, owner, players (`index`, `name`, `you`, `present`), `options.variantName`,
+`passwordProtected`, and `maxPlayers`. The client must tolerate either `game` / `joined` arrival
+order and must not treat a join request or an unconfirmed `game` as attendance.
+
+Leaving sends:
+
+```text
+tableLeave {"tableID":123}
+```
+
+The pinned Go server's `TableLeftMessage.TableID` field has no JSON tag, so its exact response
+uses an uppercase field name:
+
+```text
+left {"TableID":123}
+```
+
+Only the matching authoritative `left` ends a pregame room. A same-table non-replay
+`tableStart` takes precedence over join, pregame, or leave processing and transitions to the
+normal game-bootstrap boundary.
+
 ## Game bootstrap
 
 Authoritative bootstrap sequence:

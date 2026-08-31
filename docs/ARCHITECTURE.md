@@ -32,8 +32,8 @@ Not planned until proven necessary:
 1. Physical Android `NetworkSession` proof — **GO, completed 2026-08-30**
 2. Upstream game-core compatibility / containment
 3. Deterministic protocol + lobby runtime
-4. Spectate vertical slice — **C4-A GO, completed 2026-08-31**; join/leave/pregame remains pending C4-B
-5. Game bootstrap
+4. Table-entry vertical slices — **C4-A spectate GO and C4-B join/pregame/leave GO, completed 2026-08-31**
+5. Game bootstrap — **C5 next**
 6. Live spectator
 7. Play / Discard / Clues
 8. Finished-game proof
@@ -41,8 +41,9 @@ Not planned until proven necessary:
 10. Create / Start table
 11. Chat / polish / Android build cleanup
 
-See `docs/C1_RESULTS.md` for the physical-device evidence behind the C1 decision and
-`docs/C4A_RESULTS.md` for the physical Android running-table spectate proof.
+See `docs/C1_RESULTS.md` for the physical-device evidence behind the C1 decision,
+`docs/C4A_RESULTS.md` for the physical Android running-table spectate proof, and
+`docs/C4B_RESULTS.md` for the physical Android join/pregame/leave proof.
 
 ## C1 Android evidence
 

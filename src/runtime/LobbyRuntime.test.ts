@@ -8,7 +8,7 @@ import type {
 import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { lobbyActions } from '../store/lobbySlice';
 import { createAppStore, userSelectors } from '../store/store';
-import { isSpectateEligible, LobbyRuntime } from './LobbyRuntime';
+import { isJoinEligible, isSpectateEligible, LobbyRuntime } from './LobbyRuntime';
 
 type ListenerMap = {
   open: Set<() => void>;
@@ -103,8 +103,28 @@ const runningTable: LobbyTable = {
   sharedReplay: false,
 };
 
+const joinableTable: LobbyTable = {
+  ...runningTable,
+  name: 'Pregame table',
+  numPlayers: 1,
+  running: false,
+  progress: 0,
+  players: ['Bob'],
+};
+
+const pregameFrame = (tableID = 123, name = 'Pregame table') => (
+  `game {"tableID":${tableID},"name":"${name}","owner":2,`
+  + '"players":[{"index":0,"name":"Bob","you":false,"present":true,"stats":{}},'
+  + '{"index":1,"name":"Ada","you":true,"present":true,"stats":{}}],'
+  + '"options":{"variantName":"No Variant"},"passwordProtected":false,"maxPlayers":5}'
+);
+
 function addRunningTable(store: ReturnType<typeof createAppStore>, epoch = 1): void {
   store.dispatch(lobbyActions.tableReceived({ epoch, table: runningTable }));
+}
+
+function addJoinableTable(store: ReturnType<typeof createAppStore>, epoch = 1): void {
+  store.dispatch(lobbyActions.tableReceived({ epoch, table: joinableTable }));
 }
 
 beforeEach(() => {
@@ -121,6 +141,15 @@ describe('deterministic lobby runtime', () => {
     expect(isSpectateEligible({ ...runningTable, running: false })).toBe(false);
     expect(isSpectateEligible({ ...runningTable, sharedReplay: true })).toBe(false);
     expect(isSpectateEligible({ ...runningTable, joined: true })).toBe(false);
+  });
+
+  test('only open unprotected non-replay non-joined tables with a seat are join eligible', () => {
+    expect(isJoinEligible(joinableTable)).toBe(true);
+    expect(isJoinEligible({ ...joinableTable, running: true })).toBe(false);
+    expect(isJoinEligible({ ...joinableTable, sharedReplay: true })).toBe(false);
+    expect(isJoinEligible({ ...joinableTable, joined: true })).toBe(false);
+    expect(isJoinEligible({ ...joinableTable, passwordProtected: true })).toBe(false);
+    expect(isJoinEligible({ ...joinableTable, numPlayers: 5 })).toBe(false);
   });
 
   test('OPEN is not READY; only a valid welcome makes it ready', async () => {
@@ -248,6 +277,8 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room).toEqual({
       connectionEpoch: 1,
       pendingSpectateTableID: null,
+      pendingJoin: null,
+      pendingLeaveTableID: null,
       room: {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
@@ -305,6 +336,8 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
       pendingSpectateTableID: null,
+      pendingJoin: null,
+      pendingLeaveTableID: null,
       room: { kind: 'none' },
     });
   });
@@ -332,6 +365,296 @@ describe('deterministic lobby runtime', () => {
     second.emitMessage(welcomeFrame);
     expect(second.sent).toEqual([]);
     expect(store.getState().room.pendingSpectateTableID).toBeNull();
+  });
+
+  test('join uses the READY gate, sends exactly once, and never optimistically attends', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    addJoinableTable(store);
+
+    expect(runtime.join(123)).toBe(false);
+    socket.emitMessage(welcomeFrame);
+    expect(socket.sent).toEqual([]);
+    expect(runtime.join(123)).toBe(true);
+    expect(runtime.join(123)).toBe(false);
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingJoin).toEqual({
+      tableID: 123,
+      joinedConfirmed: false,
+      stagedGame: null,
+    });
+  });
+
+  test('pinned game-before-joined ordering stages data until join confirmation', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingJoin?.stagedGame?.tableID).toBe(123);
+
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.pendingJoin).toBeNull();
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'pregame',
+      tableID: 123,
+      role: 'player',
+      data: { name: 'Pregame table', options: { variantName: 'No Variant' } },
+    });
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+  });
+
+  test('joined-before-game ordering waits for authoritative pregame data', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingJoin?.joinedConfirmed).toBe(true);
+
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'pregame',
+      tableID: 123,
+      data: { players: [{ name: 'Bob' }, { name: 'Ada' }] },
+    });
+  });
+
+  test('unmatched and malformed C4-B events cannot create attendance', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+
+    socket.emitMessage(pregameFrame(999, 'Other table'));
+    socket.emitMessage('joined {"tableID":999}');
+    socket.emitMessage('left {"TableID":123}');
+    socket.emitMessage('game {"tableID":123}');
+    socket.emitMessage('joined {"tableID":"123"}');
+    socket.emitMessage('left {"tableID":123}');
+
+    expect(store.getState().session.protocolIssueCount).toBe(3);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingJoin).toEqual({
+      tableID: 123,
+      joinedConfirmed: false,
+      stagedGame: null,
+    });
+  });
+
+  test('leave sends exactly once and returns to lobby only on matching authoritative left', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    expect(runtime.leave(123)).toBe(true);
+    expect(runtime.leave(123)).toBe(false);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'tableLeave {"tableID":123}',
+    ]);
+    expect(store.getState().room.room.kind).toBe('pregame');
+    socket.emitMessage('left {"TableID":999}');
+    expect(store.getState().room.room.kind).toBe('pregame');
+    socket.emitMessage('left {"TableID":123}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingLeaveTableID).toBeNull();
+  });
+
+  test('new epoch clears pending and staged C4-B state; stale events cannot restore it', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(first), Promise.resolve(second));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    first.emitMessage(pregameFrame());
+    expect(store.getState().room.pendingJoin?.stagedGame).not.toBeNull();
+    const staleMessages = first.snapshotMessageListeners();
+
+    runtime.disconnect();
+    await runtime.connect();
+    for (const listener of staleMessages) {
+      listener({ data: 'joined {"tableID":123}' } as WebSocketMessageEvent);
+      listener({ data: pregameFrame() } as WebSocketMessageEvent);
+      listener({ data: 'left {"TableID":123}' } as WebSocketMessageEvent);
+    }
+
+    expect(store.getState().room).toEqual({
+      connectionEpoch: 2,
+      pendingSpectateTableID: null,
+      pendingJoin: null,
+      pendingLeaveTableID: null,
+      room: { kind: 'none' },
+    });
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+    expect(second.sent).toEqual([]);
+  });
+
+  test('new epoch clears an authoritative pregame room and pending leave intent', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(first), Promise.resolve(second));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    first.emitMessage(pregameFrame());
+    first.emitMessage('joined {"tableID":123}');
+    expect(runtime.leave(123)).toBe(true);
+    expect(store.getState().room.room.kind).toBe('pregame');
+    expect(store.getState().room.pendingLeaveTableID).toBe(123);
+
+    runtime.disconnect();
+    await runtime.connect();
+
+    expect(store.getState().room).toEqual({
+      connectionEpoch: 2,
+      pendingSpectateTableID: null,
+      pendingJoin: null,
+      pendingLeaveTableID: null,
+      room: { kind: 'none' },
+    });
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+    expect(second.sent).toEqual([]);
+  });
+
+  test('same-table tableStart overrides a pending join and late pregame events cannot restore it', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    socket.emitMessage('joined {"tableID":123}');
+    socket.emitMessage(pregameFrame(123, 'Late game'));
+
+    expect(store.getState().room.room).toEqual({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 123,
+      role: 'player',
+      tableStartReceived: true,
+      bootstrap: 'pending_c5',
+    });
+    expect(store.getState().room.pendingJoin).toBeNull();
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+  });
+
+  test('same-table tableStart overrides an established pregame room', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room.kind).toBe('pregame');
+
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 123,
+      role: 'player',
+      bootstrap: 'pending_c5',
+    });
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+  });
+
+  test('same-table tableStart overrides pregame and a pending leave without C5 commands', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage('joined {"tableID":123}');
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.room.kind).toBe('pregame');
+    expect(runtime.leave(123)).toBe(true);
+
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    socket.emitMessage('left {"TableID":123}');
+    socket.emitMessage('joined {"tableID":123}');
+    socket.emitMessage(pregameFrame(123, 'Late game'));
+
+    expect(store.getState().room.room).toEqual({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 123,
+      role: 'player',
+      tableStartReceived: true,
+      bootstrap: 'pending_c5',
+    });
+    expect(store.getState().room.pendingLeaveTableID).toBeNull();
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'tableLeave {"tableID":123}',
+    ]);
+    expect(socket.sent.some((frame) => frame.startsWith('getGameInfo'))).toBe(false);
   });
 
   test('a malformed known event reports an issue without mutating lobby state', async () => {

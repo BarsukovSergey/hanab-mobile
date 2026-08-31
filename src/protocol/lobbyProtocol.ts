@@ -2,6 +2,16 @@ import { z } from 'zod';
 
 const idSchema = z.number().int().nonnegative();
 
+const tableIDCommandSchema = z.object({
+  tableID: idSchema,
+});
+
+export const tableJoinCommandSchema = tableIDCommandSchema;
+export type TableJoinCommand = z.infer<typeof tableJoinCommandSchema>;
+
+export const tableLeaveCommandSchema = tableIDCommandSchema;
+export type TableLeaveCommand = z.infer<typeof tableLeaveCommandSchema>;
+
 export const tableSpectateCommandSchema = z.object({
   tableID: idSchema,
   shadowingPlayerIndex: z.literal(-1),
@@ -15,6 +25,41 @@ export const tableStartSchema = z.object({
 });
 
 export type TableStart = z.infer<typeof tableStartSchema>;
+
+export const tableJoinedSchema = z.object({
+  tableID: idSchema,
+});
+
+export type TableJoined = z.infer<typeof tableJoinedSchema>;
+
+// The pinned Go server intentionally emits the exported field name because
+// TableLeftMessage.TableID has no json tag.
+export const tableLeftSchema = z.object({
+  TableID: idSchema,
+});
+
+export type TableLeft = z.infer<typeof tableLeftSchema>;
+
+const pregamePlayerSchema = z.object({
+  index: z.number().int().nonnegative(),
+  name: z.string().min(1),
+  you: z.boolean(),
+  present: z.boolean(),
+});
+
+export const pregameGameSchema = z.object({
+  tableID: idSchema,
+  name: z.string().min(1),
+  owner: idSchema,
+  players: z.array(pregamePlayerSchema),
+  options: z.object({
+    variantName: z.string().min(1),
+  }),
+  passwordProtected: z.boolean(),
+  maxPlayers: z.number().int().positive(),
+});
+
+export type PregameGame = z.infer<typeof pregameGameSchema>;
 
 export const lobbyUserSchema = z.object({
   userID: idSchema,
@@ -61,6 +106,9 @@ const schemas = {
   tableList: z.array(lobbyTableSchema),
   table: lobbyTableSchema,
   tableGone: z.object({ tableID: idSchema }),
+  game: pregameGameSchema,
+  joined: tableJoinedSchema,
+  left: tableLeftSchema,
   tableStart: tableStartSchema,
   warning: z.object({ warning: z.string().min(1) }),
   error: z.object({ error: z.string().min(1) }),
@@ -133,4 +181,14 @@ export function encodeTableSpectateFrame(tableID: number): string {
     shadowingPlayerIndex: -1,
   });
   return encodeClientFrame('tableSpectate', payload);
+}
+
+export function encodeTableJoinFrame(tableID: number): string {
+  const payload = tableJoinCommandSchema.parse({ tableID });
+  return encodeClientFrame('tableJoin', payload);
+}
+
+export function encodeTableLeaveFrame(tableID: number): string {
+  const payload = tableLeaveCommandSchema.parse({ tableID });
+  return encodeClientFrame('tableLeave', payload);
 }
