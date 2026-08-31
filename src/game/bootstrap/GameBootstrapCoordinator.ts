@@ -34,9 +34,17 @@ type ActiveLoad = {
   info1Attempted: boolean;
   info2Attempted: boolean;
   metadata: GameMetadata | null;
+  timer: ReturnType<typeof setTimeout> | null;
 };
 
 type SendFrame = (frame: string) => boolean;
+
+export type BootstrapTimers = {
+  setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
+  clearTimeout(timer: ReturnType<typeof setTimeout>): void;
+};
+
+const DEFAULT_BOOTSTRAP_TIMEOUT_MS = 15_000;
 
 function makeMetadata(init: GameInit, username: string): GameMetadata {
   const { variantID: _variantID, ...wireOptions } = init.options;
@@ -124,15 +132,22 @@ export class GameBootstrapCoordinator {
   constructor(
     private readonly store: AppStore,
     private readonly sendFrame: SendFrame,
+    private readonly timers: BootstrapTimers = {
+      setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+      clearTimeout: (timer) => clearTimeout(timer),
+    },
+    private readonly timeoutMs = DEFAULT_BOOTSTRAP_TIMEOUT_MS,
   ) {}
 
   invalidateConnection(connectionEpoch: number): void {
     if (this.active !== null && this.active.connectionEpoch !== connectionEpoch) {
+      this.clearTimer(this.active);
       this.active = null;
     }
   }
 
   invalidate(): void {
+    if (this.active !== null) this.clearTimer(this.active);
     this.active = null;
   }
 
@@ -148,6 +163,7 @@ export class GameBootstrapCoordinator {
 
     const gameLoadEpoch = this.nextGameLoadEpoch + 1;
     this.nextGameLoadEpoch = gameLoadEpoch;
+    if (this.active !== null) this.clearTimer(this.active);
     const load: ActiveLoad = {
       connectionEpoch,
       gameLoadEpoch,
@@ -157,6 +173,7 @@ export class GameBootstrapCoordinator {
       info1Attempted: false,
       info2Attempted: false,
       metadata: null,
+      timer: null,
     };
     this.active = load;
     this.store.dispatch(roomActions.bootstrapStarted({
@@ -170,6 +187,7 @@ export class GameBootstrapCoordinator {
       this.fail(load);
       return null;
     }
+    this.startTimer(load, 'waiting_init');
     return gameLoadEpoch;
   }
 
@@ -206,6 +224,8 @@ export class GameBootstrapCoordinator {
 
     load.metadata = metadata;
     load.phase = 'waiting_history';
+    this.clearTimer(load);
+    this.startTimer(load, 'waiting_history');
     this.store.dispatch(roomActions.bootstrapInitAccepted({
       connectionEpoch,
       tableID: load.tableID,
@@ -238,6 +258,7 @@ export class GameBootstrapCoordinator {
       game,
       historyActionCount: history.list.length,
     }));
+    this.clearTimer(load);
     this.active = null;
     return true;
   }
@@ -269,11 +290,28 @@ export class GameBootstrapCoordinator {
 
   private fail(load: ActiveLoad): void {
     if (this.active !== load) return;
+    this.clearTimer(load);
     load.phase = 'failed';
     this.store.dispatch(roomActions.bootstrapFailed({
       connectionEpoch: load.connectionEpoch,
       tableID: load.tableID,
       gameLoadEpoch: load.gameLoadEpoch,
     }));
+  }
+
+  private startTimer(
+    load: ActiveLoad,
+    phase: 'waiting_init' | 'waiting_history',
+  ): void {
+    load.timer = this.timers.setTimeout(() => {
+      if (this.active !== load || load.phase !== phase) return;
+      this.fail(load);
+    }, this.timeoutMs);
+  }
+
+  private clearTimer(load: ActiveLoad): void {
+    if (load.timer === null) return;
+    this.timers.clearTimeout(load.timer);
+    load.timer = null;
   }
 }

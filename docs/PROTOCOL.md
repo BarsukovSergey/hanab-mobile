@@ -273,7 +273,8 @@ The pinned official client ignores every game command other than `init` and `gam
 its game UI is loading. The server builds and emits `gameActionList` while holding the table lock;
 incremental `gameAction` notification is a separate path. C5 follows the pinned loading behavior:
 premature incremental actions are discarded and never buffered, merged, deduplicated, retried, or
-replayed. Only successful full reduction of `gameActionList` can make bootstrap live.
+replayed. Only successful full reduction of `gameActionList` can make bootstrap live. Each loading
+phase has a bounded watchdog; expiry fails only that current load and sends no retry command.
 
 ## Hidden information
 

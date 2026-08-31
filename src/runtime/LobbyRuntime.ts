@@ -62,6 +62,7 @@ export class LobbyRuntime {
     this.gameBootstrap = new GameBootstrapCoordinator(
       store,
       (frame) => this.sendEncoded(frame),
+      timers,
     );
   }
 

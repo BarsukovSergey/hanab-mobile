@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 import { gameActionListSchema, gameInitSchema, incrementalGameActionSchema } from '../../protocol/gameProtocol';
 import { makeInit } from '../../protocol/gameProtocol.fixtures';
@@ -12,6 +12,9 @@ const welcome = {
   username: 'Ada',
   playingAtTables: [],
 };
+
+beforeEach(() => { jest.useFakeTimers(); });
+afterEach(() => { jest.useRealTimers(); });
 
 function readyStore(role: 'player' | 'spectator') {
   const store = createAppStore();
@@ -179,5 +182,23 @@ describe('authoritative game bootstrap coordinator', () => {
       'getGameInfo1 {"tableID":123}',
       'getGameInfo2 {"tableID":123}',
     ]);
+  });
+
+  test('a loading watchdog fails only the current load without sending retries', () => {
+    const store = readyStore('player');
+    const frames: string[] = [];
+    const coordinator = new GameBootstrapCoordinator(store, (frame) => {
+      frames.push(frame);
+      return true;
+    });
+    coordinator.startFromAuthoritativeRoom(1);
+    jest.advanceTimersByTime(15_000);
+
+    const room = store.getState().room.room;
+    expect(room.kind).toBe('awaiting_game_bootstrap');
+    if (room.kind === 'awaiting_game_bootstrap' && room.bootstrap !== 'pending_c5') {
+      expect(room.bootstrap.phase).toBe('failed');
+    }
+    expect(frames).toEqual(['getGameInfo1 {"tableID":123}']);
   });
 });
