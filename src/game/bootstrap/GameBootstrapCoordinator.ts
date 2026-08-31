@@ -287,7 +287,6 @@ export class GameBootstrapCoordinator {
       || state.session.phase !== 'ready'
       || state.room.connectionEpoch !== connectionEpoch
       || room.kind !== 'live_game'
-      || room.role !== 'spectator'
       || room.tableID !== event.tableID
     ) return false;
 
@@ -303,6 +302,7 @@ export class GameBootstrapCoordinator {
       tableID: room.tableID,
       gameLoadEpoch: room.gameLoadEpoch,
       expectedLiveActionCount: room.liveActionCount,
+      acceptedActionType: event.action.type,
       game,
     }));
     const updated = this.store.getState().room.room;

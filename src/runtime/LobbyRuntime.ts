@@ -1,6 +1,18 @@
 import type { NetworkSession, NetworkSocket } from '../network/types';
 import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
 import {
+  isCurrentVariantColorClueValue,
+  isCurrentVariantRankClueValue,
+} from '../game/selectors/gameplay';
+import {
+  clientGameplayActionSchema,
+  encodeColorClueFrame,
+  encodeDiscardFrame,
+  encodePlayFrame,
+  encodeRankClueFrame,
+  type ClientGameplayAction,
+} from '../protocol/gameProtocol';
+import {
   decodeServerFrame,
   encodeClientFrame,
   encodeTableJoinFrame,
@@ -188,6 +200,30 @@ export class LobbyRuntime {
     return true;
   }
 
+  play(cardOrder: number): boolean {
+    return this.sendGameplayAction({ type: 0, target: cardOrder });
+  }
+
+  discard(cardOrder: number): boolean {
+    return this.sendGameplayAction({ type: 1, target: cardOrder });
+  }
+
+  colorClue(targetPlayerIndex: number, colorIndex: number): boolean {
+    return this.sendGameplayAction({
+      type: 2,
+      target: targetPlayerIndex,
+      value: colorIndex,
+    });
+  }
+
+  rankClue(targetPlayerIndex: number, rank: number): boolean {
+    return this.sendGameplayAction({
+      type: 3,
+      target: targetPlayerIndex,
+      value: rank,
+    });
+  }
+
   private async open(owned: OwnedConnection): Promise<void> {
     let socket: NetworkSocket;
     try {
@@ -304,12 +340,14 @@ export class LobbyRuntime {
         break;
       }
       case 'warning':
+        this.clearCurrentGameplayPending(epoch);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
           notice: { kind: 'warning', message: event.data.warning.slice(0, MAX_STATUS_LENGTH) },
         }));
         break;
       case 'error':
+        this.clearCurrentGameplayPending(epoch);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
           notice: { kind: 'error', message: event.data.error.slice(0, MAX_STATUS_LENGTH) },
@@ -342,6 +380,90 @@ export class LobbyRuntime {
 
   private isCurrent(owned: OwnedConnection): boolean {
     return this.current === owned && owned.epoch === this.connectionEpoch;
+  }
+
+  private sendGameplayAction(
+    intent:
+      | { type: 0 | 1; target: number }
+      | { type: 2 | 3; target: number; value: number },
+  ): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    const owned = this.current;
+    if (
+      owned === null
+      || owned.epoch !== this.connectionEpoch
+      || owned.epoch !== state.session.connectionEpoch
+      || owned.socket === null
+      || owned.socket.readyState !== SOCKET_OPEN
+      || state.session.phase !== 'ready'
+      || state.room.connectionEpoch !== owned.epoch
+      || room.kind !== 'live_game'
+      || room.role !== 'player'
+      || room.game.turn.currentPlayerIndex !== room.metadata.ourPlayerIndex
+      || state.room.pendingGameplayAction !== null
+    ) return false;
+
+    const candidate = { tableID: room.tableID, ...intent };
+    const parsed = clientGameplayActionSchema.safeParse(candidate);
+    if (!parsed.success) return false;
+    const action = parsed.data;
+    const ourPlayerIndex = room.metadata.ourPlayerIndex;
+    if (
+      (action.type === 0 || action.type === 1)
+      && !(room.game.hands[ourPlayerIndex]?.includes(action.target) ?? false)
+    ) return false;
+    if (action.type === 2 || action.type === 3) {
+      if (
+        action.target === ourPlayerIndex
+        || action.target < 0
+        || action.target >= room.metadata.options.numPlayers
+      ) return false;
+      const variantName = room.metadata.options.variantName;
+      if (
+        (action.type === 2
+          && !isCurrentVariantColorClueValue(variantName, action.value))
+        || (action.type === 3
+          && !isCurrentVariantRankClueValue(variantName, action.value))
+      ) return false;
+    }
+
+    const pending = {
+      connectionEpoch: owned.epoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      action,
+    };
+    this.store.dispatch(roomActions.gameplayActionRequested(pending));
+    if (this.store.getState().room.pendingGameplayAction === null) return false;
+
+    let sent = false;
+    try {
+      sent = this.sendEncoded(this.encodeGameplayFrame(action));
+    } catch {
+      sent = false;
+    }
+    if (!sent) this.store.dispatch(roomActions.gameplayPendingCleared(pending));
+    return sent;
+  }
+
+  private encodeGameplayFrame(action: ClientGameplayAction): string {
+    switch (action.type) {
+      case 0: return encodePlayFrame(action.tableID, action.target);
+      case 1: return encodeDiscardFrame(action.tableID, action.target);
+      case 2: return encodeColorClueFrame(action.tableID, action.target, action.value);
+      case 3: return encodeRankClueFrame(action.tableID, action.target, action.value);
+    }
+  }
+
+  private clearCurrentGameplayPending(connectionEpoch: number): void {
+    const pending = this.store.getState().room.pendingGameplayAction;
+    if (pending === null || pending.connectionEpoch !== connectionEpoch) return;
+    this.store.dispatch(roomActions.gameplayPendingCleared({
+      connectionEpoch,
+      tableID: pending.tableID,
+      gameLoadEpoch: pending.gameLoadEpoch,
+    }));
   }
 
   private sendEncoded(frame: string): boolean {

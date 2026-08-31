@@ -8,6 +8,7 @@ import type {
   TableStart,
 } from '../protocol/lobbyProtocol';
 import type { GameMetadata, GameState } from '../game/bootstrap/types';
+import type { ClientGameplayAction, WireGameAction } from '../protocol/gameProtocol';
 import { sessionActions } from './sessionSlice';
 
 export type RoomState =
@@ -54,6 +55,12 @@ export type RoomSliceState = {
   pendingSpectateTableID: number | null;
   pendingJoin: PendingJoin | null;
   pendingLeaveTableID: number | null;
+  pendingGameplayAction: {
+    connectionEpoch: number;
+    tableID: number;
+    gameLoadEpoch: number;
+    action: ClientGameplayAction;
+  } | null;
   room: RoomState;
 };
 
@@ -62,6 +69,7 @@ const initialState: RoomSliceState = {
   pendingSpectateTableID: null,
   pendingJoin: null,
   pendingLeaveTableID: null,
+  pendingGameplayAction: null,
   room: { kind: 'none' },
 };
 
@@ -217,6 +225,7 @@ export const roomSlice = createSlice({
 
       state.pendingSpectateTableID = null;
       clearC4BState(state);
+      state.pendingGameplayAction = null;
       state.room = {
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
@@ -323,30 +332,84 @@ export const roomSlice = createSlice({
         tableID: number;
         gameLoadEpoch: number;
         expectedLiveActionCount: number;
+        acceptedActionType: WireGameAction['type'];
         game: GameState;
       }>,
     ) {
       const {
-        connectionEpoch, tableID, gameLoadEpoch, expectedLiveActionCount, game,
+        connectionEpoch, tableID, gameLoadEpoch, expectedLiveActionCount,
+        acceptedActionType, game,
       } = action.payload;
       if (state.connectionEpoch !== connectionEpoch) return;
       if (
         state.room.kind !== 'live_game'
-        || state.room.role !== 'spectator'
         || state.room.tableID !== tableID
         || state.room.gameLoadEpoch !== gameLoadEpoch
         || state.room.liveActionCount !== expectedLiveActionCount
       ) return;
       state.room.game = castDraft(game);
       state.room.liveActionCount += 1;
+      if (
+        acceptedActionType === 'turn'
+        && state.pendingGameplayAction?.connectionEpoch === connectionEpoch
+        && state.pendingGameplayAction.tableID === tableID
+        && state.pendingGameplayAction.gameLoadEpoch === gameLoadEpoch
+      ) {
+        state.pendingGameplayAction = null;
+      }
+    },
+    gameplayActionRequested(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        action: ClientGameplayAction;
+      }>,
+    ) {
+      const { connectionEpoch, tableID, gameLoadEpoch } = action.payload;
+      if (
+        state.connectionEpoch !== connectionEpoch
+        || state.pendingGameplayAction !== null
+        || state.room.kind !== 'live_game'
+        || state.room.role !== 'player'
+        || state.room.tableID !== tableID
+        || state.room.gameLoadEpoch !== gameLoadEpoch
+        || action.payload.action.tableID !== tableID
+      ) return;
+      state.pendingGameplayAction = castDraft(action.payload);
+    },
+    gameplayPendingCleared(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+      }>,
+    ) {
+      const pending = state.pendingGameplayAction;
+      if (
+        pending === null
+        || pending.connectionEpoch !== action.payload.connectionEpoch
+        || pending.tableID !== action.payload.tableID
+        || pending.gameLoadEpoch !== action.payload.gameLoadEpoch
+      ) return;
+      state.pendingGameplayAction = null;
     },
   },
   extraReducers: (builder) => {
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
       state.connectionEpoch = action.payload.epoch;
       state.pendingSpectateTableID = null;
+      state.pendingGameplayAction = null;
       clearC4BState(state);
       state.room = { kind: 'none' };
+    });
+    builder.addCase(sessionActions.connectionFailed, (state, action) => {
+      if (state.connectionEpoch === action.payload.epoch) state.pendingGameplayAction = null;
+    });
+    builder.addCase(sessionActions.connectionClosed, (state, action) => {
+      if (state.connectionEpoch === action.payload.epoch) state.pendingGameplayAction = null;
     });
   },
 });

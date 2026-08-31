@@ -12,6 +12,10 @@ import {
 } from 'react-native';
 
 import { isJoinEligible, isSpectateEligible } from './src/runtime/LobbyRuntime';
+import {
+  getGameplayClueChoices,
+  getVisibleCardIdentityLabel,
+} from './src/game/selectors/gameplay';
 import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
 import {
@@ -41,6 +45,16 @@ export default function App() {
   const spectateTables = tables.filter(isSpectateEligible);
   const joinTables = tables.filter(isJoinEligible);
   const pregameRoom = roomState.room.kind === 'pregame' ? roomState.room : null;
+  const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
+  const playerLiveRoom = liveRoom?.role === 'player' ? liveRoom : null;
+  const isOurTurn = playerLiveRoom !== null
+    && playerLiveRoom.game.turn.currentPlayerIndex === playerLiveRoom.metadata.ourPlayerIndex;
+  const gameplayControlsEnabled = session.phase === 'ready'
+    && isOurTurn
+    && roomState.pendingGameplayAction === null;
+  const clueChoices = playerLiveRoom === null
+    ? null
+    : getGameplayClueChoices(playerLiveRoom.metadata.options.variantName);
 
   const runProbe = useCallback(async () => {
     setProbe('UNKNOWN');
@@ -99,7 +113,7 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C6 Proof</Text>
+        <Text style={styles.title}>Hanab C7 Proof</Text>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Typed lobby runtime</Text>
@@ -220,29 +234,90 @@ export default function App() {
 
         {roomState.room.kind === 'live_game' && (
           <View style={styles.section}>
-            <Text style={styles.heading}>Authoritative game bootstrap</Text>
+            <Text style={styles.heading}>Authoritative LIVE game</Text>
             <Text>tableID: {roomState.room.tableID}</Text>
             <Text>role: {roomState.room.role}</Text>
             <Text>gameLoadEpoch: {roomState.room.gameLoadEpoch}</Text>
             <Text>bootstrap phase: LIVE</Text>
             <Text>authoritative history actions: {roomState.room.historyActionCount}</Text>
-            {roomState.room.role === 'spectator' && (
+            <Text>live actions: {roomState.room.liveActionCount}</Text>
+            <Text>turn number: {roomState.room.game.turn.turnNum}</Text>
+            <Text>
+              current player: {roomState.room.game.turn.currentPlayerIndex === null
+                ? 'none'
+                : `${roomState.room.game.turn.currentPlayerIndex}: ${
+                  roomState.room.metadata.playerNames[
+                    roomState.room.game.turn.currentPlayerIndex
+                  ]
+                }`}
+            </Text>
+            <Text>score: {roomState.room.game.score}</Text>
+            <Text>clue tokens: {roomState.room.game.clueTokens}</Text>
+            <Text>strikes: {roomState.room.game.strikes.length}</Text>
+            <Text>cards remaining: {roomState.room.game.cardsRemainingInTheDeck}</Text>
+
+            {playerLiveRoom !== null && (
               <>
-                <Text>live actions: {roomState.room.liveActionCount}</Text>
-                <Text>turn number: {roomState.room.game.turn.turnNum}</Text>
+                <Text>our turn: {isOurTurn ? 'YES' : 'NO'}</Text>
                 <Text>
-                  current player: {roomState.room.game.turn.currentPlayerIndex === null
-                    ? 'none'
-                    : `${roomState.room.game.turn.currentPlayerIndex}: ${
-                      roomState.room.metadata.playerNames[
-                        roomState.room.game.turn.currentPlayerIndex
-                      ]
-                    }`}
+                  pending action: {roomState.pendingGameplayAction === null
+                    ? 'NONE'
+                    : ['PLAY', 'DISCARD', 'COLOR CLUE', 'RANK CLUE'][
+                      roomState.pendingGameplayAction.action.type
+                    ]}
                 </Text>
-                <Text>score: {roomState.room.game.score}</Text>
-                <Text>clue tokens: {roomState.room.game.clueTokens}</Text>
-                <Text>strikes: {roomState.room.game.strikes.length}</Text>
-                <Text>cards remaining: {roomState.room.game.cardsRemainingInTheDeck}</Text>
+                <Text style={styles.subheading}>Our hand (authoritative card orders)</Text>
+                {playerLiveRoom.game.hands[playerLiveRoom.metadata.ourPlayerIndex]?.map(
+                  (order) => (
+                    <View style={styles.actionRow} key={order}>
+                      <Text style={styles.actionLabel}>card order {order}</Text>
+                      <Button disabled={!gameplayControlsEnabled} title="Play"
+                        onPress={() => lobbyRuntime.play(order)} />
+                      <Button disabled={!gameplayControlsEnabled} title="Discard"
+                        onPress={() => lobbyRuntime.discard(order)} />
+                    </View>
+                  ),
+                )}
+
+                <Text style={styles.subheading}>Other players and visible cards</Text>
+                {playerLiveRoom.metadata.playerNames.map((name, playerIndex) => {
+                  if (playerIndex === playerLiveRoom.metadata.ourPlayerIndex) return null;
+                  return (
+                    <View style={styles.playerRow} key={playerIndex}>
+                      <Text style={styles.tableName}>{playerIndex}: {name}</Text>
+                      {playerLiveRoom.game.hands[playerIndex]?.map((order) => {
+                        const card = playerLiveRoom.game.deck[order];
+                        return (
+                          <Text key={order}>
+                            order {order}: {card === undefined
+                              ? 'unknown'
+                              : getVisibleCardIdentityLabel(
+                                playerLiveRoom.metadata.options.variantName,
+                                card.suitIndex,
+                                card.rank,
+                              )}
+                          </Text>
+                        );
+                      })}
+                      <Text>Color clues:</Text>
+                      <View style={styles.buttonWrap}>
+                        {clueChoices?.colors.map((choice) => (
+                          <Button disabled={!gameplayControlsEnabled} key={choice.value}
+                            title={choice.label}
+                            onPress={() => lobbyRuntime.colorClue(playerIndex, choice.value)} />
+                        ))}
+                      </View>
+                      <Text>Rank clues:</Text>
+                      <View style={styles.buttonWrap}>
+                        {clueChoices?.ranks.map((choice) => (
+                          <Button disabled={!gameplayControlsEnabled} key={choice.value}
+                            title={choice.label}
+                            onPress={() => lobbyRuntime.rankClue(playerIndex, choice.value)} />
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })}
               </>
             )}
           </View>
@@ -280,7 +355,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700' },
   section: { borderColor: '#999', borderWidth: 1, gap: 8, padding: 12 },
   heading: { fontSize: 18, fontWeight: '600' },
+  subheading: { fontSize: 16, fontWeight: '600', marginTop: 6 },
   input: { borderColor: '#777', borderWidth: 1, padding: 10 },
   tableRow: { borderColor: '#bbb', borderWidth: 1, gap: 3, padding: 10 },
   tableName: { fontWeight: '600' },
+  actionRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  actionLabel: { flex: 1 },
+  playerRow: { borderColor: '#bbb', borderWidth: 1, gap: 5, padding: 8 },
+  buttonWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
 });

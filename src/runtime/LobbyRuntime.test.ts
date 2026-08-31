@@ -280,6 +280,7 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
+      pendingGameplayAction: null,
       room: {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
@@ -346,6 +347,7 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
+      pendingGameplayAction: null,
       room: { kind: 'none' },
     });
   });
@@ -535,6 +537,7 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
+      pendingGameplayAction: null,
       room: { kind: 'none' },
     });
     second.emitOpen();
@@ -568,6 +571,7 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingJoin: null,
       pendingLeaveTableID: null,
+      pendingGameplayAction: null,
       room: { kind: 'none' },
     });
     second.emitOpen();

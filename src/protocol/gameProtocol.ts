@@ -20,6 +20,45 @@ const tableIDCommandSchema = z.object({ tableID: idSchema });
 export const getGameInfo1CommandSchema = tableIDCommandSchema;
 export const getGameInfo2CommandSchema = tableIDCommandSchema;
 
+export const playGameplayActionSchema = z.object({
+  tableID: idSchema,
+  type: z.literal(0),
+  target: cardOrder,
+});
+
+export const discardGameplayActionSchema = z.object({
+  tableID: idSchema,
+  type: z.literal(1),
+  target: cardOrder,
+});
+
+export const colorClueGameplayActionSchema = z.object({
+  tableID: idSchema,
+  type: z.literal(2),
+  target: playerIndex,
+  value: colorIndex,
+});
+
+export const rankClueGameplayActionSchema = z.object({
+  tableID: idSchema,
+  type: z.literal(3),
+  target: playerIndex,
+  value: rankClueNumber,
+});
+
+export const clientGameplayActionSchema = z.discriminatedUnion('type', [
+  playGameplayActionSchema,
+  discardGameplayActionSchema,
+  colorClueGameplayActionSchema,
+  rankClueGameplayActionSchema,
+]);
+
+export type ClientGameplayAction = z.infer<typeof clientGameplayActionSchema>;
+export type PlayGameplayAction = z.infer<typeof playGameplayActionSchema>;
+export type DiscardGameplayAction = z.infer<typeof discardGameplayActionSchema>;
+export type ColorClueGameplayAction = z.infer<typeof colorClueGameplayActionSchema>;
+export type RankClueGameplayAction = z.infer<typeof rankClueGameplayActionSchema>;
+
 const wireOptionsSchema = z.object({
   numPlayers,
   startingPlayer: playerIndex,
@@ -202,4 +241,32 @@ export function encodeGetGameInfo1Frame(tableID: number): string {
 
 export function encodeGetGameInfo2Frame(tableID: number): string {
   return encodeTableCommand('getGameInfo2', tableID);
+}
+
+function encodeGameplayAction(action: unknown): string {
+  return `action ${JSON.stringify(clientGameplayActionSchema.parse(action))}`;
+}
+
+export function encodePlayFrame(tableID: number, target: number): string {
+  return encodeGameplayAction({ tableID, type: 0, target });
+}
+
+export function encodeDiscardFrame(tableID: number, target: number): string {
+  return encodeGameplayAction({ tableID, type: 1, target });
+}
+
+export function encodeColorClueFrame(
+  tableID: number,
+  target: number,
+  value: number,
+): string {
+  return encodeGameplayAction({ tableID, type: 2, target, value });
+}
+
+export function encodeRankClueFrame(
+  tableID: number,
+  target: number,
+  value: number,
+): string {
+  return encodeGameplayAction({ tableID, type: 3, target, value });
 }

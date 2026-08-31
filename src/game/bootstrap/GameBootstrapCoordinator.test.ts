@@ -180,7 +180,7 @@ describe('authoritative game bootstrap coordinator', () => {
     ));
   });
 
-  test('wrong-table, stale, player, and failed live actions cannot corrupt game state', () => {
+  test('wrong-table, stale, and failed live actions cannot corrupt state; player actions reduce', () => {
     const makeLive = (role: 'player' | 'spectator') => {
       const store = readyStore(role);
       const coordinator = new GameBootstrapCoordinator(store, () => true);
@@ -214,8 +214,12 @@ describe('authoritative game bootstrap coordinator', () => {
 
     const player = makeLive('player');
     const playerBefore = player.store.getState().room.room;
-    expect(player.coordinator.receiveIncremental(1, event)).toBe(false);
-    expect(player.store.getState().room.room).toBe(playerBefore);
+    expect(player.coordinator.receiveIncremental(1, event)).toBe(true);
+    const playerAfter = player.store.getState().room.room;
+    expect(playerAfter).not.toBe(playerBefore);
+    expect(playerAfter).toMatchObject({
+      kind: 'live_game', role: 'player', liveActionCount: 1,
+    });
   });
 
   test('stale connection/load epochs cannot advance and a second load invalidates the first', () => {
