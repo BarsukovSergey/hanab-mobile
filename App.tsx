@@ -94,13 +94,24 @@ export default function App() {
   const canConnect = probe === 'VALID'
     && !['connecting', 'openAwaitingWelcome', 'ready'].includes(session.phase);
 
+  if (roomState.room.kind === 'live_game') {
+    return (
+      <View style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.gameContainer}>
+          <GameScreen />
+        </ScrollView>
+        <StatusBar style="auto" />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C7 Proof</Text>
+        <Text style={styles.title}>Hanab</Text>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Typed lobby runtime</Text>
@@ -247,8 +258,6 @@ export default function App() {
           </View>
         )}
 
-        {roomState.room.kind === 'live_game' && <GameScreen />}
-
         <View style={styles.section}>
           <Text style={styles.heading}>Session</Text>
           <Text>Session probe: {probe}</Text>
@@ -278,6 +287,7 @@ export default function App() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { gap: 12, padding: 20, paddingTop: 56 },
+  gameContainer: { flexGrow: 1, padding: 16, paddingTop: 48 },
   title: { fontSize: 24, fontWeight: '700' },
   section: { borderColor: '#999', borderWidth: 1, gap: 8, padding: 12 },
   heading: { fontSize: 18, fontWeight: '600' },
