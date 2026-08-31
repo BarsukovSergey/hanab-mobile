@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { castDraft } from 'immer';
 
 import type {
   PregameGame,
@@ -6,6 +7,7 @@ import type {
   TableLeft,
   TableStart,
 } from '../protocol/lobbyProtocol';
+import type { GameMetadata, GameState } from '../game/bootstrap/types';
 import { sessionActions } from './sessionSlice';
 
 export type RoomState =
@@ -21,7 +23,23 @@ export type RoomState =
       tableID: number;
       role: 'player' | 'spectator';
       tableStartReceived: true;
-      bootstrap: 'pending_c5';
+      bootstrap:
+        | 'pending_c5'
+        | {
+            gameLoadEpoch: number;
+            phase: 'waiting_init' | 'waiting_history' | 'failed';
+            historyActionCount: 0;
+          };
+    }
+  | {
+      kind: 'live_game';
+      tableID: number;
+      role: 'player' | 'spectator';
+      gameLoadEpoch: number;
+      bootstrapPhase: 'live';
+      historyActionCount: number;
+      metadata: GameMetadata;
+      game: GameState;
     };
 
 type PendingJoin = {
@@ -170,10 +188,15 @@ export const roomSlice = createSlice({
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       const { tableStart } = action.payload;
-      if (tableStart.replay || state.room.kind === 'awaiting_game_bootstrap') return;
+      if (tableStart.replay) return;
 
       let role: 'player' | 'spectator' | null = null;
       if (
+        (state.room.kind === 'awaiting_game_bootstrap' || state.room.kind === 'live_game')
+        && state.room.tableID === tableStart.tableID
+      ) {
+        role = state.room.role;
+      } else if (
         state.room.kind === 'none'
         && state.pendingSpectateTableID === tableStart.tableID
       ) {
@@ -199,6 +222,96 @@ export const roomSlice = createSlice({
         role,
         tableStartReceived: true,
         bootstrap: 'pending_c5',
+      };
+    },
+    bootstrapStarted(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+      }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch) return;
+      if (
+        state.room.kind !== 'awaiting_game_bootstrap'
+        || state.room.tableID !== action.payload.tableID
+        || state.room.bootstrap !== 'pending_c5'
+      ) return;
+      state.room.bootstrap = {
+        gameLoadEpoch: action.payload.gameLoadEpoch,
+        phase: 'waiting_init',
+        historyActionCount: 0,
+      };
+    },
+    bootstrapInitAccepted(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+      }>,
+    ) {
+      const { connectionEpoch, tableID, gameLoadEpoch } = action.payload;
+      if (state.connectionEpoch !== connectionEpoch) return;
+      if (
+        state.room.kind !== 'awaiting_game_bootstrap'
+        || state.room.tableID !== tableID
+        || state.room.bootstrap === 'pending_c5'
+        || state.room.bootstrap.gameLoadEpoch !== gameLoadEpoch
+        || state.room.bootstrap.phase !== 'waiting_init'
+      ) return;
+      state.room.bootstrap.phase = 'waiting_history';
+    },
+    bootstrapFailed(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+      }>,
+    ) {
+      const { connectionEpoch, tableID, gameLoadEpoch } = action.payload;
+      if (state.connectionEpoch !== connectionEpoch) return;
+      if (
+        state.room.kind !== 'awaiting_game_bootstrap'
+        || state.room.tableID !== tableID
+        || state.room.bootstrap === 'pending_c5'
+        || state.room.bootstrap.gameLoadEpoch !== gameLoadEpoch
+      ) return;
+      state.room.bootstrap.phase = 'failed';
+    },
+    bootstrapCompleted(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        metadata: GameMetadata;
+        game: GameState;
+        historyActionCount: number;
+      }>,
+    ) {
+      const {
+        connectionEpoch, tableID, gameLoadEpoch, metadata, game, historyActionCount,
+      } = action.payload;
+      if (state.connectionEpoch !== connectionEpoch) return;
+      if (
+        state.room.kind !== 'awaiting_game_bootstrap'
+        || state.room.tableID !== tableID
+        || state.room.bootstrap === 'pending_c5'
+        || state.room.bootstrap.gameLoadEpoch !== gameLoadEpoch
+        || state.room.bootstrap.phase !== 'waiting_history'
+      ) return;
+      state.room = {
+        kind: 'live_game',
+        tableID,
+        role: state.room.role,
+        gameLoadEpoch,
+        bootstrapPhase: 'live',
+        historyActionCount,
+        metadata: castDraft(metadata),
+        game: castDraft(game),
       };
     },
   },

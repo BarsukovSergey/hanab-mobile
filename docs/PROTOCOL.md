@@ -241,11 +241,39 @@ server → gameAction {...}
 
 `init` contains game metadata such as table/player identity, role, options, seed, and related settings.
 
+At pinned commit `054e859b97ebacc514ca37470e6bdfae5a93d467`, `getGameInfo1` and
+`getGameInfo2` both consume exactly `{ "tableID": number }`. The `init` payload is emitted by
+`server/src/command_get_game_info_1.go` with these fields:
+
+```text
+tableID, playerNames, ourPlayerIndex, spectating, shadowing, replay,
+databaseID, hasCustomSeed, seed, datetimeStarted, datetimeFinished, options,
+characterAssignments, characterMetadata, sharedReplay, sharedReplayLeader,
+sharedReplaySegment, sharedReplayEffMod, paused, pausePlayerIndex, pauseQueued
+```
+
+The embedded server `options` object includes `variantID` in addition to the pinned game package's
+`Options` fields. Game metadata is constructed with the pinned client algorithm: normalize `-1`
+character assignments to `null`, fill empty assignments with one `null` per player, resolve the
+pinned variant, then derive end-game length, cards per hand, minimum efficiency, and hard-variant
+status before creating the initial game state.
+
 `gameActionList` is the authoritative historical action stream used to reconstruct current state.
+
+The exact pinned response is `{ "tableID": number, "list": action[] }`. The Go action stream can
+contain `cardIdentity`, `clue`, `discard`, `draw`, `gameOver`, `play`, `playerTimes`, `strike`,
+`status`, and `turn` records. Pinned Go `clue` records include the legacy `turn` field and do not
+include the game package's optional-at-runtime `ignoreNegative` property; the official client
+therefore applies normal negative clues. `status` records are retained in authoritative history
+and are intentional no-ops in the pinned game reducer.
 
 `gameAction` represents subsequent live changes.
 
-Before implementing this phase, re-verify exact current schemas and determine whether a live `gameAction` observed during bootstrap can overlap with the later `gameActionList`. Do not implement naive history+deferred concatenation until that semantic is proven.
+The pinned official client ignores every game command other than `init` and `gameActionList` while
+its game UI is loading. The server builds and emits `gameActionList` while holding the table lock;
+incremental `gameAction` notification is a separate path. C5 follows the pinned loading behavior:
+premature incremental actions are discarded and never buffered, merged, deduplicated, retried, or
+replayed. Only successful full reduction of `gameActionList` can make bootstrap live.
 
 ## Hidden information
 

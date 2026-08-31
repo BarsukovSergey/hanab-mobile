@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import {
+  gameActionListSchema,
+  gameInitSchema,
+  incrementalGameActionSchema,
+} from './gameProtocol';
+
 const idSchema = z.number().int().nonnegative();
 
 const tableIDCommandSchema = z.object({
@@ -110,6 +116,9 @@ const schemas = {
   joined: tableJoinedSchema,
   left: tableLeftSchema,
   tableStart: tableStartSchema,
+  init: gameInitSchema,
+  gameActionList: gameActionListSchema,
+  gameAction: incrementalGameActionSchema,
   warning: z.object({ warning: z.string().min(1) }),
   error: z.object({ error: z.string().min(1) }),
 } as const;

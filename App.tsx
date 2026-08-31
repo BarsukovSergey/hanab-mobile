@@ -99,7 +99,7 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C4-B Proof</Text>
+        <Text style={styles.title}>Hanab C5 Proof</Text>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Typed lobby runtime</Text>
@@ -201,11 +201,31 @@ export default function App() {
 
         {roomState.room.kind === 'awaiting_game_bootstrap' && (
           <View style={styles.section}>
-            <Text style={styles.heading}>Authoritative started room</Text>
+            <Text style={styles.heading}>Authoritative game bootstrap</Text>
             <Text>tableID: {roomState.room.tableID}</Text>
             <Text>role: {roomState.room.role}</Text>
-            <Text>tableStart: YES</Text>
-            <Text>bootstrap: PENDING C5</Text>
+            <Text>
+              gameLoadEpoch: {roomState.room.bootstrap === 'pending_c5'
+                ? 'PENDING'
+                : roomState.room.bootstrap.gameLoadEpoch}
+            </Text>
+            <Text>
+              bootstrap phase: {roomState.room.bootstrap === 'pending_c5'
+                ? 'pending'
+                : roomState.room.bootstrap.phase}
+            </Text>
+            <Text>authoritative history actions: 0</Text>
+          </View>
+        )}
+
+        {roomState.room.kind === 'live_game' && (
+          <View style={styles.section}>
+            <Text style={styles.heading}>Authoritative game bootstrap</Text>
+            <Text>tableID: {roomState.room.tableID}</Text>
+            <Text>role: {roomState.room.role}</Text>
+            <Text>gameLoadEpoch: {roomState.room.gameLoadEpoch}</Text>
+            <Text>bootstrap phase: LIVE</Text>
+            <Text>authoritative history actions: {roomState.room.historyActionCount}</Text>
           </View>
         )}
 

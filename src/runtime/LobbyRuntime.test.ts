@@ -284,10 +284,17 @@ describe('deterministic lobby runtime', () => {
         tableID: 123,
         role: 'spectator',
         tableStartReceived: true,
-        bootstrap: 'pending_c5',
+        bootstrap: {
+          gameLoadEpoch: 1,
+          phase: 'waiting_init',
+          historyActionCount: 0,
+        },
       },
     });
-    expect(socket.sent).toHaveLength(1);
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+      'getGameInfo1 {"tableID":123}',
+    ]);
   });
 
   test('malformed, mismatched, and replay tableStart do not transition', async () => {
@@ -589,10 +596,17 @@ describe('deterministic lobby runtime', () => {
       tableID: 123,
       role: 'player',
       tableStartReceived: true,
-      bootstrap: 'pending_c5',
+      bootstrap: {
+        gameLoadEpoch: 1,
+        phase: 'waiting_init',
+        historyActionCount: 0,
+      },
     });
     expect(store.getState().room.pendingJoin).toBeNull();
-    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'getGameInfo1 {"tableID":123}',
+    ]);
   });
 
   test('same-table tableStart overrides an established pregame room', async () => {
@@ -616,12 +630,19 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
-      bootstrap: 'pending_c5',
+      bootstrap: {
+        gameLoadEpoch: 1,
+        phase: 'waiting_init',
+        historyActionCount: 0,
+      },
     });
-    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'getGameInfo1 {"tableID":123}',
+    ]);
   });
 
-  test('same-table tableStart overrides pregame and a pending leave without C5 commands', async () => {
+  test('same-table tableStart overrides pregame and a pending leave, then starts C5 once', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
     session.sockets.push(Promise.resolve(socket));
@@ -647,14 +668,18 @@ describe('deterministic lobby runtime', () => {
       tableID: 123,
       role: 'player',
       tableStartReceived: true,
-      bootstrap: 'pending_c5',
+      bootstrap: {
+        gameLoadEpoch: 1,
+        phase: 'waiting_init',
+        historyActionCount: 0,
+      },
     });
     expect(store.getState().room.pendingLeaveTableID).toBeNull();
     expect(socket.sent).toEqual([
       'tableJoin {"tableID":123}',
       'tableLeave {"tableID":123}',
+      'getGameInfo1 {"tableID":123}',
     ]);
-    expect(socket.sent.some((frame) => frame.startsWith('getGameInfo'))).toBe(false);
   });
 
   test('a malformed known event reports an issue without mutating lobby state', async () => {

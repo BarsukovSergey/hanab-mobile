@@ -5,6 +5,7 @@ import path from 'node:path';
 const ALLOWED_PREFIXES = [
   'src/game/upstream/',
   'src/game/selectors/',
+  'src/game/bootstrap/',
   'src/game/c2/',
 ];
 
@@ -16,7 +17,7 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-test('direct upstream imports stay inside the allowed C2 boundary', () => {
+test('direct upstream imports stay inside the allowed engine boundaries', () => {
   const projectRoot = process.cwd();
   const upstreamRoot = path.join(projectRoot, 'src', 'game', 'upstream');
   const files = [path.join(projectRoot, 'App.tsx'), ...sourceFiles(path.join(projectRoot, 'src'))];
@@ -34,6 +35,21 @@ test('direct upstream imports stay inside the allowed C2 boundary', () => {
       return resolved === upstreamRoot || resolved.startsWith(`${upstreamRoot}${path.sep}`);
     });
     return importsUpstream
+      ? [relative]
+      : [];
+  });
+
+  expect(violations).toEqual([]);
+});
+
+test('production source never imports the C2 proof harness', () => {
+  const projectRoot = process.cwd();
+  const files = [path.join(projectRoot, 'App.tsx'), ...sourceFiles(path.join(projectRoot, 'src'))];
+  const violations = files.flatMap((file) => {
+    const relative = path.relative(projectRoot, file).replaceAll('\\', '/');
+    if (relative.startsWith('src/game/c2/')) return [];
+    const text = fs.readFileSync(file, 'utf8');
+    return /(?:from\s+|import\s*)['"][^'"]*game\/c2(?:\/|['"])/.test(text)
       ? [relative]
       : [];
   });

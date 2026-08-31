@@ -1,4 +1,5 @@
 import type { NetworkSession, NetworkSocket } from '../network/types';
+import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
 import {
   decodeServerFrame,
   encodeClientFrame,
@@ -46,6 +47,7 @@ export class LobbyRuntime {
   private current: OwnedConnection | null = null;
   private connectionEpoch: number;
   private connectPromise: Promise<void> | null = null;
+  private readonly gameBootstrap: GameBootstrapCoordinator;
 
   constructor(
     private readonly networkSession: NetworkSession,
@@ -57,6 +59,10 @@ export class LobbyRuntime {
     private readonly welcomeTimeoutMs = DEFAULT_WELCOME_TIMEOUT_MS,
   ) {
     this.connectionEpoch = store.getState().session.connectionEpoch;
+    this.gameBootstrap = new GameBootstrapCoordinator(
+      store,
+      (frame) => this.sendEncoded(frame),
+    );
   }
 
   connect(): Promise<void> {
@@ -82,6 +88,7 @@ export class LobbyRuntime {
       listeners: null,
     };
     this.current = owned;
+    this.gameBootstrap.invalidateConnection(epoch);
     this.store.dispatch(sessionActions.connectionStarted({ epoch }));
     if (previous !== null) this.dispose(previous, true);
 
@@ -102,6 +109,7 @@ export class LobbyRuntime {
     const owned = this.current;
     if (owned === null) return;
     this.current = null;
+    this.gameBootstrap.invalidate();
     this.dispose(owned, true);
     this.store.dispatch(
       sessionActions.connectionClosed({ epoch: owned.epoch, error: null }),
@@ -274,7 +282,29 @@ export class LobbyRuntime {
           epoch,
           tableStart: event.data,
         }));
+        this.gameBootstrap.startFromAuthoritativeRoom(epoch);
         break;
+      case 'init': {
+        const gameLoadEpoch = this.gameBootstrap.currentGameLoadEpoch;
+        if (gameLoadEpoch !== null) {
+          this.gameBootstrap.receiveInit(epoch, gameLoadEpoch, event.data);
+        }
+        break;
+      }
+      case 'gameActionList': {
+        const gameLoadEpoch = this.gameBootstrap.currentGameLoadEpoch;
+        if (gameLoadEpoch !== null) {
+          this.gameBootstrap.receiveHistory(epoch, gameLoadEpoch, event.data);
+        }
+        break;
+      }
+      case 'gameAction': {
+        const gameLoadEpoch = this.gameBootstrap.currentGameLoadEpoch;
+        if (gameLoadEpoch !== null) {
+          this.gameBootstrap.receiveIncremental(epoch, gameLoadEpoch, event.data);
+        }
+        break;
+      }
       case 'warning':
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
@@ -293,6 +323,7 @@ export class LobbyRuntime {
   private onClose(owned: OwnedConnection, event: WebSocketCloseEvent): void {
     if (!this.isCurrent(owned)) return;
     this.current = null;
+    this.gameBootstrap.invalidate();
     this.dispose(owned, false);
     this.store.dispatch(sessionActions.connectionClosed({
       epoch: owned.epoch,
@@ -303,6 +334,7 @@ export class LobbyRuntime {
   private failCurrent(owned: OwnedConnection, error: string): void {
     if (!this.isCurrent(owned)) return;
     this.current = null;
+    this.gameBootstrap.invalidate();
     this.dispose(owned, true);
     this.store.dispatch(sessionActions.connectionFailed({
       epoch: owned.epoch,
