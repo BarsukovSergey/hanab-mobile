@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { decodeServerFrame } from './lobbyProtocol';
+import { decodeServerFrame, encodeTableSpectateFrame } from './lobbyProtocol';
 
 const user = {
   userID: 7,
@@ -62,5 +62,26 @@ describe('lobby protocol decoder', () => {
   test('tolerates and strips additive unknown fields', () => {
     const result = decodeServerFrame(`user ${JSON.stringify({ ...user, future: { nested: true } })}`);
     expect(result).toEqual({ kind: 'event', event: { command: 'user', data: user } });
+  });
+
+  test('encodes the exact ordinary spectate command', () => {
+    expect(encodeTableSpectateFrame(123)).toBe(
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    );
+  });
+
+  test('validates the pinned tableStart payload', () => {
+    expect(decodeServerFrame('tableStart {"tableID":123,"replay":false}')).toEqual({
+      kind: 'event',
+      event: {
+        command: 'tableStart',
+        data: { tableID: 123, replay: false },
+      },
+    });
+    expect(decodeServerFrame('tableStart {"tableID":123}')).toEqual({
+      kind: 'malformed',
+      command: 'tableStart',
+      issue: 'invalid-payload',
+    });
   });
 });

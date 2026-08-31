@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 
 import { lobbySlice, tablesAdapter, usersAdapter } from './lobbySlice';
+import { roomSlice } from './roomSlice';
 import { sessionSlice } from './sessionSlice';
 
 export function createAppStore() {
@@ -8,6 +9,7 @@ export function createAppStore() {
     reducer: {
       session: sessionSlice.reducer,
       lobby: lobbySlice.reducer,
+      room: roomSlice.reducer,
     },
   });
 }

@@ -5,8 +5,10 @@ import type {
   NetworkSocket,
   SessionCheckResult,
 } from '../network/types';
+import type { LobbyTable } from '../protocol/lobbyProtocol';
+import { lobbyActions } from '../store/lobbySlice';
 import { createAppStore, userSelectors } from '../store/store';
-import { LobbyRuntime } from './LobbyRuntime';
+import { isSpectateEligible, LobbyRuntime } from './LobbyRuntime';
 
 type ListenerMap = {
   open: Set<() => void>;
@@ -87,6 +89,23 @@ function deferred<T>() {
 
 const welcomeFrame = 'welcome {"userID":1,"username":"Ada","playingAtTables":[]}';
 const userFrame = 'user {"userID":1,"name":"Ada","status":0,"hyphenated":false,"inactive":false}';
+const runningTable: LobbyTable = {
+  id: 123,
+  name: 'Running table',
+  numPlayers: 3,
+  maxPlayers: 5,
+  running: true,
+  variant: 'No Variant',
+  passwordProtected: false,
+  joined: false,
+  progress: 7,
+  players: ['Ada', 'Bob', 'Cy'],
+  sharedReplay: false,
+};
+
+function addRunningTable(store: ReturnType<typeof createAppStore>, epoch = 1): void {
+  store.dispatch(lobbyActions.tableReceived({ epoch, table: runningTable }));
+}
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -97,6 +116,13 @@ afterEach(() => {
 });
 
 describe('deterministic lobby runtime', () => {
+  test('only running non-replay non-joined tables are spectate eligible', () => {
+    expect(isSpectateEligible(runningTable)).toBe(true);
+    expect(isSpectateEligible({ ...runningTable, running: false })).toBe(false);
+    expect(isSpectateEligible({ ...runningTable, sharedReplay: true })).toBe(false);
+    expect(isSpectateEligible({ ...runningTable, joined: true })).toBe(false);
+  });
+
   test('OPEN is not READY; only a valid welcome makes it ready', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
@@ -184,6 +210,128 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toEqual([]);
     expect(runtime.send('futureCommand', { value: 1 })).toBe(true);
     expect(socket.sent).toEqual(['futureCommand {"value":1}']);
+  });
+
+  test('spectate sends exactly once and does not transition before tableStart', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addRunningTable(store);
+
+    expect(runtime.spectate(123)).toBe(true);
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+    expect(store.getState().room.pendingSpectateTableID).toBe(123);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('valid matching non-replay tableStart enters awaiting game bootstrap', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addRunningTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+
+    expect(store.getState().room).toEqual({
+      connectionEpoch: 1,
+      pendingSpectateTableID: null,
+      room: {
+        kind: 'awaiting_game_bootstrap',
+        tableID: 123,
+        role: 'spectator',
+        tableStartReceived: true,
+        bootstrap: 'pending_c5',
+      },
+    });
+    expect(socket.sent).toHaveLength(1);
+  });
+
+  test('malformed, mismatched, and replay tableStart do not transition', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(welcomeFrame);
+    addRunningTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+
+    socket.emitMessage('tableStart {"tableID":123}');
+    socket.emitMessage('tableStart {"tableID":999,"replay":false}');
+    socket.emitMessage('tableStart {"tableID":123,"replay":true}');
+
+    expect(store.getState().session.protocolIssueCount).toBe(1);
+    expect(store.getState().room.pendingSpectateTableID).toBe(123);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('new epoch resets pending and room; stale tableStart cannot restore them', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(first), Promise.resolve(second));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+    addRunningTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    const staleMessages = first.snapshotMessageListeners();
+    first.emitMessage('tableStart {"tableID":123,"replay":false}');
+    expect(store.getState().room.room.kind).toBe('awaiting_game_bootstrap');
+
+    runtime.disconnect();
+    await runtime.connect();
+    for (const listener of staleMessages) {
+      listener({ data: 'tableStart {"tableID":123,"replay":false}' } as WebSocketMessageEvent);
+    }
+
+    expect(store.getState().room).toEqual({
+      connectionEpoch: 2,
+      pendingSpectateTableID: null,
+      room: { kind: 'none' },
+    });
+  });
+
+  test('spectate uses READY gate and is never replayed on a new connection', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(first), Promise.resolve(second));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    addRunningTable(store);
+
+    expect(runtime.spectate(123)).toBe(false);
+    first.emitMessage(welcomeFrame);
+    expect(first.sent).toEqual([]);
+    expect(runtime.spectate(123)).toBe(true);
+    expect(first.sent).toHaveLength(1);
+
+    runtime.disconnect();
+    await runtime.connect();
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+    expect(second.sent).toEqual([]);
+    expect(store.getState().room.pendingSpectateTableID).toBeNull();
   });
 
   test('a malformed known event reports an issue without mutating lobby state', async () => {

@@ -172,6 +172,18 @@ tableSpectate
 
 A running table responds by transitioning the client into game mode via `tableStart`.
 
+At the pinned commit, the exact server payload is:
+
+```json
+{
+  "tableID": 123,
+  "replay": false
+}
+```
+
+For the ordinary running-table spectate path, `replay` is `false`. The client must use the
+matching `tableID`; replay tables are outside C4-A.
+
 ## Game bootstrap
 
 Authoritative bootstrap sequence:

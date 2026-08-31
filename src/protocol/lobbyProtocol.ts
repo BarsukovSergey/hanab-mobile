@@ -2,6 +2,20 @@ import { z } from 'zod';
 
 const idSchema = z.number().int().nonnegative();
 
+export const tableSpectateCommandSchema = z.object({
+  tableID: idSchema,
+  shadowingPlayerIndex: z.literal(-1),
+});
+
+export type TableSpectateCommand = z.infer<typeof tableSpectateCommandSchema>;
+
+export const tableStartSchema = z.object({
+  tableID: idSchema,
+  replay: z.boolean(),
+});
+
+export type TableStart = z.infer<typeof tableStartSchema>;
+
 export const lobbyUserSchema = z.object({
   userID: idSchema,
   name: z.string().min(1),
@@ -47,6 +61,7 @@ const schemas = {
   tableList: z.array(lobbyTableSchema),
   table: lobbyTableSchema,
   tableGone: z.object({ tableID: idSchema }),
+  tableStart: tableStartSchema,
   warning: z.object({ warning: z.string().min(1) }),
   error: z.object({ error: z.string().min(1) }),
 } as const;
@@ -110,4 +125,12 @@ export function decodeServerFrame(frame: string): DecodeResult {
 
 export function encodeClientFrame(command: string, payload?: unknown): string {
   return payload === undefined ? command : `${command} ${JSON.stringify(payload)}`;
+}
+
+export function encodeTableSpectateFrame(tableID: number): string {
+  const payload = tableSpectateCommandSchema.parse({
+    tableID,
+    shadowingPlayerIndex: -1,
+  });
+  return encodeClientFrame('tableSpectate', payload);
 }

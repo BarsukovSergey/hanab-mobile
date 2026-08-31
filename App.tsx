@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { runGameCoreProbe } from './src/game/c2/gameCoreProbe';
+import { isSpectateEligible } from './src/runtime/LobbyRuntime';
 import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
 import {
@@ -38,6 +39,8 @@ export default function App() {
   const usersCount = useAppSelector(userSelectors.selectTotal);
   const tablesCount = useAppSelector(tableSelectors.selectTotal);
   const tables = useAppSelector(tableSelectors.selectAll);
+  const roomState = useAppSelector((state) => state.room);
+  const spectateTables = tables.filter(isSpectateEligible);
 
   const runProbe = useCallback(async () => {
     setProbe('UNKNOWN');
@@ -96,7 +99,7 @@ export default function App() {
       style={styles.flex}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab C3 Proof</Text>
+        <Text style={styles.title}>Hanab C4-A Proof</Text>
 
         <View style={styles.section}>
           <Text style={styles.heading}>Typed lobby runtime</Text>
@@ -128,12 +131,35 @@ export default function App() {
           />
         </View>
 
-        {tables.slice(0, 5).map((table) => (
-          <View style={styles.tableRow} key={table.id}>
-            <Text style={styles.tableName}>{table.name}</Text>
-            <Text>{table.variant} · {table.numPlayers}/{table.maxPlayers}</Text>
+        <View style={styles.section}>
+          <Text style={styles.heading}>Running tables</Text>
+          {spectateTables.length === 0 && <Text>No eligible running tables.</Text>}
+          {spectateTables.map((table) => (
+            <View style={styles.tableRow} key={table.id}>
+              <Text style={styles.tableName}>{table.name}</Text>
+              <Text>{table.variant} · {table.numPlayers}/{table.maxPlayers}</Text>
+              <Button
+                disabled={session.phase !== 'ready'
+                  || roomState.pendingSpectateTableID !== null
+                  || roomState.room.kind !== 'none'}
+                title={roomState.pendingSpectateTableID === table.id
+                  ? 'Awaiting tableStart'
+                  : 'Spectate'}
+                onPress={() => lobbyRuntime.spectate(table.id)}
+              />
+            </View>
+          ))}
+        </View>
+
+        {roomState.room.kind === 'awaiting_game_bootstrap' && (
+          <View style={styles.section}>
+            <Text style={styles.heading}>C4-A authoritative room</Text>
+            <Text>tableID: {roomState.room.tableID}</Text>
+            <Text>role: spectator</Text>
+            <Text>tableStart: YES</Text>
+            <Text>bootstrap: PENDING C5</Text>
           </View>
-        ))}
+        )}
 
         <View style={styles.section}>
           <Text style={styles.heading}>Session</Text>

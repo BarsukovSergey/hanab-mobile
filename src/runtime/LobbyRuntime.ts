@@ -2,9 +2,12 @@ import type { NetworkSession, NetworkSocket } from '../network/types';
 import {
   decodeServerFrame,
   encodeClientFrame,
+  encodeTableSpectateFrame,
+  type LobbyTable,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
 import { lobbyActions } from '../store/lobbySlice';
+import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
 import type { AppStore } from '../store/store';
 
@@ -105,18 +108,28 @@ export class LobbyRuntime {
 
   /** Internal no-queue send gate for later typed client commands. */
   send(command: string, payload?: unknown): boolean {
-    const owned = this.current;
+    return this.sendEncoded(encodeClientFrame(command, payload));
+  }
+
+  spectate(tableID: number): boolean {
+    const state = this.store.getState();
+    const table = state.lobby.tables.entities[tableID];
     if (
-      owned === null
-      || owned.epoch !== this.connectionEpoch
-      || owned.socket === null
-      || owned.socket.readyState !== SOCKET_OPEN
-      || this.store.getState().session.phase !== 'ready'
+      table === undefined
+      || !isSpectateEligible(table)
+      || state.room.room.kind !== 'none'
+      || state.room.pendingSpectateTableID !== null
     ) {
       return false;
     }
 
-    owned.socket.send(encodeClientFrame(command, payload));
+    const sent = this.sendEncoded(encodeTableSpectateFrame(tableID));
+    if (!sent) return false;
+
+    this.store.dispatch(roomActions.spectateRequested({
+      epoch: state.session.connectionEpoch,
+      tableID,
+    }));
     return true;
   }
 
@@ -201,6 +214,12 @@ export class LobbyRuntime {
       case 'tableGone':
         this.store.dispatch(lobbyActions.tableGone({ epoch, tableID: event.data.tableID }));
         break;
+      case 'tableStart':
+        this.store.dispatch(roomActions.tableStartReceived({
+          epoch,
+          tableStart: event.data,
+        }));
+        break;
       case 'warning':
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
@@ -240,6 +259,22 @@ export class LobbyRuntime {
     return this.current === owned && owned.epoch === this.connectionEpoch;
   }
 
+  private sendEncoded(frame: string): boolean {
+    const owned = this.current;
+    if (
+      owned === null
+      || owned.epoch !== this.connectionEpoch
+      || owned.socket === null
+      || owned.socket.readyState !== SOCKET_OPEN
+      || this.store.getState().session.phase !== 'ready'
+    ) {
+      return false;
+    }
+
+    owned.socket.send(frame);
+    return true;
+  }
+
   private dispose(owned: OwnedConnection, closeSocket: boolean): void {
     if (owned.timer !== null) {
       this.timers.clearTimeout(owned.timer);
@@ -257,4 +292,8 @@ export class LobbyRuntime {
       socket.close(1000, 'Connection disposed');
     }
   }
+}
+
+export function isSpectateEligible(table: LobbyTable): boolean {
+  return table.running && !table.sharedReplay && !table.joined;
 }
