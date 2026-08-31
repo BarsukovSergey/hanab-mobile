@@ -150,15 +150,6 @@ export class LobbyRuntime {
     this.appActive = active;
     if (!active) {
       this.cancelRetry();
-      const owned = this.current;
-      this.current = null;
-      this.gameBootstrap.invalidate();
-      if (owned !== null) {
-        this.dispose(owned, true);
-        this.store.dispatch(
-          sessionActions.connectionClosed({ epoch: owned.epoch, error: null }),
-        );
-      }
       return;
     }
     if (this.maintainConnection) {

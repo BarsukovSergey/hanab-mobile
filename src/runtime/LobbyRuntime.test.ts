@@ -290,7 +290,27 @@ describe('deterministic lobby runtime', () => {
     expect(session.openCalls).toBe(3);
   });
 
-  test('foreground reconnects immediately without waiting for backoff', async () => {
+  test('background keeps a healthy READY socket and foreground opens no duplicate', async () => {
+    const session = new FakeSession();
+    const first = new FakeSocket();
+    session.sockets.push(Promise.resolve(first));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    first.emitOpen();
+    first.emitMessage(welcomeFrame);
+
+    runtime.setAppActive(false);
+    expect(first.closeCalls).toHaveLength(0);
+    expect(store.getState().session.phase).toBe('ready');
+    runtime.setAppActive(true);
+    await Promise.resolve();
+    expect(session.openCalls).toBe(1);
+    expect(store.getState().session.connectionEpoch).toBe(1);
+    expect(store.getState().session.phase).toBe('ready');
+  });
+
+  test('close while inactive waits, then foreground reconnects immediately', async () => {
     const session = new FakeSession();
     const first = new FakeSocket();
     const second = new FakeSocket();
@@ -302,8 +322,11 @@ describe('deterministic lobby runtime', () => {
     first.emitMessage(welcomeFrame);
 
     runtime.setAppActive(false);
-    expect(first.closeCalls).toHaveLength(1);
-    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    first.emitClose();
+    expect(store.getState().session.phase).toBe('closed');
+    jest.advanceTimersByTime(60_000);
+    expect(session.openCalls).toBe(1);
+
     runtime.setAppActive(true);
     await Promise.resolve();
     expect(session.openCalls).toBe(2);
@@ -323,6 +346,8 @@ describe('deterministic lobby runtime', () => {
     socket.emitClose();
 
     runtime.disconnect();
+    runtime.setAppActive(false);
+    runtime.setAppActive(true);
     jest.advanceTimersByTime(60_000);
     expect(session.openCalls).toBe(1);
     expect(store.getState().session.phase).toBe('closed');
