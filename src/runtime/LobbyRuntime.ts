@@ -21,6 +21,8 @@ import {
   BASIC_VARIANT_NAMES,
   encodeChatFrame,
   encodeClientFrame,
+  encodeReplayActionFrame,
+  encodeTableRestartFrame,
   encodeTableCreateFrame,
   encodeTableReattendFrame,
   encodeTableJoinFrame,
@@ -384,6 +386,68 @@ export class LobbyRuntime {
     return this.store.getState().room.pendingUnattendTableID === tableID;
   }
 
+  navigateReplaySegment(segment: number): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'live_game'
+      || !Number.isInteger(segment)
+      || segment < 0
+      || room.clientState.replay.states[segment] === undefined
+    ) return false;
+    const shared = room.clientState.replay.shared;
+    if (shared === null || !shared.amLeader) {
+      this.store.dispatch(roomActions.reviewSegmentSelected({
+        tableID: room.tableID,
+        gameLoadEpoch: room.gameLoadEpoch,
+        segment,
+      }));
+      return true;
+    }
+    if (!this.isReadyCurrentRoom(room.tableID)) return false;
+    return this.sendEncoded(encodeReplayActionFrame(room.tableID, segment));
+  }
+
+  followReplayLeader(): boolean {
+    const room = this.store.getState().room.room;
+    if (
+      room.kind !== 'live_game'
+      || room.clientState.replay.shared === null
+      || room.clientState.replay.shared.amLeader
+      || room.clientState.replay.shared.useSharedSegments
+    ) return false;
+    this.store.dispatch(roomActions.followReplayLeader({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+    }));
+    return true;
+  }
+
+  quickRematch(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'live_game'
+      || !isQuickRematchEligible(room.clientState, state.room.pendingRestartTableID)
+      || !this.isReadyCurrentRoom(room.tableID)
+    ) return false;
+    this.store.dispatch(roomActions.restartRequested({
+      epoch: state.session.connectionEpoch,
+      tableID: room.tableID,
+    }));
+    if (this.store.getState().room.pendingRestartTableID !== room.tableID) return false;
+    let sent = false;
+    try {
+      sent = this.sendEncoded(encodeTableRestartFrame(room.tableID));
+    } catch {
+      sent = false;
+    }
+    if (!sent) this.store.dispatch(roomActions.commandPendingCleared({
+      epoch: state.session.connectionEpoch,
+    }));
+    return sent;
+  }
+
   play(cardOrder: number): boolean {
     return this.sendGameplayAction({ type: 0, target: cardOrder });
   }
@@ -579,6 +643,40 @@ export class LobbyRuntime {
       case 'finishOngoingGame':
         this.gameBootstrap.receiveFinishOngoingGame(epoch, event.data);
         break;
+      case 'replaySegment':
+        this.store.dispatch(roomActions.sharedReplaySegmentReceived({
+          epoch,
+          tableID: event.data.tableID,
+          segment: event.data.segment,
+        }));
+        break;
+      case 'replayLeader':
+        this.store.dispatch(roomActions.sharedReplayLeaderReceived({
+          epoch,
+          tableID: event.data.tableID,
+          name: event.data.name,
+        }));
+        break;
+      case 'spectators':
+        this.store.dispatch(roomActions.spectatorsReceived({
+          epoch,
+          tableID: event.data.tableID,
+          spectators: event.data.spectators,
+        }));
+        break;
+      case 'boot':
+        {
+          const room = this.store.getState().room.room;
+          if (
+            room.kind === 'live_game'
+            && room.tableID === event.data.TableID
+            && room.clientState.replay.shared !== null
+          ) {
+            this.gameBootstrap.invalidate();
+            this.store.dispatch(roomActions.bootReceived({ epoch, boot: event.data }));
+          }
+        }
+        break;
       case 'chat':
         this.store.dispatch(chatActions.messageReceived({
           epoch,
@@ -639,6 +737,29 @@ export class LobbyRuntime {
     epoch: number,
     welcome: Extract<ServerEvent, { command: 'welcome' }>['data'],
   ): void {
+    const spectatorTableID = welcome.disconSpectatingTable;
+    if (spectatorTableID !== undefined && spectatorTableID > 0) {
+      const shadowingPlayerIndex = welcome.disconShadowingSeat;
+      if (shadowingPlayerIndex === undefined) {
+        this.store.dispatch(sessionActions.protocolIssue({
+          epoch,
+          issue: 'welcome: missing disconShadowingSeat for spectator recovery',
+        }));
+        return;
+      }
+      if (this.sendEncoded(encodeTableSpectateFrame(
+        spectatorTableID,
+        shadowingPlayerIndex,
+      ))) {
+        this.store.dispatch(roomActions.recoveryRequested({
+          epoch,
+          tableID: spectatorTableID,
+          role: 'spectator',
+        }));
+      }
+      return;
+    }
+
     const playerTableID = welcome.playingAtTables[0];
     if (playerTableID !== undefined) {
       if (this.sendEncoded(encodeTableReattendFrame(playerTableID))) {
@@ -648,29 +769,21 @@ export class LobbyRuntime {
           role: 'player',
         }));
       }
-      return;
     }
+  }
 
-    const spectatorTableID = welcome.disconSpectatingTable;
-    if (spectatorTableID === undefined || spectatorTableID <= 0) return;
-    const shadowingPlayerIndex = welcome.disconShadowingSeat;
-    if (shadowingPlayerIndex === undefined) {
-      this.store.dispatch(sessionActions.protocolIssue({
-        epoch,
-        issue: 'welcome: missing disconShadowingSeat for spectator recovery',
-      }));
-      return;
-    }
-    if (this.sendEncoded(encodeTableSpectateFrame(
-      spectatorTableID,
-      shadowingPlayerIndex,
-    ))) {
-      this.store.dispatch(roomActions.recoveryRequested({
-        epoch,
-        tableID: spectatorTableID,
-        role: 'spectator',
-      }));
-    }
+  private isReadyCurrentRoom(tableID: number): boolean {
+    const state = this.store.getState();
+    const owned = this.current;
+    return owned !== null
+      && owned.epoch === this.connectionEpoch
+      && owned.epoch === state.session.connectionEpoch
+      && owned.socket !== null
+      && owned.socket.readyState === SOCKET_OPEN
+      && state.session.phase === 'ready'
+      && state.room.connectionEpoch === owned.epoch
+      && state.room.room.kind === 'live_game'
+      && state.room.room.tableID === tableID;
   }
 
   private scheduleRetry(): void {
@@ -801,6 +914,10 @@ export class LobbyRuntime {
     if (state.pendingJoin !== null) return `table${state.pendingJoin.tableID}`;
     const createdTableID = state.pendingCreate?.joinedTableID
       ?? state.pendingCreate?.stagedGame?.tableID;
+    const rematchTableID = state.rematchTransition?.newTableID;
+    if (rematchTableID !== undefined && rematchTableID !== null) {
+      return `table${rematchTableID}`;
+    }
     return createdTableID === undefined || createdTableID === null
       ? 'lobby'
       : `table${createdTableID}`;
@@ -865,7 +982,7 @@ export class LobbyRuntime {
 }
 
 export function isSpectateEligible(table: LobbyTable): boolean {
-  return table.running && !table.sharedReplay && !table.joined;
+  return table.running && (table.sharedReplay || !table.joined);
 }
 
 export function isJoinEligible(table: LobbyTable): boolean {
@@ -874,4 +991,23 @@ export function isJoinEligible(table: LobbyTable): boolean {
     && !table.joined
     && !table.passwordProtected
     && table.numPlayers < table.maxPlayers;
+}
+
+export function isQuickRematchEligible(
+  clientState: Extract<
+    ReturnType<AppStore['getState']>['room']['room'],
+    { kind: 'live_game' }
+  >['clientState'],
+  pendingRestartTableID: number | null,
+): boolean {
+  const shared = clientState.replay.shared;
+  if (
+    shared === null
+    || !shared.amLeader
+    || pendingRestartTableID !== null
+    || !clientState.metadata.playerNames.includes(clientState.metadata.ourUsername)
+    || clientState.spectators.length < 2
+  ) return false;
+  const activeNames = new Set(clientState.spectators.map((spectator) => spectator.name));
+  return clientState.metadata.playerNames.every((name) => activeNames.has(name));
 }

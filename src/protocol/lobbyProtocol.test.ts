@@ -3,6 +3,8 @@ import { describe, expect, test } from '@jest/globals';
 import {
   decodeServerFrame,
   encodeChatFrame,
+  encodeReplayActionFrame,
+  encodeTableRestartFrame,
   encodeTableCreateFrame,
   encodeTableReattendFrame,
   encodeTableJoinFrame,
@@ -220,5 +222,46 @@ describe('lobby protocol decoder', () => {
       command: 'tableStart',
       issue: 'invalid-payload',
     });
+  });
+
+  test('validates exact shared replay events including empty shadow username', () => {
+    expect(decodeServerFrame('replaySegment {"tableID":123,"segment":7}')).toEqual({
+      kind: 'event',
+      event: { command: 'replaySegment', data: { tableID: 123, segment: 7 } },
+    });
+    expect(decodeServerFrame('replayLeader {"tableID":123,"name":"Ada"}')).toEqual({
+      kind: 'event',
+      event: { command: 'replayLeader', data: { tableID: 123, name: 'Ada' } },
+    });
+    expect(decodeServerFrame(
+      'spectators {"tableID":123,"spectators":[{"name":"Ada",'
+      + '"shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',
+    )).toEqual({
+      kind: 'event',
+      event: {
+        command: 'spectators',
+        data: {
+          tableID: 123,
+          spectators: [{
+            name: 'Ada', shadowingPlayerIndex: -1, shadowingPlayerUsername: '',
+          }],
+        },
+      },
+    });
+    expect(decodeServerFrame('boot {"TableID":123}')).toEqual({
+      kind: 'event', event: { command: 'boot', data: { TableID: 123 } },
+    });
+    expect(decodeServerFrame('boot {"tableID":123}')).toMatchObject({
+      kind: 'malformed', command: 'boot', issue: 'invalid-payload',
+    });
+  });
+
+  test('encodes exact replay navigation and quick-rematch commands', () => {
+    expect(encodeReplayActionFrame(123, 7)).toBe(
+      'replayAction {"tableID":123,"type":0,"segment":7}',
+    );
+    expect(encodeTableRestartFrame(123)).toBe(
+      'tableRestart {"tableID":123,"hidePregame":true}',
+    );
   });
 });

@@ -9,7 +9,12 @@ import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { lobbyActions } from '../store/lobbySlice';
 import { createAppStore, userSelectors } from '../store/store';
-import { isJoinEligible, isSpectateEligible, LobbyRuntime } from './LobbyRuntime';
+import {
+  isJoinEligible,
+  isQuickRematchEligible,
+  isSpectateEligible,
+  LobbyRuntime,
+} from './LobbyRuntime';
 
 type ListenerMap = {
   open: Set<() => void>;
@@ -197,6 +202,50 @@ async function makeLiveRuntime(role: 'player' | 'spectator') {
     ],
   })}`);
   expect(ready.store.getState().room.room).toMatchObject({ kind: 'live_game', role });
+  return ready;
+}
+
+async function makeSharedReplayRuntime(leader = 'Ada') {
+  const ready = await makeReadyRuntime();
+  ready.store.dispatch(lobbyActions.tableReceived({
+    epoch: 1,
+    table: { ...runningTable, sharedReplay: true, joined: true },
+  }));
+  expect(ready.runtime.spectate(123)).toBe(true);
+  ready.socket.emitMessage('tableStart {"tableID":123,"replay":true}');
+  ready.socket.emitMessage(`init ${JSON.stringify(makeInit({
+    replay: true,
+    sharedReplay: true,
+    databaseID: 77,
+    datetimeFinished: '2026-08-31T00:10:00Z',
+    sharedReplayLeader: leader,
+    sharedReplaySegment: 1,
+  }))}`);
+  ready.socket.emitMessage(`gameActionList ${JSON.stringify({
+    tableID: 123,
+    list: [
+      ...Array.from({ length: 5 }, (_, order) => ({
+        type: 'draw', playerIndex: 0, order, suitIndex: 0, rank: 1,
+      })),
+      ...Array.from({ length: 5 }, (_, index) => ({
+        type: 'draw', playerIndex: 1, order: index + 5, suitIndex: index, rank: index + 1,
+      })),
+      { type: 'turn', num: 0, currentPlayerIndex: 0 },
+      {
+        type: 'clue', clue: { type: 1, value: 1 }, giver: 0,
+        list: [5], target: 1, turn: 0,
+      },
+      { type: 'turn', num: 1, currentPlayerIndex: 1 },
+    ],
+  })}`);
+  ready.socket.emitMessage(
+    'spectators {"tableID":123,"spectators":['
+    + '{"name":"Ada","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""},'
+    + '{"name":"Bob","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',
+  );
+  expect(ready.store.getState().room.room).toMatchObject({
+    kind: 'live_game', sharedReplay: true,
+  });
   return ready;
 }
 
@@ -394,10 +443,13 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().chat.messagesByRoom).toEqual({});
   });
 
-  test('only running non-replay non-joined tables are spectate eligible', () => {
+  test('running shared replays remain spectate eligible even when joined', () => {
     expect(isSpectateEligible(runningTable)).toBe(true);
     expect(isSpectateEligible({ ...runningTable, running: false })).toBe(false);
-    expect(isSpectateEligible({ ...runningTable, sharedReplay: true })).toBe(false);
+    expect(isSpectateEligible({ ...runningTable, sharedReplay: true })).toBe(true);
+    expect(isSpectateEligible({
+      ...runningTable, sharedReplay: true, joined: true,
+    })).toBe(true);
     expect(isSpectateEligible({ ...runningTable, joined: true })).toBe(false);
   });
 
@@ -408,6 +460,150 @@ describe('deterministic lobby runtime', () => {
     expect(isJoinEligible({ ...joinableTable, joined: true })).toBe(false);
     expect(isJoinEligible({ ...joinableTable, passwordProtected: true })).toBe(false);
     expect(isJoinEligible({ ...joinableTable, numPlayers: 5 })).toBe(false);
+  });
+
+  test('leader navigation waits for authoritative replaySegment', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    const sentBefore = socket.sent.length;
+    const before = store.getState().room.room;
+    if (before.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(before.clientState.replay.segment).toBe(1);
+    expect(before.clientState.replay.shared?.segment).toBe(1);
+
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'replayAction {"tableID":123,"type":0,"segment":0}',
+    ]);
+    const stillWaiting = store.getState().room.room;
+    if (stillWaiting.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(stillWaiting.clientState.replay.segment).toBe(1);
+    expect(stillWaiting.clientState.replay.shared?.segment).toBe(1);
+
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    const confirmed = store.getState().room.room;
+    if (confirmed.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(confirmed.clientState.replay.segment).toBe(0);
+    expect(confirmed.clientState.replay.shared?.segment).toBe(0);
+  });
+
+  test('follower navigation breaks away locally and Follow Leader resumes authority', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+    const sentBefore = socket.sent.length;
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.segment).toBe(0);
+    expect(room.clientState.replay.shared).toMatchObject({
+      segment: 1, useSharedSegments: false, leader: 'Bob', amLeader: false,
+    });
+    expect(socket.sent).toHaveLength(sentBefore);
+
+    socket.emitMessage('replaySegment {"tableID":123,"segment":1}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.segment).toBe(0);
+    expect(room.clientState.replay.shared?.segment).toBe(1);
+
+    expect(runtime.followReplayLeader()).toBe(true);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.segment).toBe(1);
+    expect(room.clientState.replay.shared?.useSharedSegments).toBe(true);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('leader and spectator events are table-scoped and drive rematch eligibility', async () => {
+    const { socket, store } = await makeSharedReplayRuntime();
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(isQuickRematchEligible(room.clientState, null)).toBe(true);
+    expect(isQuickRematchEligible(room.clientState, 123)).toBe(false);
+    expect(isQuickRematchEligible({
+      ...room.clientState,
+      metadata: {
+        ...room.clientState.metadata,
+        ourUsername: 'Viewer',
+      },
+    }, null)).toBe(false);
+
+    socket.emitMessage('spectators {"tableID":999,"spectators":[]}');
+    socket.emitMessage('replayLeader {"tableID":999,"name":"Bob"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.spectators).toHaveLength(2);
+    expect(room.clientState.replay.shared?.leader).toBe('Ada');
+
+    socket.emitMessage(
+      'spectators {"tableID":123,"spectators":['
+      + '{"name":"Ada","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',
+    );
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(isQuickRematchEligible(room.clientState, null)).toBe(false);
+    socket.emitMessage(
+      'spectators {"tableID":123,"spectators":['
+      + '{"name":"Ada","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""},'
+      + '{"name":"Cy","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',
+    );
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(isQuickRematchEligible(room.clientState, null)).toBe(false);
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Bob"}');
+    expect(store.getState().room.room).toMatchObject({
+      clientState: { replay: { shared: { leader: 'Bob', amLeader: false } } },
+    });
+  });
+
+  test('quick rematch follows boot to a new table across reordered duplicate events', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    const sentBefore = socket.sent.length;
+    expect(runtime.quickRematch()).toBe(true);
+    expect(runtime.quickRematch()).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'tableRestart {"tableID":123,"hidePregame":true}',
+    ]);
+    expect(store.getState().room.pendingRestartTableID).toBe(123);
+
+    socket.emitMessage('boot {"TableID":123}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.rematchTransition).toMatchObject({
+      oldTableID: 123,
+      newTableID: null,
+      localPlayedOriginalGame: true,
+    });
+
+    const newGame = createdPregameFrame(['Ada', 'Bob'], 456, 'Running table (#2)');
+    socket.emitMessage(newGame);
+    socket.emitMessage('joined {"tableID":456}');
+    socket.emitMessage('joined {"tableID":456}');
+    socket.emitMessage('chatList {"list":[],"unread":0}');
+    socket.emitMessage('chatList {"list":[],"unread":0}');
+    expect(store.getState().room.rematchTransition).toMatchObject({
+      newTableID: 456,
+      joinedConfirmed: true,
+      stagedGame: { tableID: 456 },
+    });
+
+    socket.emitMessage('tableStart {"tableID":456,"replay":false}');
+    expect(store.getState().room.rematchTransition).toBeNull();
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 456,
+      role: 'player',
+      sharedReplay: false,
+      bootstrap: { phase: 'waiting_init' },
+    });
+    expect(socket.sent.at(-1)).toBe('getGameInfo1 {"tableID":456}');
+
+    socket.emitMessage('boot {"TableID":123}');
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    socket.emitMessage('joined {"tableID":456}');
+    socket.emitMessage(newGame);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', tableID: 456,
+    });
+    socket.emitMessage(`init ${JSON.stringify(makeInit({ tableID: 456 }))}`);
+    expect(socket.sent.at(-1)).toBe('getGameInfo2 {"tableID":456}');
   });
 
   test('OPEN is not READY; only a valid welcome makes it ready', async () => {
@@ -434,8 +630,7 @@ describe('deterministic lobby runtime', () => {
     await runtime.connect();
     socket.emitOpen();
     socket.emitMessage(
-      'welcome {"userID":1,"username":"Ada","playingAtTables":[123],'
-      + '"disconSpectatingTable":999,"disconShadowingSeat":2}',
+      'welcome {"userID":1,"username":"Ada","playingAtTables":[123]}',
     );
 
     expect(socket.sent).toEqual(['tableReattend {"tableID":123}']);
@@ -483,6 +678,28 @@ describe('deterministic lobby runtime', () => {
       'getGameInfo2 {"tableID":123}',
       'loaded {"tableID":123}',
     ]);
+  });
+
+  test('shared replay reconnect prioritizes tableSpectate over stale playing hints', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(
+      'welcome {"userID":1,"username":"Ada","playingAtTables":[123],'
+      + '"disconSpectatingTable":123,"disconShadowingSeat":-1}',
+    );
+
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+    expect(store.getState().room.pendingRecovery).toEqual({
+      tableID: 123,
+      role: 'spectator',
+    });
   });
 
   test('spectator welcome resumes with the server-provided shadowing seat', async () => {
@@ -727,12 +944,15 @@ describe('deterministic lobby runtime', () => {
       pendingCreate: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
+      pendingRestartTableID: null,
+      rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
         role: 'spectator',
+        sharedReplay: false,
         tableStartReceived: true,
         bootstrap: {
           gameLoadEpoch: 1,
@@ -747,7 +967,7 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
-  test('malformed, mismatched, and replay tableStart do not transition', async () => {
+  test('malformed and mismatched tableStart do not transition', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
     session.sockets.push(Promise.resolve(socket));
@@ -761,7 +981,6 @@ describe('deterministic lobby runtime', () => {
 
     socket.emitMessage('tableStart {"tableID":123}');
     socket.emitMessage('tableStart {"tableID":999,"replay":false}');
-    socket.emitMessage('tableStart {"tableID":123,"replay":true}');
 
     expect(store.getState().session.protocolIssueCount).toBe(1);
     expect(store.getState().room.pendingSpectateTableID).toBe(123);
@@ -798,6 +1017,8 @@ describe('deterministic lobby runtime', () => {
       pendingCreate: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
+      pendingRestartTableID: null,
+      rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
@@ -1186,6 +1407,8 @@ describe('deterministic lobby runtime', () => {
       pendingCreate: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
+      pendingRestartTableID: null,
+      rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
@@ -1224,6 +1447,8 @@ describe('deterministic lobby runtime', () => {
       pendingCreate: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
+      pendingRestartTableID: null,
+      rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
@@ -1254,6 +1479,7 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
+      sharedReplay: false,
       tableStartReceived: true,
       bootstrap: {
         gameLoadEpoch: 1,
@@ -1289,6 +1515,7 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
+      sharedReplay: false,
       bootstrap: {
         gameLoadEpoch: 1,
         phase: 'waiting_init',
@@ -1326,6 +1553,7 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
+      sharedReplay: false,
       tableStartReceived: true,
       bootstrap: {
         gameLoadEpoch: 1,

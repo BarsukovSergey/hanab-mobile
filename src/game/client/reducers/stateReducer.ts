@@ -154,8 +154,16 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
 
     case 'replayEnter':
     case 'replayExit':
-    case 'replaySegment': {
-      state.replay = castDraft(replayReducer(state.replay, action));
+    case 'replaySegment':
+    case 'replaySharedSegment':
+    case 'replayUseSharedSegments':
+    case 'replayLeader': {
+      state.replay = castDraft(replayReducer(state.replay, action, state.metadata));
+      break;
+    }
+
+    case 'spectators': {
+      state.spectators = castDraft(action.spectators);
       break;
     }
 

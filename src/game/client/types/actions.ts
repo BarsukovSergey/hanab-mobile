@@ -1,6 +1,7 @@
 import type { CardIdentity } from '../../upstream/interfaces/CardIdentity';
 import type { GameAction } from '../../upstream/types/gameActions';
 import type { PlayerIndex } from '../../upstream/types/PlayerIndex';
+import type { Spectator } from './Spectator';
 
 export type Action =
   | ActionInit
@@ -8,12 +9,16 @@ export type Action =
   | GameAction
   | ReplayAction
   | ActionCardIdentities
+  | ActionSpectators
   | ActionFinishOngoingGame;
 
 export type ReplayAction =
   | ActionReplayEnter
   | ActionReplayExit
-  | ActionReplaySegment;
+  | ActionReplaySegment
+  | ActionReplaySharedSegment
+  | ActionReplayUseSharedSegments
+  | ActionReplayLeader;
 
 export interface ActionInit {
   readonly type: 'init';
@@ -50,6 +55,11 @@ export interface ActionFinishOngoingGame {
   readonly datetimeFinished: string;
 }
 
+export interface ActionSpectators {
+  readonly type: 'spectators';
+  readonly spectators: readonly Spectator[];
+}
+
 export interface ActionReplayEnter {
   readonly type: 'replayEnter';
   readonly segment: number;
@@ -62,4 +72,19 @@ export interface ActionReplayExit {
 export interface ActionReplaySegment {
   readonly type: 'replaySegment';
   readonly segment: number;
+}
+
+export interface ActionReplaySharedSegment {
+  readonly type: 'replaySharedSegment';
+  readonly segment: number;
+}
+
+export interface ActionReplayUseSharedSegments {
+  readonly type: 'replayUseSharedSegments';
+  readonly useSharedSegments: boolean;
+}
+
+export interface ActionReplayLeader {
+  readonly type: 'replayLeader';
+  readonly name: string;
 }

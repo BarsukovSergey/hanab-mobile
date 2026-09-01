@@ -59,6 +59,51 @@ function initialHistory() {
 }
 
 describe('authoritative game bootstrap coordinator', () => {
+  test('shared replay bootstraps through spectator semantics without loaded', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome }));
+    store.dispatch(roomActions.spectateRequested({ epoch: 1, tableID: 123 }));
+    store.dispatch(roomActions.tableStartReceived({
+      epoch: 1,
+      tableStart: { tableID: 123, replay: true },
+    }));
+    const frames: string[] = [];
+    const coordinator = new GameBootstrapCoordinator(store, (frame) => {
+      frames.push(frame);
+      return true;
+    });
+
+    expect(coordinator.startFromAuthoritativeRoom(1)).toBe(1);
+    const init = gameInitSchema.parse(makeInit({
+      replay: true,
+      sharedReplay: true,
+      databaseID: 77,
+      datetimeFinished: '2026-08-31T00:10:00Z',
+      sharedReplayLeader: 'Ada',
+      sharedReplaySegment: 0,
+    }));
+    expect(coordinator.receiveInit(1, 1, init)).toBe(true);
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(true);
+
+    expect(frames).toEqual([
+      'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+    ]);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game',
+      role: 'spectator',
+      sharedReplay: true,
+      clientState: {
+        finished: true,
+        replay: {
+          active: true,
+          shared: { leader: 'Ada', amLeader: true, useSharedSegments: true },
+        },
+      },
+    });
+  });
+
   test.each(['player', 'spectator'] as const)(
     '%s enters through the shared boundary and info commands are ordered exactly once',
     (role) => {

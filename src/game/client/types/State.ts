@@ -2,6 +2,7 @@ import type { CardIdentity } from '../../upstream/interfaces/CardIdentity';
 import type { GameMetadata } from '../../upstream/interfaces/GameMetadata';
 import type { GameState } from '../../upstream/interfaces/GameState';
 import type { ReplayState } from './ReplayState';
+import type { Spectator } from './Spectator';
 
 /**
  * Platform-independent subset of the pinned upstream client State.
@@ -31,4 +32,5 @@ export interface State {
   readonly datetimeFinished: string | null;
 
   readonly cardIdentities: readonly CardIdentity[];
+  readonly spectators: readonly Spectator[];
 }

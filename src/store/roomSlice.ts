@@ -3,6 +3,8 @@ import { castDraft, original } from 'immer';
 
 import type {
   PregameGame,
+  Boot,
+  Spectator,
   TableJoined,
   TableLeft,
   TableStart,
@@ -28,6 +30,7 @@ export type RoomState =
       kind: 'awaiting_game_bootstrap';
       tableID: number;
       role: 'player' | 'spectator';
+      sharedReplay: boolean;
       tableStartReceived: true;
       bootstrap:
         | 'pending_c5'
@@ -41,6 +44,7 @@ export type RoomState =
       kind: 'live_game';
       tableID: number;
       role: 'player' | 'spectator';
+      sharedReplay: boolean;
       gameLoadEpoch: number;
       bootstrapPhase: 'live';
       historyActionCount: number;
@@ -62,6 +66,15 @@ type PendingCreate = {
   stagedGame: PregameGame | null;
 };
 
+type RematchTransition = {
+  oldTableID: number;
+  originalPlayerNames: string[];
+  localPlayedOriginalGame: boolean;
+  newTableID: number | null;
+  joinedConfirmed: boolean;
+  stagedGame: PregameGame | null;
+};
+
 export type RoomSliceState = {
   connectionEpoch: number;
   pendingSpectateTableID: number | null;
@@ -77,6 +90,8 @@ export type RoomSliceState = {
     tableID: number;
     intendedPlayers: string[];
   } | null;
+  pendingRestartTableID: number | null;
+  rematchTransition: RematchTransition | null;
   pendingGameplayAction: {
     connectionEpoch: number;
     tableID: number;
@@ -95,6 +110,8 @@ const initialState: RoomSliceState = {
   pendingLeaveTableID: null,
   pendingUnattendTableID: null,
   pendingStart: null,
+  pendingRestartTableID: null,
+  rematchTransition: null,
   pendingGameplayAction: null,
   room: { kind: 'none' },
 };
@@ -193,6 +210,20 @@ export const roomSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (state.room.kind === 'awaiting_game_bootstrap') return;
       if (state.room.kind !== 'none') return;
+
+      const rematch = state.rematchTransition;
+      if (rematch !== null) {
+        const tableID = action.payload.joined.tableID;
+        if (
+          !rematch.localPlayedOriginalGame
+          || tableID === rematch.oldTableID
+          || (rematch.newTableID !== null && rematch.newTableID !== tableID)
+        ) return;
+        rematch.newTableID = tableID;
+        rematch.joinedConfirmed = true;
+        return;
+      }
+
       const pendingJoin = state.pendingJoin;
       if (pendingJoin?.tableID === action.payload.joined.tableID) {
         pendingJoin.joinedConfirmed = true;
@@ -233,6 +264,22 @@ export const roomSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (state.room.kind === 'awaiting_game_bootstrap') return;
       const { game } = action.payload;
+
+      const rematch = state.rematchTransition;
+      if (state.room.kind === 'none' && rematch !== null) {
+        const names = game.players.map((player) => player.name);
+        if (
+          !rematch.localPlayedOriginalGame
+          || game.tableID === rematch.oldTableID
+          || !game.players.some((player) => player.you)
+          || names.length !== rematch.originalPlayerNames.length
+          || names.some((name, index) => name !== rematch.originalPlayerNames[index])
+          || (rematch.newTableID !== null && rematch.newTableID !== game.tableID)
+        ) return;
+        rematch.newTableID = game.tableID;
+        rematch.stagedGame = game;
+        return;
+      }
 
       if (state.room.kind === 'pregame') {
         if (state.room.tableID === game.tableID) {
@@ -314,11 +361,52 @@ export const roomSlice = createSlice({
       ) return;
       state.pendingStart = { tableID, intendedPlayers };
     },
+    restartRequested(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.pendingRestartTableID !== null
+        || state.rematchTransition !== null
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== action.payload.tableID
+        || state.room.clientState.replay.shared === null
+      ) return;
+      state.pendingRestartTableID = action.payload.tableID;
+    },
+    bootReceived(
+      state,
+      action: PayloadAction<{ epoch: number; boot: Boot }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== action.payload.boot.TableID
+        || state.room.clientState.replay.shared === null
+      ) return;
+      const clientState = state.room.clientState;
+      state.rematchTransition = {
+        oldTableID: state.room.tableID,
+        originalPlayerNames: [...clientState.metadata.playerNames],
+        localPlayedOriginalGame: clientState.metadata.playerNames.includes(
+          clientState.metadata.ourUsername,
+        ),
+        newTableID: null,
+        joinedConfirmed: false,
+        stagedGame: null,
+      };
+      state.pendingRestartTableID = null;
+      state.pendingGameplayAction = null;
+      state.pendingUnattendTableID = null;
+      state.room = { kind: 'none' };
+    },
     commandPendingCleared(state, action: PayloadAction<{ epoch: number }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.pendingCreate = null;
       state.pendingStart = null;
       state.pendingUnattendTableID = null;
+      state.pendingRestartTableID = null;
     },
     leaveRequested(
       state,
@@ -377,32 +465,56 @@ export const roomSlice = createSlice({
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       const { tableStart } = action.payload;
-      if (tableStart.replay) return;
 
       let role: 'player' | 'spectator' | null = null;
+      const rematch = state.rematchTransition;
       if (
+        rematch !== null
+        && state.room.kind === 'none'
+        && !tableStart.replay
+        && tableStart.tableID !== rematch.oldTableID
+        && (rematch.newTableID === null || rematch.newTableID === tableStart.tableID)
+      ) {
+        role = rematch.localPlayedOriginalGame ? 'player' : 'spectator';
+      } else if (tableStart.replay && rematch !== null) {
+        return;
+      }
+      if (
+        role === null
+        &&
         (state.room.kind === 'awaiting_game_bootstrap' || state.room.kind === 'live_game')
         && state.room.tableID === tableStart.tableID
+        && state.room.sharedReplay === tableStart.replay
       ) {
         role = state.room.role;
       } else if (
+        role === null
+        &&
         state.room.kind === 'none'
         && state.pendingRecovery?.tableID === tableStart.tableID
       ) {
         role = state.pendingRecovery.role;
       } else if (
+        role === null
+        &&
         state.room.kind === 'none'
         && state.pendingSpectateTableID === tableStart.tableID
       ) {
         role = 'spectator';
       } else if (
+        role === null
+        &&
         state.room.kind === 'none'
         && state.pendingJoin?.tableID === tableStart.tableID
+        && !tableStart.replay
       ) {
         role = 'player';
       } else if (
+        role === null
+        &&
         state.room.kind === 'pregame'
         && state.room.tableID === tableStart.tableID
+        && !tableStart.replay
       ) {
         role = 'player';
       }
@@ -410,12 +522,14 @@ export const roomSlice = createSlice({
 
       state.pendingSpectateTableID = null;
       state.pendingRecovery = null;
+      state.rematchTransition = null;
       clearC4BState(state);
       state.pendingGameplayAction = null;
       state.room = {
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
         role,
+        sharedReplay: tableStart.replay,
         tableStartReceived: true,
         bootstrap: 'pending_c5',
       };
@@ -502,6 +616,7 @@ export const roomSlice = createSlice({
         kind: 'live_game',
         tableID,
         role: state.room.role,
+        sharedReplay: state.room.sharedReplay,
         gameLoadEpoch,
         bootstrapPhase: 'live',
         historyActionCount,
@@ -558,6 +673,7 @@ export const roomSlice = createSlice({
       ) return;
       const segment = action.payload.segment;
       const latestSegment = state.room.clientState.ongoingGame.turn.segment;
+      const shared = state.room.clientState.replay.shared;
       if (
         segment !== null
         && (
@@ -568,6 +684,21 @@ export const roomSlice = createSlice({
         )
       ) return;
       const current = original(state.room.clientState) ?? state.room.clientState;
+      if (shared !== null) {
+        if (segment === null || shared.amLeader) return;
+        let next = current as State;
+        if (shared.useSharedSegments) {
+          next = stateReducer(next, {
+            type: 'replayUseSharedSegments',
+            useSharedSegments: false,
+          });
+        }
+        state.room.clientState = castDraft(stateReducer(
+          next,
+          { type: 'replaySegment', segment },
+        ));
+        return;
+      }
       if (segment === null) {
         if (current.replay.active) {
           state.room.clientState = castDraft(stateReducer(current, { type: 'replayExit' }));
@@ -581,6 +712,84 @@ export const roomSlice = createSlice({
         ));
       }
       if (segment !== null) state.pendingGameplayAction = null;
+    },
+    sharedReplaySegmentReceived(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; segment: number }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.clientState.replay.shared === null
+        || payload.segment < 0
+        || state.room.clientState.replay.states[payload.segment] === undefined
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'replaySharedSegment',
+        segment: payload.segment,
+      }));
+    },
+    sharedReplayLeaderReceived(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; name: string }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.clientState.replay.shared === null
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'replayLeader',
+        name: payload.name,
+      }));
+    },
+    spectatorsReceived(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        spectators: readonly Spectator[];
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'spectators',
+        spectators: payload.spectators,
+      }));
+    },
+    followReplayLeader(
+      state,
+      action: PayloadAction<{ tableID: number; gameLoadEpoch: number }>,
+    ) {
+      if (
+        state.room.kind !== 'live_game'
+        || state.room.tableID !== action.payload.tableID
+        || state.room.gameLoadEpoch !== action.payload.gameLoadEpoch
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      const shared = current.replay.shared;
+      if (shared === null || shared.amLeader || shared.useSharedSegments) return;
+      let next = stateReducer(current, {
+        type: 'replayUseSharedSegments',
+        useSharedSegments: true,
+      });
+      next = stateReducer(next, {
+        type: 'replaySegment',
+        segment: shared.segment,
+      });
+      state.room.clientState = castDraft(next);
     },
     clientStateAccepted(
       state,
@@ -602,6 +811,7 @@ export const roomSlice = createSlice({
         || state.room.clientState.ongoingGame.turn.currentPlayerIndex !== null
       ) return;
       state.room.clientState = castDraft(payload.clientState);
+      state.room.sharedReplay = payload.clientState.replay.shared !== null;
       state.pendingGameplayAction = null;
     },
     gameHistoryAccepted(
@@ -670,6 +880,8 @@ export const roomSlice = createSlice({
       state.pendingRecovery = null;
       state.pendingGameplayAction = null;
       state.pendingUnattendTableID = null;
+      state.pendingRestartTableID = null;
+      state.rematchTransition = null;
       clearC4BState(state);
       state.room = { kind: 'none' };
     });
@@ -679,6 +891,7 @@ export const roomSlice = createSlice({
         state.pendingStart = null;
         state.pendingGameplayAction = null;
         state.pendingUnattendTableID = null;
+        state.pendingRestartTableID = null;
       }
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
@@ -687,6 +900,7 @@ export const roomSlice = createSlice({
         state.pendingStart = null;
         state.pendingGameplayAction = null;
         state.pendingUnattendTableID = null;
+        state.pendingRestartTableID = null;
       }
     });
     builder.addCase(sessionActions.signedOut, () => initialState);

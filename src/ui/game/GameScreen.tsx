@@ -8,6 +8,7 @@ import {
   getVisibleCardIdentityLabel,
 } from '../../game/selectors/gameplay';
 import { lobbyRuntime } from '../../runtime/application';
+import { isQuickRematchEligible } from '../../runtime/LobbyRuntime';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { GameCard } from './GameCard';
@@ -80,6 +81,10 @@ export function GameScreen() {
   const availableSegments = replay.states.flatMap((state, segment) => (
     state === undefined ? [] : [segment]
   ));
+  const shared = replay.shared;
+  const selectSegment = (segment: number) => {
+    lobbyRuntime.navigateReplaySegment(segment);
+  };
   const reviewControls = (
     <View style={styles.reviewArea}>
       <Text style={styles.actionTitle}>
@@ -90,11 +95,7 @@ export function GameScreen() {
         <Button
           disabled={availableSegments.length === 0 || currentSegment === 0}
           title="First"
-          onPress={() => dispatch(roomActions.reviewSegmentSelected({
-            tableID: liveRoom.tableID,
-            gameLoadEpoch: liveRoom.gameLoadEpoch,
-            segment: availableSegments[0] ?? 0,
-          }))}
+          onPress={() => selectSegment(availableSegments[0] ?? 0)}
         />
         <Button
           disabled={availableSegments.length === 0 || currentSegment <= 0}
@@ -103,11 +104,7 @@ export function GameScreen() {
             const previous = [...availableSegments]
               .reverse()
               .find((segment) => segment < currentSegment);
-            if (previous !== undefined) dispatch(roomActions.reviewSegmentSelected({
-              tableID: liveRoom.tableID,
-              gameLoadEpoch: liveRoom.gameLoadEpoch,
-              segment: previous,
-            }));
+            if (previous !== undefined) selectSegment(previous);
           }}
         />
         <Button
@@ -115,23 +112,40 @@ export function GameScreen() {
           title="Next"
           onPress={() => {
             const next = availableSegments.find((segment) => segment > currentSegment);
-            if (next !== undefined) dispatch(roomActions.reviewSegmentSelected({
-              tableID: liveRoom.tableID,
-              gameLoadEpoch: liveRoom.gameLoadEpoch,
-              segment: next,
-            }));
+            if (next !== undefined) selectSegment(next);
           }}
         />
         <Button
-          disabled={!replay.active}
-          title="Latest live"
-          onPress={() => dispatch(roomActions.reviewSegmentSelected({
-            tableID: liveRoom.tableID,
-            gameLoadEpoch: liveRoom.gameLoadEpoch,
-            segment: null,
-          }))}
+          disabled={!replay.active || (shared !== null && currentSegment >= latestSegment)}
+          title={shared === null ? 'Latest live' : 'Last'}
+          onPress={() => {
+            if (shared !== null) {
+              selectSegment(latestSegment);
+            } else {
+              dispatch(roomActions.reviewSegmentSelected({
+                tableID: liveRoom.tableID,
+                gameLoadEpoch: liveRoom.gameLoadEpoch,
+                segment: null,
+              }));
+            }
+          }}
         />
       </View>
+      {shared !== null && (
+        <View style={styles.sharedReplayStatus}>
+          <Text>Leader: {shared.leader}</Text>
+          <Text>
+            {shared.amLeader
+              ? 'You control the shared segment.'
+              : shared.useSharedSegments
+                ? `Following shared segment ${shared.segment}.`
+                : `Viewing locally; shared segment is ${shared.segment}.`}
+          </Text>
+          {!shared.amLeader && !shared.useSharedSegments && (
+            <Button title="Follow Leader" onPress={() => lobbyRuntime.followReplayLeader()} />
+          )}
+        </View>
+      )}
     </View>
   );
 
@@ -150,6 +164,8 @@ export function GameScreen() {
       clientState.datetimeStarted ?? '',
       clientState.datetimeFinished ?? '',
     );
+    const canQuickRematch = sessionPhase === 'ready'
+      && isQuickRematchEligible(clientState, roomState.pendingRestartTableID);
 
     return (
       <View style={styles.screen}>
@@ -187,6 +203,30 @@ export function GameScreen() {
             <Text>Duration: {formatMilliseconds(timestampDuration)}</Text>
           )}
         </View>
+
+        {shared !== null && (
+          <View style={styles.resultDetails}>
+            <Text style={styles.subheading}>Shared replay</Text>
+            <Text>{clientState.spectators.length} active spectators</Text>
+            {clientState.spectators.map((spectator) => (
+              <Text key={spectator.name}>
+                {spectator.name}
+                {spectator.shadowingPlayerUsername === ''
+                  ? ''
+                  : ` (viewing as ${spectator.shadowingPlayerUsername})`}
+              </Text>
+            ))}
+            {shared.amLeader && (
+              <Button
+                disabled={!canQuickRematch}
+                title={roomState.pendingRestartTableID === null
+                  ? 'Quick rematch'
+                  : 'Starting rematch...'}
+                onPress={() => lobbyRuntime.quickRematch()}
+              />
+            )}
+          </View>
+        )}
 
         {reviewControls}
         <ReplayTable
@@ -575,6 +615,7 @@ const styles = StyleSheet.create({
   pendingBanner: { backgroundColor: '#fff0c2', borderRadius: 8, padding: 12 },
   pendingText: { color: '#654a00', fontWeight: '600' },
   reviewArea: { backgroundColor: '#eef4ff', borderRadius: 10, gap: 8, padding: 12 },
+  sharedReplayStatus: { gap: 6 },
   resultDetails: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 4, padding: 12 },
   gameLog: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 8, padding: 12 },
   logEntry: { color: '#303840' },

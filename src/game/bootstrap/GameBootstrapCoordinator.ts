@@ -43,6 +43,7 @@ type ActiveLoad = {
   gameLoadEpoch: number;
   tableID: number;
   role: Role;
+  sharedReplay: boolean;
   phase: 'waiting_init' | 'waiting_history' | 'failed';
   info1Attempted: boolean;
   info2Attempted: boolean;
@@ -164,6 +165,7 @@ export class GameBootstrapCoordinator {
       gameLoadEpoch,
       tableID: room.tableID,
       role: room.role,
+      sharedReplay: room.sharedReplay,
       phase: 'waiting_init',
       info1Attempted: false,
       info2Attempted: false,
@@ -195,10 +197,11 @@ export class GameBootstrapCoordinator {
     const load = this.match(connectionEpoch, gameLoadEpoch, init.tableID);
     if (load === null || load.phase !== 'waiting_init' || load.info2Attempted) return false;
     if (
-      init.replay
-      || init.shadowing
-      || (load.role === 'player' && init.spectating)
-      || (load.role === 'spectator' && !init.spectating)
+      init.shadowing
+      || init.replay !== load.sharedReplay
+      || init.sharedReplay !== load.sharedReplay
+      || (!load.sharedReplay && load.role === 'player' && init.spectating)
+      || (!load.sharedReplay && load.role === 'spectator' && !init.spectating)
     ) return false;
 
     const username = this.store.getState().session.authenticatedUser?.username;
@@ -259,7 +262,11 @@ export class GameBootstrapCoordinator {
     // The pinned server marks players present only when it receives `loaded`.
     // Send it after the authoritative history has reduced successfully, matching
     // the official client's post-initialization handshake, and before exposing LIVE.
-    if (load.role === 'player' && !this.sendFrame(encodeLoadedFrame(load.tableID))) {
+    if (
+      !load.sharedReplay
+      && load.role === 'player'
+      && !this.sendFrame(encodeLoadedFrame(load.tableID))
+    ) {
       this.fail(load);
       return false;
     }

@@ -38,5 +38,6 @@ export function initialState(metadata: GameMetadata): State {
       suitIndex: null,
       rank: null,
     }),
+    spectators: [],
   };
 }

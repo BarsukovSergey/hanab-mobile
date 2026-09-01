@@ -97,6 +97,17 @@ export type TableSpectateCommand = z.infer<typeof tableSpectateCommandSchema>;
 export const tableReattendCommandSchema = tableIDCommandSchema;
 export type TableReattendCommand = z.infer<typeof tableReattendCommandSchema>;
 
+export const replayActionCommandSchema = z.object({
+  tableID: idSchema,
+  type: z.literal(0),
+  segment: z.number().int().nonnegative(),
+}).strict();
+
+export const tableRestartCommandSchema = z.object({
+  tableID: idSchema,
+  hidePregame: z.literal(true),
+}).strict();
+
 export const tableStartSchema = z.object({
   tableID: idSchema,
   replay: z.boolean(),
@@ -117,6 +128,37 @@ export const tableLeftSchema = z.object({
 });
 
 export type TableLeft = z.infer<typeof tableLeftSchema>;
+
+// The pinned Go BootMessage intentionally has no json tag.
+export const bootSchema = z.object({
+  TableID: idSchema,
+}).strict();
+
+export type Boot = z.infer<typeof bootSchema>;
+
+export const replaySegmentSchema = z.object({
+  tableID: idSchema,
+  segment: z.number().int().nonnegative(),
+}).strict();
+
+export const replayLeaderSchema = z.object({
+  tableID: idSchema,
+  name: z.string().min(1),
+}).strict();
+
+export const spectatorSchema = z.object({
+  name: z.string().min(1),
+  shadowingPlayerIndex: z.number().int().min(-1),
+  // The Go server emits an empty string when the spectator is not shadowing.
+  shadowingPlayerUsername: z.string(),
+}).strict();
+
+export type Spectator = z.infer<typeof spectatorSchema>;
+
+export const spectatorsSchema = z.object({
+  tableID: idSchema,
+  spectators: z.array(spectatorSchema).readonly(),
+}).strict();
 
 const pregamePlayerSchema = z.object({
   index: z.number().int().nonnegative(),
@@ -194,6 +236,10 @@ const schemas = {
   gameHistory: gameHistorySchema,
   cardIdentities: cardIdentitiesSchema,
   finishOngoingGame: finishOngoingGameSchema,
+  replaySegment: replaySegmentSchema,
+  replayLeader: replayLeaderSchema,
+  spectators: spectatorsSchema,
+  boot: bootSchema,
   chat: chatMessageSchema,
   chatList: chatListSchema,
   warning: z.object({ warning: z.string().min(1) }),
@@ -275,6 +321,16 @@ export function encodeTableSpectateFrame(
 export function encodeTableReattendFrame(tableID: number): string {
   const payload = tableReattendCommandSchema.parse({ tableID });
   return encodeClientFrame('tableReattend', payload);
+}
+
+export function encodeReplayActionFrame(tableID: number, segment: number): string {
+  const payload = replayActionCommandSchema.parse({ tableID, type: 0, segment });
+  return encodeClientFrame('replayAction', payload);
+}
+
+export function encodeTableRestartFrame(tableID: number): string {
+  const payload = tableRestartCommandSchema.parse({ tableID, hidePregame: true });
+  return encodeClientFrame('tableRestart', payload);
 }
 
 export function encodeTableJoinFrame(tableID: number): string {

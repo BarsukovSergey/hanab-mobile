@@ -9,5 +9,8 @@
 The reducer flow and C12-A branches are copied from the pinned client. Imports are adapted to the
 existing vendored game package. Browser-only UI, DOM/Konva, networking, notes, premoves, pauses,
 spectator presentation, and hypothetical replay branches are omitted from the mobile headless
-boundary. Shared replay data created by `finishOngoingGame` is retained, but C12-B networking and
-controls are not included.
+boundary. C12-B additionally retains the pinned `replaySharedSegment`,
+`replayUseSharedSegments`, `replayLeader`, and `spectators` reducer behavior. Mobile networking and
+controls dispatch those vendored actions while keeping the server-owned shared segment separate
+from the locally viewed replay segment. Browser-only replay arrows, sounds, and hypotheticals remain
+omitted.

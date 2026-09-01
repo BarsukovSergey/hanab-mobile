@@ -175,6 +175,8 @@ export default function App() {
     content = <Text>Connecting to lobby...</Text>;
   } else if (roomState.room.kind === 'awaiting_game_bootstrap') {
     content = <Text style={styles.heading}>Loading game...</Text>;
+  } else if (roomState.rematchTransition !== null) {
+    content = <Text style={styles.heading}>Starting rematch...</Text>;
   } else if (pregameRoom !== null) {
     const isOwner = session.authenticatedUser?.userID === pregameRoom.data.owner;
     content = (
