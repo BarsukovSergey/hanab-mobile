@@ -115,16 +115,24 @@ export default function App() {
   }
 
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
+    const liveTableID = roomState.room.tableID;
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}>
         <View style={styles.authBar}>
           <Text style={styles.authName}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
-          <Button title="Sign out" onPress={() => void signOut()} />
+          <View style={styles.authActions}>
+            <Button
+              disabled={roomState.pendingUnattendTableID !== null}
+              title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
+              onPress={() => lobbyRuntime.unattendLiveGame(liveTableID)}
+            />
+            <Button title="Sign out" onPress={() => void signOut()} />
+          </View>
         </View>
         <ScrollView contentContainerStyle={styles.gameContainer} keyboardShouldPersistTaps="handled">
           <GameScreen />
-          <ChatPanel room={`table${roomState.room.tableID}`} title="Table chat" />
+          <ChatPanel room={`table${liveTableID}`} title="Table chat" />
         </ScrollView>
         <StatusBar style="auto" />
       </KeyboardAvoidingView>
@@ -280,6 +288,7 @@ const styles = StyleSheet.create({
     paddingTop: 44, paddingBottom: 8,
   },
   authName: { fontSize: 16, fontWeight: '700' },
+  authActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   titleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   title: { fontSize: 28, fontWeight: '700' },
   section: { borderColor: '#999', borderWidth: 1, gap: 10, padding: 14 },

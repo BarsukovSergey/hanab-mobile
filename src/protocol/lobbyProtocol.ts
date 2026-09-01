@@ -81,6 +81,9 @@ export type TableJoinCommand = z.infer<typeof tableJoinCommandSchema>;
 export const tableLeaveCommandSchema = tableIDCommandSchema;
 export type TableLeaveCommand = z.infer<typeof tableLeaveCommandSchema>;
 
+export const tableUnattendCommandSchema = tableIDCommandSchema;
+export type TableUnattendCommand = z.infer<typeof tableUnattendCommandSchema>;
+
 export const tableSpectateCommandSchema = z.object({
   tableID: idSchema,
   shadowingPlayerIndex: z.number().int(),
@@ -276,6 +279,11 @@ export function encodeTableJoinFrame(tableID: number): string {
 export function encodeTableLeaveFrame(tableID: number): string {
   const payload = tableLeaveCommandSchema.parse({ tableID });
   return encodeClientFrame('tableLeave', payload);
+}
+
+export function encodeTableUnattendFrame(tableID: number): string {
+  const payload = tableUnattendCommandSchema.parse({ tableID });
+  return encodeClientFrame('tableUnattend', payload);
 }
 
 export function encodeTableCreateFrame(

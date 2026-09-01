@@ -27,6 +27,7 @@ import {
   encodeTableLeaveFrame,
   encodeTableSpectateFrame,
   encodeTableStartFrame,
+  encodeTableUnattendFrame,
   type LobbyTable,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
@@ -41,6 +42,7 @@ const SOCKET_CLOSING = 2;
 const DEFAULT_WELCOME_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000] as const;
 const MAX_STATUS_LENGTH = 240;
+const USER_STATUS_LOBBY = 0;
 
 export type RuntimeTimers = {
   setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
@@ -363,6 +365,25 @@ export class LobbyRuntime {
     return true;
   }
 
+  unattendLiveGame(tableID: number): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'live_game'
+      || room.tableID !== tableID
+      || state.room.pendingUnattendTableID !== null
+    ) return false;
+
+    const sent = this.sendEncoded(encodeTableUnattendFrame(tableID));
+    if (!sent) return false;
+
+    this.store.dispatch(roomActions.unattendRequested({
+      epoch: state.session.connectionEpoch,
+      tableID,
+    }));
+    return this.store.getState().room.pendingUnattendTableID === tableID;
+  }
+
   play(cardOrder: number): boolean {
     return this.sendGameplayAction({ type: 0, target: cardOrder });
   }
@@ -502,6 +523,10 @@ export class LobbyRuntime {
         break;
       case 'user':
         this.store.dispatch(lobbyActions.userReceived({ epoch, user: event.data }));
+        if (
+          event.data.userID === this.store.getState().session.authenticatedUser?.userID
+          && event.data.status === USER_STATUS_LOBBY
+        ) this.store.dispatch(roomActions.unattendConfirmed({ epoch }));
         break;
       case 'userLeft':
         this.store.dispatch(lobbyActions.userLeft({ epoch, userID: event.data.userID }));

@@ -9,6 +9,7 @@ import {
   encodeTableLeaveFrame,
   encodeTableSpectateFrame,
   encodeTableStartFrame,
+  encodeTableUnattendFrame,
 } from './lobbyProtocol';
 
 const user = {
@@ -140,6 +141,7 @@ describe('lobby protocol decoder', () => {
   test('encodes the exact join and leave commands', () => {
     expect(encodeTableJoinFrame(123)).toBe('tableJoin {"tableID":123}');
     expect(encodeTableLeaveFrame(123)).toBe('tableLeave {"tableID":123}');
+    expect(encodeTableUnattendFrame(123)).toBe('tableUnattend {"tableID":123}');
   });
 
   test('encodes exact basic table create and start commands', () => {

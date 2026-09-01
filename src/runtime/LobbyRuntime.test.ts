@@ -168,6 +168,38 @@ function addJoinableTable(store: ReturnType<typeof createAppStore>, epoch = 1): 
   store.dispatch(lobbyActions.tableReceived({ epoch, table: joinableTable }));
 }
 
+async function makeLiveRuntime(role: 'player' | 'spectator') {
+  const ready = await makeReadyRuntime();
+  if (role === 'player') {
+    addJoinableTable(ready.store);
+    ready.runtime.join(123);
+    ready.socket.emitMessage(pregameFrame());
+    ready.socket.emitMessage('joined {"tableID":123}');
+  } else {
+    addRunningTable(ready.store);
+    ready.runtime.spectate(123);
+  }
+  ready.socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+  ready.socket.emitMessage(`init ${JSON.stringify(makeInit({
+    spectating: role === 'spectator',
+  }))}`);
+  ready.socket.emitMessage(`gameActionList ${JSON.stringify({
+    tableID: 123,
+    list: [
+      ...Array.from({ length: 5 }, (_, order) => ({
+        type: 'draw', playerIndex: 0, order, suitIndex: -1, rank: -1,
+      })),
+      ...Array.from({ length: 5 }, (_, index) => ({
+        type: 'draw', playerIndex: 1, order: index + 5, suitIndex: index, rank: index + 1,
+      })),
+      { type: 'status', clues: 8, score: 0, maxScore: 25 },
+      { type: 'turn', num: 0, currentPlayerIndex: 0 },
+    ],
+  })}`);
+  expect(ready.store.getState().room.room).toMatchObject({ kind: 'live_game', role });
+  return ready;
+}
+
 beforeEach(() => {
   jest.useFakeTimers();
 });
@@ -177,6 +209,70 @@ afterEach(() => {
 });
 
 describe('deterministic lobby runtime', () => {
+  test.each(['player', 'spectator'] as const)(
+    '%s live game sends one exact unattend without optimistic exit',
+    async (role) => {
+      const { runtime, socket, store } = await makeLiveRuntime(role);
+      const sentBefore = socket.sent.length;
+
+      expect(runtime.unattendLiveGame(123)).toBe(true);
+      expect(runtime.unattendLiveGame(123)).toBe(false);
+
+      expect(socket.sent.slice(sentBefore)).toEqual(['tableUnattend {"tableID":123}']);
+      expect(store.getState().room.pendingUnattendTableID).toBe(123);
+      expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 123, role });
+    },
+  );
+
+  test('unattend rejects a wrong table and a non-READY live game', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    const sentBefore = [...socket.sent];
+    expect(runtime.unattendLiveGame(999)).toBe(false);
+    expect(socket.sent).toEqual(sentBefore);
+
+    runtime.disconnect();
+    expect(store.getState().room.room.kind).toBe('live_game');
+    expect(runtime.unattendLiveGame(123)).toBe(false);
+    expect(socket.sent).toEqual(sentBefore);
+  });
+
+  test('only authoritative own-user Lobby status completes unattend', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('spectator');
+    expect(runtime.unattendLiveGame(123)).toBe(true);
+
+    socket.emitMessage(
+      'user {"userID":2,"name":"Bob","status":0,"hyphenated":false,"inactive":false}',
+    );
+    expect(store.getState().room.pendingUnattendTableID).toBe(123);
+    expect(store.getState().room.room.kind).toBe('live_game');
+    socket.emitMessage(
+      'user {"userID":1,"name":"Ada","status":2,"tableID":123,'
+      + '"hyphenated":false,"inactive":false}',
+    );
+    expect(store.getState().room.room.kind).toBe('live_game');
+
+    socket.emitMessage(userFrame);
+    expect(store.getState().room.pendingUnattendTableID).toBeNull();
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('connection replacement clears unattend and never replays it', async () => {
+    const { session, runtime, socket: first, store } = await makeLiveRuntime('player');
+    expect(runtime.unattendLiveGame(123)).toBe(true);
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+
+    first.emitClose();
+    expect(store.getState().room.pendingUnattendTableID).toBeNull();
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+
+    expect(store.getState().room.pendingUnattendTableID).toBeNull();
+    expect(second.sent).toEqual([]);
+  });
+
   test('chat is READY-only, trimmed, bounded, and routed to the current room', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
@@ -630,6 +726,7 @@ describe('deterministic lobby runtime', () => {
       pendingJoin: null,
       pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingUnattendTableID: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: {
@@ -700,6 +797,7 @@ describe('deterministic lobby runtime', () => {
       pendingJoin: null,
       pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingUnattendTableID: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
@@ -1087,6 +1185,7 @@ describe('deterministic lobby runtime', () => {
       pendingJoin: null,
       pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingUnattendTableID: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
@@ -1124,6 +1223,7 @@ describe('deterministic lobby runtime', () => {
       pendingJoin: null,
       pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingUnattendTableID: null,
       pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },

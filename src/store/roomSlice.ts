@@ -67,6 +67,7 @@ export type RoomSliceState = {
   pendingJoin: PendingJoin | null;
   pendingCreate: PendingCreate | null;
   pendingLeaveTableID: number | null;
+  pendingUnattendTableID: number | null;
   pendingStart: {
     tableID: number;
     intendedPlayers: string[];
@@ -87,6 +88,7 @@ const initialState: RoomSliceState = {
   pendingJoin: null,
   pendingCreate: null,
   pendingLeaveTableID: null,
+  pendingUnattendTableID: null,
   pendingStart: null,
   pendingGameplayAction: null,
   room: { kind: 'none' },
@@ -311,6 +313,7 @@ export const roomSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.pendingCreate = null;
       state.pendingStart = null;
+      state.pendingUnattendTableID = null;
     },
     leaveRequested(
       state,
@@ -324,6 +327,28 @@ export const roomSlice = createSlice({
         || state.pendingStart !== null
       ) return;
       state.pendingLeaveTableID = action.payload.tableID;
+    },
+    unattendRequested(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== action.payload.tableID
+        || state.pendingUnattendTableID !== null
+      ) return;
+      state.pendingUnattendTableID = action.payload.tableID;
+    },
+    unattendConfirmed(state, action: PayloadAction<{ epoch: number }>) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.pendingUnattendTableID !== state.room.tableID
+      ) return;
+      state.pendingUnattendTableID = null;
+      state.pendingGameplayAction = null;
+      state.room = { kind: 'none' };
     },
     leftReceived(
       state,
@@ -559,6 +584,7 @@ export const roomSlice = createSlice({
       state.pendingSpectateTableID = null;
       state.pendingRecovery = null;
       state.pendingGameplayAction = null;
+      state.pendingUnattendTableID = null;
       clearC4BState(state);
       state.room = { kind: 'none' };
     });
@@ -567,6 +593,7 @@ export const roomSlice = createSlice({
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
+        state.pendingUnattendTableID = null;
       }
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
@@ -574,6 +601,7 @@ export const roomSlice = createSlice({
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
+        state.pendingUnattendTableID = null;
       }
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
