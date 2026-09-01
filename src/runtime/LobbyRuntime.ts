@@ -280,6 +280,32 @@ export class LobbyRuntime {
     return true;
   }
 
+  reattend(tableID: number): boolean {
+    const state = this.store.getState();
+    const table = state.lobby.tables.entities[tableID];
+    if (
+      table === undefined
+      || !isReattendEligible(table)
+      || state.room.room.kind !== 'none'
+      || state.room.pendingRecovery !== null
+      || state.room.pendingSpectateTableID !== null
+      || state.room.pendingJoin !== null
+      || state.room.pendingCreate !== null
+    ) {
+      return false;
+    }
+
+    const sent = this.sendEncoded(encodeTableReattendFrame(tableID));
+    if (!sent) return false;
+
+    this.store.dispatch(roomActions.recoveryRequested({
+      epoch: state.session.connectionEpoch,
+      tableID,
+      role: 'player',
+    }));
+    return this.store.getState().room.pendingRecovery?.tableID === tableID;
+  }
+
   createTable(name: string, maxPlayers: number, variant: string): boolean {
     const state = this.store.getState();
     const creatorUserID = state.session.authenticatedUser?.userID;
@@ -992,6 +1018,10 @@ export function isJoinEligible(table: LobbyTable): boolean {
     && !table.joined
     && !table.passwordProtected
     && table.numPlayers < table.maxPlayers;
+}
+
+export function isReattendEligible(table: LobbyTable): boolean {
+  return table.running && table.joined && !table.sharedReplay;
 }
 
 export function isQuickRematchEligible(

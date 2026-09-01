@@ -6,7 +6,11 @@ import {
 } from 'react-native';
 
 import { BASIC_VARIANT_NAMES } from './src/protocol/lobbyProtocol';
-import { isJoinEligible, isSpectateEligible } from './src/runtime/LobbyRuntime';
+import {
+  isJoinEligible,
+  isReattendEligible,
+  isSpectateEligible,
+} from './src/runtime/LobbyRuntime';
 import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated, tableSelectors } from './src/store/store';
@@ -32,6 +36,7 @@ export default function App() {
   const roomState = useAppSelector((state) => state.room);
   const spectateTables = tables.filter(isSpectateEligible);
   const joinTables = tables.filter(isJoinEligible);
+  const reattendTables = tables.filter(isReattendEligible);
   const pregameRoom = roomState.room.kind === 'pregame' ? roomState.room : null;
   const attendancePending = roomState.pendingSpectateTableID !== null
     || roomState.pendingRecovery !== null
@@ -227,6 +232,18 @@ export default function App() {
           <Button disabled={attendancePending || tableName.trim().length === 0}
             title={roomState.pendingCreate === null ? 'Create' : 'Creating...'}
             onPress={() => lobbyRuntime.createTable(tableName, maxPlayers, variant)} />
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.heading}>Your running game</Text>
+          {reattendTables.length === 0 && <Text>No game to resume.</Text>}
+          {reattendTables.map((table) => (
+            <View style={styles.tableRow} key={table.id}>
+              <Text style={styles.tableName}>{table.name}</Text>
+              <Text>{table.variant} · {table.numPlayers}/{table.maxPlayers}</Text>
+              <Button disabled={attendancePending} title="Return to game"
+                onPress={() => lobbyRuntime.reattend(table.id)} />
+            </View>
+          ))}
         </View>
         <View style={styles.section}>
           <Text style={styles.heading}>Running tables</Text>

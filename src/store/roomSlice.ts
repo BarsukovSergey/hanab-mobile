@@ -728,11 +728,19 @@ export const roomSlice = createSlice({
         || payload.segment < 0
         || state.room.clientState.replay.states[payload.segment] === undefined
       ) return;
+      const amLeader = state.room.clientState.replay.shared.amLeader;
       const current = original(state.room.clientState) ?? state.room.clientState;
-      state.room.clientState = castDraft(stateReducer(current, {
+      let next = stateReducer(current, {
         type: 'replaySharedSegment',
         segment: payload.segment,
-      }));
+      });
+      if (amLeader && next.replay.segment !== payload.segment) {
+        next = stateReducer(next, {
+          type: 'replaySegment',
+          segment: payload.segment,
+        });
+      }
+      state.room.clientState = castDraft(next);
     },
     sharedReplayLeaderReceived(
       state,

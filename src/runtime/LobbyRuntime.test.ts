@@ -7,11 +7,13 @@ import type {
 } from '../network/types';
 import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
+import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import { lobbyActions } from '../store/lobbySlice';
 import { createAppStore, userSelectors } from '../store/store';
 import {
   isJoinEligible,
   isQuickRematchEligible,
+  isReattendEligible,
   isSpectateEligible,
   LobbyRuntime,
 } from './LobbyRuntime';
@@ -462,52 +464,106 @@ describe('deterministic lobby runtime', () => {
     expect(isJoinEligible({ ...joinableTable, numPlayers: 5 })).toBe(false);
   });
 
-  test('leader navigation waits for authoritative replaySegment', async () => {
-    const { runtime, socket, store } = await makeSharedReplayRuntime();
-    const sentBefore = socket.sent.length;
-    const before = store.getState().room.room;
-    if (before.kind !== 'live_game') throw new Error('Expected shared replay');
-    expect(before.clientState.replay.segment).toBe(1);
-    expect(before.clientState.replay.shared?.segment).toBe(1);
+  test('only own running non-replay tables are reattend eligible', () => {
+    const ownRunningTable = { ...runningTable, joined: true };
+    expect(isReattendEligible(ownRunningTable)).toBe(true);
+    expect(isReattendEligible({ ...ownRunningTable, running: false })).toBe(false);
+    expect(isReattendEligible({ ...ownRunningTable, joined: false })).toBe(false);
+    expect(isReattendEligible({ ...ownRunningTable, sharedReplay: true })).toBe(false);
+  });
 
+  test('reattend uses the existing player recovery path and attendance guard', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.tableReceived({
+      epoch: 1,
+      table: { ...runningTable, joined: true },
+    }));
+
+    expect(runtime.reattend(123)).toBe(true);
+    expect(runtime.reattend(123)).toBe(false);
+    expect(socket.sent).toEqual(['tableReattend {"tableID":123}']);
+    expect(store.getState().room.pendingRecovery).toEqual({
+      tableID: 123,
+      role: 'player',
+    });
+
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 123,
+      role: 'player',
+    });
+  });
+
+  test('detached leader moves visible replay knowledge only on authoritative echo', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
     expect(runtime.navigateReplaySegment(0)).toBe(true);
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({
+      segment: 1, useSharedSegments: false, leader: 'Ada', amLeader: true,
+    });
+    expect(room.clientState.replay.segment).toBe(0);
+    const beforeVisible = room.clientState.visibleState;
+    if (beforeVisible === null) throw new Error('Expected visible replay state');
+    expect(beforeVisible.turn.turnNum).toBe(0);
+    const beforeCard = beforeVisible.deck[5];
+    if (beforeCard === undefined) throw new Error('Expected replay card');
+    expect(getCardKnowledgeViewModel('No Variant', beforeCard).positiveRanks).toEqual([]);
+
+    const sentBefore = socket.sent.length;
+    expect(runtime.navigateReplaySegment(1)).toBe(true);
     expect(socket.sent.slice(sentBefore)).toEqual([
-      'replayAction {"tableID":123,"type":0,"segment":0}',
+      'replayAction {"tableID":123,"type":0,"segment":1}',
     ]);
     const stillWaiting = store.getState().room.room;
     if (stillWaiting.kind !== 'live_game') throw new Error('Expected shared replay');
-    expect(stillWaiting.clientState.replay.segment).toBe(1);
+    expect(stillWaiting.clientState.replay.segment).toBe(0);
     expect(stillWaiting.clientState.replay.shared?.segment).toBe(1);
+    const waitingVisible = stillWaiting.clientState.visibleState;
+    if (waitingVisible === null) throw new Error('Expected visible replay state');
+    expect(waitingVisible.turn.turnNum).toBe(0);
 
-    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
-    const confirmed = store.getState().room.room;
-    if (confirmed.kind !== 'live_game') throw new Error('Expected shared replay');
-    expect(confirmed.clientState.replay.segment).toBe(0);
-    expect(confirmed.clientState.replay.shared?.segment).toBe(0);
+    socket.emitMessage('replaySegment {"tableID":123,"segment":1}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.segment).toBe(1);
+    expect(room.clientState.replay.shared).toMatchObject({
+      segment: 1, useSharedSegments: false, amLeader: true,
+    });
+    const confirmedVisible = room.clientState.visibleState;
+    if (confirmedVisible === null) throw new Error('Expected visible replay state');
+    expect(confirmedVisible.turn.turnNum).toBe(1);
+    const confirmedCard = confirmedVisible.deck[5];
+    if (confirmedCard === undefined) throw new Error('Expected replay card');
+    expect(getCardKnowledgeViewModel('No Variant', confirmedCard).positiveRanks).toEqual([1]);
   });
 
-  test('follower navigation breaks away locally and Follow Leader resumes authority', async () => {
+  test('detached follower keeps its viewed segment when shared truth changes', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
     const sentBefore = socket.sent.length;
     expect(runtime.navigateReplaySegment(0)).toBe(true);
+    expect(runtime.navigateReplaySegment(1)).toBe(true);
     let room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected shared replay');
-    expect(room.clientState.replay.segment).toBe(0);
+    expect(room.clientState.replay.segment).toBe(1);
     expect(room.clientState.replay.shared).toMatchObject({
       segment: 1, useSharedSegments: false, leader: 'Bob', amLeader: false,
     });
     expect(socket.sent).toHaveLength(sentBefore);
 
-    socket.emitMessage('replaySegment {"tableID":123,"segment":1}');
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
     room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected shared replay');
-    expect(room.clientState.replay.segment).toBe(0);
-    expect(room.clientState.replay.shared?.segment).toBe(1);
+    expect(room.clientState.replay.segment).toBe(1);
+    expect(room.clientState.replay.shared?.segment).toBe(0);
 
     expect(runtime.followReplayLeader()).toBe(true);
     room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected shared replay');
-    expect(room.clientState.replay.segment).toBe(1);
+    expect(room.clientState.replay.segment).toBe(0);
     expect(room.clientState.replay.shared?.useSharedSegments).toBe(true);
     expect(socket.sent).toHaveLength(sentBefore);
   });

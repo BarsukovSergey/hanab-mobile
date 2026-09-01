@@ -11,7 +11,7 @@ import { lobbyRuntime } from '../../runtime/application';
 import { isQuickRematchEligible } from '../../runtime/LobbyRuntime';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
-import { GameCard } from './GameCard';
+import { CardKnowledgeDetails, GameCard } from './GameCard';
 import type { GameState } from '../../game/bootstrap/types';
 
 const END_CONDITION_TEXT: Record<number, string> = {
@@ -541,6 +541,9 @@ function ReplayHands({
           <View style={styles.visibleHand}>
             {game.hands[playerIndex]?.map((order, position) => {
               const card = game.deck[order];
+              const knowledge = card === undefined
+                ? null
+                : getCardKnowledgeViewModel(variantName, card);
               return (
                 <View style={styles.visibleCard} key={order}>
                   <Text style={styles.visibleCardPosition}>{position + 1}</Text>
@@ -553,6 +556,9 @@ function ReplayHands({
                         card.rank,
                       )}
                   </Text>
+                  {knowledge !== null && (
+                    <CardKnowledgeDetails knowledge={knowledge} />
+                  )}
                 </View>
               );
             })}

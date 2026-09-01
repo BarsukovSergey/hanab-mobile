@@ -10,11 +10,6 @@ type GameCardProps = {
 };
 
 export function GameCard({ position, knowledge, selected, onSelect }: GameCardProps) {
-  const positiveClues = [
-    ...knowledge.positiveColorLabels,
-    ...knowledge.positiveRanks.map(String),
-  ];
-
   return (
     <Pressable
       accessibilityRole="button"
@@ -26,11 +21,28 @@ export function GameCard({ position, knowledge, selected, onSelect }: GameCardPr
         <Text style={styles.title}>Card {position + 1}</Text>
         {selected && <Text style={styles.selectedLabel}>SELECTED</Text>}
       </View>
+      <CardKnowledgeDetails knowledge={knowledge} />
+    </Pressable>
+  );
+}
+
+export function CardKnowledgeDetails({
+  knowledge,
+}: {
+  knowledge: CardKnowledgeViewModel;
+}) {
+  const positiveClues = [
+    ...knowledge.positiveColorLabels,
+    ...knowledge.positiveRanks.map(String),
+  ];
+
+  return (
+    <>
       {!knowledge.hasClueApplied && <Text style={styles.muted}>No clue information</Text>}
       {positiveClues.length > 0 && <Text>Clued: {positiveClues.join(' · ')}</Text>}
       <Text>Possible colors: {knowledge.possibleSuitLabels.join(' / ')}</Text>
       <Text>Possible ranks: {knowledge.possibleRanks.join(' / ')}</Text>
-    </Pressable>
+    </>
   );
 }
 
