@@ -1,4 +1,8 @@
-import type { NetworkSession, NetworkSocket } from '../network/types';
+import type {
+  NetworkSession,
+  NetworkSocket,
+  SessionCheckResult,
+} from '../network/types';
 import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
 import {
   isCurrentVariantColorClueValue,
@@ -154,6 +158,12 @@ export class LobbyRuntime {
     );
   }
 
+  async checkSession(): Promise<SessionCheckResult> {
+    const result = await this.networkSession.checkSession();
+    if (result.kind === 'missing') this.resetConfirmedMissingSession();
+    return result;
+  }
+
   async signOut(): Promise<SignOutResult> {
     // Stop retry/socket ownership before the cookie-changing HTTP request.
     this.disconnect();
@@ -164,9 +174,8 @@ export class LobbyRuntime {
       logoutError = safeStatus(error, 'Logout request failed');
     }
 
-    const check = await this.networkSession.checkSession();
+    const check = await this.checkSession();
     if (check.kind === 'missing') {
-      this.store.dispatch(sessionActions.signedOut());
       return { kind: 'signedOut' };
     }
 
@@ -759,6 +768,17 @@ export class LobbyRuntime {
     return createdTableID === undefined || createdTableID === null
       ? 'lobby'
       : `table${createdTableID}`;
+  }
+
+  private resetConfirmedMissingSession(): void {
+    this.maintainConnection = false;
+    this.retryAttempt = 0;
+    this.cancelRetry();
+    const owned = this.current;
+    this.current = null;
+    this.gameBootstrap.invalidate();
+    if (owned !== null) this.dispose(owned, true);
+    this.store.dispatch(sessionActions.signedOut());
   }
 
   private recordInboundDiagnostic(

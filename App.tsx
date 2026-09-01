@@ -41,7 +41,7 @@ export default function App() {
   const runProbe = useCallback(async () => {
     setProbe('checking');
     setStatusMessage('');
-    const result = await networkSession.checkSession();
+    const result = await lobbyRuntime.checkSession();
     if (result.kind === 'valid') {
       setProbe('valid');
       void lobbyRuntime.connect();
@@ -72,7 +72,7 @@ export default function App() {
     try {
       await networkSession.submitLogin(username, password);
       setPassword('');
-      const result = await networkSession.checkSession();
+      const result = await lobbyRuntime.checkSession();
       if (result.kind === 'valid') {
         setProbe('valid');
         void lobbyRuntime.connect();

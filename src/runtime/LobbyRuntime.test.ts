@@ -251,6 +251,43 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().chat.messagesByRoom).toEqual({});
   });
 
+  test('later confirmed missing resets stale state after indeterminate logout verification', async () => {
+    const { session, socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.userReceived({
+      epoch: 1,
+      user: { userID: 1, name: 'Ada', status: 0, hyphenated: false, inactive: false },
+    }));
+    socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"lobby"}');
+    addJoinableTable(store);
+    runtime.join(123);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    session.sessionCheckResult = {
+      kind: 'indeterminate',
+      error: { kind: 'transport', message: 'offline' },
+    };
+
+    await expect(runtime.signOut()).resolves.toEqual({
+      kind: 'failed', message: 'offline', sessionValid: false,
+    });
+    expect(store.getState().session.authenticatedUser).toEqual({ userID: 1, username: 'Ada' });
+    expect(store.getState().room.room.kind).toBe('pregame');
+    expect(store.getState().chat.messagesByRoom.lobby).toHaveLength(1);
+
+    session.sessionCheckResult = { kind: 'missing' };
+    await expect(runtime.checkSession()).resolves.toEqual({ kind: 'missing' });
+
+    expect(session.openCalls).toBe(1);
+    expect(store.getState().session).toMatchObject({
+      connectionEpoch: 0, phase: 'idle', authenticatedUser: null, resumeHints: null,
+    });
+    expect(userSelectors.selectTotal(store.getState())).toBe(0);
+    expect(store.getState().lobby.tables.ids).toEqual([]);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().chat.messagesByRoom).toEqual({});
+  });
+
   test('only running non-replay non-joined tables are spectate eligible', () => {
     expect(isSpectateEligible(runningTable)).toBe(true);
     expect(isSpectateEligible({ ...runningTable, running: false })).toBe(false);
