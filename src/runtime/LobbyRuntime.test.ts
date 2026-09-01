@@ -120,6 +120,39 @@ const pregameFrame = (tableID = 123, name = 'Pregame table') => (
   + '"options":{"variantName":"No Variant"},"passwordProtected":false,"maxPlayers":5}'
 );
 
+function createdPregameFrame(
+  players: readonly string[] = ['Ada'],
+  tableID = 321,
+  name = 'Mobile table',
+): string {
+  return `game ${JSON.stringify({
+    tableID,
+    name,
+    owner: 1,
+    players: players.map((playerName, index) => ({
+      index,
+      name: playerName,
+      you: index === 0,
+      present: true,
+    })),
+    options: { variantName: 'No Variant' },
+    passwordProtected: false,
+    maxPlayers: 5,
+  })}`;
+}
+
+async function makeReadyRuntime() {
+  const session = new FakeSession();
+  const socket = new FakeSocket();
+  session.sockets.push(Promise.resolve(socket));
+  const store = createAppStore();
+  const runtime = new LobbyRuntime(session, store);
+  await runtime.connect();
+  socket.emitOpen();
+  socket.emitMessage(welcomeFrame);
+  return { session, socket, store, runtime };
+}
+
 function addRunningTable(store: ReturnType<typeof createAppStore>, epoch = 1): void {
   store.dispatch(lobbyActions.tableReceived({ epoch, table: runningTable }));
 }
@@ -467,7 +500,9 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingRecovery: null,
       pendingJoin: null,
+      pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingStart: null,
       pendingGameplayAction: null,
       room: {
         kind: 'awaiting_game_bootstrap',
@@ -535,7 +570,9 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingRecovery: null,
       pendingJoin: null,
+      pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
     });
@@ -588,6 +625,200 @@ describe('deterministic lobby runtime', () => {
       joinedConfirmed: false,
       stagedGame: null,
     });
+  });
+
+  test('create validates v1 input, sends the exact frame once, and is not optimistic', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+
+    expect(runtime.createTable(' ', 5, 'No Variant')).toBe(false);
+    expect(runtime.createTable('Table', 1, 'No Variant')).toBe(false);
+    expect(runtime.createTable('Table', 5, 'Clue Starved')).toBe(false);
+    expect(runtime.createTable('  Mobile table  ', 5, 'No Variant')).toBe(true);
+    expect(runtime.createTable('Other', 4, '6 Suits')).toBe(false);
+
+    expect(socket.sent).toEqual([
+      'tableCreate {"name":"Mobile table","password":"","maxPlayers":5,'
+      + '"variant":"No Variant","timed":false,"timeBase":0,"timePerTurn":0,'
+      + '"speedrun":false,"cardCycle":false,"deckPlays":false,"emptyClues":false,'
+      + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
+      + '"detrimentalCharacters":false}',
+    ]);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingCreate).toMatchObject({
+      name: 'Mobile table',
+      creatorUserID: 1,
+      joinedTableID: null,
+      stagedGame: null,
+    });
+  });
+
+  test.each(['game-first', 'joined-first'] as const)(
+    'create enters pregame only after matching authoritative game + joined (%s)',
+    async (order) => {
+      const { runtime, socket, store } = await makeReadyRuntime();
+      expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+
+      if (order === 'game-first') {
+        socket.emitMessage(createdPregameFrame());
+        expect(store.getState().room.room).toEqual({ kind: 'none' });
+        socket.emitMessage('joined {"tableID":321}');
+      } else {
+        socket.emitMessage('joined {"tableID":321}');
+        expect(store.getState().room.room).toEqual({ kind: 'none' });
+        socket.emitMessage(createdPregameFrame());
+      }
+
+      expect(store.getState().room.pendingCreate).toBeNull();
+      expect(store.getState().room.room).toMatchObject({
+        kind: 'pregame',
+        tableID: 321,
+        role: 'player',
+        data: { name: 'Mobile table', owner: 1 },
+      });
+    },
+  );
+
+  test('mismatched create traffic cannot establish attendance', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+
+    socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Other table'));
+    socket.emitMessage(pregameFrame(321, 'Mobile table'));
+    socket.emitMessage('joined {"tableID":999}');
+
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingCreate).toMatchObject({
+      name: 'Mobile table',
+      creatorUserID: 1,
+      joinedTableID: 999,
+      stagedGame: null,
+    });
+  });
+
+  test('owner start sends authoritative intendedPlayers once and reuses bootstrap', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+
+    expect(runtime.startGame()).toBe(true);
+    expect(runtime.startGame()).toBe(false);
+    expect(socket.sent.at(-1)).toBe(
+      'tableStart {"tableID":321,"intendedPlayers":["Ada","Bob"]}',
+    );
+    expect(store.getState().room.pendingStart).toEqual({
+      tableID: 321,
+      intendedPlayers: ['Ada', 'Bob'],
+    });
+
+    socket.emitMessage('tableStart {"tableID":321,"replay":false}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap',
+      tableID: 321,
+      role: 'player',
+      bootstrap: { phase: 'waiting_init' },
+    });
+    expect(store.getState().room.pendingStart).toBeNull();
+    expect(socket.sent.slice(-2)).toEqual([
+      'tableStart {"tableID":321,"intendedPlayers":["Ada","Bob"]}',
+      'getGameInfo1 {"tableID":321}',
+    ]);
+  });
+
+  test('non-owner and fewer-than-two-player pregames cannot start', async () => {
+    const nonOwner = await makeReadyRuntime();
+    addJoinableTable(nonOwner.store);
+    expect(nonOwner.runtime.join(123)).toBe(true);
+    nonOwner.socket.emitMessage(pregameFrame());
+    nonOwner.socket.emitMessage('joined {"tableID":123}');
+    const nonOwnerFrames = [...nonOwner.socket.sent];
+    expect(nonOwner.runtime.startGame()).toBe(false);
+    expect(nonOwner.socket.sent).toEqual(nonOwnerFrames);
+
+    const soloOwner = await makeReadyRuntime();
+    expect(soloOwner.runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    soloOwner.socket.emitMessage(createdPregameFrame());
+    soloOwner.socket.emitMessage('joined {"tableID":321}');
+    const soloFrames = [...soloOwner.socket.sent];
+    expect(soloOwner.runtime.startGame()).toBe(false);
+    expect(soloOwner.socket.sent).toEqual(soloFrames);
+  });
+
+  test('authoritative player-list change releases pending start and permits retry', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+    expect(runtime.startGame()).toBe(true);
+
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    expect(store.getState().room.pendingStart).not.toBeNull();
+    expect(runtime.startGame()).toBe(false);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Cy']));
+    expect(store.getState().room.pendingStart).toBeNull();
+    expect(runtime.startGame()).toBe(true);
+    expect(socket.sent.slice(-2)).toEqual([
+      'tableStart {"tableID":321,"intendedPlayers":["Ada","Bob"]}',
+      'tableStart {"tableID":321,"intendedPlayers":["Ada","Cy"]}',
+    ]);
+  });
+
+  test.each(['warning', 'error'] as const)(
+    '%s clears create and start pending state',
+    async (command) => {
+      const create = await makeReadyRuntime();
+      expect(create.runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+      create.socket.emitMessage(`${command} {"${command}":"rejected"}`);
+      expect(create.store.getState().room.pendingCreate).toBeNull();
+
+      const start = await makeReadyRuntime();
+      expect(start.runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+      start.socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+      start.socket.emitMessage('joined {"tableID":321}');
+      expect(start.runtime.startGame()).toBe(true);
+      start.socket.emitMessage(`${command} {"${command}":"rejected"}`);
+      expect(start.store.getState().room.pendingStart).toBeNull();
+    },
+  );
+
+  test('connection replacement clears create/start intent and never replays either command', async () => {
+    const createSession = new FakeSession();
+    const createFirst = new FakeSocket();
+    const createSecond = new FakeSocket();
+    createSession.sockets.push(Promise.resolve(createFirst), Promise.resolve(createSecond));
+    const createStore = createAppStore();
+    const createRuntime = new LobbyRuntime(createSession, createStore);
+    await createRuntime.connect();
+    createFirst.emitOpen();
+    createFirst.emitMessage(welcomeFrame);
+    expect(createRuntime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    createRuntime.disconnect();
+    await createRuntime.connect();
+    expect(createStore.getState().room.pendingCreate).toBeNull();
+    createSecond.emitOpen();
+    createSecond.emitMessage(welcomeFrame);
+    expect(createSecond.sent).toEqual([]);
+
+    const startSession = new FakeSession();
+    const startFirst = new FakeSocket();
+    const startSecond = new FakeSocket();
+    startSession.sockets.push(Promise.resolve(startFirst), Promise.resolve(startSecond));
+    const startStore = createAppStore();
+    const startRuntime = new LobbyRuntime(startSession, startStore);
+    await startRuntime.connect();
+    startFirst.emitOpen();
+    startFirst.emitMessage(welcomeFrame);
+    expect(startRuntime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    startFirst.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    startFirst.emitMessage('joined {"tableID":321}');
+    expect(startRuntime.startGame()).toBe(true);
+    startFirst.emitClose();
+    expect(startStore.getState().room.pendingStart).toBeNull();
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    startSecond.emitOpen();
+    startSecond.emitMessage(welcomeFrame);
+    expect(startSecond.sent).toEqual([]);
   });
 
   test('pinned game-before-joined ordering stages data until join confirmation', async () => {
@@ -726,7 +957,9 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingRecovery: null,
       pendingJoin: null,
+      pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
     });
@@ -761,7 +994,9 @@ describe('deterministic lobby runtime', () => {
       pendingSpectateTableID: null,
       pendingRecovery: null,
       pendingJoin: null,
+      pendingCreate: null,
       pendingLeaveTableID: null,
+      pendingStart: null,
       pendingGameplayAction: null,
       room: { kind: 'none' },
     });

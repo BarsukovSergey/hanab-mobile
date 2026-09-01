@@ -12,6 +12,40 @@ const tableIDCommandSchema = z.object({
   tableID: idSchema,
 });
 
+export const BASIC_VARIANT_NAMES = [
+  'No Variant',
+  '6 Suits',
+  'Black (6 Suits)',
+  'Rainbow (6 Suits)',
+] as const;
+
+export const tableCreateCommandSchema = z.object({
+  name: z.string().trim().min(1).max(45),
+  password: z.literal(''),
+  maxPlayers: z.number().int().min(2).max(6),
+  variant: z.enum(BASIC_VARIANT_NAMES),
+  timed: z.literal(false),
+  timeBase: z.literal(0),
+  timePerTurn: z.literal(0),
+  speedrun: z.literal(false),
+  cardCycle: z.literal(false),
+  deckPlays: z.literal(false),
+  emptyClues: z.literal(false),
+  oneExtraCard: z.literal(false),
+  oneLessCard: z.literal(false),
+  allOrNothing: z.literal(false),
+  detrimentalCharacters: z.literal(false),
+});
+
+export type TableCreateCommand = z.infer<typeof tableCreateCommandSchema>;
+
+export const tableStartCommandSchema = z.object({
+  tableID: idSchema,
+  intendedPlayers: z.array(z.string().min(1)).min(2),
+});
+
+export type TableStartCommand = z.infer<typeof tableStartCommandSchema>;
+
 export const tableJoinCommandSchema = tableIDCommandSchema;
 export type TableJoinCommand = z.infer<typeof tableJoinCommandSchema>;
 
@@ -211,4 +245,37 @@ export function encodeTableJoinFrame(tableID: number): string {
 export function encodeTableLeaveFrame(tableID: number): string {
   const payload = tableLeaveCommandSchema.parse({ tableID });
   return encodeClientFrame('tableLeave', payload);
+}
+
+export function encodeTableCreateFrame(
+  name: string,
+  maxPlayers: number,
+  variant: string,
+): string {
+  const payload = tableCreateCommandSchema.parse({
+    name,
+    password: '',
+    maxPlayers,
+    variant,
+    timed: false,
+    timeBase: 0,
+    timePerTurn: 0,
+    speedrun: false,
+    cardCycle: false,
+    deckPlays: false,
+    emptyClues: false,
+    oneExtraCard: false,
+    oneLessCard: false,
+    allOrNothing: false,
+    detrimentalCharacters: false,
+  });
+  return encodeClientFrame('tableCreate', payload);
+}
+
+export function encodeTableStartFrame(
+  tableID: number,
+  intendedPlayers: readonly string[],
+): string {
+  const payload = tableStartCommandSchema.parse({ tableID, intendedPlayers });
+  return encodeClientFrame('tableStart', payload);
 }

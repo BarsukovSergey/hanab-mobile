@@ -50,6 +50,13 @@ type PendingJoin = {
   stagedGame: PregameGame | null;
 };
 
+type PendingCreate = {
+  name: string;
+  creatorUserID: number;
+  joinedTableID: number | null;
+  stagedGame: PregameGame | null;
+};
+
 export type RoomSliceState = {
   connectionEpoch: number;
   pendingSpectateTableID: number | null;
@@ -58,7 +65,12 @@ export type RoomSliceState = {
     role: 'player' | 'spectator';
   } | null;
   pendingJoin: PendingJoin | null;
+  pendingCreate: PendingCreate | null;
   pendingLeaveTableID: number | null;
+  pendingStart: {
+    tableID: number;
+    intendedPlayers: string[];
+  } | null;
   pendingGameplayAction: {
     connectionEpoch: number;
     tableID: number;
@@ -73,14 +85,18 @@ const initialState: RoomSliceState = {
   pendingSpectateTableID: null,
   pendingRecovery: null,
   pendingJoin: null,
+  pendingCreate: null,
   pendingLeaveTableID: null,
+  pendingStart: null,
   pendingGameplayAction: null,
   room: { kind: 'none' },
 };
 
 function clearC4BState(state: RoomSliceState): void {
   state.pendingJoin = null;
+  state.pendingCreate = null;
   state.pendingLeaveTableID = null;
+  state.pendingStart = null;
 }
 
 export const roomSlice = createSlice({
@@ -101,6 +117,7 @@ export const roomSlice = createSlice({
         || state.pendingRecovery !== null
         || state.pendingSpectateTableID !== null
         || state.pendingJoin !== null
+        || state.pendingCreate !== null
       ) return;
       state.pendingRecovery = {
         tableID: action.payload.tableID,
@@ -117,6 +134,7 @@ export const roomSlice = createSlice({
         || state.pendingRecovery !== null
         || state.pendingSpectateTableID !== null
         || state.pendingJoin !== null
+        || state.pendingCreate !== null
       ) return;
       state.pendingSpectateTableID = action.payload.tableID;
     },
@@ -130,10 +148,34 @@ export const roomSlice = createSlice({
         || state.pendingRecovery !== null
         || state.pendingSpectateTableID !== null
         || state.pendingJoin !== null
+        || state.pendingCreate !== null
       ) return;
       state.pendingJoin = {
         tableID: action.payload.tableID,
         joinedConfirmed: false,
+        stagedGame: null,
+      };
+    },
+    createRequested(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        name: string;
+        creatorUserID: number;
+      }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      if (
+        state.room.kind !== 'none'
+        || state.pendingRecovery !== null
+        || state.pendingSpectateTableID !== null
+        || state.pendingJoin !== null
+        || state.pendingCreate !== null
+      ) return;
+      state.pendingCreate = {
+        name: action.payload.name,
+        creatorUserID: action.payload.creatorUserID,
+        joinedTableID: null,
         stagedGame: null,
       };
     },
@@ -143,23 +185,39 @@ export const roomSlice = createSlice({
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (state.room.kind === 'awaiting_game_bootstrap') return;
-      const pending = state.pendingJoin;
-      if (
-        state.room.kind !== 'none'
-        || pending === null
-        || pending.tableID !== action.payload.joined.tableID
-      ) return;
-
-      pending.joinedConfirmed = true;
-      if (pending.stagedGame !== null) {
+      if (state.room.kind !== 'none') return;
+      const pendingJoin = state.pendingJoin;
+      if (pendingJoin?.tableID === action.payload.joined.tableID) {
+        pendingJoin.joinedConfirmed = true;
+        if (pendingJoin.stagedGame === null) return;
         state.room = {
           kind: 'pregame',
-          tableID: pending.tableID,
+          tableID: pendingJoin.tableID,
           role: 'player',
-          data: pending.stagedGame,
+          data: pendingJoin.stagedGame,
         };
         state.pendingJoin = null;
+        return;
       }
+
+      const pendingCreate = state.pendingCreate;
+      if (
+        pendingCreate === null
+        || (pendingCreate.joinedTableID !== null
+          && pendingCreate.joinedTableID !== action.payload.joined.tableID)
+      ) return;
+      pendingCreate.joinedTableID = action.payload.joined.tableID;
+      if (
+        pendingCreate.stagedGame === null
+        || pendingCreate.stagedGame.tableID !== action.payload.joined.tableID
+      ) return;
+      state.room = {
+        kind: 'pregame',
+        tableID: action.payload.joined.tableID,
+        role: 'player',
+        data: pendingCreate.stagedGame,
+      };
+      state.pendingCreate = null;
     },
     gameReceived(
       state,
@@ -170,25 +228,89 @@ export const roomSlice = createSlice({
       const { game } = action.payload;
 
       if (state.room.kind === 'pregame') {
-        if (state.room.tableID === game.tableID) state.room.data = game;
+        if (state.room.tableID === game.tableID) {
+          const nextNames = game.players.map((player) => player.name);
+          state.room.data = game;
+          if (
+            state.pendingStart?.tableID === game.tableID
+            && (state.pendingStart.intendedPlayers.length !== nextNames.length
+              || state.pendingStart.intendedPlayers.some(
+                (name, index) => name !== nextNames[index],
+              ))
+          ) state.pendingStart = null;
+        }
         return;
       }
 
-      const pending = state.pendingJoin;
-      if (pending === null || pending.tableID !== game.tableID) return;
-      if (pending.joinedConfirmed) {
+      const pendingJoin = state.pendingJoin;
+      if (pendingJoin?.tableID === game.tableID) {
+        if (!pendingJoin.joinedConfirmed) {
+          pendingJoin.stagedGame = game;
+          return;
+        }
         state.room = {
           kind: 'pregame',
-          tableID: pending.tableID,
+          tableID: pendingJoin.tableID,
           role: 'player',
           data: game,
         };
         state.pendingJoin = null;
-      } else {
-        // At most one same-epoch join may be pending, so this staging cannot
-        // be attributed to any other table or connection.
-        pending.stagedGame = game;
+        return;
       }
+
+      const pendingCreate = state.pendingCreate;
+      if (
+        pendingCreate === null
+        || game.name !== pendingCreate.name
+        || game.owner !== pendingCreate.creatorUserID
+        || !game.players.some((player) => player.you)
+        || (pendingCreate.joinedTableID !== null
+          && pendingCreate.joinedTableID !== game.tableID)
+        || (pendingCreate.stagedGame !== null
+          && pendingCreate.stagedGame.tableID !== game.tableID)
+      ) return;
+      if (pendingCreate.joinedTableID === game.tableID) {
+        state.room = {
+          kind: 'pregame',
+          tableID: game.tableID,
+          role: 'player',
+          data: game,
+        };
+        state.pendingCreate = null;
+      } else {
+        pendingCreate.stagedGame = game;
+      }
+    },
+    startRequested(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        ownerUserID: number;
+        intendedPlayers: string[];
+      }>,
+    ) {
+      const { epoch, tableID, ownerUserID, intendedPlayers } = action.payload;
+      if (
+        state.connectionEpoch !== epoch
+        || state.room.kind !== 'pregame'
+        || state.room.tableID !== tableID
+        || state.room.data.owner !== ownerUserID
+        || intendedPlayers.length < 2
+        || state.pendingStart !== null
+        || state.pendingLeaveTableID !== null
+      ) return;
+      const authoritativeNames = state.room.data.players.map((player) => player.name);
+      if (
+        authoritativeNames.length !== intendedPlayers.length
+        || authoritativeNames.some((name, index) => name !== intendedPlayers[index])
+      ) return;
+      state.pendingStart = { tableID, intendedPlayers };
+    },
+    commandPendingCleared(state, action: PayloadAction<{ epoch: number }>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      state.pendingCreate = null;
+      state.pendingStart = null;
     },
     leaveRequested(
       state,
@@ -199,6 +321,7 @@ export const roomSlice = createSlice({
         state.room.kind !== 'pregame'
         || state.room.tableID !== action.payload.tableID
         || state.pendingLeaveTableID !== null
+        || state.pendingStart !== null
       ) return;
       state.pendingLeaveTableID = action.payload.tableID;
     },
@@ -440,10 +563,18 @@ export const roomSlice = createSlice({
       state.room = { kind: 'none' };
     });
     builder.addCase(sessionActions.connectionFailed, (state, action) => {
-      if (state.connectionEpoch === action.payload.epoch) state.pendingGameplayAction = null;
+      if (state.connectionEpoch === action.payload.epoch) {
+        state.pendingCreate = null;
+        state.pendingStart = null;
+        state.pendingGameplayAction = null;
+      }
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
-      if (state.connectionEpoch === action.payload.epoch) state.pendingGameplayAction = null;
+      if (state.connectionEpoch === action.payload.epoch) {
+        state.pendingCreate = null;
+        state.pendingStart = null;
+        state.pendingGameplayAction = null;
+      }
     });
   },
 });

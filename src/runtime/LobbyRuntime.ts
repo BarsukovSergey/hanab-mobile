@@ -14,11 +14,14 @@ import {
 } from '../protocol/gameProtocol';
 import {
   decodeServerFrame,
+  BASIC_VARIANT_NAMES,
   encodeClientFrame,
+  encodeTableCreateFrame,
   encodeTableReattendFrame,
   encodeTableJoinFrame,
   encodeTableLeaveFrame,
   encodeTableSpectateFrame,
+  encodeTableStartFrame,
   type LobbyTable,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
@@ -173,6 +176,7 @@ export class LobbyRuntime {
       || state.room.pendingRecovery !== null
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
+      || state.room.pendingCreate !== null
     ) {
       return false;
     }
@@ -197,6 +201,7 @@ export class LobbyRuntime {
       || state.room.pendingRecovery !== null
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
+      || state.room.pendingCreate !== null
     ) {
       return false;
     }
@@ -211,12 +216,79 @@ export class LobbyRuntime {
     return true;
   }
 
+  createTable(name: string, maxPlayers: number, variant: string): boolean {
+    const state = this.store.getState();
+    const creatorUserID = state.session.authenticatedUser?.userID;
+    const trimmedName = name.trim();
+    if (
+      creatorUserID === undefined
+      || trimmedName.length < 1
+      || trimmedName.length > 45
+      || !Number.isInteger(maxPlayers)
+      || maxPlayers < 2
+      || maxPlayers > 6
+      || !(BASIC_VARIANT_NAMES as readonly string[]).includes(variant)
+      || state.room.room.kind !== 'none'
+      || state.room.pendingRecovery !== null
+      || state.room.pendingSpectateTableID !== null
+      || state.room.pendingJoin !== null
+      || state.room.pendingCreate !== null
+    ) return false;
+
+    let frame: string;
+    try {
+      frame = encodeTableCreateFrame(trimmedName, maxPlayers, variant);
+    } catch {
+      return false;
+    }
+    if (!this.sendEncoded(frame)) return false;
+
+    this.store.dispatch(roomActions.createRequested({
+      epoch: state.session.connectionEpoch,
+      name: trimmedName,
+      creatorUserID,
+    }));
+    return true;
+  }
+
+  startGame(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    const ownerUserID = state.session.authenticatedUser?.userID;
+    if (
+      ownerUserID === undefined
+      || room.kind !== 'pregame'
+      || room.data.owner !== ownerUserID
+      || room.data.players.length < 2
+      || state.room.pendingStart !== null
+      || state.room.pendingLeaveTableID !== null
+    ) return false;
+
+    const intendedPlayers = room.data.players.map((player) => player.name);
+    let frame: string;
+    try {
+      frame = encodeTableStartFrame(room.tableID, intendedPlayers);
+    } catch {
+      return false;
+    }
+    if (!this.sendEncoded(frame)) return false;
+
+    this.store.dispatch(roomActions.startRequested({
+      epoch: state.session.connectionEpoch,
+      tableID: room.tableID,
+      ownerUserID,
+      intendedPlayers,
+    }));
+    return true;
+  }
+
   leave(tableID: number): boolean {
     const state = this.store.getState();
     if (
       state.room.room.kind !== 'pregame'
       || state.room.room.tableID !== tableID
       || state.room.pendingLeaveTableID !== null
+      || state.room.pendingStart !== null
     ) {
       return false;
     }
@@ -414,6 +486,7 @@ export class LobbyRuntime {
         break;
       }
       case 'warning':
+        this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
@@ -421,6 +494,7 @@ export class LobbyRuntime {
         }));
         break;
       case 'error':
+        this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
