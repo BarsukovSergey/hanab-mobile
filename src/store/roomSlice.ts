@@ -576,6 +576,7 @@ export const roomSlice = createSlice({
         state.pendingGameplayAction = null;
       }
     });
+    builder.addCase(sessionActions.signedOut, () => initialState);
   },
 });
 

@@ -12,6 +12,33 @@ const tableIDCommandSchema = z.object({
   tableID: idSchema,
 });
 
+export const chatCommandSchema = z.object({
+  msg: z.string().trim().min(1).max(300),
+  room: z.string().regex(/^(?:lobby|table\d+)$/),
+}).strict();
+
+export type ChatCommand = z.infer<typeof chatCommandSchema>;
+
+// Exact schemas from packages/data/src/serverCommands.ts at the pinned upstream commit.
+export const chatMessageSchema = z.object({
+  msg: z.string().min(1),
+  who: z.string().min(1).optional(),
+  discord: z.boolean(),
+  server: z.boolean(),
+  datetime: z.string().min(1),
+  room: z.string().min(1).optional(),
+  recipient: z.string().min(1).optional(),
+}).strict().readonly();
+
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+export const chatListSchema = z.object({
+  list: z.array(chatMessageSchema).readonly(),
+  unread: z.number().int(),
+}).strict().readonly();
+
+export type ChatList = z.infer<typeof chatListSchema>;
+
 export const BASIC_VARIANT_NAMES = [
   'No Variant',
   '6 Suits',
@@ -158,6 +185,8 @@ const schemas = {
   init: gameInitSchema,
   gameActionList: gameActionListSchema,
   gameAction: incrementalGameActionSchema,
+  chat: chatMessageSchema,
+  chatList: chatListSchema,
   warning: z.object({ warning: z.string().min(1) }),
   error: z.object({ error: z.string().min(1) }),
 } as const;
@@ -282,4 +311,9 @@ export function encodeTableStartFrame(
 ): string {
   const payload = tableStartCommandSchema.parse({ tableID, intendedPlayers });
   return encodeClientFrame('tableStart', payload);
+}
+
+export function encodeChatFrame(msg: string, room: string): string {
+  const payload = chatCommandSchema.parse({ msg, room });
+  return encodeClientFrame('chat', payload);
 }

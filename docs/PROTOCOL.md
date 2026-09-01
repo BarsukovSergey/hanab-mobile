@@ -52,6 +52,12 @@ anything else → indeterminate, not logout
 
 Transport failures (DNS/TLS/timeout/offline) are also indeterminate.
 
+### `GET /logout`
+
+Logout uses a credentialed GET. The server clears the platform-owned session cookie and redirects
+to `/`. Mobile stops socket/retry ownership before this request, then calls `/test-cookie`; only a
+`204` completes signout and permits the explicit local authenticated-state reset.
+
 ## Session cookie
 
 Production session cookie name:
@@ -145,6 +151,41 @@ tableLeave
 tableSpectate
 tableReattend
 ```
+
+## Chat
+
+The exact pinned inbound `chat` payload is strict:
+
+```text
+msg: string (nonempty; pre-escaped HTML/server markup)
+who?: nonempty string
+discord: boolean
+server: boolean
+datetime: nonempty string
+room?: nonempty string
+recipient?: nonempty string
+```
+
+The exact pinned inbound `chatList` payload is strict:
+
+```text
+list: chat[]
+unread: integer
+```
+
+Public mobile chat sends:
+
+```text
+chat {"msg":"hello","room":"lobby"}
+chat {"msg":"hello","room":"table123"}
+```
+
+Lobby room is `lobby`; pregame and live-game room is `table${tableID}`. Mobile trims outgoing
+messages and rejects blank or longer-than-300-character input. Chat sends are current-READY,
+current-room, one-shot commands and are never queued or replayed across connection epochs.
+
+Inbound `msg` is pre-escaped text with optional trusted server markup. Mobile removes server
+markup before decoding HTML entities and renders only React Native text, never HTML or a WebView.
 
 Create/start are deliberately outside the critical path to the first playable proof:
 

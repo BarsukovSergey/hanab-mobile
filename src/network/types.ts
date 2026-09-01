@@ -26,6 +26,7 @@ export interface NetworkSocket {
 export interface NetworkSession {
   checkSession(): Promise<SessionCheckResult>;
   submitLogin(username: string, password: string): Promise<void>;
+  logout(): Promise<void>;
   openSocket(): Promise<NetworkSocket>;
 }
 

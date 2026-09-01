@@ -73,8 +73,15 @@ class FakeSocket implements NetworkSocket {
 class FakeSession implements NetworkSession {
   readonly sockets: Array<Promise<NetworkSocket>> = [];
   openCalls = 0;
-  checkSession(): Promise<SessionCheckResult> { return Promise.resolve({ kind: 'valid' }); }
+  logoutCalls = 0;
+  checkCalls = 0;
+  sessionCheckResult: SessionCheckResult = { kind: 'valid' };
+  checkSession(): Promise<SessionCheckResult> {
+    this.checkCalls += 1;
+    return Promise.resolve(this.sessionCheckResult);
+  }
   submitLogin(): Promise<void> { return Promise.resolve(); }
+  logout(): Promise<void> { this.logoutCalls += 1; return Promise.resolve(); }
   openSocket(): Promise<NetworkSocket> {
     const socket = this.sockets[this.openCalls++];
     if (socket === undefined) throw new Error('No fake socket configured');
@@ -170,6 +177,80 @@ afterEach(() => {
 });
 
 describe('deterministic lobby runtime', () => {
+  test('chat is READY-only, trimmed, bounded, and routed to the current room', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    expect(runtime.sendChat('too early')).toBe(false);
+    socket.emitMessage(welcomeFrame);
+    expect(runtime.sendChat('  hello lobby  ')).toBe(true);
+    expect(runtime.sendChat('   ')).toBe(false);
+    expect(runtime.sendChat('x'.repeat(301))).toBe(false);
+
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.sendChat('table hello')).toBe(true);
+    expect(socket.sent).toEqual([
+      'chat {"msg":"hello lobby","room":"lobby"}',
+      'tableJoin {"tableID":123}',
+      'chat {"msg":"table hello","room":"table123"}',
+    ]);
+  });
+
+  test('chat frames and history route by room and reset on connection replacement', async () => {
+    const { session, socket: first, store, runtime } = await makeReadyRuntime();
+    first.emitMessage('chatList {"list":[{"msg":"old &amp; <strong>clear</strong>",'
+      + '"who":"Ada","discord":false,"server":false,'
+      + '"datetime":"2026-09-01T10:00:00Z","room":"lobby"}],"unread":0}');
+    first.emitMessage('chat {"msg":"&lt;b&gt;safe&lt;/b&gt;",'
+      + '"who":"Bob","discord":false,"server":false,'
+      + '"datetime":"2026-09-01T10:01:00Z","room":"lobby"}');
+    expect(store.getState().chat.messagesByRoom.lobby?.map((message) => message.msg)).toEqual([
+      'old & clear',
+      '<b>safe</b>',
+    ]);
+
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+    runtime.disconnect();
+    await runtime.connect();
+    expect(store.getState().chat.messagesByRoom).toEqual({});
+  });
+
+  test('logout stops the socket and fully resets authenticated state', async () => {
+    const { session, socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.userReceived({
+      epoch: 1,
+      user: { userID: 1, name: 'Ada', status: 0, hyphenated: false, inactive: false },
+    }));
+    socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"lobby"}');
+    addJoinableTable(store);
+    runtime.join(123);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    session.sessionCheckResult = { kind: 'missing' };
+
+    await expect(runtime.signOut()).resolves.toEqual({ kind: 'signedOut' });
+
+    expect(session.logoutCalls).toBe(1);
+    expect(session.checkCalls).toBe(1);
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'Connection disposed' }]);
+    expect(store.getState().session).toMatchObject({
+      connectionEpoch: 0, phase: 'idle', authenticatedUser: null, resumeHints: null,
+    });
+    expect(userSelectors.selectTotal(store.getState())).toBe(0);
+    expect(store.getState().lobby.tables.ids).toEqual([]);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().chat.messagesByRoom).toEqual({});
+  });
+
   test('only running non-replay non-joined tables are spectate eligible', () => {
     expect(isSpectateEligible(runningTable)).toBe(true);
     expect(isSpectateEligible({ ...runningTable, running: false })).toBe(false);

@@ -82,6 +82,7 @@ export const sessionSlice = createSlice({
   name: 'session',
   initialState,
   reducers: {
+    signedOut: () => initialState,
     connectionStarted(state, action: PayloadAction<EpochPayload>) {
       state.connectionEpoch = action.payload.epoch;
       state.phase = 'connecting';

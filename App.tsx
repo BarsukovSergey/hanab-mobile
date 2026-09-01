@@ -11,6 +11,7 @@ import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated, tableSelectors } from './src/store/store';
 import { GameScreen } from './src/ui/game/GameScreen';
+import { ChatPanel } from './src/ui/ChatPanel';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 
@@ -18,6 +19,7 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
   const [loginPending, setLoginPending] = useState(false);
+  const [signOutPending, setSignOutPending] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [tableName, setTableName] = useState('');
@@ -88,12 +90,44 @@ export default function App() {
     }
   };
 
-  if (roomState.room.kind === 'live_game') {
+  const signOut = async () => {
+    setSignOutPending(true);
+    setStatusMessage('');
+    const result = await lobbyRuntime.signOut();
+    if (result.kind === 'signedOut') {
+      setProbe('missing');
+      setUsername('');
+      setPassword('');
+    } else {
+      setProbe(result.sessionValid ? 'valid' : 'indeterminate');
+      setStatusMessage(result.message);
+    }
+    setSignOutPending(false);
+  };
+
+  if (signOutPending) {
     return (
-      <View style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.gameContainer}><GameScreen /></ScrollView>
-        <StatusBar style="auto" />
+      <View style={styles.centered}>
+        <Text style={styles.heading}>Signing out…</Text>
+        <Text>Closing the realtime session and clearing local game data.</Text>
       </View>
+    );
+  }
+
+  if (probe === 'valid' && roomState.room.kind === 'live_game') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}>
+        <View style={styles.authBar}>
+          <Text style={styles.authName}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
+          <Button title="Sign out" onPress={() => void signOut()} />
+        </View>
+        <ScrollView contentContainerStyle={styles.gameContainer} keyboardShouldPersistTaps="handled">
+          <GameScreen />
+          <ChatPanel room={`table${roomState.room.tableID}`} title="Table chat" />
+        </ScrollView>
+        <StatusBar style="auto" />
+      </KeyboardAvoidingView>
     );
   }
 
@@ -154,11 +188,16 @@ export default function App() {
         <Button disabled={roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
           title={roomState.pendingLeaveTableID === null ? 'Leave' : 'Leaving...'}
           onPress={() => lobbyRuntime.leave(pregameRoom.tableID)} />
+        <ChatPanel room={`table${pregameRoom.tableID}`} title="Pre-game chat" />
       </View>
     );
   } else {
     content = (
       <>
+        <View style={styles.section}>
+          <Text style={styles.heading}>Lobby</Text>
+          <Text>{tables.length} tables available</Text>
+        </View>
         <View style={styles.section}>
           <Text style={styles.heading}>Create table</Text>
           <TextInput maxLength={45} onChangeText={setTableName} placeholder="Table name"
@@ -203,6 +242,7 @@ export default function App() {
             </View>
           ))}
         </View>
+        <ChatPanel room="lobby" title="Lobby chat" />
       </>
     );
   }
@@ -211,7 +251,12 @@ export default function App() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.flex}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hanab</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Hanab</Text>
+          {probe === 'valid' && session.authenticatedUser !== null && (
+            <Button title="Sign out" onPress={() => void signOut()} />
+          )}
+        </View>
         {lobbyNotice !== null && (
           <Text style={lobbyNotice.kind === 'error' ? styles.error : undefined}>
             {lobbyNotice.message}
@@ -228,6 +273,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { gap: 16, padding: 20, paddingTop: 56 },
   gameContainer: { flexGrow: 1, padding: 16, paddingTop: 48 },
+  centered: { flex: 1, gap: 8, justifyContent: 'center', padding: 24 },
+  authBar: {
+    alignItems: 'center', borderBottomColor: '#d5d9dd', borderBottomWidth: 1,
+    flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16,
+    paddingTop: 44, paddingBottom: 8,
+  },
+  authName: { fontSize: 16, fontWeight: '700' },
+  titleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   title: { fontSize: 28, fontWeight: '700' },
   section: { borderColor: '#999', borderWidth: 1, gap: 10, padding: 14 },
   heading: { fontSize: 19, fontWeight: '600' },

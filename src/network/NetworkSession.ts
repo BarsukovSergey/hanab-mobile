@@ -74,6 +74,29 @@ export class HanabNetworkSession implements NetworkSession {
     }
   }
 
+  async logout(): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch(`${HANAB_HTTP_BASE_URL}/logout`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+    } catch (error) {
+      throw new NetworkRequestError({
+        kind: 'transport',
+        message: transportMessage(error),
+      });
+    }
+
+    if (!response.ok) {
+      throw new NetworkRequestError({
+        kind: 'http',
+        status: response.status,
+        message: `Logout returned HTTP ${response.status}`,
+      });
+    }
+  }
+
   async openSocket(): Promise<NetworkSocket> {
     return new WebSocket(HANAB_WEBSOCKET_URL);
   }

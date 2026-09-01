@@ -15,6 +15,7 @@ import {
 import {
   decodeServerFrame,
   BASIC_VARIANT_NAMES,
+  encodeChatFrame,
   encodeClientFrame,
   encodeTableCreateFrame,
   encodeTableReattendFrame,
@@ -25,6 +26,7 @@ import {
   type LobbyTable,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
+import { chatActions } from '../store/chatSlice';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
@@ -40,6 +42,10 @@ export type RuntimeTimers = {
   setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
   clearTimeout(timer: ReturnType<typeof setTimeout>): void;
 };
+
+export type SignOutResult =
+  | { kind: 'signedOut' }
+  | { kind: 'failed'; message: string; sessionValid: boolean };
 
 type SocketListeners = {
   open: () => void;
@@ -148,6 +154,38 @@ export class LobbyRuntime {
     );
   }
 
+  async signOut(): Promise<SignOutResult> {
+    // Stop retry/socket ownership before the cookie-changing HTTP request.
+    this.disconnect();
+    let logoutError: string | null = null;
+    try {
+      await this.networkSession.logout();
+    } catch (error) {
+      logoutError = safeStatus(error, 'Logout request failed');
+    }
+
+    const check = await this.networkSession.checkSession();
+    if (check.kind === 'missing') {
+      this.store.dispatch(sessionActions.signedOut());
+      return { kind: 'signedOut' };
+    }
+
+    if (check.kind === 'valid') {
+      void this.connect();
+      return {
+        kind: 'failed',
+        message: logoutError ?? 'The server session is still active. Please try again.',
+        sessionValid: true,
+      };
+    }
+
+    return {
+      kind: 'failed',
+      message: logoutError ?? check.error.message,
+      sessionValid: false,
+    };
+  }
+
   setAppActive(active: boolean): void {
     if (this.appActive === active) return;
     this.appActive = active;
@@ -164,6 +202,19 @@ export class LobbyRuntime {
   /** Internal no-queue send gate for later typed client commands. */
   send(command: string, payload?: unknown): boolean {
     return this.sendEncoded(encodeClientFrame(command, payload));
+  }
+
+  sendChat(message: string): boolean {
+    const trimmed = message.trim();
+    if (trimmed.length === 0 || trimmed.length > 300) return false;
+    const room = this.currentChatRoom();
+    let frame: string;
+    try {
+      frame = encodeChatFrame(trimmed, room);
+    } catch {
+      return false;
+    }
+    return this.sendEncoded(frame);
   }
 
   spectate(tableID: number): boolean {
@@ -485,6 +536,19 @@ export class LobbyRuntime {
         }
         break;
       }
+      case 'chat':
+        this.store.dispatch(chatActions.messageReceived({
+          epoch,
+          message: event.data,
+        }));
+        break;
+      case 'chatList':
+        this.store.dispatch(chatActions.historyReceived({
+          epoch,
+          defaultRoom: this.currentHistoryRoom(),
+          messages: event.data.list,
+        }));
+        break;
       case 'warning':
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
@@ -679,6 +743,22 @@ export class LobbyRuntime {
       tableID: pending.tableID,
       gameLoadEpoch: pending.gameLoadEpoch,
     }));
+  }
+
+  private currentChatRoom(): string {
+    const room = this.store.getState().room.room;
+    return room.kind === 'none' ? 'lobby' : `table${room.tableID}`;
+  }
+
+  private currentHistoryRoom(): string {
+    const state = this.store.getState().room;
+    if (state.room.kind !== 'none') return `table${state.room.tableID}`;
+    if (state.pendingJoin !== null) return `table${state.pendingJoin.tableID}`;
+    const createdTableID = state.pendingCreate?.joinedTableID
+      ?? state.pendingCreate?.stagedGame?.tableID;
+    return createdTableID === undefined || createdTableID === null
+      ? 'lobby'
+      : `table${createdTableID}`;
   }
 
   private recordInboundDiagnostic(

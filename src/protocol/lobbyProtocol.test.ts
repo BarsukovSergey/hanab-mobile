@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 
 import {
   decodeServerFrame,
+  encodeChatFrame,
   encodeTableCreateFrame,
   encodeTableReattendFrame,
   encodeTableJoinFrame,
@@ -19,6 +20,42 @@ const user = {
 };
 
 describe('lobby protocol decoder', () => {
+  test('validates exact pinned chat and chatList payloads', () => {
+    const chat = {
+      msg: 'hello &amp; goodbye',
+      who: 'Ada',
+      discord: false,
+      server: false,
+      datetime: '2026-09-01T10:00:00Z',
+      room: 'lobby',
+    };
+    expect(decodeServerFrame(`chat ${JSON.stringify(chat)}`)).toEqual({
+      kind: 'event', event: { command: 'chat', data: chat },
+    });
+    expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 2 })}`))
+      .toEqual({
+        kind: 'event',
+        event: { command: 'chatList', data: { list: [chat], unread: 2 } },
+      });
+    expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, extra: true })}`)).toMatchObject({
+      kind: 'malformed', command: 'chat', issue: 'invalid-payload',
+    });
+    expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 0, extra: 1 })}`))
+      .toMatchObject({ kind: 'malformed', command: 'chatList', issue: 'invalid-payload' });
+  });
+
+  test('encodes trimmed bounded chat for exact rooms', () => {
+    expect(encodeChatFrame('  hello  ', 'lobby')).toBe(
+      'chat {"msg":"hello","room":"lobby"}',
+    );
+    expect(encodeChatFrame('table', 'table123')).toBe(
+      'chat {"msg":"table","room":"table123"}',
+    );
+    expect(() => encodeChatFrame(' ', 'lobby')).toThrow();
+    expect(() => encodeChatFrame('x'.repeat(301), 'lobby')).toThrow();
+    expect(() => encodeChatFrame('hello', 'table')).toThrow();
+  });
+
   test('decodes a normal JSON frame', () => {
     expect(decodeServerFrame(`user ${JSON.stringify(user)}`)).toEqual({
       kind: 'event',

@@ -68,6 +68,7 @@ class FakeSession implements NetworkSession {
   private nextSocket = 0;
   checkSession(): Promise<SessionCheckResult> { return Promise.resolve({ kind: 'valid' }); }
   submitLogin(): Promise<void> { return Promise.resolve(); }
+  logout(): Promise<void> { return Promise.resolve(); }
   openSocket(): Promise<NetworkSocket> {
     const socket = this.sockets[this.nextSocket++];
     if (socket === undefined) throw new Error('Missing fake socket');

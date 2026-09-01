@@ -72,6 +72,7 @@ export const lobbySlice = createSlice({
       state.tableListReceived = false;
       state.notice = null;
     });
+    builder.addCase(sessionActions.signedOut, () => initialState);
   },
 });
 

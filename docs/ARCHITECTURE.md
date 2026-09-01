@@ -74,6 +74,7 @@ HTTP login, session probing, and WebSocket creation share one logical platform b
 interface NetworkSession {
   checkSession(): Promise<SessionCheckResult>;
   submitLogin(username: string, password: string): Promise<void>;
+  logout(): Promise<void>;
   openSocket(): Promise<NetworkSocket>;
 }
 
