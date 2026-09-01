@@ -12,6 +12,7 @@ const message = (msg: string, room = 'lobby') => ({
   server: false,
   datetime: '2026-09-01T10:00:00Z',
   room,
+  recipient: '',
 });
 
 describe('chat state and plain-text conversion', () => {
@@ -33,6 +34,24 @@ describe('chat state and plain-text conversion', () => {
     store.dispatch(chatActions.messageReceived({ epoch: 1, message: message('three') }));
     expect(store.getState().chat.messagesByRoom.lobby?.map((entry) => entry.msg)).toEqual([
       'one', 'two', 'three',
+    ]);
+  });
+
+  test('actual Go public and server messages become renderable plain text', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1,
+      defaultRoom: 'lobby',
+      messages: [
+        message('hello &amp; goodbye'),
+        { ...message('<strong>Server ready</strong>'), who: '', server: true },
+      ],
+    }));
+
+    expect(store.getState().chat.messagesByRoom.lobby).toMatchObject([
+      { who: 'Ada', recipient: '', server: false, msg: 'hello & goodbye' },
+      { who: '', recipient: '', server: true, msg: 'Server ready' },
     ]);
   });
 

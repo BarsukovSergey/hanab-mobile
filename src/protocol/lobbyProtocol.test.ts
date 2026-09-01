@@ -28,6 +28,7 @@ describe('lobby protocol decoder', () => {
       server: false,
       datetime: '2026-09-01T10:00:00Z',
       room: 'lobby',
+      recipient: '',
     };
     expect(decodeServerFrame(`chat ${JSON.stringify(chat)}`)).toEqual({
       kind: 'event', event: { command: 'chat', data: chat },
@@ -42,6 +43,20 @@ describe('lobby protocol decoder', () => {
     });
     expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 0, extra: 1 })}`))
       .toMatchObject({ kind: 'malformed', command: 'chatList', issue: 'invalid-payload' });
+
+    const serverChat = {
+      ...chat,
+      msg: '<strong>[Server Notice]</strong> Ready &amp; waiting',
+      who: '',
+      server: true,
+    };
+    expect(decodeServerFrame(`chat ${JSON.stringify(serverChat)}`)).toEqual({
+      kind: 'event', event: { command: 'chat', data: serverChat },
+    });
+    expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, recipient: undefined })}`))
+      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
+    expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, who: undefined })}`))
+      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
   });
 
   test('encodes trimmed bounded chat for exact rooms', () => {

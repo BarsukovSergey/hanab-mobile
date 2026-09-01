@@ -188,6 +188,7 @@ describe('deterministic lobby runtime', () => {
     expect(runtime.sendChat('too early')).toBe(false);
     socket.emitMessage(welcomeFrame);
     expect(runtime.sendChat('  hello lobby  ')).toBe(true);
+    expect(store.getState().chat.messagesByRoom).toEqual({});
     expect(runtime.sendChat('   ')).toBe(false);
     expect(runtime.sendChat('x'.repeat(301))).toBe(false);
 
@@ -207,14 +208,21 @@ describe('deterministic lobby runtime', () => {
     const { session, socket: first, store, runtime } = await makeReadyRuntime();
     first.emitMessage('chatList {"list":[{"msg":"old &amp; <strong>clear</strong>",'
       + '"who":"Ada","discord":false,"server":false,'
-      + '"datetime":"2026-09-01T10:00:00Z","room":"lobby"}],"unread":0}');
+      + '"datetime":"2026-09-01T10:00:00Z","room":"lobby","recipient":""},'
+      + '{"msg":"<strong>Server ready</strong>","who":"","discord":false,'
+      + '"server":true,"datetime":"2026-09-01T10:00:30Z","room":"lobby",'
+      + '"recipient":""}],"unread":0}');
     first.emitMessage('chat {"msg":"&lt;b&gt;safe&lt;/b&gt;",'
       + '"who":"Bob","discord":false,"server":false,'
-      + '"datetime":"2026-09-01T10:01:00Z","room":"lobby"}');
+      + '"datetime":"2026-09-01T10:01:00Z","room":"lobby","recipient":""}');
     expect(store.getState().chat.messagesByRoom.lobby?.map((message) => message.msg)).toEqual([
       'old & clear',
+      'Server ready',
       '<b>safe</b>',
     ]);
+    expect(store.getState().chat.messagesByRoom.lobby?.[1]).toMatchObject({
+      who: '', recipient: '', server: true,
+    });
 
     const second = new FakeSocket();
     session.sockets.push(Promise.resolve(second));
@@ -230,7 +238,8 @@ describe('deterministic lobby runtime', () => {
       user: { userID: 1, name: 'Ada', status: 0, hyphenated: false, inactive: false },
     }));
     socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
-      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"lobby"}');
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"lobby",'
+      + '"recipient":""}');
     addJoinableTable(store);
     runtime.join(123);
     socket.emitMessage(pregameFrame());
@@ -258,7 +267,8 @@ describe('deterministic lobby runtime', () => {
       user: { userID: 1, name: 'Ada', status: 0, hyphenated: false, inactive: false },
     }));
     socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
-      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"lobby"}');
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"lobby",'
+      + '"recipient":""}');
     addJoinableTable(store);
     runtime.join(123);
     socket.emitMessage(pregameFrame());

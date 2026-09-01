@@ -19,15 +19,15 @@ export const chatCommandSchema = z.object({
 
 export type ChatCommand = z.infer<typeof chatCommandSchema>;
 
-// Exact schemas from packages/data/src/serverCommands.ts at the pinned upstream commit.
+// Exact payload emitted by the pinned Go server. Go serializes who/recipient even when empty.
 export const chatMessageSchema = z.object({
   msg: z.string().min(1),
-  who: z.string().min(1).optional(),
+  who: z.string(),
   discord: z.boolean(),
   server: z.boolean(),
   datetime: z.string().min(1),
   room: z.string().min(1).optional(),
-  recipient: z.string().min(1).optional(),
+  recipient: z.string(),
 }).strict().readonly();
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
