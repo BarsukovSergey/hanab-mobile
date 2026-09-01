@@ -10,6 +10,9 @@ import {
   encodeColorClueFrame,
   encodeRankClueFrame,
   gameInitSchema,
+  cardIdentitiesSchema,
+  finishOngoingGameSchema,
+  gameHistorySchema,
 } from './gameProtocol';
 import { makeInit } from './gameProtocol.fixtures';
 
@@ -52,5 +55,38 @@ describe('pinned game bootstrap protocol', () => {
       .toMatchObject({ kind: 'malformed', command: 'gameActionList' });
     expect(decodeServerFrame('init {"tableID":123}'))
       .toMatchObject({ kind: 'malformed', command: 'init' });
+  });
+
+  test('validates exact pinned Go postgame payloads with string timestamps', () => {
+    const historyItem = {
+      id: 456,
+      options: makeInit().options,
+      seed: 'p2v0s1',
+      score: 24,
+      numTurns: 17,
+      endCondition: 1,
+      datetimeStarted: '2026-09-01T10:00:00Z',
+      datetimeFinished: '2026-09-01T10:12:00Z',
+      numGamesOnThisSeed: 3,
+      playerNames: ['Ada', 'Bob'],
+      incrementNumGames: true,
+      tags: '',
+    };
+    expect(gameHistorySchema.parse([historyItem])).toEqual([historyItem]);
+    expect(gameHistorySchema.safeParse({ list: [historyItem] }).success).toBe(false);
+    expect(gameHistorySchema.safeParse([{
+      ...historyItem,
+      datetimeFinished: new Date('2026-09-01T10:12:00Z'),
+    }]).success).toBe(false);
+
+    expect(cardIdentitiesSchema.parse({
+      tableID: 123,
+      cardIdentities: [{ suitIndex: 0, rank: 1 }],
+    })).toEqual({ tableID: 123, cardIdentities: [{ suitIndex: 0, rank: 1 }] });
+    expect(finishOngoingGameSchema.parse({
+      tableID: 123,
+      databaseID: 456,
+      sharedReplayLeader: 'Ada',
+    })).toEqual({ tableID: 123, databaseID: 456, sharedReplayLeader: 'Ada' });
   });
 });

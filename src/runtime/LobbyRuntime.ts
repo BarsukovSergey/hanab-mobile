@@ -570,6 +570,15 @@ export class LobbyRuntime {
         }
         break;
       }
+      case 'gameHistory':
+        this.gameBootstrap.receiveGameHistory(epoch, event.data);
+        break;
+      case 'cardIdentities':
+        this.gameBootstrap.receiveCardIdentities(epoch, event.data);
+        break;
+      case 'finishOngoingGame':
+        this.gameBootstrap.receiveFinishOngoingGame(epoch, event.data);
+        break;
       case 'chat':
         this.store.dispatch(chatActions.messageReceived({
           epoch,
@@ -713,6 +722,7 @@ export class LobbyRuntime {
       || state.room.connectionEpoch !== owned.epoch
       || room.kind !== 'live_game'
       || room.role !== 'player'
+      || room.reviewSegment !== null
       || room.game.turn.currentPlayerIndex !== room.metadata.ourPlayerIndex
       || state.room.pendingGameplayAction !== null
     ) return false;

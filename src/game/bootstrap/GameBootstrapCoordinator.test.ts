@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-import { gameActionListSchema, gameInitSchema, incrementalGameActionSchema } from '../../protocol/gameProtocol';
+import {
+  cardIdentitiesSchema,
+  gameActionListSchema,
+  gameHistorySchema,
+  gameInitSchema,
+  incrementalGameActionSchema,
+} from '../../protocol/gameProtocol';
 import { makeInit } from '../../protocol/gameProtocol.fixtures';
 import { roomActions } from '../../store/roomSlice';
 import { sessionActions } from '../../store/sessionSlice';
@@ -117,6 +123,7 @@ describe('authoritative game bootstrap coordinator', () => {
     if (room.kind === 'live_game') {
       expect(room.bootstrapPhase).toBe('live');
       expect(room.historyActionCount).toBe(12);
+      expect(room.actionHistory).toEqual(initialHistory().list);
       expect(room.game.hands[0]).toEqual([0, 1, 2, 3, 4]);
       expect(room.game.deck.slice(0, 5).every((card) => (
         card?.suitIndex === null && card.rank === null
@@ -233,11 +240,134 @@ describe('authoritative game bootstrap coordinator', () => {
     const room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.liveActionCount).toBe(1);
+    expect(room.actionHistory).toEqual([...history.list, event.action]);
     expect(room.game).toEqual(replayAuthoritativeHistory(
       room.metadata,
       'spectator',
       [...history.list, event.action],
     ));
+  });
+
+  test('authoritative live state and history advance while an old segment stays selected', () => {
+    const store = readyStore('player');
+    const coordinator = new GameBootstrapCoordinator(store, () => true);
+    coordinator.startFromAuthoritativeRoom(1);
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
+    coordinator.receiveHistory(1, 1, initialHistory());
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: 123,
+      gameLoadEpoch: 1,
+      segment: 0,
+    }));
+    const clue = incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: {
+        type: 'clue', clue: { type: 1, value: 1 }, giver: 0, list: [5], target: 1, turn: 0,
+      },
+    });
+
+    expect(coordinator.receiveIncremental(1, clue)).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.reviewSegment).toBe(0);
+    expect(room.game.turn.segment).toBe(1);
+    expect(room.actionHistory.at(-1)).toEqual(clue.action);
+  });
+
+  test('postgame wire rehydrates history, reveals own hand, and records result metadata', () => {
+    const store = readyStore('player');
+    const coordinator = new GameBootstrapCoordinator(store, () => true);
+    coordinator.startFromAuthoritativeRoom(1);
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
+    coordinator.receiveHistory(1, 1, initialHistory());
+    expect(coordinator.receiveIncremental(1, incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'gameOver', endCondition: 1, playerIndex: 0, votes: null },
+    }))).toBe(true);
+
+    const historyItem = gameHistorySchema.parse([{
+      id: 456,
+      options: makeInit().options,
+      seed: 'p2v0s1',
+      score: 0,
+      numTurns: 0,
+      endCondition: 1,
+      datetimeStarted: '2026-08-31T00:00:00Z',
+      datetimeFinished: '2026-08-31T00:05:00Z',
+      numGamesOnThisSeed: 1,
+      playerNames: ['Ada', 'Bob'],
+      incrementNumGames: true,
+      tags: '',
+    }])[0]!;
+    expect(coordinator.receiveGameHistory(1, [historyItem])).toBe(true);
+    expect(coordinator.receiveCardIdentities(1, cardIdentitiesSchema.parse({
+      tableID: 123,
+      cardIdentities: Array.from({ length: 10 }, (_, order) => ({
+        suitIndex: order % 5,
+        rank: (order % 5) + 1,
+      })),
+    }))).toBe(true);
+    expect(coordinator.receiveFinishOngoingGame(1, {
+      tableID: 123,
+      databaseID: 456,
+      sharedReplayLeader: 'Ada',
+    })).toBe(true);
+
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.actionHistory[0]).toMatchObject({ suitIndex: 0, rank: 1 });
+    expect(room.game.deck[0]).toMatchObject({ suitIndex: 0, rank: 1 });
+    expect(room.postgame).toMatchObject({
+      databaseID: 456,
+      datetimeFinished: '2026-08-31T00:05:00Z',
+      sharedReplayLeader: 'Ada',
+      identitiesRevealed: true,
+      gameHistory: { id: 456 },
+    });
+  });
+
+  test('stale and wrong-table postgame events are rejected', () => {
+    const store = readyStore('player');
+    const coordinator = new GameBootstrapCoordinator(store, () => true);
+    coordinator.startFromAuthoritativeRoom(1);
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
+    coordinator.receiveHistory(1, 1, initialHistory());
+    coordinator.receiveIncremental(1, incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'gameOver', endCondition: 1, playerIndex: 0, votes: null },
+    }));
+    const before = store.getState().room.room;
+
+    expect(coordinator.receiveCardIdentities(1, {
+      tableID: 999,
+      cardIdentities: [],
+    })).toBe(false);
+    expect(coordinator.receiveFinishOngoingGame(2, {
+      tableID: 123,
+      databaseID: 456,
+      sharedReplayLeader: 'Ada',
+    })).toBe(false);
+    expect(coordinator.receiveFinishOngoingGame(1, {
+      tableID: 999,
+      databaseID: 456,
+      sharedReplayLeader: 'Ada',
+    })).toBe(false);
+    const unrelatedHistory = gameHistorySchema.parse([{
+      id: 999,
+      options: makeInit().options,
+      seed: 'different-seed',
+      score: 0,
+      numTurns: 0,
+      endCondition: 1,
+      datetimeStarted: '2026-08-31T00:00:00Z',
+      datetimeFinished: '2026-08-31T00:05:00Z',
+      numGamesOnThisSeed: 1,
+      playerNames: ['Ada', 'Bob'],
+      incrementNumGames: true,
+      tags: '',
+    }]);
+    expect(coordinator.receiveGameHistory(1, unrelatedHistory)).toBe(false);
+    expect(store.getState().room.room).toBe(before);
   });
 
   test('wrong-table, stale, and failed live actions cannot corrupt state; player actions reduce', () => {

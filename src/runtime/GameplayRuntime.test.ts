@@ -198,6 +198,31 @@ describe('C7 authoritative gameplay runtime', () => {
     });
   });
 
+  test('review mode cannot emit gameplay and returning live restores command eligibility', async () => {
+    const { runtime, socket, store } = await makeLive();
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    const before = [...socket.sent];
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+
+    expect(runtime.play(0)).toBe(false);
+    expect(runtime.discard(0)).toBe(false);
+    expect(runtime.colorClue(1, 0)).toBe(false);
+    expect(socket.sent).toEqual(before);
+
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: null,
+    }));
+    expect(runtime.play(0)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('action {"tableID":123,"type":0,"target":0}');
+  });
+
   test('player LIVE actions reduce authoritatively and accepted turn settles pending', async () => {
     const { runtime, socket, store } = await makeLive();
     expect(runtime.discard(0)).toBe(true);
@@ -250,7 +275,7 @@ describe('C7 authoritative gameplay runtime', () => {
       tableID: 123,
       gameLoadEpoch: 999,
       expectedLiveActionCount: 0,
-      acceptedActionType: 'turn',
+      acceptedAction: { type: 'turn', num: 1, currentPlayerIndex: 1 },
       game: before.game,
     }));
     expect(store.getState().room.room).toBe(before);

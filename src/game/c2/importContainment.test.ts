@@ -6,6 +6,7 @@ const ALLOWED_PREFIXES = [
   'src/game/upstream/',
   'src/game/selectors/',
   'src/game/bootstrap/',
+  'src/game/replay/',
   'src/game/c2/',
 ];
 

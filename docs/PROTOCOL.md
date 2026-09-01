@@ -333,6 +333,27 @@ The server scrubs hidden card identity information for the receiving player when
 
 The mobile client must still treat server state as authoritative and must not invent or derive secret identities outside the provided game-core semantics.
 
+## Finished game lifecycle
+
+At the pinned commit, the server finishes an ongoing game in this order:
+
+```text
+gameHistory [{...}]
+cardIdentities {tableID, cardIdentities:[{suitIndex,rank}]}
+finishOngoingGame {tableID,databaseID,sharedReplayLeader}
+```
+
+`gameHistory` is a bare array of the pinned Go `GameHistory` records, not an object containing a
+list. Its `datetimeStarted` and `datetimeFinished` values are JSON strings. They remain strings in
+application state; they are never decoded into `Date` objects.
+
+`cardIdentities` supplies the authoritative identity at each card-order index. The official client
+uses it to fill scrubbed `draw`, `play`, and `discard` actions, then reconstructs the game with the
+same game reducer using spectator/finished semantics.
+
+`finishOngoingGame` records the database ID and shared replay leader. C12-A consumes the result
+metadata only; shared replay synchronization and controls remain outside this slice.
+
 ## Player actions
 
 Gameplay client command:

@@ -80,6 +80,26 @@ const wireOptionsSchema = z.object({
   maxPlayers: numPlayers.optional(),
 }).passthrough();
 
+const gameHistoryOptionsSchema = z.object({
+  numPlayers,
+  startingPlayer: playerIndex,
+  variantID: z.number().int().nonnegative(),
+  variantName: z.string().min(1),
+  timed: z.boolean(),
+  timeBase: z.number().int(),
+  timePerTurn: z.number().int(),
+  speedrun: z.boolean(),
+  cardCycle: z.boolean(),
+  deckPlays: z.boolean(),
+  emptyClues: z.boolean(),
+  oneExtraCard: z.boolean(),
+  oneLessCard: z.boolean(),
+  allOrNothing: z.boolean(),
+  detrimentalCharacters: z.boolean(),
+  tableName: z.string().min(1).optional(),
+  maxPlayers: numPlayers.optional(),
+}).strict();
+
 export const gameInitSchema = z.object({
   tableID: idSchema,
   playerNames: z.array(z.string().min(1)),
@@ -228,6 +248,43 @@ export const incrementalGameActionSchema = z.object({
 }).passthrough();
 
 export type IncrementalGameAction = z.infer<typeof incrementalGameActionSchema>;
+
+// The pinned Go server emits gameHistory as a bare array. Although its struct fields
+// use time.Time internally, encoding/json puts both timestamps on the wire as strings.
+export const gameHistoryItemSchema = z.object({
+  id: idSchema,
+  options: gameHistoryOptionsSchema,
+  seed: z.string(),
+  score: z.number().int().nonnegative(),
+  numTurns: z.number().int().nonnegative(),
+  endCondition: z.number().int().min(0).max(10),
+  datetimeStarted: z.string().min(1),
+  datetimeFinished: z.string().min(1),
+  numGamesOnThisSeed: z.number().int().nonnegative(),
+  playerNames: z.array(z.string().min(1)),
+  incrementNumGames: z.boolean(),
+  tags: z.string(),
+}).strict();
+
+export const gameHistorySchema = z.array(gameHistoryItemSchema);
+export type GameHistoryItem = z.infer<typeof gameHistoryItemSchema>;
+export type GameHistory = z.infer<typeof gameHistorySchema>;
+
+export const cardIdentitiesSchema = z.object({
+  tableID: idSchema,
+  cardIdentities: z.array(z.object({
+    suitIndex,
+    rank,
+  }).strict()),
+}).strict();
+export type CardIdentities = z.infer<typeof cardIdentitiesSchema>;
+
+export const finishOngoingGameSchema = z.object({
+  tableID: idSchema,
+  databaseID: idSchema,
+  sharedReplayLeader: z.string(),
+}).strict();
+export type FinishOngoingGame = z.infer<typeof finishOngoingGameSchema>;
 
 function encodeTableCommand(
   command: 'getGameInfo1' | 'getGameInfo2' | 'loaded',

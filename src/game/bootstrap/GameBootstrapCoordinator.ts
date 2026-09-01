@@ -3,7 +3,6 @@ import type { Tuple } from 'complete-common';
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
 import { options as optionsSchema, type Options } from '../upstream/interfaces/Options';
 import { getVariant } from '../upstream/gameData';
-import { gameReducer } from '../upstream/reducers/gameReducer';
 import { getInitialGameState } from '../upstream/reducers/initialStates/initialGameState';
 import { getCardsPerHand } from '../upstream/rules/hand';
 import { getMinEfficiency } from '../upstream/rules/stats';
@@ -11,16 +10,23 @@ import { getEndGameLength } from '../upstream/rules/turn';
 import { isHardVariant } from '../upstream/rules/variants/hGroup';
 import type { NumPlayers } from '../upstream/types/NumPlayers';
 import type { PlayerIndex } from '../upstream/types/PlayerIndex';
-import type { GameAction } from '../upstream/types/gameActions';
 import {
   encodeGetGameInfo1Frame,
   encodeGetGameInfo2Frame,
   encodeLoadedFrame,
+  type CardIdentities,
+  type FinishOngoingGame,
   type GameActionList,
+  type GameHistory,
   type GameInit,
   type IncrementalGameAction,
   type WireGameAction,
 } from '../../protocol/gameProtocol';
+import {
+  buildReplayTimeline,
+  reduceAuthoritativeAction,
+  rehydrateScrubbedActions,
+} from '../replay/ReplayTimeline';
 import { roomActions } from '../../store/roomSlice';
 import type { AppStore } from '../../store/store';
 import type { IncrementalRejectionReason } from '../../store/sessionSlice';
@@ -36,6 +42,7 @@ type ActiveLoad = {
   info1Attempted: boolean;
   info2Attempted: boolean;
   metadata: GameMetadata | null;
+  init: GameInit | null;
   timer: ReturnType<typeof setTimeout> | null;
 };
 
@@ -81,63 +88,16 @@ function makeMetadata(init: GameInit, username: string): GameMetadata {
   };
 }
 
-function actionMatchesMetadata(action: WireGameAction, metadata: GameMetadata): boolean {
-  const count = metadata.options.numPlayers;
-  const validPlayer = (value: number): boolean => value >= 0 && value < count;
-  switch (action.type) {
-    case 'cardIdentity':
-    case 'discard':
-    case 'draw':
-    case 'play':
-      return validPlayer(action.playerIndex);
-    case 'clue':
-      return validPlayer(action.giver) && validPlayer(action.target);
-    case 'gameOver':
-      return (action.playerIndex === -1 || validPlayer(action.playerIndex))
-        && (action.votes === null || action.votes.every(validPlayer));
-    case 'playerTimes':
-      return action.playerTimes.length === count;
-    case 'turn':
-      return action.currentPlayerIndex === -1 || validPlayer(action.currentPlayerIndex);
-    case 'status':
-    case 'strike':
-      return true;
-  }
-}
-
-export function reduceAuthoritativeAction(
-  game: ReturnType<typeof getInitialGameState>,
-  metadata: GameMetadata,
-  role: Role,
-  action: WireGameAction,
-) {
-  if (!actionMatchesMetadata(action, metadata)) {
-    throw new Error(`Action ${action.type} does not match init metadata`);
-  }
-  // The pinned Go stream also contains "status" no-op records and clue records
-  // whose legacy `turn` field is ignored. The pinned reducer intentionally no-ops
-  // unknown status records, matching the official client runtime behavior.
-  return gameReducer(
-    game,
-    action as GameAction,
-    role === 'player',
-    false,
-    false,
-    false,
-    metadata,
-  );
-}
-
 export function replayAuthoritativeHistory(
   metadata: GameMetadata,
   role: Role,
   actions: readonly WireGameAction[],
 ) {
-  let game = getInitialGameState(metadata);
-  for (const action of actions) {
-    game = reduceAuthoritativeAction(game, metadata, role, action);
-  }
-  return game;
+  return buildReplayTimeline(
+    metadata,
+    role === 'player' ? 'player-live' : 'spectator-live',
+    actions,
+  ).finalGame;
 }
 
 export class GameBootstrapCoordinator {
@@ -188,6 +148,7 @@ export class GameBootstrapCoordinator {
       info1Attempted: false,
       info2Attempted: false,
       metadata: null,
+      init: null,
       timer: null,
     };
     this.active = load;
@@ -238,6 +199,7 @@ export class GameBootstrapCoordinator {
     }
 
     load.metadata = metadata;
+    load.init = init;
     load.phase = 'waiting_history';
     this.clearTimer(load);
     this.startTimer(load, 'waiting_history');
@@ -255,7 +217,12 @@ export class GameBootstrapCoordinator {
     history: GameActionList,
   ): boolean {
     const load = this.match(connectionEpoch, gameLoadEpoch, history.tableID);
-    if (load === null || load.phase !== 'waiting_history' || load.metadata === null) return false;
+    if (
+      load === null
+      || load.phase !== 'waiting_history'
+      || load.metadata === null
+      || load.init === null
+    ) return false;
 
     let game;
     try {
@@ -280,7 +247,10 @@ export class GameBootstrapCoordinator {
       gameLoadEpoch,
       metadata: load.metadata,
       game,
-      historyActionCount: history.list.length,
+      history: history.list,
+      databaseID: load.init.databaseID,
+      datetimeStarted: load.init.datetimeStarted,
+      datetimeFinished: load.init.datetimeFinished,
     }));
     this.clearTimer(load);
     this.active = null;
@@ -319,7 +289,12 @@ export class GameBootstrapCoordinator {
 
     let game;
     try {
-      game = reduceAuthoritativeAction(room.game, room.metadata, room.role, event.action);
+      game = reduceAuthoritativeAction(
+        room.game,
+        room.metadata,
+        room.role === 'player' ? 'player-live' : 'spectator-live',
+        event.action,
+      );
     } catch {
       return { accepted: false, rejectionReason: 'reducer-failure' };
     }
@@ -329,7 +304,7 @@ export class GameBootstrapCoordinator {
       tableID: room.tableID,
       gameLoadEpoch: room.gameLoadEpoch,
       expectedLiveActionCount: room.liveActionCount,
-      acceptedActionType: event.action.type,
+      acceptedAction: event.action,
       game,
     }));
     const updated = this.store.getState().room.room;
@@ -340,6 +315,93 @@ export class GameBootstrapCoordinator {
     return accepted
       ? { accepted: true, rejectionReason: null }
       : { accepted: false, rejectionReason: 'reducer-store-acceptance-failure' };
+  }
+
+  receiveGameHistory(connectionEpoch: number, history: GameHistory): boolean {
+    const room = this.currentFinishedRoom(connectionEpoch);
+    if (room === null) return false;
+    const expectedNames = [...room.metadata.playerNames]
+      .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+    const matches = history.filter((item) => (
+      item.seed === room.metadata.seed
+      && item.datetimeStarted === room.postgame.datetimeStarted
+      && item.options.variantName === room.metadata.options.variantName
+      && item.options.numPlayers === room.metadata.options.numPlayers
+      && item.playerNames.length === expectedNames.length
+      && [...item.playerNames]
+        .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
+        .every((name, index) => name === expectedNames[index])
+      && (room.postgame.databaseID === null || item.id === room.postgame.databaseID)
+    ));
+    if (matches.length !== 1) return false;
+    const match = matches[0];
+    if (match === undefined) return false;
+    this.store.dispatch(roomActions.gameHistoryAccepted({
+      connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      history: match,
+    }));
+    const updated = this.store.getState().room.room;
+    return updated.kind === 'live_game'
+      && updated.postgame.gameHistory?.id === match.id;
+  }
+
+  receiveCardIdentities(connectionEpoch: number, event: CardIdentities): boolean {
+    const room = this.currentFinishedRoom(connectionEpoch);
+    if (room === null || room.tableID !== event.tableID) return false;
+    let actionHistory: WireGameAction[];
+    let game;
+    try {
+      actionHistory = rehydrateScrubbedActions(room.actionHistory, event.cardIdentities);
+      game = buildReplayTimeline(room.metadata, 'finished', actionHistory).finalGame;
+    } catch {
+      return false;
+    }
+    this.store.dispatch(roomActions.revealedHistoryAccepted({
+      connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      expectedActionCount: room.actionHistory.length,
+      actionHistory,
+      game,
+    }));
+    const updated = this.store.getState().room.room;
+    return updated.kind === 'live_game'
+      && updated.tableID === room.tableID
+      && updated.gameLoadEpoch === room.gameLoadEpoch
+      && updated.postgame.identitiesRevealed;
+  }
+
+  receiveFinishOngoingGame(connectionEpoch: number, event: FinishOngoingGame): boolean {
+    const room = this.currentFinishedRoom(connectionEpoch);
+    if (room === null || room.tableID !== event.tableID) return false;
+    this.store.dispatch(roomActions.finishOngoingGameAccepted({
+      connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      databaseID: event.databaseID,
+      sharedReplayLeader: event.sharedReplayLeader,
+    }));
+    const updated = this.store.getState().room.room;
+    return updated.kind === 'live_game'
+      && updated.tableID === room.tableID
+      && updated.gameLoadEpoch === room.gameLoadEpoch
+      && updated.postgame.databaseID === event.databaseID;
+  }
+
+  private currentFinishedRoom(connectionEpoch: number) {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      this.active !== null
+      || state.session.connectionEpoch !== connectionEpoch
+      || state.session.phase !== 'ready'
+      || state.room.connectionEpoch !== connectionEpoch
+      || room.kind !== 'live_game'
+      || room.game.turn.currentPlayerIndex !== null
+    ) return null;
+    return room;
   }
 
   private match(

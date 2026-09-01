@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 import {
+  cardIdentitiesSchema,
+  finishOngoingGameSchema,
   gameActionListSchema,
+  gameHistorySchema,
   gameInitSchema,
   incrementalGameActionSchema,
 } from './gameProtocol';
@@ -188,6 +191,9 @@ const schemas = {
   init: gameInitSchema,
   gameActionList: gameActionListSchema,
   gameAction: incrementalGameActionSchema,
+  gameHistory: gameHistorySchema,
+  cardIdentities: cardIdentitiesSchema,
+  finishOngoingGame: finishOngoingGameSchema,
   chat: chatMessageSchema,
   chatList: chatListSchema,
   warning: z.object({ warning: z.string().min(1) }),
