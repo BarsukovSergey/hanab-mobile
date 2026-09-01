@@ -15,7 +15,9 @@
 - `interfaces/GameState.ts`
 - `types/gameActions.ts`
 
-The transitive closure contains 78 upstream source/JSON files. It does not import another hanabi-live workspace package or any upstream client, server, database, or UI source.
+The closure contains the original 78 C2 source/JSON files plus the pinned pure
+`interfaces/CardIdentity.ts` dependency required by the C12-A client State. It does not import
+upstream client, server, database, or UI source.
 
 ## External runtime dependencies
 

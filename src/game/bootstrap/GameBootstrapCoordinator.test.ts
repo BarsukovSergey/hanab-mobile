@@ -123,9 +123,10 @@ describe('authoritative game bootstrap coordinator', () => {
     if (room.kind === 'live_game') {
       expect(room.bootstrapPhase).toBe('live');
       expect(room.historyActionCount).toBe(12);
-      expect(room.actionHistory).toEqual(initialHistory().list);
-      expect(room.game.hands[0]).toEqual([0, 1, 2, 3, 4]);
-      expect(room.game.deck.slice(0, 5).every((card) => (
+      expect(room.clientState.replay.actions).toHaveLength(initialHistory().list.length);
+      expect(room.clientState.ongoingGame.hands[0]).toEqual([0, 1, 2, 3, 4]);
+      expect(room.clientState.visibleState).toBe(room.clientState.ongoingGame);
+      expect(room.clientState.ongoingGame.deck.slice(0, 5).every((card) => (
         card?.suitIndex === null && card.rank === null
       ))).toBe(true);
     }
@@ -196,8 +197,12 @@ describe('authoritative game bootstrap coordinator', () => {
     expect(coordinator.receiveHistory(1, 1, history)).toBe(true);
     const live = store.getState().room.room;
     if (live.kind !== 'live_game') throw new Error('Expected LIVE');
-    const again = replayAuthoritativeHistory(live.metadata, 'player', history.list);
-    expect(again).toEqual(live.game);
+    const again = replayAuthoritativeHistory(
+      live.clientState.metadata,
+      'player',
+      history.list,
+    );
+    expect(again).toEqual(live.clientState.ongoingGame);
   });
 
   test('premature incremental actions are ignored without buffering or extra commands', () => {
@@ -240,9 +245,9 @@ describe('authoritative game bootstrap coordinator', () => {
     const room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.liveActionCount).toBe(1);
-    expect(room.actionHistory).toEqual([...history.list, event.action]);
-    expect(room.game).toEqual(replayAuthoritativeHistory(
-      room.metadata,
+    expect(room.clientState.replay.actions).toHaveLength(history.list.length + 1);
+    expect(room.clientState.ongoingGame).toEqual(replayAuthoritativeHistory(
+      room.clientState.metadata,
       'spectator',
       [...history.list, event.action],
     ));
@@ -269,9 +274,13 @@ describe('authoritative game bootstrap coordinator', () => {
     expect(coordinator.receiveIncremental(1, clue)).toBe(true);
     const room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
-    expect(room.reviewSegment).toBe(0);
-    expect(room.game.turn.segment).toBe(1);
-    expect(room.actionHistory.at(-1)).toEqual(clue.action);
+    expect(room.clientState.replay).toMatchObject({ active: true, segment: 0 });
+    expect(room.clientState.ongoingGame.turn.segment).toBe(1);
+    expect(room.clientState.visibleState?.turn.segment).toBe(0);
+    expect(room.clientState.replay.actions.at(-1)).toEqual({
+      ...clue.action,
+      ignoreNegative: false,
+    });
   });
 
   test('postgame wire rehydrates history, reveals own hand, and records result metadata', () => {
@@ -283,6 +292,10 @@ describe('authoritative game bootstrap coordinator', () => {
     expect(coordinator.receiveIncremental(1, incrementalGameActionSchema.parse({
       tableID: 123,
       action: { type: 'gameOver', endCondition: 1, playerIndex: 0, votes: null },
+    }))).toBe(true);
+    expect(coordinator.receiveIncremental(1, incrementalGameActionSchema.parse({
+      tableID: 123,
+      action: { type: 'playerTimes', playerTimes: [60_000, 60_000], duration: 300_000 },
     }))).toBe(true);
 
     const historyItem = gameHistorySchema.parse([{
@@ -307,6 +320,16 @@ describe('authoritative game bootstrap coordinator', () => {
         rank: (order % 5) + 1,
       })),
     }))).toBe(true);
+    const beforeFinish = store.getState().room.room;
+    if (beforeFinish.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(beforeFinish.clientState.replay.actions[0]).toMatchObject({
+      suitIndex: 0,
+      rank: 1,
+    });
+    expect(beforeFinish.clientState.ongoingGame.deck[0]).toMatchObject({
+      suitIndex: null,
+      rank: null,
+    });
     expect(coordinator.receiveFinishOngoingGame(1, {
       tableID: 123,
       databaseID: 456,
@@ -315,15 +338,18 @@ describe('authoritative game bootstrap coordinator', () => {
 
     const room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
-    expect(room.actionHistory[0]).toMatchObject({ suitIndex: 0, rank: 1 });
-    expect(room.game.deck[0]).toMatchObject({ suitIndex: 0, rank: 1 });
-    expect(room.postgame).toMatchObject({
-      databaseID: 456,
+    expect(room.clientState.replay.actions[0]).toMatchObject({ suitIndex: 0, rank: 1 });
+    expect(room.clientState.ongoingGame.deck[0]).toMatchObject({ suitIndex: 0, rank: 1 });
+    expect(room.clientState).toMatchObject({
+      playing: false,
+      finished: true,
       datetimeFinished: '2026-08-31T00:05:00Z',
-      sharedReplayLeader: 'Ada',
-      identitiesRevealed: true,
-      gameHistory: { id: 456 },
+      replay: {
+        databaseID: 456,
+        shared: { leader: 'Ada', amLeader: true },
+      },
     });
+    expect(room.gameHistory).toMatchObject({ id: 456 });
   });
 
   test('stale and wrong-table postgame events are rejected', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -8,7 +8,6 @@ import {
   getVisibleCardIdentityLabel,
 } from '../../game/selectors/gameplay';
 import { lobbyRuntime } from '../../runtime/application';
-import { buildReplayTimeline } from '../../game/replay/ReplayTimeline';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { GameCard } from './GameCard';
@@ -36,24 +35,17 @@ export function GameScreen() {
   const [selectedCardOrder, setSelectedCardOrder] = useState<number | null>(null);
   const [selectedClueTarget, setSelectedClueTarget] = useState<number | null>(null);
 
-  const timeline = useMemo(() => liveRoom === null ? null : buildReplayTimeline(
-    liveRoom.metadata,
-    liveRoom.postgame.identitiesRevealed
-      ? 'finished'
-      : liveRoom.role === 'player' ? 'player-live' : 'spectator-live',
-    liveRoom.actionHistory,
-  ), [liveRoom]);
-  const selectedSnapshot = liveRoom?.reviewSegment === null
-    ? null
-    : timeline?.snapshots.find((snapshot) => snapshot.segment === liveRoom?.reviewSegment) ?? null;
-  const displayedGame = selectedSnapshot?.game ?? liveRoom?.game ?? null;
+  const clientState = liveRoom?.clientState ?? null;
+  const displayedGame = clientState?.visibleState ?? null;
 
-  const playerLiveRoom = liveRoom?.role === 'player' ? liveRoom : null;
-  const ourPlayerIndex = playerLiveRoom?.metadata.ourPlayerIndex ?? null;
+  const playerLiveRoom = liveRoom?.role === 'player' && clientState?.playing
+    ? liveRoom
+    : null;
+  const ourPlayerIndex = playerLiveRoom?.clientState.metadata.ourPlayerIndex ?? null;
   const ourHand = ourPlayerIndex === null
     ? []
     : displayedGame?.hands[ourPlayerIndex] ?? [];
-  const clueTargetIndexes = playerLiveRoom?.metadata.playerNames
+  const clueTargetIndexes = playerLiveRoom?.clientState.metadata.playerNames
     .map((_, playerIndex) => playerIndex)
     .filter((playerIndex) => playerIndex !== ourPlayerIndex) ?? [];
 
@@ -79,55 +71,59 @@ export function GameScreen() {
 
   if (liveRoom === null) return null;
 
-  if (displayedGame === null || timeline === null) return null;
+  if (displayedGame === null || clientState === null) return null;
 
-  const isFinished = liveRoom.game.turn.currentPlayerIndex === null;
-  const latestSegment = timeline.snapshots.at(-1)?.segment ?? 0;
-  const currentSegment = liveRoom.reviewSegment ?? latestSegment;
+  const { metadata, replay, ongoingGame } = clientState;
+  const isFinished = clientState.finished;
+  const latestSegment = ongoingGame.turn.segment ?? 0;
+  const currentSegment = replay.active ? replay.segment : latestSegment;
+  const availableSegments = replay.states.flatMap((state, segment) => (
+    state === undefined ? [] : [segment]
+  ));
   const reviewControls = (
     <View style={styles.reviewArea}>
       <Text style={styles.actionTitle}>
-        {liveRoom.reviewSegment === null ? 'Live' : 'Review'} · Segment {currentSegment}
+        {!replay.active ? 'Live' : 'Review'} · Segment {currentSegment}
         {' / '}{latestSegment} · Turn {displayedGame.turn.turnNum}
       </Text>
       <View style={styles.buttonWrap}>
         <Button
-          disabled={timeline.snapshots.length === 0 || currentSegment === 0}
+          disabled={availableSegments.length === 0 || currentSegment === 0}
           title="First"
           onPress={() => dispatch(roomActions.reviewSegmentSelected({
             tableID: liveRoom.tableID,
             gameLoadEpoch: liveRoom.gameLoadEpoch,
-            segment: timeline.snapshots[0]?.segment ?? 0,
+            segment: availableSegments[0] ?? 0,
           }))}
         />
         <Button
-          disabled={timeline.snapshots.length === 0 || currentSegment <= 0}
+          disabled={availableSegments.length === 0 || currentSegment <= 0}
           title="Previous"
           onPress={() => {
-            const previous = [...timeline.snapshots]
+            const previous = [...availableSegments]
               .reverse()
-              .find((snapshot) => snapshot.segment < currentSegment);
+              .find((segment) => segment < currentSegment);
             if (previous !== undefined) dispatch(roomActions.reviewSegmentSelected({
               tableID: liveRoom.tableID,
               gameLoadEpoch: liveRoom.gameLoadEpoch,
-              segment: previous.segment,
+              segment: previous,
             }));
           }}
         />
         <Button
-          disabled={liveRoom.reviewSegment === null || currentSegment >= latestSegment}
+          disabled={!replay.active || currentSegment >= latestSegment}
           title="Next"
           onPress={() => {
-            const next = timeline.snapshots.find((snapshot) => snapshot.segment > currentSegment);
+            const next = availableSegments.find((segment) => segment > currentSegment);
             if (next !== undefined) dispatch(roomActions.reviewSegmentSelected({
               tableID: liveRoom.tableID,
               gameLoadEpoch: liveRoom.gameLoadEpoch,
-              segment: next.segment,
+              segment: next,
             }));
           }}
         />
         <Button
-          disabled={liveRoom.reviewSegment === null}
+          disabled={!replay.active}
           title="Latest live"
           onPress={() => dispatch(roomActions.reviewSegmentSelected({
             tableID: liveRoom.tableID,
@@ -140,49 +136,49 @@ export function GameScreen() {
   );
 
   if (isFinished) {
-    const history = liveRoom.postgame.gameHistory;
-    const gameOver = [...liveRoom.actionHistory].reverse().find((action) => (
+    const history = liveRoom.gameHistory;
+    const gameOver = [...replay.actions].reverse().find((action) => (
       action.type === 'gameOver'
     ));
-    const times = [...liveRoom.actionHistory].reverse().find((action) => (
+    const times = [...replay.actions].reverse().find((action) => (
       action.type === 'playerTimes'
     ));
     const endCondition = history?.endCondition
       ?? (gameOver?.type === 'gameOver' ? gameOver.endCondition : 0);
     const endConditionText = END_CONDITION_TEXT[endCondition] ?? `End condition ${endCondition}`;
     const timestampDuration = durationBetween(
-      liveRoom.postgame.datetimeStarted,
-      liveRoom.postgame.datetimeFinished,
+      clientState.datetimeStarted ?? '',
+      clientState.datetimeFinished ?? '',
     );
 
     return (
       <View style={styles.screen}>
         <View style={styles.finishedHeader}>
           <Text style={styles.gameOver}>GAME OVER</Text>
-          <Text style={styles.finalScore}>{liveRoom.game.score}</Text>
+          <Text style={styles.finalScore}>{ongoingGame.score}</Text>
           <Text style={styles.scoreLabel}>FINAL SCORE</Text>
         </View>
 
         <View style={styles.statRow}>
-          <Stat label="Strikes" value={liveRoom.game.strikes.length} />
-          <Stat label="Clues" value={liveRoom.game.clueTokens} />
-          <Stat label="Cards remaining" value={liveRoom.game.cardsRemainingInTheDeck} />
+          <Stat label="Strikes" value={ongoingGame.strikes.length} />
+          <Stat label="Clues" value={ongoingGame.clueTokens} />
+          <Stat label="Cards remaining" value={ongoingGame.cardsRemainingInTheDeck} />
         </View>
 
         <View style={styles.resultDetails}>
           <Text>End: {endConditionText}</Text>
-          <Text>Players: {liveRoom.metadata.playerNames.join(', ')}</Text>
-          <Text>Turns: {history?.numTurns ?? liveRoom.game.turn.turnNum}</Text>
-          {liveRoom.postgame.databaseID !== null && (
-            <Text>Game ID: {liveRoom.postgame.databaseID}</Text>
+          <Text>Players: {metadata.playerNames.join(', ')}</Text>
+          <Text>Turns: {history?.numTurns ?? ongoingGame.turn.turnNum}</Text>
+          {replay.databaseID !== null && (
+            <Text>Game ID: {replay.databaseID}</Text>
           )}
-          <Text>Seed: {liveRoom.metadata.seed}</Text>
+          <Text>Seed: {metadata.seed}</Text>
           {times?.type === 'playerTimes' && (
             <>
               <Text>Duration: {formatMilliseconds(times.duration)}</Text>
               {times.playerTimes.map((time, index) => (
-                <Text key={liveRoom.metadata.playerNames[index] ?? index}>
-                  {liveRoom.metadata.playerNames[index] ?? `Player ${index + 1}`}: {formatMilliseconds(time)}
+                <Text key={metadata.playerNames[index] ?? index}>
+                  {metadata.playerNames[index] ?? `Player ${index + 1}`}: {formatMilliseconds(time)}
                 </Text>
               ))}
             </>
@@ -195,17 +191,17 @@ export function GameScreen() {
         {reviewControls}
         <ReplayTable
           game={displayedGame}
-          variantName={liveRoom.metadata.options.variantName}
+          variantName={metadata.options.variantName}
         />
         <ReplayHands
           game={displayedGame}
-          playerNames={liveRoom.metadata.playerNames}
-          variantName={liveRoom.metadata.options.variantName}
+          playerNames={metadata.playerNames}
+          variantName={metadata.options.variantName}
         />
 
         <View style={styles.gameLog}>
           <Text style={styles.subheading}>Full game log</Text>
-          {liveRoom.game.log.map((entry, index) => (
+          {ongoingGame.log.map((entry, index) => (
             <Text key={`${entry.turn}-${index}`} style={styles.logEntry}>
               {entry.text}
             </Text>
@@ -219,22 +215,22 @@ export function GameScreen() {
     && displayedGame.turn.currentPlayerIndex === ourPlayerIndex;
   const gameplayControlsEnabled = sessionPhase === 'ready'
     && isOurTurn
-    && liveRoom.reviewSegment === null
+    && !replay.active
     && roomState.pendingGameplayAction === null;
   const clueChoices = playerLiveRoom === null
     ? null
-    : getGameplayClueChoices(playerLiveRoom.metadata.options.variantName);
+    : getGameplayClueChoices(playerLiveRoom.clientState.metadata.options.variantName);
   const currentPlayerIndex = displayedGame.turn.currentPlayerIndex;
   const currentPlayerName = currentPlayerIndex === null
     ? 'No current player'
-    : liveRoom.metadata.playerNames[currentPlayerIndex] ?? `Player ${currentPlayerIndex + 1}`;
+    : metadata.playerNames[currentPlayerIndex] ?? `Player ${currentPlayerIndex + 1}`;
   const pendingAction = roomState.pendingGameplayAction?.action ?? null;
   const pendingLabel = pendingAction === null
     ? null
     : ['Playing card', 'Discarding card', 'Giving color clue', 'Giving rank clue'][
       pendingAction.type
     ];
-  const visiblePlayerIndexes = liveRoom.metadata.playerNames
+  const visiblePlayerIndexes = metadata.playerNames
     .map((_, playerIndex) => playerIndex)
     .filter((playerIndex) => playerLiveRoom === null || playerIndex !== ourPlayerIndex);
   const cardActionsEnabled = gameplayControlsEnabled && selectedCardOrder !== null;
@@ -242,7 +238,7 @@ export function GameScreen() {
     && displayedGame.clueTokens > 0
     && selectedClueTarget !== null;
   const tableSuits = getGameTableSuits(
-    liveRoom.metadata.options.variantName,
+    metadata.options.variantName,
     displayedGame,
   );
 
@@ -254,7 +250,7 @@ export function GameScreen() {
           <Text style={styles.eyebrow}>TURN {displayedGame.turn.turnNum}</Text>
           <Text style={styles.heading}>{currentPlayerName}</Text>
           <Text style={styles.turnStatus}>
-            {liveRoom.reviewSegment !== null
+            {replay.active
               ? 'Reviewing an earlier segment'
               : playerLiveRoom === null
               ? 'Spectating'
@@ -317,7 +313,7 @@ export function GameScreen() {
                 return <Text key={order}>Card {position + 1} unavailable</Text>;
               }
               const knowledge = getCardKnowledgeViewModel(
-                playerLiveRoom.metadata.options.variantName,
+                playerLiveRoom.clientState.metadata.options.variantName,
                 card,
               );
               return (
@@ -383,7 +379,7 @@ export function GameScreen() {
               style={[styles.playerRow, isTarget && styles.selectedPlayer]}
             >
               <View style={styles.playerHeadingRow}>
-                <Text style={styles.playerName}>{liveRoom.metadata.playerNames[playerIndex]}</Text>
+                <Text style={styles.playerName}>{metadata.playerNames[playerIndex]}</Text>
                 {isTarget && <Text style={styles.selectedLabel}>CLUE TARGET</Text>}
               </View>
               <View style={styles.visibleHand}>
@@ -396,7 +392,7 @@ export function GameScreen() {
                         {card === undefined
                           ? 'Unknown'
                           : getVisibleCardIdentityLabel(
-                            liveRoom.metadata.options.variantName,
+                            metadata.options.variantName,
                             card.suitIndex,
                             card.rank,
                           )}
@@ -415,7 +411,7 @@ export function GameScreen() {
           <Text style={styles.actionTitle}>
             Give a clue to {selectedClueTarget === null
               ? 'a player'
-              : playerLiveRoom.metadata.playerNames[selectedClueTarget]}
+              : playerLiveRoom.clientState.metadata.playerNames[selectedClueTarget]}
           </Text>
           <Text style={styles.helper}>
             {displayedGame.clueTokens === 0

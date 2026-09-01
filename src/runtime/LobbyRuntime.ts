@@ -722,8 +722,9 @@ export class LobbyRuntime {
       || state.room.connectionEpoch !== owned.epoch
       || room.kind !== 'live_game'
       || room.role !== 'player'
-      || room.reviewSegment !== null
-      || room.game.turn.currentPlayerIndex !== room.metadata.ourPlayerIndex
+      || room.clientState.replay.active
+      || room.clientState.ongoingGame.turn.currentPlayerIndex
+        !== room.clientState.metadata.ourPlayerIndex
       || state.room.pendingGameplayAction !== null
     ) return false;
 
@@ -731,18 +732,18 @@ export class LobbyRuntime {
     const parsed = clientGameplayActionSchema.safeParse(candidate);
     if (!parsed.success) return false;
     const action = parsed.data;
-    const ourPlayerIndex = room.metadata.ourPlayerIndex;
+    const ourPlayerIndex = room.clientState.metadata.ourPlayerIndex;
     if (
       (action.type === 0 || action.type === 1)
-      && !(room.game.hands[ourPlayerIndex]?.includes(action.target) ?? false)
+      && !(room.clientState.ongoingGame.hands[ourPlayerIndex]?.includes(action.target) ?? false)
     ) return false;
     if (action.type === 2 || action.type === 3) {
       if (
         action.target === ourPlayerIndex
         || action.target < 0
-        || action.target >= room.metadata.options.numPlayers
+        || action.target >= room.clientState.metadata.options.numPlayers
       ) return false;
-      const variantName = room.metadata.options.variantName;
+      const variantName = room.clientState.metadata.options.variantName;
       if (
         (action.type === 2
           && !isCurrentVariantColorClueValue(variantName, action.value))

@@ -178,7 +178,7 @@ describe('C7 authoritative gameplay runtime', () => {
     const { runtime, socket, store } = await makeLive();
     const roomBefore = store.getState().room.room;
     if (roomBefore.kind !== 'live_game') throw new Error('Expected LIVE');
-    const gameBefore = roomBefore.game;
+    const gameBefore = roomBefore.clientState.ongoingGame;
     const sentBefore = socket.sent.length;
 
     expect(runtime.play(0)).toBe(true);
@@ -189,7 +189,7 @@ describe('C7 authoritative gameplay runtime', () => {
     ]);
     const roomAfter = store.getState().room.room;
     if (roomAfter.kind !== 'live_game') throw new Error('Expected LIVE');
-    expect(roomAfter.game).toBe(gameBefore);
+    expect(roomAfter.clientState.ongoingGame).toBe(gameBefore);
     expect(store.getState().room.pendingGameplayAction).toMatchObject({
       connectionEpoch: 1,
       tableID: 123,
@@ -237,9 +237,9 @@ describe('C7 authoritative gameplay runtime', () => {
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.role).toBe('player');
     expect(room.liveActionCount).toBe(2);
-    expect(room.game.turn.turnNum).toBe(1);
-    expect(room.game.turn.currentPlayerIndex).toBe(1);
-    expect(room.game.clueTokens).toBe(7);
+    expect(room.clientState.ongoingGame.turn.turnNum).toBe(1);
+    expect(room.clientState.ongoingGame.turn.currentPlayerIndex).toBe(1);
+    expect(room.clientState.ongoingGame.clueTokens).toBe(7);
     expect(store.getState().room.pendingGameplayAction).toBeNull();
   });
 
@@ -253,7 +253,7 @@ describe('C7 authoritative gameplay runtime', () => {
       socket.emitMessage(`${command} {"${command}":"rejected"}`);
       const after = store.getState().room.room;
       if (after.kind !== 'live_game') throw new Error('Expected LIVE');
-      expect(after.game).toBe(before.game);
+      expect(after.clientState).toBe(before.clientState);
       expect(after.liveActionCount).toBe(before.liveActionCount);
       expect(store.getState().room.pendingGameplayAction).toBeNull();
     },
@@ -276,7 +276,7 @@ describe('C7 authoritative gameplay runtime', () => {
       gameLoadEpoch: 999,
       expectedLiveActionCount: 0,
       acceptedAction: { type: 'turn', num: 1, currentPlayerIndex: 1 },
-      game: before.game,
+      clientState: before.clientState,
     }));
     expect(store.getState().room.room).toBe(before);
     expect(store.getState().room.pendingGameplayAction).not.toBeNull();

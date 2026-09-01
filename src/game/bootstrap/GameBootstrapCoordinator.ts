@@ -1,9 +1,9 @@
 import type { Tuple } from 'complete-common';
 
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
+import type { GameState } from '../upstream/interfaces/GameState';
 import { options as optionsSchema, type Options } from '../upstream/interfaces/Options';
 import { getVariant } from '../upstream/gameData';
-import { getInitialGameState } from '../upstream/reducers/initialStates/initialGameState';
 import { getCardsPerHand } from '../upstream/rules/hand';
 import { getMinEfficiency } from '../upstream/rules/stats';
 import { getEndGameLength } from '../upstream/rules/turn';
@@ -23,10 +23,15 @@ import {
   type WireGameAction,
 } from '../../protocol/gameProtocol';
 import {
-  buildReplayTimeline,
-  reduceAuthoritativeAction,
-  rehydrateScrubbedActions,
-} from '../replay/ReplayTimeline';
+  initializeHeadlessState,
+  toCardIdentitiesAction,
+  toFinishOngoingGameAction,
+  toGameActionListAction,
+  toUpstreamGameAction,
+} from '../client/boundary';
+import { initialState } from '../client/reducers/initialStates/initialState';
+import { stateReducer } from '../client/reducers/stateReducer';
+import type { State } from '../client/types/State';
 import { roomActions } from '../../store/roomSlice';
 import type { AppStore } from '../../store/store';
 import type { IncrementalRejectionReason } from '../../store/sessionSlice';
@@ -42,7 +47,7 @@ type ActiveLoad = {
   info1Attempted: boolean;
   info2Attempted: boolean;
   metadata: GameMetadata | null;
-  init: GameInit | null;
+  clientState: State | null;
   timer: ReturnType<typeof setTimeout> | null;
 };
 
@@ -92,12 +97,27 @@ export function replayAuthoritativeHistory(
   metadata: GameMetadata,
   role: Role,
   actions: readonly WireGameAction[],
-) {
-  return buildReplayTimeline(
-    metadata,
-    role === 'player' ? 'player-live' : 'spectator-live',
-    actions,
-  ).finalGame;
+): GameState {
+  let clientState = initialState(metadata);
+  clientState = stateReducer(clientState, {
+    type: 'init',
+    datetimeStarted: '',
+    datetimeFinished: '',
+    spectating: role === 'spectator',
+    shadowing: false,
+    replay: false,
+    sharedReplay: false,
+    databaseID: -1,
+    sharedReplaySegment: 0,
+    sharedReplayLeader: '',
+    paused: false,
+    pausePlayerIndex: 0,
+  });
+  clientState = stateReducer(
+    clientState,
+    toGameActionListAction(actions, metadata),
+  );
+  return clientState.ongoingGame;
 }
 
 export class GameBootstrapCoordinator {
@@ -148,7 +168,7 @@ export class GameBootstrapCoordinator {
       info1Attempted: false,
       info2Attempted: false,
       metadata: null,
-      init: null,
+      clientState: null,
       timer: null,
     };
     this.active = load;
@@ -185,9 +205,10 @@ export class GameBootstrapCoordinator {
     if (username === undefined) return false;
 
     let metadata: GameMetadata;
+    let clientState: State;
     try {
       metadata = makeMetadata(init, username);
-      getInitialGameState(metadata);
+      clientState = initializeHeadlessState(metadata, init);
     } catch {
       return false;
     }
@@ -199,7 +220,7 @@ export class GameBootstrapCoordinator {
     }
 
     load.metadata = metadata;
-    load.init = init;
+    load.clientState = clientState;
     load.phase = 'waiting_history';
     this.clearTimer(load);
     this.startTimer(load, 'waiting_history');
@@ -221,12 +242,15 @@ export class GameBootstrapCoordinator {
       load === null
       || load.phase !== 'waiting_history'
       || load.metadata === null
-      || load.init === null
+      || load.clientState === null
     ) return false;
 
-    let game;
+    let clientState: State;
     try {
-      game = replayAuthoritativeHistory(load.metadata, load.role, history.list);
+      clientState = stateReducer(
+        load.clientState,
+        toGameActionListAction(history.list, load.metadata),
+      );
     } catch {
       return false;
     }
@@ -245,12 +269,8 @@ export class GameBootstrapCoordinator {
       connectionEpoch,
       tableID: load.tableID,
       gameLoadEpoch,
-      metadata: load.metadata,
-      game,
-      history: history.list,
-      databaseID: load.init.databaseID,
-      datetimeStarted: load.init.datetimeStarted,
-      datetimeFinished: load.init.datetimeFinished,
+      clientState,
+      historyActionCount: history.list.length,
     }));
     this.clearTimer(load);
     this.active = null;
@@ -287,13 +307,11 @@ export class GameBootstrapCoordinator {
       return { accepted: false, rejectionReason: 'wrong-room-table' };
     }
 
-    let game;
+    let clientState: State;
     try {
-      game = reduceAuthoritativeAction(
-        room.game,
-        room.metadata,
-        room.role === 'player' ? 'player-live' : 'spectator-live',
-        event.action,
+      clientState = stateReducer(
+        room.clientState,
+        toUpstreamGameAction(event.action, room.clientState.metadata),
       );
     } catch {
       return { accepted: false, rejectionReason: 'reducer-failure' };
@@ -305,7 +323,7 @@ export class GameBootstrapCoordinator {
       gameLoadEpoch: room.gameLoadEpoch,
       expectedLiveActionCount: room.liveActionCount,
       acceptedAction: event.action,
-      game,
+      clientState,
     }));
     const updated = this.store.getState().room.room;
     const accepted = updated.kind === 'live_game'
@@ -320,18 +338,20 @@ export class GameBootstrapCoordinator {
   receiveGameHistory(connectionEpoch: number, history: GameHistory): boolean {
     const room = this.currentFinishedRoom(connectionEpoch);
     if (room === null) return false;
-    const expectedNames = [...room.metadata.playerNames]
+    const metadata = room.clientState.metadata;
+    const expectedNames = [...metadata.playerNames]
       .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
     const matches = history.filter((item) => (
-      item.seed === room.metadata.seed
-      && item.datetimeStarted === room.postgame.datetimeStarted
-      && item.options.variantName === room.metadata.options.variantName
-      && item.options.numPlayers === room.metadata.options.numPlayers
+      item.seed === metadata.seed
+      && item.datetimeStarted === room.clientState.datetimeStarted
+      && item.options.variantName === metadata.options.variantName
+      && item.options.numPlayers === metadata.options.numPlayers
       && item.playerNames.length === expectedNames.length
       && [...item.playerNames]
         .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
         .every((name, index) => name === expectedNames[index])
-      && (room.postgame.databaseID === null || item.id === room.postgame.databaseID)
+      && (room.clientState.replay.databaseID === null
+        || item.id === room.clientState.replay.databaseID)
     ));
     if (matches.length !== 1) return false;
     const match = matches[0];
@@ -344,50 +364,60 @@ export class GameBootstrapCoordinator {
     }));
     const updated = this.store.getState().room.room;
     return updated.kind === 'live_game'
-      && updated.postgame.gameHistory?.id === match.id;
+      && updated.gameHistory?.id === match.id;
   }
 
   receiveCardIdentities(connectionEpoch: number, event: CardIdentities): boolean {
     const room = this.currentFinishedRoom(connectionEpoch);
     if (room === null || room.tableID !== event.tableID) return false;
-    let actionHistory: WireGameAction[];
-    let game;
+    let clientState: State;
     try {
-      actionHistory = rehydrateScrubbedActions(room.actionHistory, event.cardIdentities);
-      game = buildReplayTimeline(room.metadata, 'finished', actionHistory).finalGame;
+      clientState = stateReducer(room.clientState, toCardIdentitiesAction(event));
     } catch {
       return false;
     }
-    this.store.dispatch(roomActions.revealedHistoryAccepted({
+    this.store.dispatch(roomActions.clientStateAccepted({
       connectionEpoch,
       tableID: room.tableID,
       gameLoadEpoch: room.gameLoadEpoch,
-      expectedActionCount: room.actionHistory.length,
-      actionHistory,
-      game,
+      expectedActionCount: room.clientState.replay.actions.length,
+      clientState,
     }));
     const updated = this.store.getState().room.room;
     return updated.kind === 'live_game'
       && updated.tableID === room.tableID
       && updated.gameLoadEpoch === room.gameLoadEpoch
-      && updated.postgame.identitiesRevealed;
+      && updated.clientState.cardIdentities === clientState.cardIdentities;
   }
 
   receiveFinishOngoingGame(connectionEpoch: number, event: FinishOngoingGame): boolean {
     const room = this.currentFinishedRoom(connectionEpoch);
     if (room === null || room.tableID !== event.tableID) return false;
-    this.store.dispatch(roomActions.finishOngoingGameAccepted({
+    let clientState: State;
+    try {
+      const datetimeFinished = room.gameHistory?.datetimeFinished
+        ?? room.clientState.datetimeFinished
+        ?? '';
+      clientState = stateReducer(
+        room.clientState,
+        toFinishOngoingGameAction(event, datetimeFinished),
+      );
+    } catch {
+      return false;
+    }
+    this.store.dispatch(roomActions.clientStateAccepted({
       connectionEpoch,
       tableID: room.tableID,
       gameLoadEpoch: room.gameLoadEpoch,
-      databaseID: event.databaseID,
-      sharedReplayLeader: event.sharedReplayLeader,
+      expectedActionCount: room.clientState.replay.actions.length,
+      clientState,
     }));
     const updated = this.store.getState().room.room;
     return updated.kind === 'live_game'
       && updated.tableID === room.tableID
       && updated.gameLoadEpoch === room.gameLoadEpoch
-      && updated.postgame.databaseID === event.databaseID;
+      && updated.clientState.finished
+      && updated.clientState.replay.databaseID === event.databaseID;
   }
 
   private currentFinishedRoom(connectionEpoch: number) {
@@ -399,7 +429,7 @@ export class GameBootstrapCoordinator {
       || state.session.phase !== 'ready'
       || state.room.connectionEpoch !== connectionEpoch
       || room.kind !== 'live_game'
-      || room.game.turn.currentPlayerIndex !== null
+      || room.clientState.ongoingGame.turn.currentPlayerIndex !== null
     ) return null;
     return room;
   }

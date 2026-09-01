@@ -1534,10 +1534,10 @@ describe('deterministic lobby runtime', () => {
     const room = store.getState().room.room;
     expect(room).toMatchObject({
       kind: 'live_game', role: 'spectator', liveActionCount: 1,
-      game: { cardsRemainingInTheDeck: 39 },
+      clientState: { ongoingGame: { cardsRemainingInTheDeck: 39 } },
     });
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
-    expect(room.game.hands[0]).toEqual([0, 1, 2, 3, 4, 10]);
+    expect(room.clientState.ongoingGame.hands[0]).toEqual([0, 1, 2, 3, 4, 10]);
     expect(socket.sent).toEqual(sentBeforeLiveAction);
     expect(store.getState().session.inboundDiagnostics.at(-1)).toEqual({
       command: 'gameAction',

@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { castDraft } from 'immer';
+import { castDraft, original } from 'immer';
 
 import type {
   PregameGame,
@@ -7,7 +7,8 @@ import type {
   TableLeft,
   TableStart,
 } from '../protocol/lobbyProtocol';
-import type { GameMetadata, GameState } from '../game/bootstrap/types';
+import { stateReducer } from '../game/client/reducers/stateReducer';
+import type { State } from '../game/client/types/State';
 import type {
   ClientGameplayAction,
   GameHistoryItem,
@@ -44,18 +45,8 @@ export type RoomState =
       bootstrapPhase: 'live';
       historyActionCount: number;
       liveActionCount: number;
-      metadata: GameMetadata;
-      actionHistory: WireGameAction[];
-      game: GameState;
-      reviewSegment: number | null;
-      postgame: {
-        databaseID: number | null;
-        datetimeStarted: string;
-        datetimeFinished: string;
-        gameHistory: GameHistoryItem | null;
-        sharedReplayLeader: string | null;
-        identitiesRevealed: boolean;
-      };
+      clientState: State;
+      gameHistory: GameHistoryItem | null;
     };
 
 type PendingJoin = {
@@ -492,17 +483,12 @@ export const roomSlice = createSlice({
         connectionEpoch: number;
         tableID: number;
         gameLoadEpoch: number;
-        metadata: GameMetadata;
-        game: GameState;
-        history: WireGameAction[];
-        databaseID: number;
-        datetimeStarted: string;
-        datetimeFinished: string;
+        clientState: State;
+        historyActionCount: number;
       }>,
     ) {
       const {
-        connectionEpoch, tableID, gameLoadEpoch, metadata, game, history,
-        databaseID, datetimeStarted, datetimeFinished,
+        connectionEpoch, tableID, gameLoadEpoch, clientState, historyActionCount,
       } = action.payload;
       if (state.connectionEpoch !== connectionEpoch) return;
       if (
@@ -518,20 +504,10 @@ export const roomSlice = createSlice({
         role: state.room.role,
         gameLoadEpoch,
         bootstrapPhase: 'live',
-        historyActionCount: history.length,
+        historyActionCount,
         liveActionCount: 0,
-        metadata: castDraft(metadata),
-        actionHistory: castDraft(history),
-        game: castDraft(game),
-        reviewSegment: null,
-        postgame: {
-          databaseID: databaseID >= 0 ? databaseID : null,
-          datetimeStarted,
-          datetimeFinished,
-          gameHistory: null,
-          sharedReplayLeader: null,
-          identitiesRevealed: false,
-        },
+        clientState: castDraft(clientState),
+        gameHistory: null,
       };
     },
     liveActionAccepted(
@@ -542,12 +518,12 @@ export const roomSlice = createSlice({
         gameLoadEpoch: number;
         expectedLiveActionCount: number;
         acceptedAction: WireGameAction;
-        game: GameState;
+        clientState: State;
       }>,
     ) {
       const {
         connectionEpoch, tableID, gameLoadEpoch, expectedLiveActionCount,
-        acceptedAction, game,
+        acceptedAction, clientState,
       } = action.payload;
       if (state.connectionEpoch !== connectionEpoch) return;
       if (
@@ -556,8 +532,7 @@ export const roomSlice = createSlice({
         || state.room.gameLoadEpoch !== gameLoadEpoch
         || state.room.liveActionCount !== expectedLiveActionCount
       ) return;
-      state.room.game = castDraft(game);
-      state.room.actionHistory.push(castDraft(acceptedAction));
+      state.room.clientState = castDraft(clientState);
       state.room.liveActionCount += 1;
       if (
         acceptedAction.type === 'turn'
@@ -582,23 +557,39 @@ export const roomSlice = createSlice({
         || state.room.gameLoadEpoch !== action.payload.gameLoadEpoch
       ) return;
       const segment = action.payload.segment;
-      const latestSegment = state.room.game.turn.segment;
+      const latestSegment = state.room.clientState.ongoingGame.turn.segment;
       if (
         segment !== null
-        && (latestSegment === null || segment < 0 || segment > latestSegment)
+        && (
+          latestSegment === null
+          || segment < 0
+          || segment > latestSegment
+          || state.room.clientState.replay.states[segment] === undefined
+        )
       ) return;
-      state.room.reviewSegment = segment;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      if (segment === null) {
+        if (current.replay.active) {
+          state.room.clientState = castDraft(stateReducer(current, { type: 'replayExit' }));
+        }
+      } else {
+        state.room.clientState = castDraft(stateReducer(
+          current,
+          current.replay.active
+            ? { type: 'replaySegment', segment }
+            : { type: 'replayEnter', segment },
+        ));
+      }
       if (segment !== null) state.pendingGameplayAction = null;
     },
-    revealedHistoryAccepted(
+    clientStateAccepted(
       state,
       action: PayloadAction<{
         connectionEpoch: number;
         tableID: number;
         gameLoadEpoch: number;
         expectedActionCount: number;
-        actionHistory: WireGameAction[];
-        game: GameState;
+        clientState: State;
       }>,
     ) {
       const payload = action.payload;
@@ -607,12 +598,10 @@ export const roomSlice = createSlice({
         || state.room.kind !== 'live_game'
         || state.room.tableID !== payload.tableID
         || state.room.gameLoadEpoch !== payload.gameLoadEpoch
-        || state.room.actionHistory.length !== payload.expectedActionCount
-        || state.room.game.turn.currentPlayerIndex !== null
+        || state.room.clientState.replay.actions.length !== payload.expectedActionCount
+        || state.room.clientState.ongoingGame.turn.currentPlayerIndex !== null
       ) return;
-      state.room.actionHistory = castDraft(payload.actionHistory);
-      state.room.game = castDraft(payload.game);
-      state.room.postgame.identitiesRevealed = true;
+      state.room.clientState = castDraft(payload.clientState);
       state.pendingGameplayAction = null;
     },
     gameHistoryAccepted(
@@ -630,34 +619,9 @@ export const roomSlice = createSlice({
         || state.room.kind !== 'live_game'
         || state.room.tableID !== payload.tableID
         || state.room.gameLoadEpoch !== payload.gameLoadEpoch
-        || state.room.game.turn.currentPlayerIndex !== null
+        || state.room.clientState.ongoingGame.turn.currentPlayerIndex !== null
       ) return;
-      state.room.postgame.gameHistory = castDraft(payload.history);
-      state.room.postgame.databaseID = payload.history.id;
-      state.room.postgame.datetimeStarted = payload.history.datetimeStarted;
-      state.room.postgame.datetimeFinished = payload.history.datetimeFinished;
-    },
-    finishOngoingGameAccepted(
-      state,
-      action: PayloadAction<{
-        connectionEpoch: number;
-        tableID: number;
-        gameLoadEpoch: number;
-        databaseID: number;
-        sharedReplayLeader: string;
-      }>,
-    ) {
-      const payload = action.payload;
-      if (
-        state.connectionEpoch !== payload.connectionEpoch
-        || state.room.kind !== 'live_game'
-        || state.room.tableID !== payload.tableID
-        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
-        || state.room.game.turn.currentPlayerIndex !== null
-      ) return;
-      state.room.postgame.databaseID = payload.databaseID;
-      state.room.postgame.sharedReplayLeader = payload.sharedReplayLeader;
-      state.pendingGameplayAction = null;
+      state.room.gameHistory = castDraft(payload.history);
     },
     gameplayActionRequested(
       state,
@@ -676,7 +640,7 @@ export const roomSlice = createSlice({
         || state.room.role !== 'player'
         || state.room.tableID !== tableID
         || state.room.gameLoadEpoch !== gameLoadEpoch
-        || state.room.reviewSegment !== null
+        || state.room.clientState.replay.active
         || action.payload.action.tableID !== tableID
       ) return;
       state.pendingGameplayAction = castDraft(action.payload);
