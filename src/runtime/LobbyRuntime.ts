@@ -737,6 +737,18 @@ export class LobbyRuntime {
     epoch: number,
     welcome: Extract<ServerEvent, { command: 'welcome' }>['data'],
   ): void {
+    const playerTableID = welcome.playingAtTables[0];
+    if (playerTableID !== undefined) {
+      if (this.sendEncoded(encodeTableReattendFrame(playerTableID))) {
+        this.store.dispatch(roomActions.recoveryRequested({
+          epoch,
+          tableID: playerTableID,
+          role: 'player',
+        }));
+      }
+      return;
+    }
+
     const spectatorTableID = welcome.disconSpectatingTable;
     if (spectatorTableID !== undefined && spectatorTableID > 0) {
       const shadowingPlayerIndex = welcome.disconShadowingSeat;
@@ -758,17 +770,6 @@ export class LobbyRuntime {
         }));
       }
       return;
-    }
-
-    const playerTableID = welcome.playingAtTables[0];
-    if (playerTableID !== undefined) {
-      if (this.sendEncoded(encodeTableReattendFrame(playerTableID))) {
-        this.store.dispatch(roomActions.recoveryRequested({
-          epoch,
-          tableID: playerTableID,
-          role: 'player',
-        }));
-      }
     }
   }
 

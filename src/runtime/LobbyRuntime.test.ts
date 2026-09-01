@@ -606,6 +606,21 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent.at(-1)).toBe('getGameInfo2 {"tableID":456}');
   });
 
+  test('shared replay boot only starts rematch after a pending restart', async () => {
+    const { socket, store } = await makeSharedReplayRuntime();
+
+    socket.emitMessage('boot {"TableID":999}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', tableID: 123,
+    });
+    expect(store.getState().room.rematchTransition).toBeNull();
+
+    socket.emitMessage('boot {"TableID":123}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingRestartTableID).toBeNull();
+    expect(store.getState().room.rematchTransition).toBeNull();
+  });
+
   test('OPEN is not READY; only a valid welcome makes it ready', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
@@ -680,7 +695,7 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
-  test('shared replay reconnect prioritizes tableSpectate over stale playing hints', async () => {
+  test('welcome recovery prioritizes playingAtTables over spectator recovery', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
     session.sockets.push(Promise.resolve(socket));
@@ -693,12 +708,10 @@ describe('deterministic lobby runtime', () => {
       + '"disconSpectatingTable":123,"disconShadowingSeat":-1}',
     );
 
-    expect(socket.sent).toEqual([
-      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
-    ]);
+    expect(socket.sent).toEqual(['tableReattend {"tableID":123}']);
     expect(store.getState().room.pendingRecovery).toEqual({
       tableID: 123,
-      role: 'spectator',
+      role: 'player',
     });
   });
 

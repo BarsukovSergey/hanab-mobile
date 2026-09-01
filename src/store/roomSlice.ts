@@ -386,16 +386,18 @@ export const roomSlice = createSlice({
         || state.room.clientState.replay.shared === null
       ) return;
       const clientState = state.room.clientState;
-      state.rematchTransition = {
-        oldTableID: state.room.tableID,
-        originalPlayerNames: [...clientState.metadata.playerNames],
-        localPlayedOriginalGame: clientState.metadata.playerNames.includes(
-          clientState.metadata.ourUsername,
-        ),
-        newTableID: null,
-        joinedConfirmed: false,
-        stagedGame: null,
-      };
+      if (state.pendingRestartTableID === action.payload.boot.TableID) {
+        state.rematchTransition = {
+          oldTableID: state.room.tableID,
+          originalPlayerNames: [...clientState.metadata.playerNames],
+          localPlayedOriginalGame: clientState.metadata.playerNames.includes(
+            clientState.metadata.ourUsername,
+          ),
+          newTableID: null,
+          joinedConfirmed: false,
+          stagedGame: null,
+        };
+      }
       state.pendingRestartTableID = null;
       state.pendingGameplayAction = null;
       state.pendingUnattendTableID = null;
