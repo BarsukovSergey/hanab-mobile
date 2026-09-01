@@ -92,11 +92,11 @@ describe('lobby protocol decoder', () => {
 
   test('encodes exact basic table create and start commands', () => {
     expect(encodeTableCreateFrame('  Mobile table  ', 6, 'Rainbow (6 Suits)')).toBe(
-      'tableCreate {"name":"Mobile table","password":"","maxPlayers":6,'
-      + '"variant":"Rainbow (6 Suits)","timed":false,"timeBase":0,"timePerTurn":0,'
+      'tableCreate {"name":"Mobile table","options":{'
+      + '"variantName":"Rainbow (6 Suits)","timed":false,"timeBase":0,"timePerTurn":0,'
       + '"speedrun":false,"cardCycle":false,"deckPlays":false,"emptyClues":false,'
       + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
-      + '"detrimentalCharacters":false}',
+      + '"detrimentalCharacters":false},"password":"","maxPlayers":6}',
     );
     expect(encodeTableStartFrame(123, ['Ada', 'Bob'])).toBe(
       'tableStart {"tableID":123,"intendedPlayers":["Ada","Bob"]}',

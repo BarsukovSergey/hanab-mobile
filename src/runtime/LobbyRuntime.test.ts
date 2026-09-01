@@ -637,11 +637,11 @@ describe('deterministic lobby runtime', () => {
     expect(runtime.createTable('Other', 4, '6 Suits')).toBe(false);
 
     expect(socket.sent).toEqual([
-      'tableCreate {"name":"Mobile table","password":"","maxPlayers":5,'
-      + '"variant":"No Variant","timed":false,"timeBase":0,"timePerTurn":0,'
+      'tableCreate {"name":"Mobile table","options":{'
+      + '"variantName":"No Variant","timed":false,"timeBase":0,"timePerTurn":0,'
       + '"speedrun":false,"cardCycle":false,"deckPlays":false,"emptyClues":false,'
       + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
-      + '"detrimentalCharacters":false}',
+      + '"detrimentalCharacters":false},"password":"","maxPlayers":5}',
     ]);
     expect(store.getState().room.room).toEqual({ kind: 'none' });
     expect(store.getState().room.pendingCreate).toMatchObject({

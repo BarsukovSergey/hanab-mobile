@@ -21,20 +21,22 @@ export const BASIC_VARIANT_NAMES = [
 
 export const tableCreateCommandSchema = z.object({
   name: z.string().trim().min(1).max(45),
+  options: z.object({
+    variantName: z.enum(BASIC_VARIANT_NAMES),
+    timed: z.literal(false),
+    timeBase: z.literal(0),
+    timePerTurn: z.literal(0),
+    speedrun: z.literal(false),
+    cardCycle: z.literal(false),
+    deckPlays: z.literal(false),
+    emptyClues: z.literal(false),
+    oneExtraCard: z.literal(false),
+    oneLessCard: z.literal(false),
+    allOrNothing: z.literal(false),
+    detrimentalCharacters: z.literal(false),
+  }),
   password: z.literal(''),
   maxPlayers: z.number().int().min(2).max(6),
-  variant: z.enum(BASIC_VARIANT_NAMES),
-  timed: z.literal(false),
-  timeBase: z.literal(0),
-  timePerTurn: z.literal(0),
-  speedrun: z.literal(false),
-  cardCycle: z.literal(false),
-  deckPlays: z.literal(false),
-  emptyClues: z.literal(false),
-  oneExtraCard: z.literal(false),
-  oneLessCard: z.literal(false),
-  allOrNothing: z.literal(false),
-  detrimentalCharacters: z.literal(false),
 });
 
 export type TableCreateCommand = z.infer<typeof tableCreateCommandSchema>;
@@ -250,24 +252,26 @@ export function encodeTableLeaveFrame(tableID: number): string {
 export function encodeTableCreateFrame(
   name: string,
   maxPlayers: number,
-  variant: string,
+  variantName: string,
 ): string {
   const payload = tableCreateCommandSchema.parse({
     name,
+    options: {
+      variantName,
+      timed: false,
+      timeBase: 0,
+      timePerTurn: 0,
+      speedrun: false,
+      cardCycle: false,
+      deckPlays: false,
+      emptyClues: false,
+      oneExtraCard: false,
+      oneLessCard: false,
+      allOrNothing: false,
+      detrimentalCharacters: false,
+    },
     password: '',
     maxPlayers,
-    variant,
-    timed: false,
-    timeBase: 0,
-    timePerTurn: 0,
-    speedrun: false,
-    cardCycle: false,
-    deckPlays: false,
-    emptyClues: false,
-    oneExtraCard: false,
-    oneLessCard: false,
-    allOrNothing: false,
-    detrimentalCharacters: false,
   });
   return encodeClientFrame('tableCreate', payload);
 }
