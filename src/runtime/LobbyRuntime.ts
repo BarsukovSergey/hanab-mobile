@@ -5,10 +5,14 @@ import type {
 } from '../network/types';
 import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
 import {
+  hasClueTokenForVariant,
   isCurrentVariantColorClueValue,
   isCurrentVariantRankClueValue,
 } from '../game/selectors/gameplay';
-import { isVariantNameSupported } from '../game/client/supportedVariants';
+import {
+  areTableOptionsSupported,
+  isVariantNameSupported,
+} from '../game/client/supportedVariants';
 import {
   clientGameplayActionSchema,
   encodeColorClueFrame,
@@ -48,6 +52,10 @@ const DEFAULT_WELCOME_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000] as const;
 const MAX_STATUS_LENGTH = 240;
 const USER_STATUS_LOBBY = 0;
+const USER_STATUS_PLAYER_MIN = 1;
+const USER_STATUS_PLAYER_MAX = 2;
+const USER_STATUS_SPECTATOR = 3;
+const UNSUPPORTED_TABLE_WARNING = 'This table uses options that Hanab Mobile does not support.';
 
 export type RuntimeTimers = {
   setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
@@ -539,7 +547,9 @@ export class LobbyRuntime {
     const room = state.room.room;
     if (
       room.kind !== 'live_game'
-      || !isQuickRematchEligible(room.clientState, state.room.pendingRestartTableID)
+      || !(hidePregame
+        ? isQuickRematchEligible(room.clientState, state.room.pendingRestartTableID)
+        : isRestartToPregameEligible(room.clientState, state.room.pendingRestartTableID))
       || !this.isReadyCurrentRoom(room.tableID)
     ) return false;
     this.store.dispatch(roomActions.restartRequested({
@@ -699,6 +709,21 @@ export class LobbyRuntime {
         break;
       case 'user':
         this.store.dispatch(lobbyActions.userReceived({ epoch, user: event.data }));
+        if (event.data.userID === this.store.getState().session.authenticatedUser?.userID) {
+          const role = event.data.status >= USER_STATUS_PLAYER_MIN
+            && event.data.status <= USER_STATUS_PLAYER_MAX
+            ? 'player'
+            : event.data.status === USER_STATUS_SPECTATOR ? 'spectator' : null;
+          if (role !== null && event.data.tableID !== undefined && event.data.tableID > 0) {
+            const before = this.store.getState().room.room;
+            this.store.dispatch(roomActions.restartMigrationConfirmed({
+              epoch, tableID: event.data.tableID, role,
+            }));
+            if (before.kind === 'live_game' && this.store.getState().room.room.kind === 'none') {
+              this.gameBootstrap.invalidate();
+            }
+          }
+        }
         if (
           event.data.userID === this.store.getState().session.authenticatedUser?.userID
           && event.data.status === USER_STATUS_LOBBY
@@ -717,6 +742,7 @@ export class LobbyRuntime {
         this.store.dispatch(lobbyActions.tableGone({ epoch, tableID: event.data.tableID }));
         break;
       case 'game':
+        if (this.rejectUnsupportedRoom(epoch, event.data.tableID, event.data.options)) break;
         this.store.dispatch(roomActions.gameReceived({ epoch, game: event.data }));
         break;
       case 'joined':
@@ -784,7 +810,6 @@ export class LobbyRuntime {
             && room.tableID === event.data.TableID
             && room.clientState.replay.shared !== null
           ) {
-            this.gameBootstrap.invalidate();
             this.store.dispatch(roomActions.bootReceived({ epoch, boot: event.data }));
           }
         }
@@ -971,6 +996,8 @@ export class LobbyRuntime {
       ) return false;
       const variantName = room.clientState.metadata.options.variantName;
       if (
+        !hasClueTokenForVariant(room.clientState.ongoingGame.clueTokens, variantName)
+        ||
         (action.type === 2
           && !isCurrentVariantColorClueValue(variantName, action.value))
         || (action.type === 3
@@ -1019,6 +1046,28 @@ export class LobbyRuntime {
   private currentChatRoom(): string {
     const room = this.store.getState().room.room;
     return room.kind === 'none' ? 'lobby' : `table${room.tableID}`;
+  }
+
+  private rejectUnsupportedRoom(
+    epoch: number,
+    tableID: number,
+    options: Parameters<typeof areTableOptionsSupported>[0],
+  ): boolean {
+    if (areTableOptionsSupported(options)) return false;
+    const state = this.store.getState().room;
+    const relevant = state.pendingRecovery?.tableID === tableID
+      || state.pendingJoin?.tableID === tableID
+      || state.pendingSpectateTableID === tableID
+      || state.rematchTransition?.newTableID === tableID;
+    if (!relevant) return false;
+    this.gameBootstrap.invalidate();
+    this.sendEncoded(encodeTableUnattendFrame(tableID));
+    this.store.dispatch(roomActions.unsupportedRoomRejected({ epoch, tableID }));
+    this.store.dispatch(lobbyActions.noticeReceived({
+      epoch,
+      notice: { kind: 'warning', message: UNSUPPORTED_TABLE_WARNING },
+    }));
+    return true;
   }
 
   private currentHistoryRoom(): string {
@@ -1095,13 +1144,13 @@ export class LobbyRuntime {
 }
 
 export function isSpectateEligible(table: LobbyTable): boolean {
-  return isVariantNameSupported(table.variant)
+  return areTableOptionsSupported(table.options)
     && table.running
     && (table.sharedReplay || !table.joined);
 }
 
 export function isPregameSpectateEligible(table: LobbyTable): boolean {
-  return isVariantNameSupported(table.variant)
+  return areTableOptionsSupported(table.options)
     && !table.running
     && !table.sharedReplay
     && !table.joined;
@@ -1111,12 +1160,15 @@ export function isJoinEligible(table: LobbyTable): boolean {
   return !table.running
     && !table.sharedReplay
     && !table.joined
-    && isVariantNameSupported(table.variant)
+    && areTableOptionsSupported(table.options)
     && table.numPlayers < table.maxPlayers;
 }
 
 export function isReattendEligible(table: LobbyTable): boolean {
-  return table.running && table.joined && !table.sharedReplay;
+  return table.running
+    && table.joined
+    && !table.sharedReplay
+    && areTableOptionsSupported(table.options);
 }
 
 export function isQuickRematchEligible(
@@ -1136,4 +1188,16 @@ export function isQuickRematchEligible(
   ) return false;
   const activeNames = new Set(clientState.spectators.map((spectator) => spectator.name));
   return clientState.metadata.playerNames.every((name) => activeNames.has(name));
+}
+
+export function isRestartToPregameEligible(
+  clientState: Parameters<typeof isQuickRematchEligible>[0],
+  pendingRestartTableID: number | null,
+): boolean {
+  const shared = clientState.replay.shared;
+  return shared !== null
+    && shared.amLeader
+    && pendingRestartTableID === null
+    && clientState.metadata.playerNames.includes(clientState.metadata.ourUsername)
+    && clientState.spectators.length >= 2;
 }

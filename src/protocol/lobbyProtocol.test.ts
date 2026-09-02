@@ -97,6 +97,23 @@ describe('lobby protocol decoder', () => {
     if (result.kind === 'event') expect(result.event.data).toEqual([user]);
   });
 
+  test('retains complete lobby table options', () => {
+    const options = {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
+      oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+      detrimentalCharacters: false, future: true,
+    };
+    const table = {
+      id: 12, name: 'Table', numPlayers: 2, maxPlayers: 5, running: false,
+      variant: 'No Variant', options, passwordProtected: false, joined: false,
+      progress: 0, players: ['Ada', 'Bob'], sharedReplay: false,
+    };
+    expect(decodeServerFrame(`table ${JSON.stringify(table)}`)).toMatchObject({
+      kind: 'event', event: { command: 'table', data: { options } },
+    });
+  });
+
   test('accepts an unknown payloadless command as out-of-scope traffic', () => {
     expect(decodeServerFrame('ping')).toEqual({ kind: 'unknown', command: 'ping' });
   });

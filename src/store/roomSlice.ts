@@ -71,11 +71,11 @@ type PendingCreate = {
 type RematchTransition = {
   oldTableID: number;
   originalPlayerNames: string[];
-  localPlayedOriginalGame: boolean;
+  role: 'player' | 'spectator';
   newTableID: number | null;
   joinedConfirmed: boolean;
   stagedGame: PregameGame | null;
-  hidePregame: boolean;
+  hidePregame: boolean | null;
 };
 
 export type RoomSliceState = {
@@ -85,6 +85,8 @@ export type RoomSliceState = {
     tableID: number;
     role: 'player' | 'spectator';
   } | null;
+  recoveryJoinedConfirmed: boolean;
+  recoveryStagedGame: PregameGame | null;
   pendingJoin: PendingJoin | null;
   pendingCreate: PendingCreate | null;
   pendingLeaveTableID: number | null;
@@ -112,6 +114,8 @@ const initialState: RoomSliceState = {
   connectionEpoch: 0,
   pendingSpectateTableID: null,
   pendingRecovery: null,
+  recoveryJoinedConfirmed: false,
+  recoveryStagedGame: null,
   pendingJoin: null,
   pendingCreate: null,
   pendingLeaveTableID: null,
@@ -159,6 +163,8 @@ export const roomSlice = createSlice({
         tableID: action.payload.tableID,
         role: action.payload.role,
       };
+      state.recoveryJoinedConfirmed = false;
+      state.recoveryStagedGame = null;
     },
     spectateRequested(
       state,
@@ -232,17 +238,31 @@ export const roomSlice = createSlice({
       if (rematch !== null) {
         const tableID = action.payload.joined.tableID;
         if (
-          !rematch.localPlayedOriginalGame
-          || tableID === rematch.oldTableID
-          || (rematch.newTableID !== null && rematch.newTableID !== tableID)
+          rematch.newTableID === null
+          || rematch.newTableID !== tableID
         ) return;
-        rematch.newTableID = tableID;
         rematch.joinedConfirmed = true;
-        if (rematch.stagedGame !== null && !rematch.hidePregame) {
+        if (rematch.stagedGame !== null && rematch.hidePregame !== true) {
           state.room = {
-            kind: 'pregame', tableID, role: 'player', data: rematch.stagedGame,
+            kind: 'pregame', tableID, role: rematch.role, data: rematch.stagedGame,
           };
           state.rematchTransition = null;
+        }
+        return;
+      }
+
+      if (state.pendingRecovery?.tableID === action.payload.joined.tableID) {
+        state.recoveryJoinedConfirmed = true;
+        if (state.recoveryStagedGame !== null) {
+          state.room = {
+            kind: 'pregame',
+            tableID: state.pendingRecovery.tableID,
+            role: state.pendingRecovery.role,
+            data: state.recoveryStagedGame,
+          };
+          state.pendingRecovery = null;
+          state.recoveryJoinedConfirmed = false;
+          state.recoveryStagedGame = null;
         }
         return;
       }
@@ -292,21 +312,35 @@ export const roomSlice = createSlice({
       if (state.room.kind === 'none' && rematch !== null) {
         const names = game.players.map((player) => player.name);
         if (
-          !rematch.localPlayedOriginalGame
-          || game.tableID === rematch.oldTableID
-          || !game.players.some((player) => player.you)
-          || names.length !== rematch.originalPlayerNames.length
-          || names.some((name, index) => name !== rematch.originalPlayerNames[index])
-          || (rematch.newTableID !== null && rematch.newTableID !== game.tableID)
+          rematch.newTableID === null
+          || rematch.newTableID !== game.tableID
+          || names.some((name) => !rematch.originalPlayerNames.includes(name))
+          || (rematch.role === 'player') !== game.players.some((player) => player.you)
         ) return;
-        rematch.newTableID = game.tableID;
         rematch.stagedGame = game;
-        if (rematch.joinedConfirmed && !rematch.hidePregame) {
+        if (rematch.joinedConfirmed && rematch.hidePregame !== true) {
           state.room = {
-            kind: 'pregame', tableID: game.tableID, role: 'player', data: game,
+            kind: 'pregame', tableID: game.tableID, role: rematch.role, data: game,
           };
           state.rematchTransition = null;
         }
+        return;
+      }
+
+      if (state.room.kind === 'none' && state.pendingRecovery?.tableID === game.tableID) {
+        if (!state.recoveryJoinedConfirmed) {
+          state.recoveryStagedGame = game;
+          return;
+        }
+        state.room = {
+          kind: 'pregame',
+          tableID: game.tableID,
+          role: state.pendingRecovery.role,
+          data: game,
+        };
+        state.pendingRecovery = null;
+        state.recoveryJoinedConfirmed = false;
+        state.recoveryStagedGame = null;
         return;
       }
 
@@ -479,24 +513,63 @@ export const roomSlice = createSlice({
         || state.room.clientState.replay.shared === null
       ) return;
       const clientState = state.room.clientState;
-      if (state.pendingRestartTableID === action.payload.boot.TableID) {
+      if (state.rematchTransition === null) {
         state.rematchTransition = {
           oldTableID: state.room.tableID,
           originalPlayerNames: [...clientState.metadata.playerNames],
-          localPlayedOriginalGame: clientState.metadata.playerNames.includes(
-            clientState.metadata.ourUsername,
-          ),
+          role: clientState.metadata.playerNames.includes(clientState.metadata.ourUsername)
+            ? 'player'
+            : 'spectator',
           newTableID: null,
           joinedConfirmed: false,
           stagedGame: null,
-          hidePregame: state.pendingRestartHidePregame ?? true,
+          hidePregame: state.pendingRestartTableID === action.payload.boot.TableID
+            ? state.pendingRestartHidePregame ?? true
+            : null,
         };
       }
       state.pendingRestartTableID = null;
       state.pendingRestartHidePregame = null;
+    },
+    restartMigrationConfirmed(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        role: 'player' | 'spectator';
+      }>,
+    ) {
+      const rematch = state.rematchTransition;
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || rematch === null
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== rematch.oldTableID
+        || action.payload.tableID === 0
+        || action.payload.tableID === rematch.oldTableID
+        || action.payload.role !== rematch.role
+      ) return;
+      rematch.newTableID = action.payload.tableID;
       state.pendingGameplayAction = null;
       state.pendingUnattendTableID = null;
       state.room = { kind: 'none' };
+    },
+    unsupportedRoomRejected(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      const { tableID } = action.payload;
+      if (state.pendingRecovery?.tableID === tableID) state.pendingRecovery = null;
+      if (state.pendingJoin?.tableID === tableID) state.pendingJoin = null;
+      if (state.pendingSpectateTableID === tableID) state.pendingSpectateTableID = null;
+      if (state.room.kind !== 'none' && state.room.tableID === tableID) {
+        state.room = { kind: 'none' };
+      }
+      if (state.rematchTransition?.newTableID === tableID) state.rematchTransition = null;
+      state.recoveryJoinedConfirmed = false;
+      state.recoveryStagedGame = null;
+      state.pendingGameplayAction = null;
     },
     commandPendingCleared(state, action: PayloadAction<{ epoch: number }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -580,10 +653,9 @@ export const roomSlice = createSlice({
         rematch !== null
         && state.room.kind === 'none'
         && !tableStart.replay
-        && tableStart.tableID !== rematch.oldTableID
-        && (rematch.newTableID === null || rematch.newTableID === tableStart.tableID)
+        && rematch.newTableID === tableStart.tableID
       ) {
-        role = rematch.localPlayedOriginalGame ? 'player' : 'spectator';
+        role = rematch.role;
       } else if (tableStart.replay && rematch !== null) {
         return;
       }
@@ -630,6 +702,8 @@ export const roomSlice = createSlice({
 
       state.pendingSpectateTableID = null;
       state.pendingRecovery = null;
+      state.recoveryJoinedConfirmed = false;
+      state.recoveryStagedGame = null;
       state.rematchTransition = null;
       clearC4BState(state);
       state.pendingGameplayAction = null;
@@ -994,6 +1068,8 @@ export const roomSlice = createSlice({
       state.connectionEpoch = action.payload.epoch;
       state.pendingSpectateTableID = null;
       state.pendingRecovery = null;
+      state.recoveryJoinedConfirmed = false;
+      state.recoveryStagedGame = null;
       state.pendingGameplayAction = null;
       state.pendingUnattendTableID = null;
       state.pendingRestartTableID = null;

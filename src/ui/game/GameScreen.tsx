@@ -3,12 +3,17 @@ import { Button, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import {
+  getDisplayedClueTokens,
   getGameTableSuits,
   getGameplayClueChoicesForPlayer,
   getVisibleCardIdentityLabel,
+  hasClueTokenForVariant,
 } from '../../game/selectors/gameplay';
 import { lobbyRuntime } from '../../runtime/application';
-import { isQuickRematchEligible } from '../../runtime/LobbyRuntime';
+import {
+  isQuickRematchEligible,
+  isRestartToPregameEligible,
+} from '../../runtime/LobbyRuntime';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { CardKnowledgeDetails, GameCard } from './GameCard';
@@ -166,6 +171,8 @@ export function GameScreen() {
     );
     const canQuickRematch = sessionPhase === 'ready'
       && isQuickRematchEligible(clientState, roomState.pendingRestartTableID);
+    const canRestartToPregame = sessionPhase === 'ready'
+      && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID);
 
     return (
       <View style={styles.screen}>
@@ -177,7 +184,9 @@ export function GameScreen() {
 
         <View style={styles.statRow}>
           <Stat label="Strikes" value={ongoingGame.strikes.length} />
-          <Stat label="Clues" value={ongoingGame.clueTokens} />
+          <Stat label="Clues" value={getDisplayedClueTokens(
+            ongoingGame.clueTokens, metadata.options.variantName,
+          )} />
           <Stat label="Cards remaining" value={ongoingGame.cardsRemainingInTheDeck} />
         </View>
 
@@ -226,7 +235,7 @@ export function GameScreen() {
                   onPress={() => lobbyRuntime.quickRematch()}
                 />
                 <Button
-                  disabled={!canQuickRematch}
+                  disabled={!canRestartToPregame}
                   title={roomState.pendingRestartTableID === null
                     ? 'Remake table'
                     : 'Remaking table...'}
@@ -284,7 +293,7 @@ export function GameScreen() {
     .filter((playerIndex) => playerLiveRoom === null || playerIndex !== ourPlayerIndex);
   const cardActionsEnabled = gameplayControlsEnabled && selectedCardOrder !== null;
   const clueActionsEnabled = gameplayControlsEnabled
-    && displayedGame.clueTokens > 0
+    && hasClueTokenForVariant(displayedGame.clueTokens, metadata.options.variantName)
     && selectedClueTarget !== null;
   const tableSuits = getGameTableSuits(
     metadata.options.variantName,
@@ -313,7 +322,9 @@ export function GameScreen() {
       </View>
 
       <View style={styles.statRow}>
-        <Stat label="Clues" value={displayedGame.clueTokens} />
+        <Stat label="Clues" value={getDisplayedClueTokens(
+          displayedGame.clueTokens, metadata.options.variantName,
+        )} />
         <Stat label="Strikes" value={displayedGame.strikes.length} />
         <Stat label="Deck" value={displayedGame.cardsRemainingInTheDeck} />
       </View>
@@ -463,7 +474,7 @@ export function GameScreen() {
               : playerLiveRoom.clientState.metadata.playerNames[selectedClueTarget]}
           </Text>
           <Text style={styles.helper}>
-            {displayedGame.clueTokens === 0
+            {!hasClueTokenForVariant(displayedGame.clueTokens, metadata.options.variantName)
               ? 'No clue tokens available.'
               : 'Choose a color or rank.'}
           </Text>

@@ -8,6 +8,7 @@ export function isVariantSupported(variant: Variant): boolean {
     && !variant.cowAndPig
     && !variant.duck
     && !variant.hasInverted
+    && !variant.alternatingClues
     && !variant.suits.some((suit) => suit.reversed);
 }
 
@@ -19,4 +20,20 @@ const supportedVariantNames = new Set<string>(SUPPORTED_VARIANT_NAMES);
 
 export function isVariantNameSupported(name: string): boolean {
   return supportedVariantNames.has(name);
+}
+
+export type CompatibilityOptions = {
+  variantName: string;
+  timed: boolean;
+  speedrun: boolean;
+  deckPlays: boolean;
+  detrimentalCharacters: boolean;
+};
+
+export function areTableOptionsSupported(options: CompatibilityOptions): boolean {
+  return isVariantNameSupported(options.variantName)
+    && !options.timed
+    && !options.speedrun
+    && !options.deckPlays
+    && !options.detrimentalCharacters;
 }

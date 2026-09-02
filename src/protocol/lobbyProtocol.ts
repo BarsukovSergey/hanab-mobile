@@ -234,6 +234,7 @@ export const lobbyTableSchema = z.object({
   maxPlayers: z.number().int().positive(),
   running: z.boolean(),
   variant: z.string().min(1),
+  options: tableOptionsSchema,
   passwordProtected: z.boolean(),
   joined: z.boolean(),
   progress: z.number().int().nonnegative(),

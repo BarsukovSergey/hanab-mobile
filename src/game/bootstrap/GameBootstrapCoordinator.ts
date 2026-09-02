@@ -33,8 +33,11 @@ import { initialState } from '../client/reducers/initialStates/initialState';
 import { stateReducer } from '../client/reducers/stateReducer';
 import type { State } from '../client/types/State';
 import { roomActions } from '../../store/roomSlice';
+import { lobbyActions } from '../../store/lobbySlice';
 import type { AppStore } from '../../store/store';
 import type { IncrementalRejectionReason } from '../../store/sessionSlice';
+import { areTableOptionsSupported } from '../client/supportedVariants';
+import { encodeTableUnattendFrame } from '../../protocol/lobbyProtocol';
 
 type Role = 'player' | 'spectator';
 
@@ -64,6 +67,7 @@ export type BootstrapTimers = {
 };
 
 const DEFAULT_BOOTSTRAP_TIMEOUT_MS = 15_000;
+const UNSUPPORTED_TABLE_WARNING = 'This table uses options that Hanab Mobile does not support.';
 
 function makeMetadata(init: GameInit, username: string): GameMetadata {
   const { variantID: _variantID, ...wireOptions } = init.options;
@@ -196,6 +200,20 @@ export class GameBootstrapCoordinator {
   receiveInit(connectionEpoch: number, gameLoadEpoch: number, init: GameInit): boolean {
     const load = this.match(connectionEpoch, gameLoadEpoch, init.tableID);
     if (load === null || load.phase !== 'waiting_init' || load.info2Attempted) return false;
+    if (!areTableOptionsSupported(init.options)) {
+      this.sendFrame(encodeTableUnattendFrame(load.tableID));
+      this.clearTimer(load);
+      this.active = null;
+      this.store.dispatch(roomActions.unsupportedRoomRejected({
+        epoch: connectionEpoch,
+        tableID: load.tableID,
+      }));
+      this.store.dispatch(lobbyActions.noticeReceived({
+        epoch: connectionEpoch,
+        notice: { kind: 'warning', message: UNSUPPORTED_TABLE_WARNING },
+      }));
+      return false;
+    }
     if (
       init.shadowing
       || init.replay !== load.sharedReplay

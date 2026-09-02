@@ -84,6 +84,12 @@ const playerTable = {
   maxPlayers: 5,
   running: false,
   variant: 'No Variant',
+  options: {
+    variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+    speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
+    oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    detrimentalCharacters: false,
+  },
   passwordProtected: false,
   joined: false,
   progress: 0,

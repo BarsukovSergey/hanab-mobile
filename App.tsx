@@ -382,6 +382,10 @@ function TableOptionsEditor({
   options: MobileTableOptions;
   onChange: (options: MobileTableOptions) => void;
 }) {
+  const [variantSearch, setVariantSearch] = useState('');
+  const matchingVariants = SUPPORTED_VARIANT_NAMES.filter((name) => (
+    name.toLocaleLowerCase().includes(variantSearch.trim().toLocaleLowerCase())
+  )).slice(0, 20);
   const toggle = (key: Exclude<keyof MobileTableOptions, 'variantName'>) => {
     const value = !options[key];
     onChange({
@@ -394,7 +398,13 @@ function TableOptionsEditor({
   return (
     <View style={styles.subsection}>
       <Text>Variant</Text>
-      {SUPPORTED_VARIANT_NAMES.map((name) => (
+      <TextInput
+        autoCapitalize="none"
+        onChangeText={setVariantSearch}
+        placeholder="Search variants"
+        value={variantSearch}
+      />
+      {matchingVariants.map((name) => (
         <Button key={name} title={`${options.variantName === name ? '✓ ' : ''}${name}`}
           onPress={() => onChange({ ...options, variantName: name })} />
       ))}

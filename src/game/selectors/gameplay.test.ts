@@ -1,6 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { getGameTableSuits, getGameplayClueChoices } from './gameplay';
+import {
+  getDisplayedClueTokens,
+  getGameTableSuits,
+  getGameplayClueChoices,
+  hasClueTokenForVariant,
+} from './gameplay';
 
 describe('getGameTableSuits', () => {
   it('uses upstream clue names for variant and character semantics', () => {
@@ -37,5 +42,13 @@ describe('getGameTableSuits', () => {
       topCardLabel: null,
       discardCardLabels: ['Yellow 1', 'Yellow 4'],
     });
+  });
+
+  it('uses adjusted Clue Starved thresholds and unadjusted display values', () => {
+    const variantName = 'Clue Starved (5 Suits)';
+    expect(hasClueTokenForVariant(1, variantName)).toBe(false);
+    expect(hasClueTokenForVariant(2, variantName)).toBe(true);
+    expect(getDisplayedClueTokens(1, variantName)).toBe(0.5);
+    expect(getDisplayedClueTokens(2, variantName)).toBe(1);
   });
 });

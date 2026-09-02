@@ -4,6 +4,10 @@ import type { GameState } from '../upstream/interfaces/GameState';
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
 import { getCharacterNameForPlayer } from '../upstream/reducers/reducerHelpers';
 import { getClueName } from '../upstream/rules/clues';
+import {
+  getAdjustedClueTokens,
+  getUnadjustedClueTokens,
+} from '../upstream/rules/clueTokens';
 
 export type GameplayClueChoice = {
   value: number;
@@ -48,6 +52,14 @@ export function getGameplayClueChoicesForPlayer(
     metadata.options.variantName,
     getCharacterNameForPlayer(metadata.ourPlayerIndex, metadata.characterAssignments),
   );
+}
+
+export function hasClueTokenForVariant(clueTokens: number, variantName: string): boolean {
+  return clueTokens >= getAdjustedClueTokens(1, getVariant(variantName));
+}
+
+export function getDisplayedClueTokens(clueTokens: number, variantName: string): number {
+  return getUnadjustedClueTokens(clueTokens, getVariant(variantName));
 }
 
 export function getGameTableSuits(

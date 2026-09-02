@@ -302,6 +302,15 @@ tableRestart {"tableID":123,"hidePregame":false} # restart to pregame
 ```
 
 Both reuse the C12 boot/new-table transition and wait for authoritative new-table events.
+`boot` only stages a possible shared-replay migration. The new table is confirmed solely by the
+authenticated user's own `user` event with a different nonzero `tableID`: status 1 or 2 preserves
+the original-player role and status 3 preserves the spectator role. Status 0 does not confirm a
+restart. After confirmation, only matching `joined`, `game`, and `tableStart` events are accepted.
+
+Mobile participation is rejected when the variant is unsupported or when `timed`, `speedrun`,
+`deckPlays`, or `detrimentalCharacters` is enabled. Lobby table options are retained for this
+eligibility check. Recovery and bootstrap fail closed by sending `tableUnattend`, clearing the
+pending/local room, and showing a warning.
 
 ## Game bootstrap
 

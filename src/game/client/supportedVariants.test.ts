@@ -14,6 +14,7 @@ describe('mobile variant capabilities', () => {
     );
     expect(SUPPORTED_VARIANT_NAMES).toEqual(expect.arrayContaining([
       'No Variant', '6 Suits', 'Black (6 Suits)', 'Rainbow (6 Suits)',
+      'Clue Starved (5 Suits)',
     ]));
     expect(SUPPORTED_VARIANT_NAMES.length).toBeGreaterThan(4);
   });
@@ -29,9 +30,11 @@ describe('mobile variant capabilities', () => {
         duck: variant.duck,
         inverted: variant.hasInverted,
         reversed: variant.suits.some((suit) => suit.reversed),
+        alternatingClues: variant.alternatingClues,
       }).toEqual({
         throwItInAHole: false, upOrDown: false, sudoku: false,
         cowAndPig: false, duck: false, inverted: false, reversed: false,
+        alternatingClues: false,
       });
       expect(isVariantNameSupported(name)).toBe(true);
     }

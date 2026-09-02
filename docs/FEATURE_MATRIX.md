@@ -27,14 +27,14 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Replay participants / leader state | DONE | C12 | Replay participant and leader state physically verified. |
 | Quick rematch | DONE | C12 | Quick Rematch and new-game lifecycle physically verified. |
 | Shared replay reconnect / recovery | DONE | C12 | Lobby return-to-game and kill/relaunch recovery physically verified. |
-| Password-protected table create/join | DONE | C13 | Passwords are transient outbound input only; never logged or persisted. |
-| Variant compatibility matrix | DONE | C13 | Vendored `VARIANT_NAMES` filtered through one capability predicate. |
-| Full supported variants / modifiers UI | DONE | C13 | Supported variants and the five C13 modifiers are available in create/edit. |
+| Password-protected table create/join | IMPLEMENTED / UNVERIFIED | C13 | Passwords are transient outbound input only; physical verification remains. |
+| Variant compatibility matrix | IMPLEMENTED / UNVERIFIED | C13 | Vendored `VARIANT_NAMES` and table options are filtered through one capability predicate; physical verification remains. |
+| Full supported variants / modifiers UI | IMPLEMENTED / UNVERIFIED | C13 | Supported variants and the five C13 modifiers are available in create/edit; physical verification remains. |
 | Timed table settings in create/edit | NOT IMPLEMENTED | C14 | Timed configuration remains unavailable until clock behavior is supported. |
-| Edit table settings / name / max players | DONE | C13 | Authoritative `tableUpdate` lifecycle preserves unexposed options. |
-| Pregame leader transfer | DONE | C13 | Authoritative `tableSetLeader` lifecycle. |
-| Restart to pregame | DONE | C13 | C12 restart lifecycle with `hidePregame:false`. |
-| Pregame spectator parity | DONE | C13 | Pregame spectate, authoritative attendance, and unattend supported. |
+| Edit table settings / name / max players | IMPLEMENTED / UNVERIFIED | C13 | Authoritative `tableUpdate` lifecycle preserves unexposed options; physical verification remains. |
+| Pregame leader transfer | IMPLEMENTED / UNVERIFIED | C13 | Authoritative `tableSetLeader` lifecycle; physical verification remains. |
+| Restart to pregame | IMPLEMENTED / UNVERIFIED | C13 | Server-confirmed migration with `hidePregame:false`; physical verification remains. |
+| Pregame spectator parity | IMPLEMENTED / UNVERIFIED | C13 | Pregame spectate, recovery, authoritative attendance, and unattend are implemented; physical verification remains. |
 | Card notes | NOT IMPLEMENTED | C14 | Player/spectator/replay notes and authoritative note messages. |
 | Game clocks / timed-game UI | NOT IMPLEMENTED | C14 | Clock state and timer UX. |
 | Pause / unpause / queued pause | NOT IMPLEMENTED | C14 | Server-authoritative pause lifecycle. |
