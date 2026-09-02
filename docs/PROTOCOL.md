@@ -342,6 +342,11 @@ not subtracted from display. The active clock counts down from receipt time loca
 tick. An authoritative pause freezes the active clock at pause receipt, unpause clears the clock,
 and the next turn clears the old clock while awaiting a fresh server clock.
 
+Local in-game review is presentation-only. Authoritative pause and clock events continue updating
+the underlying live game during review, while live clocks and pause controls remain hidden until
+the player returns to the live segment. Dedicated/shared replay and untimed pause events remain
+ineligible.
+
 Pause commands encode exactly:
 
 ```text

@@ -441,4 +441,56 @@ describe('C7 authoritative gameplay runtime', () => {
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.clientState.pause.queued).toBe(false);
   });
+
+  test('local review preserves authoritative live pause and clock state and rejects untimed pause', async () => {
+    jest.setSystemTime(1_000);
+    const timed = await makeLive('player', { timed: true });
+    let room = timed.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    timed.store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+    room = timed.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.replay.active).toBe(true);
+
+    timed.socket.emitMessage('pause {"tableID":123,"active":true,"playerIndex":0}');
+    room = timed.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause).toEqual({ active: true, playerIndex: 0, queued: false });
+
+    timed.socket.emitMessage('pause {"tableID":123,"active":false,"playerIndex":-1}');
+    jest.setSystemTime(2_000);
+    timed.socket.emitMessage(
+      'clock {"tableID":123,"times":[10000,20000],"activePlayerIndex":0,"timeTaken":5000}',
+    );
+    room = timed.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause.active).toBe(false);
+    expect(room.clock).toEqual({
+      times: [10_000, 20_000], activePlayerIndex: 0, timeTaken: 5_000, receivedAtMs: 2_000,
+    });
+
+    jest.setSystemTime(3_500);
+    timed.socket.emitMessage('pause {"tableID":123,"active":true,"playerIndex":0}');
+    timed.store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: null,
+    }));
+    room = timed.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.replay.active).toBe(false);
+    expect(room.clientState.pause).toEqual({ active: true, playerIndex: 0, queued: false });
+    expect(room.clock).toEqual({
+      times: [8_500, 20_000], activePlayerIndex: 0, timeTaken: 5_000, receivedAtMs: 3_500,
+    });
+
+    const untimed = await makeLive();
+    const untimedBefore = untimed.store.getState().room.room;
+    untimed.socket.emitMessage('pause {"tableID":123,"active":true,"playerIndex":0}');
+    expect(untimed.store.getState().room.room).toBe(untimedBefore);
+  });
 });

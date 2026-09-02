@@ -345,9 +345,10 @@ export class GameBootstrapCoordinator {
       || state.room.connectionEpoch !== connectionEpoch
       || room.kind !== 'live_game'
       || room.tableID !== event.tableID
+      || room.sharedReplay
       || room.clientState.finished
-      || room.clientState.replay.active
       || room.clientState.ongoingGame.turn.currentPlayerIndex === null
+      || !room.clientState.metadata.options.timed
       || !this.pauseMatches(event, room.clientState.metadata.options.numPlayers)
     ) return false;
     this.store.dispatch(roomActions.pauseReceived({
@@ -376,7 +377,6 @@ export class GameBootstrapCoordinator {
       || room.tableID !== event.tableID
       || room.sharedReplay
       || room.clientState.finished
-      || room.clientState.replay.active
       || room.clientState.ongoingGame.turn.currentPlayerIndex === null
       || !room.clientState.metadata.options.timed
       || room.clientState.pause.active

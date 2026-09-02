@@ -96,6 +96,7 @@ export function GameScreen() {
 
   const timedOngoing = clientState?.metadata.options.timed === true
     && !clientState.finished
+    && !clientState.replay.active
     && clientState.ongoingGame.turn.currentPlayerIndex !== null
     && !liveRoom?.sharedReplay;
   useEffect(() => {
@@ -381,7 +382,7 @@ export function GameScreen() {
       {timedOngoing && clientState.pause.active && (
         <Text style={styles.paused}>Paused</Text>
       )}
-      {timedOngoing && playerLiveRoom !== null && (
+      {timedOngoing && playerLiveRoom !== null && sessionPhase === 'ready' && (
         <Button title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />
       )}
 
