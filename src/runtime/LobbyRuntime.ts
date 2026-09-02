@@ -48,6 +48,7 @@ import { chatActions } from '../store/chatSlice';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
+import { terminationActions } from '../store/terminationSlice';
 import type { AppStore } from '../store/store';
 
 const SOCKET_OPEN = 1;
@@ -965,6 +966,27 @@ export class LobbyRuntime {
           inactive: event.data.inactive,
         }));
         break;
+      case 'voteChange': {
+        const state = this.store.getState();
+        const room = state.room.room;
+        if (
+          state.session.connectionEpoch !== epoch
+          || state.session.phase !== 'ready'
+          || state.room.connectionEpoch !== epoch
+          || room.kind !== 'live_game'
+          || room.role !== 'player'
+          || room.sharedReplay
+          || room.clientState.finished
+          || room.clientState.ongoingGame.turn.currentPlayerIndex === null
+        ) break;
+        this.store.dispatch(terminationActions.voteChanged({
+          connectionEpoch: epoch,
+          tableID: room.tableID,
+          gameLoadEpoch: room.gameLoadEpoch,
+          value: event.data.vote,
+        }));
+        break;
+      }
       case 'boot':
         {
           const room = this.store.getState().room.room;

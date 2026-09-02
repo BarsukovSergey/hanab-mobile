@@ -13,6 +13,7 @@ import {
   pauseSchema,
   clockSchema,
 } from './gameProtocol';
+import { voteChangeSchema } from './terminationProtocol';
 import { isVariantNameSupported } from '../game/client/supportedVariants';
 
 const idSchema = z.number().int().nonnegative();
@@ -324,6 +325,7 @@ const schemas = {
   clock: clockSchema,
   connected: connectedSchema,
   userInactive: userInactiveSchema,
+  voteChange: voteChangeSchema,
   gameHistory: gameHistorySchema,
   cardIdentities: cardIdentitiesSchema,
   finishOngoingGame: finishOngoingGameSchema,

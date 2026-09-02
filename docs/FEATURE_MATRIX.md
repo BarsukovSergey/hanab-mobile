@@ -35,10 +35,10 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Pregame leader transfer | IMPLEMENTED / UNVERIFIED | C13 | Authoritative `tableSetLeader` lifecycle; physical verification remains. |
 | Restart to pregame | IMPLEMENTED / UNVERIFIED | C13 | Server-confirmed migration with `hidePregame:false`; physical verification remains. |
 | Pregame spectator parity | IMPLEMENTED / UNVERIFIED | C13 | Pregame spectate, recovery, authoritative attendance, and unattend are implemented; physical verification remains. |
-| Card notes | NOT IMPLEMENTED | C14 | Player/spectator/replay notes and authoritative note messages. |
+| Card notes | IMPLEMENTED / UNVERIFIED | C14 | C14-A player/spectator/replay notes plus upstream-sized card and stack-base note state; physical verification remains. |
 | Game clocks / timed-game UI | IMPLEMENTED / UNVERIFIED | C14 | C14-B1 server clock state and local display ticking; physical verification remains. |
 | Pause / unpause / queued pause | IMPLEMENTED / UNVERIFIED | C14 | C14-B1 server-authoritative pause and post-send queue lifecycle; physical verification remains. |
-| Terminate game / vote to terminate | NOT IMPLEMENTED | C14 | Proper permissions, vote state, and end-condition handling. |
+| Terminate game / vote to terminate | IMPLEMENTED / UNVERIFIED | C14 | C14-B2 authoritative self-vote echo, vote toggle, and confirmed direct termination; physical verification remains. |
 | Player connected / away state | PARTIAL | C14 | Recovery exists; complete in-game presence presentation remains. |
 | Full live action log UX | PARTIAL | C12 / C14 | Current UI only exposes a minimal finished log; timeline/full log comes with replay core. |
 | Game history list / pagination | NOT IMPLEMENTED | C15 | `historyGet` + local history screen. |

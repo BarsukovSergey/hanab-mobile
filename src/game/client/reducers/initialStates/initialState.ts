@@ -12,6 +12,7 @@ export function initialState(metadata: GameMetadata): State {
   const { options } = metadata;
   const variant = getVariant(options.variantName);
   const totalCardsInDeck = getTotalCardsInDeck(variant);
+  const notesSize = totalCardsInDeck + variant.suits.length + 1;
 
   return {
     visibleState: null,
@@ -26,8 +27,21 @@ export function initialState(metadata: GameMetadata): State {
       shared: null,
     },
     notes: {
-      ourNotes: [],
-      allNotes: [],
+      ourNotes: newArray(notesSize, {
+        possibilities: [],
+        chopMoved: false,
+        needsFix: false,
+        questionMark: false,
+        exclamationMark: false,
+        knownTrash: false,
+        finessed: false,
+        discardPermission: false,
+        blank: false,
+        unclued: false,
+        clued: false,
+        text: '',
+      }),
+      allNotes: newArray(notesSize, []),
       efficiencyModifier: 0,
     },
     pause: { active: false, playerIndex: 0, queued: false },

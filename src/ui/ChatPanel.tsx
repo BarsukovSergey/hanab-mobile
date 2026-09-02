@@ -3,6 +3,7 @@ import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-nat
 
 import { lobbyRuntime } from '../runtime/application';
 import { useAppSelector } from '../store/hooks';
+import { TerminationControls } from './game/TerminationControls';
 
 type Props = {
   room: string;
@@ -26,6 +27,7 @@ export function ChatPanel({ room, title }: Props) {
 
   return (
     <View style={styles.panel}>
+      <TerminationControls />
       <Text style={styles.heading}>{title}</Text>
       <ScrollView
         contentContainerStyle={styles.historyContent}
