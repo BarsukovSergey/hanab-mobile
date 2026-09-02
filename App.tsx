@@ -202,7 +202,10 @@ export default function App() {
       <View style={styles.section}>
         <Text style={styles.heading}>Connection lost</Text>
         {session.error !== null && <Text style={styles.error}>{session.error}</Text>}
-        <Button title="Retry" onPress={() => void lobbyRuntime.connect()} />
+        <Button title="Retry" onPress={() => {
+          lobbyRuntime.disconnect();
+          void runProbe();
+        }} />
       </View>
     );
   } else if (session.phase !== 'ready' || !hydrated) {
