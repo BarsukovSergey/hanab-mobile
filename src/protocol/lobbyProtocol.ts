@@ -8,6 +8,7 @@ import {
   gameInitSchema,
   incrementalGameActionSchema,
 } from './gameProtocol';
+import { isVariantNameSupported } from '../game/client/supportedVariants';
 
 const idSchema = z.number().int().nonnegative();
 
@@ -42,32 +43,53 @@ export const chatListSchema = z.object({
 
 export type ChatList = z.infer<typeof chatListSchema>;
 
-export const BASIC_VARIANT_NAMES = [
-  'No Variant',
-  '6 Suits',
-  'Black (6 Suits)',
-  'Rainbow (6 Suits)',
-] as const;
+const supportedVariantNameSchema = z.string().min(1).refine(isVariantNameSupported);
+
+export const tableOptionsSchema = z.object({
+  variantName: z.string().min(1),
+  timed: z.boolean(),
+  timeBase: z.number().int().nonnegative(),
+  timePerTurn: z.number().int().nonnegative(),
+  speedrun: z.boolean(),
+  cardCycle: z.boolean(),
+  deckPlays: z.boolean(),
+  emptyClues: z.boolean(),
+  oneExtraCard: z.boolean(),
+  oneLessCard: z.boolean(),
+  allOrNothing: z.boolean(),
+  detrimentalCharacters: z.boolean(),
+}).passthrough();
+
+export type TableOptions = z.infer<typeof tableOptionsSchema>;
+
+export type MobileTableOptions = Pick<TableOptions,
+  'variantName' | 'cardCycle' | 'emptyClues' | 'oneExtraCard' | 'oneLessCard' | 'allOrNothing'>;
+
+const mobileTableOptionsSchema = z.object({
+  variantName: supportedVariantNameSchema,
+  cardCycle: z.boolean(),
+  emptyClues: z.boolean(),
+  oneExtraCard: z.boolean(),
+  oneLessCard: z.boolean(),
+  allOrNothing: z.boolean(),
+}).refine((options) => !(options.oneExtraCard && options.oneLessCard));
+
+const unavailableTableOptions = {
+  timed: false,
+  timeBase: 0,
+  timePerTurn: 0,
+  speedrun: false,
+  deckPlays: false,
+  detrimentalCharacters: false,
+} as const;
 
 export const tableCreateCommandSchema = z.object({
   name: z.string().trim().min(1).max(45),
-  options: z.object({
-    variantName: z.enum(BASIC_VARIANT_NAMES),
-    timed: z.literal(false),
-    timeBase: z.literal(0),
-    timePerTurn: z.literal(0),
-    speedrun: z.literal(false),
-    cardCycle: z.literal(false),
-    deckPlays: z.literal(false),
-    emptyClues: z.literal(false),
-    oneExtraCard: z.literal(false),
-    oneLessCard: z.literal(false),
-    allOrNothing: z.literal(false),
-    detrimentalCharacters: z.literal(false),
-  }),
-  password: z.literal(''),
+  options: tableOptionsSchema,
+  password: z.string(),
   maxPlayers: z.number().int().min(2).max(6),
-});
+}).refine(({ options }) => isVariantNameSupported(options.variantName)
+  && !(options.oneExtraCard && options.oneLessCard));
 
 export type TableCreateCommand = z.infer<typeof tableCreateCommandSchema>;
 
@@ -78,7 +100,9 @@ export const tableStartCommandSchema = z.object({
 
 export type TableStartCommand = z.infer<typeof tableStartCommandSchema>;
 
-export const tableJoinCommandSchema = tableIDCommandSchema;
+export const tableJoinCommandSchema = tableIDCommandSchema.extend({
+  password: z.string().optional(),
+}).strict();
 export type TableJoinCommand = z.infer<typeof tableJoinCommandSchema>;
 
 export const tableLeaveCommandSchema = tableIDCommandSchema;
@@ -105,7 +129,20 @@ export const replayActionCommandSchema = z.object({
 
 export const tableRestartCommandSchema = z.object({
   tableID: idSchema,
-  hidePregame: z.literal(true),
+  hidePregame: z.boolean(),
+}).strict();
+
+export const tableUpdateCommandSchema = z.object({
+  tableID: idSchema,
+  name: z.string().trim().min(1).max(45),
+  options: tableOptionsSchema,
+  maxPlayers: z.number().int().min(2).max(6),
+}).refine(({ options }) => isVariantNameSupported(options.variantName)
+  && !(options.oneExtraCard && options.oneLessCard));
+
+export const tableSetLeaderCommandSchema = z.object({
+  tableID: idSchema,
+  name: z.string().min(1),
 }).strict();
 
 export const tableStartSchema = z.object({
@@ -172,9 +209,7 @@ export const pregameGameSchema = z.object({
   name: z.string().min(1),
   owner: idSchema,
   players: z.array(pregamePlayerSchema),
-  options: z.object({
-    variantName: z.string().min(1),
-  }),
+  options: tableOptionsSchema,
   passwordProtected: z.boolean(),
   maxPlayers: z.number().int().positive(),
 });
@@ -328,13 +363,13 @@ export function encodeReplayActionFrame(tableID: number, segment: number): strin
   return encodeClientFrame('replayAction', payload);
 }
 
-export function encodeTableRestartFrame(tableID: number): string {
-  const payload = tableRestartCommandSchema.parse({ tableID, hidePregame: true });
+export function encodeTableRestartFrame(tableID: number, hidePregame = true): string {
+  const payload = tableRestartCommandSchema.parse({ tableID, hidePregame });
   return encodeClientFrame('tableRestart', payload);
 }
 
-export function encodeTableJoinFrame(tableID: number): string {
-  const payload = tableJoinCommandSchema.parse({ tableID });
+export function encodeTableJoinFrame(tableID: number, password?: string): string {
+  const payload = tableJoinCommandSchema.parse({ tableID, password });
   return encodeClientFrame('tableJoin', payload);
 }
 
@@ -351,28 +386,49 @@ export function encodeTableUnattendFrame(tableID: number): string {
 export function encodeTableCreateFrame(
   name: string,
   maxPlayers: number,
-  variantName: string,
+  options: MobileTableOptions | string,
+  password = '',
 ): string {
+  const exposed = mobileTableOptionsSchema.parse(typeof options === 'string' ? {
+    variantName: options,
+    cardCycle: false,
+    emptyClues: false,
+    oneExtraCard: false,
+    oneLessCard: false,
+    allOrNothing: false,
+  } : options);
   const payload = tableCreateCommandSchema.parse({
     name,
     options: {
-      variantName,
-      timed: false,
-      timeBase: 0,
-      timePerTurn: 0,
-      speedrun: false,
-      cardCycle: false,
-      deckPlays: false,
-      emptyClues: false,
-      oneExtraCard: false,
-      oneLessCard: false,
-      allOrNothing: false,
-      detrimentalCharacters: false,
+      ...unavailableTableOptions,
+      ...exposed,
     },
-    password: '',
+    password,
     maxPlayers,
   });
   return encodeClientFrame('tableCreate', payload);
+}
+
+export function encodeTableUpdateFrame(
+  tableID: number,
+  name: string,
+  maxPlayers: number,
+  existingOptions: TableOptions,
+  changes: MobileTableOptions,
+): string {
+  const exposed = mobileTableOptionsSchema.parse(changes);
+  const payload = tableUpdateCommandSchema.parse({
+    tableID,
+    name,
+    maxPlayers,
+    options: { ...existingOptions, ...exposed },
+  });
+  return encodeClientFrame('tableUpdate', payload);
+}
+
+export function encodeTableSetLeaderFrame(tableID: number, name: string): string {
+  const payload = tableSetLeaderCommandSchema.parse({ tableID, name });
+  return encodeClientFrame('tableSetLeader', payload);
 }
 
 export function encodeTableStartFrame(

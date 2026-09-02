@@ -1,5 +1,9 @@
 import { getVariant } from '../upstream/gameData';
+import { ClueType } from '../upstream/enums/ClueType';
 import type { GameState } from '../upstream/interfaces/GameState';
+import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
+import { getCharacterNameForPlayer } from '../upstream/reducers/reducerHelpers';
+import { getClueName } from '../upstream/rules/clues';
 
 export type GameplayClueChoice = {
   value: number;
@@ -20,12 +24,30 @@ export type GameTableSuit = {
 
 type AuthoritativeTableState = Pick<GameState, 'playStacks' | 'discardStacks' | 'deck'>;
 
-export function getGameplayClueChoices(variantName: string): GameplayClueChoices {
+export function getGameplayClueChoices(
+  variantName: string,
+  characterName = '',
+): GameplayClueChoices {
   const variant = getVariant(variantName);
   return {
-    colors: variant.clueColors.map((color, value) => ({ value, label: color.name })),
-    ranks: variant.clueRanks.map((value) => ({ value, label: String(value) })),
+    colors: variant.clueColors.map((_color, value) => ({
+      value,
+      label: getClueName(ClueType.Color, value, variant, characterName),
+    })),
+    ranks: variant.clueRanks.map((value) => ({
+      value,
+      label: getClueName(ClueType.Rank, value, variant, characterName),
+    })),
   };
+}
+
+export function getGameplayClueChoicesForPlayer(
+  metadata: Pick<GameMetadata, 'options' | 'ourPlayerIndex' | 'characterAssignments'>,
+): GameplayClueChoices {
+  return getGameplayClueChoices(
+    metadata.options.variantName,
+    getCharacterNameForPlayer(metadata.ourPlayerIndex, metadata.characterAssignments),
+  );
 }
 
 export function getGameTableSuits(

@@ -4,7 +4,7 @@ import { Button, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import {
   getGameTableSuits,
-  getGameplayClueChoices,
+  getGameplayClueChoicesForPlayer,
   getVisibleCardIdentityLabel,
 } from '../../game/selectors/gameplay';
 import { lobbyRuntime } from '../../runtime/application';
@@ -217,13 +217,22 @@ export function GameScreen() {
               </Text>
             ))}
             {shared.amLeader && (
-              <Button
-                disabled={!canQuickRematch}
-                title={roomState.pendingRestartTableID === null
-                  ? 'Quick rematch'
-                  : 'Starting rematch...'}
-                onPress={() => lobbyRuntime.quickRematch()}
-              />
+              <>
+                <Button
+                  disabled={!canQuickRematch}
+                  title={roomState.pendingRestartTableID === null
+                    ? 'Quick rematch'
+                    : 'Starting rematch...'}
+                  onPress={() => lobbyRuntime.quickRematch()}
+                />
+                <Button
+                  disabled={!canQuickRematch}
+                  title={roomState.pendingRestartTableID === null
+                    ? 'Remake table'
+                    : 'Remaking table...'}
+                  onPress={() => lobbyRuntime.restartToPregame()}
+                />
+              </>
             )}
           </View>
         )}
@@ -259,7 +268,7 @@ export function GameScreen() {
     && roomState.pendingGameplayAction === null;
   const clueChoices = playerLiveRoom === null
     ? null
-    : getGameplayClueChoices(playerLiveRoom.clientState.metadata.options.variantName);
+    : getGameplayClueChoicesForPlayer(playerLiveRoom.clientState.metadata);
   const currentPlayerIndex = displayedGame.turn.currentPlayerIndex;
   const currentPlayerName = currentPlayerIndex === null
     ? 'No current player'

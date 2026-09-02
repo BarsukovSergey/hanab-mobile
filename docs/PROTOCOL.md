@@ -233,6 +233,14 @@ At the pinned commit, an unprotected pregame join sends:
 tableJoin {"tableID":123}
 ```
 
+A password-protected join adds the password only to that one outbound command:
+
+```text
+tableJoin {"tableID":123,"password":"..."}
+```
+
+Mobile does not persist the password or put it in application state or diagnostics.
+
 The server appends the player and calls `NotifyPlayerChange()` before it calls
 `NotifyTableJoined()`. For the joining session, the normal server order is therefore:
 
@@ -262,6 +270,38 @@ left {"TableID":123}
 Only the matching authoritative `left` ends a pregame room. A same-table non-replay
 `tableStart` takes precedence over join, pregame, or leave processing and transitions to the
 normal game-bootstrap boundary.
+
+Pregame spectating uses the ordinary `tableSpectate` command. The server responds with the same
+authoritative `game` plus `joined` attendance pair as a player join; the `game.players[].you`
+values are all false. A pregame spectator leaves with `tableUnattend` and waits for the
+authoritative own-user Lobby status before leaving local room state.
+
+## C13 table configuration
+
+Create sends `name`, `options`, optional `password`, and `maxPlayers`. Mobile exposes supported
+vendored variants plus `cardCycle`, `emptyClues`, `oneExtraCard`, `oneLessCard`, and
+`allOrNothing`. It sends timed, speedrun, deckPlays, and detrimentalCharacters disabled on create.
+One Extra Card and One Less Card may not both be enabled.
+
+The pregame owner updates a table with:
+
+```text
+tableUpdate {"tableID":123,"name":"Table","options":{...},"maxPlayers":5}
+tableSetLeader {"tableID":123,"name":"Alice"}
+```
+
+`tableUpdate` starts from the complete authoritative pregame options object and changes only the
+mobile-exposed values, preserving options mobile does not expose. Mobile waits for a matching
+authoritative `game` snapshot for update and leader-transfer truth.
+
+The existing shared-replay restart command supports both transitions:
+
+```text
+tableRestart {"tableID":123,"hidePregame":true}  # Quick Rematch
+tableRestart {"tableID":123,"hidePregame":false} # restart to pregame
+```
+
+Both reuse the C12 boot/new-table transition and wait for authoritative new-table events.
 
 ## Game bootstrap
 

@@ -3,6 +3,7 @@ import { castDraft, original } from 'immer';
 
 import type {
   PregameGame,
+  MobileTableOptions,
   Boot,
   Spectator,
   TableJoined,
@@ -23,7 +24,7 @@ export type RoomState =
   | {
       kind: 'pregame';
       tableID: number;
-      role: 'player';
+      role: 'player' | 'spectator';
       data: PregameGame;
     }
   | {
@@ -55,6 +56,7 @@ export type RoomState =
 
 type PendingJoin = {
   tableID: number;
+  role: 'player' | 'spectator';
   joinedConfirmed: boolean;
   stagedGame: PregameGame | null;
 };
@@ -73,6 +75,7 @@ type RematchTransition = {
   newTableID: number | null;
   joinedConfirmed: boolean;
   stagedGame: PregameGame | null;
+  hidePregame: boolean;
 };
 
 export type RoomSliceState = {
@@ -90,7 +93,11 @@ export type RoomSliceState = {
     tableID: number;
     intendedPlayers: string[];
   } | null;
+  pendingUpdate: ({ tableID: number; name: string; maxPlayers: number }
+    & MobileTableOptions) | null;
+  pendingLeaderName: string | null;
   pendingRestartTableID: number | null;
+  pendingRestartHidePregame: boolean | null;
   rematchTransition: RematchTransition | null;
   pendingGameplayAction: {
     connectionEpoch: number;
@@ -110,7 +117,10 @@ const initialState: RoomSliceState = {
   pendingLeaveTableID: null,
   pendingUnattendTableID: null,
   pendingStart: null,
+  pendingUpdate: null,
+  pendingLeaderName: null,
   pendingRestartTableID: null,
+  pendingRestartHidePregame: null,
   rematchTransition: null,
   pendingGameplayAction: null,
   room: { kind: 'none' },
@@ -121,6 +131,8 @@ function clearC4BState(state: RoomSliceState): void {
   state.pendingCreate = null;
   state.pendingLeaveTableID = null;
   state.pendingStart = null;
+  state.pendingUpdate = null;
+  state.pendingLeaderName = null;
 }
 
 export const roomSlice = createSlice({
@@ -164,7 +176,11 @@ export const roomSlice = createSlice({
     },
     joinRequested(
       state,
-      action: PayloadAction<{ epoch: number; tableID: number }>,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        role?: 'player' | 'spectator';
+      }>,
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (
@@ -176,6 +192,7 @@ export const roomSlice = createSlice({
       ) return;
       state.pendingJoin = {
         tableID: action.payload.tableID,
+        role: action.payload.role ?? 'player',
         joinedConfirmed: false,
         stagedGame: null,
       };
@@ -221,6 +238,12 @@ export const roomSlice = createSlice({
         ) return;
         rematch.newTableID = tableID;
         rematch.joinedConfirmed = true;
+        if (rematch.stagedGame !== null && !rematch.hidePregame) {
+          state.room = {
+            kind: 'pregame', tableID, role: 'player', data: rematch.stagedGame,
+          };
+          state.rematchTransition = null;
+        }
         return;
       }
 
@@ -231,7 +254,7 @@ export const roomSlice = createSlice({
         state.room = {
           kind: 'pregame',
           tableID: pendingJoin.tableID,
-          role: 'player',
+          role: pendingJoin.role,
           data: pendingJoin.stagedGame,
         };
         state.pendingJoin = null;
@@ -278,13 +301,36 @@ export const roomSlice = createSlice({
         ) return;
         rematch.newTableID = game.tableID;
         rematch.stagedGame = game;
+        if (rematch.joinedConfirmed && !rematch.hidePregame) {
+          state.room = {
+            kind: 'pregame', tableID: game.tableID, role: 'player', data: game,
+          };
+          state.rematchTransition = null;
+        }
         return;
       }
 
       if (state.room.kind === 'pregame') {
         if (state.room.tableID === game.tableID) {
           const nextNames = game.players.map((player) => player.name);
+          const pendingUpdate = state.pendingUpdate;
+          const previousOwner = state.room.data.owner;
           state.room.data = game;
+          if (
+            pendingUpdate?.tableID === game.tableID
+            && pendingUpdate.name === game.name
+            && pendingUpdate.maxPlayers === game.maxPlayers
+            && pendingUpdate.variantName === game.options.variantName
+            && pendingUpdate.cardCycle === game.options.cardCycle
+            && pendingUpdate.emptyClues === game.options.emptyClues
+            && pendingUpdate.oneExtraCard === game.options.oneExtraCard
+            && pendingUpdate.oneLessCard === game.options.oneLessCard
+            && pendingUpdate.allOrNothing === game.options.allOrNothing
+          ) state.pendingUpdate = null;
+          if (
+            state.pendingLeaderName === game.players[0]?.name
+            && game.owner !== previousOwner
+          ) state.pendingLeaderName = null;
           if (
             state.pendingStart?.tableID === game.tableID
             && (state.pendingStart.intendedPlayers.length !== nextNames.length
@@ -305,7 +351,7 @@ export const roomSlice = createSlice({
         state.room = {
           kind: 'pregame',
           tableID: pendingJoin.tableID,
-          role: 'player',
+          role: pendingJoin.role,
           data: game,
         };
         state.pendingJoin = null;
@@ -361,9 +407,55 @@ export const roomSlice = createSlice({
       ) return;
       state.pendingStart = { tableID, intendedPlayers };
     },
+    updateRequested(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        ownerUserID: number;
+        name: string;
+        maxPlayers: number;
+        changes: MobileTableOptions;
+      }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.room.kind !== 'pregame'
+        || state.room.role !== 'player'
+        || state.room.tableID !== action.payload.tableID
+        || state.room.data.owner !== action.payload.ownerUserID
+        || state.pendingUpdate !== null
+      ) return;
+      state.pendingUpdate = {
+        tableID: action.payload.tableID,
+        name: action.payload.name,
+        maxPlayers: action.payload.maxPlayers,
+        ...action.payload.changes,
+      };
+    },
+    leaderRequested(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableID: number;
+        ownerUserID: number;
+        name: string;
+      }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.room.kind !== 'pregame'
+        || state.room.role !== 'player'
+        || state.room.tableID !== action.payload.tableID
+        || state.room.data.owner !== action.payload.ownerUserID
+        || !state.room.data.players.some((player) => player.name === action.payload.name)
+        || state.pendingLeaderName !== null
+      ) return;
+      state.pendingLeaderName = action.payload.name;
+    },
     restartRequested(
       state,
-      action: PayloadAction<{ epoch: number; tableID: number }>,
+      action: PayloadAction<{ epoch: number; tableID: number; hidePregame?: boolean }>,
     ) {
       if (
         state.connectionEpoch !== action.payload.epoch
@@ -374,6 +466,7 @@ export const roomSlice = createSlice({
         || state.room.clientState.replay.shared === null
       ) return;
       state.pendingRestartTableID = action.payload.tableID;
+      state.pendingRestartHidePregame = action.payload.hidePregame ?? true;
     },
     bootReceived(
       state,
@@ -396,19 +489,26 @@ export const roomSlice = createSlice({
           newTableID: null,
           joinedConfirmed: false,
           stagedGame: null,
+          hidePregame: state.pendingRestartHidePregame ?? true,
         };
       }
       state.pendingRestartTableID = null;
+      state.pendingRestartHidePregame = null;
       state.pendingGameplayAction = null;
       state.pendingUnattendTableID = null;
       state.room = { kind: 'none' };
     },
     commandPendingCleared(state, action: PayloadAction<{ epoch: number }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
+      state.pendingSpectateTableID = null;
+      state.pendingJoin = null;
       state.pendingCreate = null;
       state.pendingStart = null;
       state.pendingUnattendTableID = null;
       state.pendingRestartTableID = null;
+      state.pendingRestartHidePregame = null;
+      state.pendingUpdate = null;
+      state.pendingLeaderName = null;
     },
     leaveRequested(
       state,
@@ -438,10 +538,16 @@ export const roomSlice = createSlice({
     unattendConfirmed(state, action: PayloadAction<{ epoch: number }>) {
       if (
         state.connectionEpoch !== action.payload.epoch
-        || state.room.kind !== 'live_game'
-        || state.pendingUnattendTableID !== state.room.tableID
+        || !(
+          (state.room.kind === 'live_game'
+            && state.pendingUnattendTableID === state.room.tableID)
+          || (state.room.kind === 'pregame'
+            && state.room.role === 'spectator'
+            && state.pendingLeaveTableID === state.room.tableID)
+        )
       ) return;
       state.pendingUnattendTableID = null;
+      state.pendingLeaveTableID = null;
       state.pendingGameplayAction = null;
       state.room = { kind: 'none' };
     },
@@ -510,7 +616,7 @@ export const roomSlice = createSlice({
         && state.pendingJoin?.tableID === tableStart.tableID
         && !tableStart.replay
       ) {
-        role = 'player';
+        role = state.pendingJoin.role;
       } else if (
         role === null
         &&
@@ -518,7 +624,7 @@ export const roomSlice = createSlice({
         && state.room.tableID === tableStart.tableID
         && !tableStart.replay
       ) {
-        role = 'player';
+        role = state.room.role;
       }
       if (role === null) return;
 
@@ -891,6 +997,7 @@ export const roomSlice = createSlice({
       state.pendingGameplayAction = null;
       state.pendingUnattendTableID = null;
       state.pendingRestartTableID = null;
+      state.pendingRestartHidePregame = null;
       state.rematchTransition = null;
       clearC4BState(state);
       state.room = { kind: 'none' };
@@ -902,6 +1009,9 @@ export const roomSlice = createSlice({
         state.pendingGameplayAction = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
+        state.pendingRestartHidePregame = null;
+        state.pendingUpdate = null;
+        state.pendingLeaderName = null;
       }
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
@@ -911,6 +1021,9 @@ export const roomSlice = createSlice({
         state.pendingGameplayAction = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
+        state.pendingRestartHidePregame = null;
+        state.pendingUpdate = null;
+        state.pendingLeaderName = null;
       }
     });
     builder.addCase(sessionActions.signedOut, () => initialState);

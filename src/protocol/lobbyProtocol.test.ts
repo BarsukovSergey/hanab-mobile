@@ -5,6 +5,8 @@ import {
   encodeChatFrame,
   encodeReplayActionFrame,
   encodeTableRestartFrame,
+  encodeTableSetLeaderFrame,
+  encodeTableUpdateFrame,
   encodeTableCreateFrame,
   encodeTableReattendFrame,
   encodeTableJoinFrame,
@@ -159,6 +161,52 @@ describe('lobby protocol decoder', () => {
     );
   });
 
+  test('encodes protected create/join and never requires password persistence', () => {
+    expect(encodeTableJoinFrame(123, 'open sesame')).toBe(
+      'tableJoin {"tableID":123,"password":"open sesame"}',
+    );
+    expect(encodeTableCreateFrame('Secret', 5, {
+      variantName: 'No Variant', cardCycle: false, emptyClues: false,
+      oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    }, 'swordfish')).toContain('"password":"swordfish"');
+  });
+
+  test('updates exposed options while preserving the complete authoritative option object', () => {
+    expect(encodeTableUpdateFrame(123, ' Changed ', 4, {
+      variantName: 'No Variant', timed: true, timeBase: 90, timePerTurn: 15,
+      speedrun: true, cardCycle: false, deckPlays: true, emptyClues: false,
+      oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+      detrimentalCharacters: true, futureOption: 'keep',
+    }, {
+      variantName: '6 Suits', cardCycle: true, emptyClues: true,
+      oneExtraCard: true, oneLessCard: false, allOrNothing: true,
+    })).toBe(
+      'tableUpdate {"tableID":123,"name":"Changed","options":{'
+      + '"variantName":"6 Suits","timed":true,"timeBase":90,"timePerTurn":15,'
+      + '"speedrun":true,"cardCycle":true,"deckPlays":true,"emptyClues":true,'
+      + '"oneExtraCard":true,"oneLessCard":false,"allOrNothing":true,'
+      + '"detrimentalCharacters":true,"futureOption":"keep"},"maxPlayers":4}',
+    );
+    expect(() => encodeTableUpdateFrame(123, 'Table', 5, {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
+      oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+      detrimentalCharacters: false,
+    }, {
+      variantName: 'No Variant', cardCycle: false, emptyClues: false,
+      oneExtraCard: true, oneLessCard: true, allOrNothing: false,
+    })).toThrow();
+  });
+
+  test('encodes leader transfer and both restart modes', () => {
+    expect(encodeTableSetLeaderFrame(123, 'Bob')).toBe(
+      'tableSetLeader {"tableID":123,"name":"Bob"}',
+    );
+    expect(encodeTableRestartFrame(123, false)).toBe(
+      'tableRestart {"tableID":123,"hidePregame":false}',
+    );
+  });
+
   test('rejects invalid create and start command input', () => {
     expect(() => encodeTableCreateFrame(' ', 5, 'No Variant')).toThrow();
     expect(() => encodeTableCreateFrame('x'.repeat(46), 5, 'No Variant')).toThrow();
@@ -179,7 +227,10 @@ describe('lobby protocol decoder', () => {
     expect(decodeServerFrame(
       'game {"tableID":123,"name":"Table","owner":7,'
       + '"players":[{"index":0,"name":"Ada","you":true,"present":true,"stats":{}}],'
-      + '"options":{"variantName":"No Variant","future":true},'
+      + '"options":{"variantName":"No Variant","timed":false,"timeBase":0,'
+      + '"timePerTurn":0,"speedrun":false,"cardCycle":false,"deckPlays":false,'
+      + '"emptyClues":false,"oneExtraCard":false,"oneLessCard":false,'
+      + '"allOrNothing":false,"detrimentalCharacters":false,"future":true},'
       + '"passwordProtected":false,"maxPlayers":5}',
     )).toEqual({
       kind: 'event',
@@ -190,7 +241,12 @@ describe('lobby protocol decoder', () => {
           name: 'Table',
           owner: 7,
           players: [{ index: 0, name: 'Ada', you: true, present: true }],
-          options: { variantName: 'No Variant' },
+          options: {
+            variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+            speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
+            oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+            detrimentalCharacters: false, future: true,
+          },
           passwordProtected: false,
           maxPlayers: 5,
         },

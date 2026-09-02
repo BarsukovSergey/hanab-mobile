@@ -8,6 +8,7 @@ import {
   isCurrentVariantColorClueValue,
   isCurrentVariantRankClueValue,
 } from '../game/selectors/gameplay';
+import { isVariantNameSupported } from '../game/client/supportedVariants';
 import {
   clientGameplayActionSchema,
   encodeColorClueFrame,
@@ -18,7 +19,6 @@ import {
 } from '../protocol/gameProtocol';
 import {
   decodeServerFrame,
-  BASIC_VARIANT_NAMES,
   encodeChatFrame,
   encodeClientFrame,
   encodeReplayActionFrame,
@@ -29,8 +29,11 @@ import {
   encodeTableLeaveFrame,
   encodeTableSpectateFrame,
   encodeTableStartFrame,
+  encodeTableSetLeaderFrame,
+  encodeTableUpdateFrame,
   encodeTableUnattendFrame,
   type LobbyTable,
+  type MobileTableOptions,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
 import { chatActions } from '../store/chatSlice';
@@ -235,7 +238,7 @@ export class LobbyRuntime {
     const table = state.lobby.tables.entities[tableID];
     if (
       table === undefined
-      || !isSpectateEligible(table)
+      || (!isSpectateEligible(table) && !isPregameSpectateEligible(table))
       || state.room.room.kind !== 'none'
       || state.room.pendingRecovery !== null
       || state.room.pendingSpectateTableID !== null
@@ -248,14 +251,22 @@ export class LobbyRuntime {
     const sent = this.sendEncoded(encodeTableSpectateFrame(tableID));
     if (!sent) return false;
 
-    this.store.dispatch(roomActions.spectateRequested({
-      epoch: state.session.connectionEpoch,
-      tableID,
-    }));
+    if (table.running) {
+      this.store.dispatch(roomActions.spectateRequested({
+        epoch: state.session.connectionEpoch,
+        tableID,
+      }));
+    } else {
+      this.store.dispatch(roomActions.joinRequested({
+        epoch: state.session.connectionEpoch,
+        tableID,
+        role: 'spectator',
+      }));
+    }
     return true;
   }
 
-  join(tableID: number): boolean {
+  join(tableID: number, password?: string): boolean {
     const state = this.store.getState();
     const table = state.lobby.tables.entities[tableID];
     if (
@@ -266,11 +277,15 @@ export class LobbyRuntime {
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
       || state.room.pendingCreate !== null
+      || (table.passwordProtected && (password === undefined || password.length === 0))
     ) {
       return false;
     }
 
-    const sent = this.sendEncoded(encodeTableJoinFrame(tableID));
+    const sent = this.sendEncoded(encodeTableJoinFrame(
+      tableID,
+      table.passwordProtected ? password : undefined,
+    ));
     if (!sent) return false;
 
     this.store.dispatch(roomActions.joinRequested({
@@ -306,10 +321,23 @@ export class LobbyRuntime {
     return this.store.getState().room.pendingRecovery?.tableID === tableID;
   }
 
-  createTable(name: string, maxPlayers: number, variant: string): boolean {
+  createTable(
+    name: string,
+    maxPlayers: number,
+    options: MobileTableOptions | string,
+    password = '',
+  ): boolean {
     const state = this.store.getState();
     const creatorUserID = state.session.authenticatedUser?.userID;
     const trimmedName = name.trim();
+    const exposed = typeof options === 'string' ? {
+      variantName: options,
+      cardCycle: false,
+      emptyClues: false,
+      oneExtraCard: false,
+      oneLessCard: false,
+      allOrNothing: false,
+    } : options;
     if (
       creatorUserID === undefined
       || trimmedName.length < 1
@@ -317,7 +345,8 @@ export class LobbyRuntime {
       || !Number.isInteger(maxPlayers)
       || maxPlayers < 2
       || maxPlayers > 6
-      || !(BASIC_VARIANT_NAMES as readonly string[]).includes(variant)
+      || !isVariantNameSupported(exposed.variantName)
+      || (exposed.oneExtraCard && exposed.oneLessCard)
       || state.room.room.kind !== 'none'
       || state.room.pendingRecovery !== null
       || state.room.pendingSpectateTableID !== null
@@ -327,7 +356,7 @@ export class LobbyRuntime {
 
     let frame: string;
     try {
-      frame = encodeTableCreateFrame(trimmedName, maxPlayers, variant);
+      frame = encodeTableCreateFrame(trimmedName, maxPlayers, exposed, password);
     } catch {
       return false;
     }
@@ -372,6 +401,52 @@ export class LobbyRuntime {
     return true;
   }
 
+  updateTable(name: string, maxPlayers: number, changes: MobileTableOptions): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    const ownerUserID = state.session.authenticatedUser?.userID;
+    if (
+      ownerUserID === undefined
+      || room.kind !== 'pregame'
+      || room.role !== 'player'
+      || room.data.owner !== ownerUserID
+      || state.room.pendingUpdate !== null
+    ) return false;
+    let frame: string;
+    try {
+      frame = encodeTableUpdateFrame(
+        room.tableID, name, maxPlayers, room.data.options, changes,
+      );
+    } catch {
+      return false;
+    }
+    if (!this.sendEncoded(frame)) return false;
+    this.store.dispatch(roomActions.updateRequested({
+      epoch: state.session.connectionEpoch, tableID: room.tableID, ownerUserID,
+      name: name.trim(), maxPlayers, changes,
+    }));
+    return this.store.getState().room.pendingUpdate?.tableID === room.tableID;
+  }
+
+  setTableLeader(name: string): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    const ownerUserID = state.session.authenticatedUser?.userID;
+    if (
+      ownerUserID === undefined
+      || room.kind !== 'pregame'
+      || room.role !== 'player'
+      || room.data.owner !== ownerUserID
+      || !room.data.players.some((player) => player.name === name && !player.you)
+      || state.room.pendingLeaderName !== null
+    ) return false;
+    if (!this.sendEncoded(encodeTableSetLeaderFrame(room.tableID, name))) return false;
+    this.store.dispatch(roomActions.leaderRequested({
+      epoch: state.session.connectionEpoch, tableID: room.tableID, ownerUserID, name,
+    }));
+    return this.store.getState().room.pendingLeaderName === name;
+  }
+
   leave(tableID: number): boolean {
     const state = this.store.getState();
     if (
@@ -383,7 +458,9 @@ export class LobbyRuntime {
       return false;
     }
 
-    const sent = this.sendEncoded(encodeTableLeaveFrame(tableID));
+    const sent = this.sendEncoded(state.room.room.role === 'player'
+      ? encodeTableLeaveFrame(tableID)
+      : encodeTableUnattendFrame(tableID));
     if (!sent) return false;
 
     this.store.dispatch(roomActions.leaveRequested({
@@ -450,6 +527,14 @@ export class LobbyRuntime {
   }
 
   quickRematch(): boolean {
+    return this.restartSharedReplay(true);
+  }
+
+  restartToPregame(): boolean {
+    return this.restartSharedReplay(false);
+  }
+
+  private restartSharedReplay(hidePregame: boolean): boolean {
     const state = this.store.getState();
     const room = state.room.room;
     if (
@@ -460,11 +545,12 @@ export class LobbyRuntime {
     this.store.dispatch(roomActions.restartRequested({
       epoch: state.session.connectionEpoch,
       tableID: room.tableID,
+      hidePregame,
     }));
     if (this.store.getState().room.pendingRestartTableID !== room.tableID) return false;
     let sent = false;
     try {
-      sent = this.sendEncoded(encodeTableRestartFrame(room.tableID));
+      sent = this.sendEncoded(encodeTableRestartFrame(room.tableID, hidePregame));
     } catch {
       sent = false;
     }
@@ -1009,14 +1095,23 @@ export class LobbyRuntime {
 }
 
 export function isSpectateEligible(table: LobbyTable): boolean {
-  return table.running && (table.sharedReplay || !table.joined);
+  return isVariantNameSupported(table.variant)
+    && table.running
+    && (table.sharedReplay || !table.joined);
+}
+
+export function isPregameSpectateEligible(table: LobbyTable): boolean {
+  return isVariantNameSupported(table.variant)
+    && !table.running
+    && !table.sharedReplay
+    && !table.joined;
 }
 
 export function isJoinEligible(table: LobbyTable): boolean {
   return !table.running
     && !table.sharedReplay
     && !table.joined
-    && !table.passwordProtected
+    && isVariantNameSupported(table.variant)
     && table.numPlayers < table.maxPlayers;
 }
 

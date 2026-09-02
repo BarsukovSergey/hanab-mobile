@@ -27,14 +27,14 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Replay participants / leader state | DONE | C12 | Replay participant and leader state physically verified. |
 | Quick rematch | DONE | C12 | Quick Rematch and new-game lifecycle physically verified. |
 | Shared replay reconnect / recovery | DONE | C12 | Lobby return-to-game and kill/relaunch recovery physically verified. |
-| Password-protected table create/join | NOT IMPLEMENTED | C13 | Must preserve secret-handling rules; never log/store table passwords. |
-| Variant compatibility matrix | NOT IMPLEMENTED | C13 | Expose only variants the vendored reducer/selectors/RN UI can correctly support. |
-| Full supported variants / modifiers UI | NOT IMPLEMENTED | C13 | Expand create/edit only after compatibility audit. |
-| Timed table settings in create/edit | NOT IMPLEMENTED | C13 / C14 | Configuration in C13; full clocks/gameplay behavior in C14. |
-| Edit table settings / name / max players | NOT IMPLEMENTED | C13 | `tableUpdate` lifecycle. |
-| Pregame leader transfer | NOT IMPLEMENTED | C13 | `tableSetLeader`. |
-| Restart to pregame | NOT IMPLEMENTED | C13 | `tableRestart` with `hidePregame:false`. |
-| Pregame spectator parity | PARTIAL | C13 | Basic live spectating exists; full pregame spectator behavior does not. |
+| Password-protected table create/join | DONE | C13 | Passwords are transient outbound input only; never logged or persisted. |
+| Variant compatibility matrix | DONE | C13 | Vendored `VARIANT_NAMES` filtered through one capability predicate. |
+| Full supported variants / modifiers UI | DONE | C13 | Supported variants and the five C13 modifiers are available in create/edit. |
+| Timed table settings in create/edit | NOT IMPLEMENTED | C14 | Timed configuration remains unavailable until clock behavior is supported. |
+| Edit table settings / name / max players | DONE | C13 | Authoritative `tableUpdate` lifecycle preserves unexposed options. |
+| Pregame leader transfer | DONE | C13 | Authoritative `tableSetLeader` lifecycle. |
+| Restart to pregame | DONE | C13 | C12 restart lifecycle with `hidePregame:false`. |
+| Pregame spectator parity | DONE | C13 | Pregame spectate, authoritative attendance, and unattend supported. |
 | Card notes | NOT IMPLEMENTED | C14 | Player/spectator/replay notes and authoritative note messages. |
 | Game clocks / timed-game UI | NOT IMPLEMENTED | C14 | Clock state and timer UX. |
 | Pause / unpause / queued pause | NOT IMPLEMENTED | C14 | Server-authoritative pause lifecycle. |

@@ -1,8 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { getGameTableSuits } from './gameplay';
+import { getGameTableSuits, getGameplayClueChoices } from './gameplay';
 
 describe('getGameTableSuits', () => {
+  it('uses upstream clue names for variant and character semantics', () => {
+    expect(getGameplayClueChoices('Odds and Evens (5 Suits)').ranks).toEqual([
+      { value: 1, label: 'Odd' }, { value: 2, label: 'Even' },
+    ]);
+    expect(getGameplayClueChoices('No Variant', 'Quacker').colors[0]?.label).toBe('Quack');
+  });
+
   it('maps authoritative play and discard orders to visible suit labels', () => {
     const game = {
       playStacks: [[0, 1], [], [], [], []],

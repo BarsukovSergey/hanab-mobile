@@ -5,9 +5,11 @@ import {
   Text, TextInput, View,
 } from 'react-native';
 
-import { BASIC_VARIANT_NAMES } from './src/protocol/lobbyProtocol';
+import { SUPPORTED_VARIANT_NAMES } from './src/game/client/supportedVariants';
+import type { MobileTableOptions } from './src/protocol/lobbyProtocol';
 import {
   isJoinEligible,
+  isPregameSpectateEligible,
   isReattendEligible,
   isSpectateEligible,
 } from './src/runtime/LobbyRuntime';
@@ -19,6 +21,11 @@ import { ChatPanel } from './src/ui/ChatPanel';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 
+const defaultMobileOptions: MobileTableOptions = {
+  variantName: 'No Variant', cardCycle: false, emptyClues: false,
+  oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+};
+
 export default function App() {
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
@@ -27,21 +34,43 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [tableName, setTableName] = useState('');
+  const [tablePassword, setTablePassword] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(5);
-  const [variant, setVariant] = useState<(typeof BASIC_VARIANT_NAMES)[number]>('No Variant');
+  const [createOptions, setCreateOptions] = useState<MobileTableOptions>(defaultMobileOptions);
+  const [joinPassword, setJoinPassword] = useState('');
+  const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editMaxPlayers, setEditMaxPlayers] = useState(5);
+  const [editOptions, setEditOptions] = useState<MobileTableOptions>(defaultMobileOptions);
   const session = useAppSelector((state) => state.session);
   const hydrated = useAppSelector(selectLobbyHydrated);
   const tables = useAppSelector(tableSelectors.selectAll);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
   const spectateTables = tables.filter(isSpectateEligible);
-  const joinTables = tables.filter(isJoinEligible);
+  const joinTables = tables.filter((table) => (
+    isJoinEligible(table) || isPregameSpectateEligible(table)
+  ));
   const reattendTables = tables.filter(isReattendEligible);
   const pregameRoom = roomState.room.kind === 'pregame' ? roomState.room : null;
   const attendancePending = roomState.pendingSpectateTableID !== null
     || roomState.pendingRecovery !== null
     || roomState.pendingJoin !== null
     || roomState.pendingCreate !== null;
+
+  useEffect(() => {
+    if (pregameRoom === null) return;
+    setEditName(pregameRoom.data.name);
+    setEditMaxPlayers(pregameRoom.data.maxPlayers);
+    setEditOptions({
+      variantName: pregameRoom.data.options.variantName,
+      cardCycle: pregameRoom.data.options.cardCycle,
+      emptyClues: pregameRoom.data.options.emptyClues,
+      oneExtraCard: pregameRoom.data.options.oneExtraCard,
+      oneLessCard: pregameRoom.data.options.oneLessCard,
+      allOrNothing: pregameRoom.data.options.allOrNothing,
+    });
+  }, [pregameRoom?.data]);
 
   const runProbe = useCallback(async () => {
     setProbe('checking');
@@ -183,23 +212,49 @@ export default function App() {
   } else if (roomState.rematchTransition !== null) {
     content = <Text style={styles.heading}>Starting rematch...</Text>;
   } else if (pregameRoom !== null) {
-    const isOwner = session.authenticatedUser?.userID === pregameRoom.data.owner;
+    const isOwner = pregameRoom.role === 'player'
+      && session.authenticatedUser?.userID === pregameRoom.data.owner;
     content = (
       <View style={styles.section}>
         <Text style={styles.heading}>{pregameRoom.data.name}</Text>
         <Text>{pregameRoom.data.options.variantName}</Text>
+        <Text>{pregameRoom.role === 'spectator' ? 'Spectating pregame' : 'Joined as player'}</Text>
         <Text>{pregameRoom.data.players.length}/{pregameRoom.data.maxPlayers} players</Text>
         {pregameRoom.data.players.map((player) => (
           <Text key={player.index}>
             {player.name}{player.you ? ' (you)' : ''}{player.present ? '' : ' (away)'}
           </Text>
         ))}
-        {isOwner && (
+        {isOwner && (<>
+          <View style={styles.subsection}>
+            <Text style={styles.heading}>Edit table</Text>
+            <TextInput maxLength={45} onChangeText={setEditName} placeholder="Table name"
+              style={styles.input} value={editName} />
+            <Text>Max players: {editMaxPlayers}</Text>
+            <View style={styles.buttonRow}>
+              <Button disabled={editMaxPlayers <= 2} title="−"
+                onPress={() => setEditMaxPlayers((count) => count - 1)} />
+              <Button disabled={editMaxPlayers >= 6} title="+"
+                onPress={() => setEditMaxPlayers((count) => count + 1)} />
+            </View>
+            <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
+            <Button disabled={roomState.pendingUpdate !== null
+                || editName.trim().length === 0}
+              title={roomState.pendingUpdate === null ? 'Apply changes' : 'Applying...'}
+              onPress={() => lobbyRuntime.updateTable(editName, editMaxPlayers, editOptions)} />
+          </View>
+          <Text style={styles.heading}>Transfer leader</Text>
+          {pregameRoom.data.players.filter((player) => !player.you).map((player) => (
+            <Button key={`leader-${player.name}`} disabled={roomState.pendingLeaderName !== null}
+              title={roomState.pendingLeaderName === player.name
+                ? `Transferring to ${player.name}...` : `Make ${player.name} leader`}
+              onPress={() => lobbyRuntime.setTableLeader(player.name)} />
+          ))}
           <Button disabled={pregameRoom.data.players.length < 2
               || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
             title={roomState.pendingStart === null ? 'Start' : 'Starting...'}
             onPress={() => lobbyRuntime.startGame()} />
-        )}
+        </>)}
         <Button disabled={roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
           title={roomState.pendingLeaveTableID === null ? 'Leave' : 'Leaving...'}
           onPress={() => lobbyRuntime.leave(pregameRoom.tableID)} />
@@ -217,6 +272,9 @@ export default function App() {
           <Text style={styles.heading}>Create table</Text>
           <TextInput maxLength={45} onChangeText={setTableName} placeholder="Table name"
             style={styles.input} value={tableName} />
+          <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setTablePassword}
+            placeholder="Table password (optional)" secureTextEntry style={styles.input}
+            value={tablePassword} />
           <Text>Max players: {maxPlayers}</Text>
           <View style={styles.buttonRow}>
             <Button disabled={maxPlayers <= 2} title="−"
@@ -224,14 +282,14 @@ export default function App() {
             <Button disabled={maxPlayers >= 6} title="+"
               onPress={() => setMaxPlayers((count) => count + 1)} />
           </View>
-          <Text>Variant</Text>
-          {BASIC_VARIANT_NAMES.map((name) => (
-            <Button key={name} title={`${variant === name ? '✓ ' : ''}${name}`}
-              onPress={() => setVariant(name)} />
-          ))}
+          <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
           <Button disabled={attendancePending || tableName.trim().length === 0}
             title={roomState.pendingCreate === null ? 'Create' : 'Creating...'}
-            onPress={() => lobbyRuntime.createTable(tableName, maxPlayers, variant)} />
+            onPress={() => {
+              if (lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)) {
+                setTablePassword('');
+              }
+            }} />
         </View>
         <View style={styles.section}>
           <Text style={styles.heading}>Your running game</Text>
@@ -258,14 +316,35 @@ export default function App() {
           ))}
         </View>
         <View style={styles.section}>
-          <Text style={styles.heading}>Joinable tables</Text>
-          {joinTables.length === 0 && <Text>No joinable tables.</Text>}
+          <Text style={styles.heading}>Pregame tables</Text>
+          {joinTables.length === 0 && <Text>No pregame tables.</Text>}
           {joinTables.map((table) => (
             <View style={styles.tableRow} key={table.id}>
               <Text style={styles.tableName}>{table.name}</Text>
               <Text>{table.variant} · {table.numPlayers}/{table.maxPlayers}</Text>
-              <Button disabled={attendancePending} title="Join"
-                onPress={() => lobbyRuntime.join(table.id)} />
+              {table.passwordProtected && (
+                <TextInput autoCapitalize="none" autoCorrect={false}
+                  onChangeText={(value) => {
+                    setJoinPasswordTableID(table.id);
+                    setJoinPassword(value);
+                  }} placeholder="Table password" secureTextEntry style={styles.input}
+                  value={joinPasswordTableID === table.id ? joinPassword : ''} />
+              )}
+              {isJoinEligible(table) && (
+                <Button disabled={attendancePending} title="Join"
+                  onPress={() => {
+                    const tableSecret = joinPasswordTableID === table.id
+                      ? joinPassword : undefined;
+                    if (lobbyRuntime.join(table.id, tableSecret)) {
+                      setJoinPassword('');
+                      setJoinPasswordTableID(null);
+                    }
+                  }} />
+              )}
+              {isPregameSpectateEligible(table) && (
+                <Button disabled={attendancePending} title="Spectate pregame"
+                  onPress={() => lobbyRuntime.spectate(table.id)} />
+              )}
             </View>
           ))}
         </View>
@@ -296,6 +375,43 @@ export default function App() {
   );
 }
 
+function TableOptionsEditor({
+  options,
+  onChange,
+}: {
+  options: MobileTableOptions;
+  onChange: (options: MobileTableOptions) => void;
+}) {
+  const toggle = (key: Exclude<keyof MobileTableOptions, 'variantName'>) => {
+    const value = !options[key];
+    onChange({
+      ...options,
+      [key]: value,
+      ...(key === 'oneExtraCard' && value ? { oneLessCard: false } : {}),
+      ...(key === 'oneLessCard' && value ? { oneExtraCard: false } : {}),
+    });
+  };
+  return (
+    <View style={styles.subsection}>
+      <Text>Variant</Text>
+      {SUPPORTED_VARIANT_NAMES.map((name) => (
+        <Button key={name} title={`${options.variantName === name ? '✓ ' : ''}${name}`}
+          onPress={() => onChange({ ...options, variantName: name })} />
+      ))}
+      {([
+        ['cardCycle', 'Card Cycle'],
+        ['emptyClues', 'Empty Clues'],
+        ['oneExtraCard', 'One Extra Card'],
+        ['oneLessCard', 'One Less Card'],
+        ['allOrNothing', 'All or Nothing'],
+      ] as const).map(([key, label]) => (
+        <Button key={key} title={`${options[key] ? '✓ ' : ''}${label}`}
+          onPress={() => toggle(key)} />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { gap: 16, padding: 20, paddingTop: 56 },
@@ -311,6 +427,7 @@ const styles = StyleSheet.create({
   titleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   title: { fontSize: 28, fontWeight: '700' },
   section: { borderColor: '#999', borderWidth: 1, gap: 10, padding: 14 },
+  subsection: { gap: 8 },
   heading: { fontSize: 19, fontWeight: '600' },
   input: { borderColor: '#777', borderWidth: 1, padding: 10 },
   tableRow: { borderColor: '#bbb', borderWidth: 1, gap: 5, padding: 10 },
