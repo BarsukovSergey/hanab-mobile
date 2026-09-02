@@ -19,14 +19,14 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Lobby + table chat | DONE | — | Server echo/history authoritative; production Go wire compatibility. |
 | Logout | DONE | — | Explicit server logout and signed-out Redux reset. |
 | Autonomous Android release build | DONE | C17 hardening | Release build works without Metro / laptop; distribution hardening remains. |
-| In-game review / rewind | NOT IMPLEMENTED | C12 | Persist action timeline + intermediate replay states while live game continues. |
-| Proper postgame result lifecycle | NOT IMPLEMENTED | C12 | `gameHistory`, end condition, full result metadata/log and finished-state handling. |
-| Full card reveal after game | NOT IMPLEMENTED | C12 | Handle `cardIdentities` and rehydrate scrubbed actions. |
-| Shared replay after game | NOT IMPLEMENTED | C12 | Handle `finishOngoingGame`, shared replay state and replay bootstrap. |
-| Shared replay turn synchronization | NOT IMPLEMENTED | C12 | Leader segment via `replayAction`; follower can break away / follow leader. |
-| Replay participants / leader state | NOT IMPLEMENTED | C12 | Spectators + `replayLeader`; leader transfer may be included when state is added. |
-| Quick rematch | NOT IMPLEMENTED | C12 | `tableRestart {tableID, hidePregame:true}` with full boot/new-table lifecycle. |
-| Shared replay reconnect / recovery | NOT IMPLEMENTED | C12 | Replay-aware `tableStart`, `init`, `gameActionList` bootstrap. |
+| In-game review / rewind | DONE | C12 | Persisted action timeline and intermediate replay states while live game continues; physically verified. |
+| Proper postgame result lifecycle | DONE | C12 | Finished-state handling and result lifecycle physically verified. |
+| Full card reveal after game | DONE | C12 | `cardIdentities` handling and replay knowledge physically verified across historical segments. |
+| Shared replay after game | DONE | C12 | Shared replay state and replay bootstrap physically verified. |
+| Shared replay turn synchronization | DONE | C12 | Leader synchronization, follower breakaway, and Follow Leader physically verified. |
+| Replay participants / leader state | DONE | C12 | Replay participant and leader state physically verified. |
+| Quick rematch | DONE | C12 | Quick Rematch and new-game lifecycle physically verified. |
+| Shared replay reconnect / recovery | DONE | C12 | Lobby return-to-game and kill/relaunch recovery physically verified. |
 | Password-protected table create/join | NOT IMPLEMENTED | C13 | Must preserve secret-handling rules; never log/store table passwords. |
 | Variant compatibility matrix | NOT IMPLEMENTED | C13 | Expose only variants the vendored reducer/selectors/RN UI can correctly support. |
 | Full supported variants / modifiers UI | NOT IMPLEMENTED | C13 | Expand create/edit only after compatibility audit. |

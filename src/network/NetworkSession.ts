@@ -6,6 +6,31 @@ import {
   type SessionCheckResult,
 } from './types';
 
+const HTTP_REQUEST_TIMEOUT_MS = 10_000;
+
+async function boundedFetch(
+  input: RequestInfo | URL,
+  init: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, HTTP_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function encodeForm(fields: Readonly<Record<string, string>>): string {
   return Object.entries(fields)
     .map(
@@ -22,7 +47,7 @@ function transportMessage(error: unknown): string {
 export class HanabNetworkSession implements NetworkSession {
   async checkSession(): Promise<SessionCheckResult> {
     try {
-      const response = await fetch(`${HANAB_HTTP_BASE_URL}/test-cookie`, {
+      const response = await boundedFetch(`${HANAB_HTTP_BASE_URL}/test-cookie`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -52,7 +77,7 @@ export class HanabNetworkSession implements NetworkSession {
   async submitLogin(username: string, password: string): Promise<void> {
     let response: Response;
     try {
-      response = await fetch(`${HANAB_HTTP_BASE_URL}/login`, {
+      response = await boundedFetch(`${HANAB_HTTP_BASE_URL}/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -77,7 +102,7 @@ export class HanabNetworkSession implements NetworkSession {
   async logout(): Promise<void> {
     let response: Response;
     try {
-      response = await fetch(`${HANAB_HTTP_BASE_URL}/logout`, {
+      response = await boundedFetch(`${HANAB_HTTP_BASE_URL}/logout`, {
         method: 'GET',
         credentials: 'include',
       });
