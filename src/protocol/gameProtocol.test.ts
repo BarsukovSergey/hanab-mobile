@@ -13,6 +13,7 @@ import {
   cardIdentitiesSchema,
   finishOngoingGameSchema,
   gameHistorySchema,
+  encodeNoteFrame,
 } from './gameProtocol';
 import { makeInit } from './gameProtocol.fixtures';
 
@@ -36,6 +37,13 @@ describe('pinned game bootstrap protocol', () => {
     expect(encodeRankClueFrame(123, 1, 3)).toBe(
       'action {"tableID":123,"type":3,"target":1,"value":3}',
     );
+  });
+
+  test('encodes an exact bounded note frame', () => {
+    expect(encodeNoteFrame(123, 17, 'r1')).toBe(
+      'note {"tableID":123,"order":17,"note":"r1"}',
+    );
+    expect(() => encodeNoteFrame(123, 17, 'x'.repeat(301))).toThrow();
   });
 
   test('validates the complete init shape and its metadata cardinality', () => {

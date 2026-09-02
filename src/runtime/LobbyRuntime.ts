@@ -19,11 +19,14 @@ import {
   encodeDiscardFrame,
   encodePlayFrame,
   encodeRankClueFrame,
+  encodeNoteFrame,
+  noteCommandSchema,
   type ClientGameplayAction,
 } from '../protocol/gameProtocol';
 import {
   decodeServerFrame,
   encodeChatFrame,
+  encodeInactiveFrame,
   encodeClientFrame,
   encodeReplayActionFrame,
   encodeTableRestartFrame,
@@ -213,6 +216,11 @@ export class LobbyRuntime {
   setAppActive(active: boolean): void {
     if (this.appActive === active) return;
     this.appActive = active;
+    try {
+      this.sendEncoded(encodeInactiveFrame(!active));
+    } catch {
+      // Presence is advisory and is never queued or retried.
+    }
     if (!active) {
       this.cancelRetry();
       return;
@@ -594,6 +602,49 @@ export class LobbyRuntime {
     });
   }
 
+  editNote(cardOrder: number, text: string): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'live_game'
+      || room.clientState.finished
+      || room.sharedReplay
+      || room.clientState.replay.active
+      || !Number.isInteger(cardOrder)
+      || cardOrder < 0
+      || text.length > 300
+      || !this.isReadyCurrentRoom(room.tableID)
+    ) return false;
+
+    const parsed = noteCommandSchema.safeParse({
+      tableID: room.tableID,
+      order: cardOrder,
+      note: text,
+    });
+    if (!parsed.success) return false;
+    const order = parsed.data.order;
+    const hands = room.clientState.ongoingGame.hands;
+    const editable = room.role === 'player'
+      ? hands[room.clientState.metadata.ourPlayerIndex]?.includes(order) ?? false
+      : hands.some((hand) => hand.includes(order));
+    if (!editable) return false;
+
+    let sent = false;
+    try {
+      sent = this.sendEncoded(encodeNoteFrame(room.tableID, order, text));
+    } catch {
+      sent = false;
+    }
+    if (!sent) return false;
+    this.store.dispatch(roomActions.noteActionAccepted({
+      connectionEpoch: state.session.connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      noteAction: { type: 'editNote', order, text },
+    }));
+    return true;
+  }
+
   private async open(owned: OwnedConnection): Promise<void> {
     let socket: NetworkSocket;
     try {
@@ -800,6 +851,66 @@ export class LobbyRuntime {
           epoch,
           tableID: event.data.tableID,
           spectators: event.data.spectators,
+        }));
+        break;
+      case 'noteListPlayer': {
+        const room = this.store.getState().room.room;
+        if (room.kind !== 'live_game') break;
+        this.store.dispatch(roomActions.noteActionAccepted({
+          connectionEpoch: epoch,
+          tableID: event.data.tableID,
+          gameLoadEpoch: room.gameLoadEpoch,
+          noteAction: { type: 'noteListPlayer', texts: event.data.notes },
+        }));
+        break;
+      }
+      case 'noteList': {
+        const room = this.store.getState().room.room;
+        if (room.kind !== 'live_game') break;
+        this.store.dispatch(roomActions.noteActionAccepted({
+          connectionEpoch: epoch,
+          tableID: event.data.tableID,
+          gameLoadEpoch: room.gameLoadEpoch,
+          noteAction: {
+            type: 'noteList',
+            names: event.data.notes.map((notes) => notes.name),
+            noteTextLists: event.data.notes.map((notes) => notes.notes),
+            isSpectators: event.data.notes.map((notes) => notes.isSpectator),
+          },
+        }));
+        break;
+      }
+      case 'note': {
+        const room = this.store.getState().room.room;
+        if (room.kind !== 'live_game') break;
+        this.store.dispatch(roomActions.noteActionAccepted({
+          connectionEpoch: epoch,
+          tableID: event.data.tableID,
+          gameLoadEpoch: room.gameLoadEpoch,
+          noteAction: {
+            type: 'receiveNote',
+            order: event.data.order,
+            notes: event.data.notes,
+          },
+        }));
+        break;
+      }
+      case 'connected': {
+        const room = this.store.getState().room.room;
+        if (room.kind !== 'live_game') break;
+        this.store.dispatch(roomActions.connectedReceived({
+          connectionEpoch: epoch,
+          tableID: event.data.tableID,
+          gameLoadEpoch: room.gameLoadEpoch,
+          list: event.data.list,
+        }));
+        break;
+      }
+      case 'userInactive':
+        this.store.dispatch(lobbyActions.userInactiveReceived({
+          epoch,
+          userID: event.data.userID,
+          inactive: event.data.inactive,
         }));
         break;
       case 'boot':

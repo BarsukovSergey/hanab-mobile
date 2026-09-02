@@ -25,6 +25,11 @@ export function initialState(metadata: GameMetadata): State {
       databaseID: null,
       shared: null,
     },
+    notes: {
+      ourNotes: [],
+      allNotes: [],
+      efficiencyModifier: 0,
+    },
 
     playing: true,
     shadowing: false,

@@ -39,6 +39,19 @@ export const lobbySlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       usersAdapter.removeOne(state.users, action.payload.userID);
     },
+    userInactiveReceived(
+      state,
+      action: PayloadAction<{ epoch: number; userID: number; inactive: boolean }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.users.entities[action.payload.userID] === undefined
+      ) return;
+      usersAdapter.updateOne(state.users, {
+        id: action.payload.userID,
+        changes: { inactive: action.payload.inactive },
+      });
+    },
     tableListReceived(state, action: PayloadAction<{ epoch: number; tables: LobbyTable[] }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       tablesAdapter.upsertMany(state.tables, action.payload.tables);

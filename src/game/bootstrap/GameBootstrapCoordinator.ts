@@ -117,6 +117,7 @@ export function replayAuthoritativeHistory(
     sharedReplayLeader: '',
     paused: false,
     pausePlayerIndex: 0,
+    sharedReplayEffMod: 0,
   });
   clientState = stateReducer(
     clientState,

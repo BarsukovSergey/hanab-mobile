@@ -1,12 +1,15 @@
 import type { CardIdentity } from '../../upstream/interfaces/CardIdentity';
-import type { GameAction } from '../../upstream/types/gameActions';
+import type { GameAction, NoteAction } from '../../upstream/types/gameActions';
 import type { PlayerIndex } from '../../upstream/types/PlayerIndex';
 import type { Spectator } from './Spectator';
+
+export type { NoteAction } from '../../upstream/types/gameActions';
 
 export type Action =
   | ActionInit
   | ActionListReceived
   | GameAction
+  | NoteAction
   | ReplayAction
   | ActionCardIdentities
   | ActionSpectators
@@ -36,6 +39,7 @@ export interface ActionInit {
   readonly sharedReplayLeader: string;
   readonly paused: boolean;
   readonly pausePlayerIndex: PlayerIndex;
+  readonly sharedReplayEffMod: number;
 }
 
 export interface ActionListReceived {

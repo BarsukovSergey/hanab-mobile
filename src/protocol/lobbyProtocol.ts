@@ -7,6 +7,9 @@ import {
   gameHistorySchema,
   gameInitSchema,
   incrementalGameActionSchema,
+  noteListPlayerSchema,
+  noteListSchema,
+  noteSchema,
 } from './gameProtocol';
 import { isVariantNameSupported } from '../game/client/supportedVariants';
 
@@ -227,6 +230,20 @@ export const lobbyUserSchema = z.object({
 
 export type LobbyUser = z.infer<typeof lobbyUserSchema>;
 
+export const connectedSchema = z.object({
+  tableID: idSchema,
+  list: z.array(z.boolean()).readonly(),
+}).strict().readonly();
+
+export const userInactiveSchema = z.object({
+  userID: idSchema,
+  inactive: z.boolean(),
+}).strict().readonly();
+
+export const inactiveCommandSchema = z.object({
+  inactive: z.boolean(),
+}).strict();
+
 export const lobbyTableSchema = z.object({
   id: idSchema,
   name: z.string().min(1),
@@ -269,6 +286,11 @@ const schemas = {
   init: gameInitSchema,
   gameActionList: gameActionListSchema,
   gameAction: incrementalGameActionSchema,
+  noteListPlayer: noteListPlayerSchema,
+  noteList: noteListSchema,
+  note: noteSchema,
+  connected: connectedSchema,
+  userInactive: userInactiveSchema,
   gameHistory: gameHistorySchema,
   cardIdentities: cardIdentitiesSchema,
   finishOngoingGame: finishOngoingGameSchema,
@@ -443,4 +465,8 @@ export function encodeTableStartFrame(
 export function encodeChatFrame(msg: string, room: string): string {
   const payload = chatCommandSchema.parse({ msg, room });
   return encodeClientFrame('chat', payload);
+}
+
+export function encodeInactiveFrame(inactive: boolean): string {
+  return encodeClientFrame('inactive', inactiveCommandSchema.parse({ inactive }));
 }

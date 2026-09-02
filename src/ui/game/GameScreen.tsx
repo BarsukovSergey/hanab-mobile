@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import {
@@ -37,9 +37,11 @@ export function GameScreen() {
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
   const roomState = useAppSelector((state) => state.room);
+  const lobbyUsers = useAppSelector((state) => state.lobby.users.entities);
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
   const [selectedCardOrder, setSelectedCardOrder] = useState<number | null>(null);
   const [selectedClueTarget, setSelectedClueTarget] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState('');
 
   const clientState = liveRoom?.clientState ?? null;
   const displayedGame = clientState?.visibleState ?? null;
@@ -51,20 +53,30 @@ export function GameScreen() {
   const ourHand = ourPlayerIndex === null
     ? []
     : displayedGame?.hands[ourPlayerIndex] ?? [];
+  const editableCardOrders = liveRoom?.role === 'spectator'
+    ? displayedGame?.hands.flatMap((hand) => hand) ?? []
+    : ourHand;
   const clueTargetIndexes = playerLiveRoom?.clientState.metadata.playerNames
     .map((_, playerIndex) => playerIndex)
     .filter((playerIndex) => playerIndex !== ourPlayerIndex) ?? [];
 
   useEffect(() => {
-    if (ourHand.length === 0) {
+    if (editableCardOrders.length === 0) {
       setSelectedCardOrder(null);
     } else if (
       selectedCardOrder === null
-      || !ourHand.some((order) => order === selectedCardOrder)
+      || !editableCardOrders.some((order) => order === selectedCardOrder)
     ) {
-      setSelectedCardOrder(ourHand[0] ?? null);
+      setSelectedCardOrder(editableCardOrders[0] ?? null);
     }
-  }, [ourHand, selectedCardOrder]);
+  }, [editableCardOrders, selectedCardOrder]);
+
+  const authoritativeNote = selectedCardOrder === null
+    ? ''
+    : clientState?.notes.ourNotes[selectedCardOrder]?.text ?? '';
+  useEffect(() => {
+    setNoteText(authoritativeNote);
+  }, [authoritativeNote, selectedCardOrder]);
 
   useEffect(() => {
     if (
@@ -299,6 +311,11 @@ export function GameScreen() {
     metadata.options.variantName,
     displayedGame,
   );
+  const notesEditable = sessionPhase === 'ready'
+    && !replay.active
+    && !clientState.finished
+    && !liveRoom.sharedReplay
+    && selectedCardOrder !== null;
 
   return (
     <View style={styles.screen}>
@@ -364,7 +381,17 @@ export function GameScreen() {
 
       {playerLiveRoom !== null && (
         <>
-          <Text style={styles.subheading}>Your hand</Text>
+          <View style={styles.playerHeadingRow}>
+            <Text style={styles.subheading}>Your hand</Text>
+            <Text style={styles.presenceText}>
+              {getPlayerPresence(
+                liveRoom.connected?.[metadata.ourPlayerIndex],
+                Object.values(lobbyUsers).find(
+                  (user) => user?.name === metadata.playerNames[metadata.ourPlayerIndex],
+                )?.inactive ?? false,
+              )}
+            </Text>
+          </View>
           <Text style={styles.helper}>Tap a card to select it. Its identity stays hidden.</Text>
           <View style={styles.cardList}>
             {ourHand.map((order, position) => {
@@ -440,13 +467,35 @@ export function GameScreen() {
             >
               <View style={styles.playerHeadingRow}>
                 <Text style={styles.playerName}>{metadata.playerNames[playerIndex]}</Text>
+                <Text style={styles.presenceText}>
+                  {getPlayerPresence(
+                    liveRoom.connected?.[playerIndex],
+                    Object.values(lobbyUsers).find(
+                      (user) => user?.name === metadata.playerNames[playerIndex],
+                    )?.inactive ?? false,
+                  )}
+                </Text>
                 {isTarget && <Text style={styles.selectedLabel}>CLUE TARGET</Text>}
               </View>
               <View style={styles.visibleHand}>
                 {displayedGame.hands[playerIndex]?.map((order, position) => {
                   const card = displayedGame.deck[order];
                   return (
-                    <View style={styles.visibleCard} key={order}>
+                    <Pressable
+                      accessibilityRole={liveRoom.role === 'spectator' ? 'button' : undefined}
+                      accessibilityState={liveRoom.role === 'spectator'
+                        ? { selected: selectedCardOrder === order }
+                        : undefined}
+                      disabled={liveRoom.role !== 'spectator' || replay.active}
+                      key={order}
+                      onPress={() => setSelectedCardOrder(order)}
+                      style={[
+                        styles.visibleCard,
+                        selectedCardOrder === order && liveRoom.role === 'spectator'
+                          ? styles.selectedVisibleCard
+                          : undefined,
+                      ]}
+                    >
                       <Text style={styles.visibleCardPosition}>{position + 1}</Text>
                       <Text style={styles.visibleCardIdentity}>
                         {card === undefined
@@ -457,13 +506,49 @@ export function GameScreen() {
                             card.rank,
                           )}
                       </Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
             </Pressable>
           );
         })}
+      </View>
+
+      <View style={styles.noteArea}>
+        <Text style={styles.actionTitle}>Selected card note</Text>
+        <TextInput
+          editable={notesEditable}
+          maxLength={300}
+          onChangeText={setNoteText}
+          placeholder={selectedCardOrder === null ? 'Select a card' : 'Add a note'}
+          style={styles.noteInput}
+          value={noteText}
+        />
+        <View style={styles.buttonRow}>
+          <View style={styles.buttonCell}>
+            <Button
+              disabled={!notesEditable || noteText.length > 300}
+              title="Save"
+              onPress={() => {
+                if (selectedCardOrder !== null) {
+                  lobbyRuntime.editNote(selectedCardOrder, noteText);
+                }
+              }}
+            />
+          </View>
+          <View style={styles.buttonCell}>
+            <Button
+              disabled={!notesEditable}
+              title="Clear"
+              onPress={() => {
+                if (selectedCardOrder !== null && lobbyRuntime.editNote(selectedCardOrder, '')) {
+                  setNoteText('');
+                }
+              }}
+            />
+          </View>
+        </View>
       </View>
 
       {playerLiveRoom !== null && (
@@ -510,8 +595,22 @@ export function GameScreen() {
           </View>
         </View>
       )}
+
+      <View style={styles.gameLog}>
+        <Text style={styles.subheading}>Game log</Text>
+        {displayedGame.log.map((entry, index) => (
+          <Text key={`${entry.turn}-${index}`} style={styles.logEntry}>
+            {entry.text}
+          </Text>
+        ))}
+      </View>
     </View>
   );
+}
+
+function getPlayerPresence(connected: boolean | undefined, inactive: boolean): string {
+  if (connected === false) return 'disconnected';
+  return inactive ? 'away' : 'online';
 }
 
 function ReplayTable({ game, variantName }: { game: GameState; variantName: string }) {
@@ -687,6 +786,7 @@ const styles = StyleSheet.create({
   },
   playerName: { fontWeight: '600' },
   selectedLabel: { color: '#2457a6', fontSize: 11, fontWeight: '700' },
+  presenceText: { color: '#626b73', fontSize: 12 },
   visibleHand: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   visibleCard: {
     alignItems: 'center',
@@ -694,6 +794,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     minWidth: 72,
     padding: 8,
+  },
+  selectedVisibleCard: { borderColor: '#2457a6', borderWidth: 2 },
+  noteArea: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 8, padding: 12 },
+  noteInput: {
+    backgroundColor: '#fff',
+    borderColor: '#c7ccd1',
+    borderRadius: 6,
+    borderWidth: 1,
+    padding: 10,
   },
   visibleCardPosition: { color: '#626b73', fontSize: 11 },
   visibleCardIdentity: { fontWeight: '600' },

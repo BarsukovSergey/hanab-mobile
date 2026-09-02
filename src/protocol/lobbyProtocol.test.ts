@@ -3,6 +3,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   decodeServerFrame,
   encodeChatFrame,
+  encodeInactiveFrame,
   encodeReplayActionFrame,
   encodeTableRestartFrame,
   encodeTableSetLeaderFrame,
@@ -62,6 +63,27 @@ describe('lobby protocol decoder', () => {
       .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
     expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, who: undefined })}`))
       .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
+  });
+
+  test('strictly decodes notes and presence and encodes inactivity', () => {
+    expect(decodeServerFrame('noteListPlayer {"tableID":123,"notes":["r1",""]}'))
+      .toMatchObject({ kind: 'event', event: { command: 'noteListPlayer' } });
+    expect(decodeServerFrame(
+      'noteList {"tableID":123,"notes":[{"name":"Ada","notes":["r1"],"isSpectator":false}]}',
+    )).toMatchObject({ kind: 'event', event: { command: 'noteList' } });
+    expect(decodeServerFrame(
+      'note {"tableID":123,"order":0,"notes":[{"name":"Ada","text":"r1","isSpectator":true}]}',
+    )).toMatchObject({ kind: 'event', event: { command: 'note' } });
+    expect(decodeServerFrame('connected {"tableID":123,"list":[true,false]}'))
+      .toMatchObject({ kind: 'event', event: { command: 'connected' } });
+    expect(decodeServerFrame('userInactive {"userID":7,"inactive":true}'))
+      .toMatchObject({ kind: 'event', event: { command: 'userInactive' } });
+    expect(decodeServerFrame('connected {"tableID":123,"list":[true],"extra":1}'))
+      .toMatchObject({ kind: 'malformed', command: 'connected' });
+    expect(decodeServerFrame('userInactive {"userID":7,"inactive":true,"extra":1}'))
+      .toMatchObject({ kind: 'malformed', command: 'userInactive' });
+    expect(encodeInactiveFrame(true)).toBe('inactive {"inactive":true}');
+    expect(encodeInactiveFrame(false)).toBe('inactive {"inactive":false}');
   });
 
   test('encodes trimmed bounded chat for exact rooms', () => {

@@ -76,6 +76,7 @@ export function toInitAction(init: GameInit): ActionInit {
     sharedReplayLeader: init.sharedReplayLeader,
     paused: init.paused,
     pausePlayerIndex: init.pausePlayerIndex as PlayerIndex,
+    sharedReplayEffMod: init.sharedReplayEffMod,
   };
 }
 

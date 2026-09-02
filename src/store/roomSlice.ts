@@ -17,6 +17,7 @@ import type {
   GameHistoryItem,
   WireGameAction,
 } from '../protocol/gameProtocol';
+import type { NoteAction } from '../game/client/types/actions';
 import { lobbyActions } from './lobbySlice';
 import { sessionActions } from './sessionSlice';
 
@@ -53,6 +54,7 @@ export type RoomState =
       liveActionCount: number;
       clientState: State;
       gameHistory: GameHistoryItem | null;
+      connected: readonly boolean[] | null;
     };
 
 type PendingJoin = {
@@ -830,6 +832,7 @@ export const roomSlice = createSlice({
         liveActionCount: 0,
         clientState: castDraft(clientState),
         gameHistory: null,
+        connected: null,
       };
     },
     liveActionAccepted(
@@ -983,6 +986,44 @@ export const roomSlice = createSlice({
         type: 'spectators',
         spectators: payload.spectators,
       }));
+    },
+    noteActionAccepted(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        noteAction: NoteAction;
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, payload.noteAction));
+    },
+    connectedReceived(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        list: readonly boolean[];
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+        || payload.list.length !== state.room.clientState.metadata.options.numPlayers
+      ) return;
+      state.room.connected = castDraft(payload.list);
     },
     followReplayLeader(
       state,

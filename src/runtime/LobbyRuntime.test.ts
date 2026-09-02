@@ -7,8 +7,10 @@ import type {
 } from '../network/types';
 import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
+import { noteCommandSchema } from '../protocol/gameProtocol';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import { lobbyActions } from '../store/lobbySlice';
+import { roomActions } from '../store/roomSlice';
 import { createAppStore, userSelectors } from '../store/store';
 import {
   isJoinEligible,
@@ -292,6 +294,83 @@ describe('deterministic lobby runtime', () => {
       expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 123, role });
     },
   );
+
+  test.each(['player', 'spectator'] as const)(
+    '%s sends notes once, then applies the local edit outside replay actions',
+    async (role) => {
+      const { runtime, socket, store } = await makeLiveRuntime(role);
+      const roomBefore = store.getState().room.room;
+      if (roomBefore.kind !== 'live_game') throw new Error('Expected live game');
+      const order = role === 'player' ? 0 : 5;
+      const replayCount = roomBefore.clientState.replay.actions.length;
+
+      expect(runtime.editNote(order, 'r1')).toBe(true);
+      expect(socket.sent.at(-1)).toBe(`note {"tableID":123,"order":${order},"note":"r1"}`);
+      const roomAfter = store.getState().room.room;
+      if (roomAfter.kind !== 'live_game') throw new Error('Expected live game');
+      expect(roomAfter.clientState.notes.ourNotes[order]).toMatchObject({
+        text: 'r1', knownTrash: false,
+      });
+      expect(roomAfter.clientState.notes.ourNotes[order]?.possibilities).toEqual([[0, 1]]);
+      expect(roomAfter.clientState.replay.actions).toHaveLength(replayCount);
+      expect(runtime.editNote(order, 'x'.repeat(301))).toBe(false);
+    },
+  );
+
+  test('accepts current note/presence events and ignores wrong table or cardinality', async () => {
+    const { socket, store } = await makeLiveRuntime('spectator');
+    socket.emitMessage('noteListPlayer {"tableID":999,"notes":["wrong"]}');
+    socket.emitMessage('noteListPlayer {"tableID":123,"notes":["r1"]}');
+    socket.emitMessage(
+      'note {"tableID":123,"order":0,"notes":[{"name":"Ada","text":"kt","isSpectator":true}]}',
+    );
+    socket.emitMessage('connected {"tableID":123,"list":[false]}');
+    socket.emitMessage('connected {"tableID":123,"list":[true,false]}');
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.notes.ourNotes[0]).toMatchObject({ text: 'kt', knownTrash: true });
+    expect(room.clientState.notes.allNotes[0]).toEqual([
+      { name: 'Ada', text: 'kt', isSpectator: true },
+    ]);
+    expect(room.connected).toEqual([true, false]);
+
+    store.dispatch(roomActions.noteActionAccepted({
+      connectionEpoch: 1,
+      tableID: 123,
+      gameLoadEpoch: room.gameLoadEpoch + 1,
+      noteAction: {
+        type: 'editNote',
+        order: noteCommandSchema.parse({ tableID: 123, order: 0, note: 'stale' }).order,
+        text: 'stale',
+      },
+    }));
+    store.dispatch(roomActions.connectedReceived({
+      connectionEpoch: 1,
+      tableID: 123,
+      gameLoadEpoch: room.gameLoadEpoch + 1,
+      list: [false, false],
+    }));
+    const afterStale = store.getState().room.room;
+    if (afterStale.kind !== 'live_game') throw new Error('Expected live game');
+    expect(afterStale.clientState.notes.ourNotes[0]?.text).toBe('kt');
+    expect(afterStale.connected).toEqual([true, false]);
+  });
+
+  test('patches inactivity only for known users and sends lifecycle presence once', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    socket.emitMessage(userFrame);
+    socket.emitMessage('userInactive {"userID":1,"inactive":true}');
+    socket.emitMessage('userInactive {"userID":99,"inactive":true}');
+    expect(userSelectors.selectById(store.getState(), 1)?.inactive).toBe(true);
+    expect(userSelectors.selectById(store.getState(), 99)).toBeUndefined();
+
+    runtime.setAppActive(false);
+    runtime.setAppActive(true);
+    expect(socket.sent.slice(-2)).toEqual([
+      'inactive {"inactive":true}',
+      'inactive {"inactive":false}',
+    ]);
+  });
 
   test('unattend rejects a wrong table and a non-READY live game', async () => {
     const { runtime, socket, store } = await makeLiveRuntime('player');

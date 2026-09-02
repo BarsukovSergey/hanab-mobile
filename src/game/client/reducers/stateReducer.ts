@@ -11,6 +11,7 @@ import type { GameAction } from '../../upstream/types/gameActions';
 import type { State } from '../types/State';
 import type { Action } from '../types/actions';
 import { replayReducer } from './replayReducer';
+import { notesReducer } from './notesReducer';
 import { shouldStoreSegment } from './stateReducerHelpers';
 
 export const stateReducer = produce(stateReducerFunction, {} as State);
@@ -122,6 +123,10 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
     case 'init': {
       state.datetimeStarted = action.datetimeStarted;
       state.datetimeFinished = action.datetimeFinished;
+      state.notes = castDraft(notesReducer(state.notes, {
+        type: 'setEffMod',
+        mod: action.sharedReplayEffMod,
+      }, state.metadata));
 
       if (action.spectating) {
         state.playing = false;
@@ -152,6 +157,15 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
       break;
     }
 
+    case 'editNote':
+    case 'noteListPlayer':
+    case 'noteList':
+    case 'receiveNote':
+    case 'setEffMod': {
+      state.notes = castDraft(notesReducer(state.notes, action, state.metadata));
+      break;
+    }
+
     case 'replayEnter':
     case 'replayExit':
     case 'replaySegment':
@@ -179,6 +193,7 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
           state.finished,
           false,
           state.metadata,
+          state.notes.ourNotes.length === 0 ? undefined : state.notes.ourNotes,
         ),
       );
 

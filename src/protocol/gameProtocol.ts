@@ -21,6 +21,44 @@ export const getGameInfo1CommandSchema = tableIDCommandSchema;
 export const getGameInfo2CommandSchema = tableIDCommandSchema;
 export const loadedCommandSchema = tableIDCommandSchema;
 
+export const noteCommandSchema = z.object({
+  tableID: idSchema,
+  order: cardOrder,
+  note: z.string().max(300),
+}).strict();
+
+export type NoteCommand = z.infer<typeof noteCommandSchema>;
+
+const spectatorNoteSchema = z.object({
+  name: z.string().min(1),
+  text: z.string(),
+  isSpectator: z.boolean(),
+}).strict().readonly();
+
+export const noteListPlayerSchema = z.object({
+  tableID: idSchema,
+  notes: z.array(z.string()).readonly(),
+}).strict().readonly();
+
+export const noteListSchema = z.object({
+  tableID: idSchema,
+  notes: z.array(z.object({
+    name: z.string().min(1),
+    notes: z.array(z.string()).readonly(),
+    isSpectator: z.boolean(),
+  }).strict().readonly()).readonly(),
+}).strict().readonly();
+
+export const noteSchema = z.object({
+  tableID: idSchema,
+  order: cardOrder,
+  notes: z.array(spectatorNoteSchema).readonly(),
+}).strict().readonly();
+
+export type NoteListPlayer = z.infer<typeof noteListPlayerSchema>;
+export type NoteList = z.infer<typeof noteListSchema>;
+export type Note = z.infer<typeof noteSchema>;
+
 export const playGameplayActionSchema = z.object({
   tableID: idSchema,
   type: z.literal(0),
@@ -303,6 +341,10 @@ export function encodeGetGameInfo2Frame(tableID: number): string {
 
 export function encodeLoadedFrame(tableID: number): string {
   return encodeTableCommand('loaded', tableID);
+}
+
+export function encodeNoteFrame(tableID: number, order: number, note: string): string {
+  return `note ${JSON.stringify(noteCommandSchema.parse({ tableID, order, note }))}`;
 }
 
 function encodeGameplayAction(action: unknown): string {
