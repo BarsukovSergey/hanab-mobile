@@ -1,93 +1,163 @@
-import {
-  BLANK_NOTES,
-  CHOP_MOVED_NOTES,
-  CLUED_NOTES,
-  DISCARD_PERMISSION_NOTES,
-  EXCLAMATION_MARK_NOTES,
-  FINESSED_NOTES,
-  KNOWN_TRASH_NOTES,
-  NEEDS_FIX_NOTES,
-  QUESTION_MARK_NOTES,
-  UNCLUED_NOTES,
-} from '../../upstream/abbreviations';
-import { START_CARD_RANK } from '../../upstream/constants';
-import type { CardNote } from '../../upstream/interfaces/CardNote';
+import { eRange, newArray } from 'complete-common';
+
+import { ALL_RESERVED_NOTES } from '../../upstream/abbreviations';
 import type { Variant } from '../../upstream/interfaces/Variant';
 import type { Rank } from '../../upstream/types/Rank';
 import type { SuitIndex } from '../../upstream/types/SuitIndex';
 import type { SuitRankTuple } from '../../upstream/types/SuitRankTuple';
+import { START_CARD_RANK } from '../../upstream/constants';
 
-function includesNote(notes: readonly string[], text: string): boolean {
-  return notes.includes(text);
+interface CardIdentities {
+  readonly suitIndices: SuitIndex[];
+  readonly ranks: Rank[];
 }
 
-function rankTokens(rank: Rank): readonly string[] {
-  return rank === START_CARD_RANK ? ['0', 's', 'start'] : [String(rank)];
+function parseSuit(variant: Variant, suitText: string): SuitIndex | null {
+  const abbreviationIndex = variant.suitAbbreviations.findIndex(
+    (abbreviation) => abbreviation.toLowerCase() === suitText,
+  );
+  if (abbreviationIndex !== -1) return abbreviationIndex as SuitIndex;
+  const nameIndex = variant.suits.findIndex(
+    (suit) => suit.displayName.toLowerCase() === suitText,
+  );
+  return nameIndex === -1 ? null : nameIndex as SuitIndex;
 }
 
-function identityPossibilities(text: string, variant: Variant): readonly SuitRankTuple[] {
-  if (!new RegExp(variant.identityNotePattern, 'i').test(text)) return [];
+function parseRank(rankText: string): Rank | null {
+  switch (rankText) {
+    case '0':
+    case 's':
+    case 'S': return START_CARD_RANK;
+    case '1': return 1;
+    case '2': return 2;
+    case '3': return 3;
+    case '4': return 4;
+    case '5': return 5;
+    default: return null;
+  }
+}
 
-  const suits = variant.suits.map((suit, index) => ({
-    index: index as SuitIndex,
-    tokens: [variant.suitAbbreviations[index]?.toLowerCase(), suit.displayName.toLowerCase()]
-      .filter((token): token is string => token !== undefined),
-  }));
-  const ranks = variant.ranks.map((rank) => ({ rank, tokens: rankTokens(rank) }));
-
-  for (const suit of suits) {
-    for (const suitToken of suit.tokens) {
-      if (text === suitToken) return variant.ranks.map((rank) => [suit.index, rank]);
-      for (const rank of ranks) {
-        if (rank.tokens.some((rankToken) => (
-          text === `${suitToken}${rankToken}`
-          || text === `${suitToken} ${rankToken}`
-          || text === `${rankToken}${suitToken}`
-          || text === `${rankToken} ${suitToken}`
-        ))) return [[suit.index, rank.rank]];
+function parseIdentities(variant: Variant, keyword: string): CardIdentities {
+  const identityMatch = new RegExp(variant.identityNotePattern).exec(keyword);
+  let suitIndex: SuitIndex | null = null;
+  let rank: Rank | null = null;
+  if (identityMatch !== null) {
+    const squishText = extractSquishText(identityMatch);
+    const suitIndices: SuitIndex[] = [];
+    const ranks: Rank[] = [];
+    if (squishText !== undefined) {
+      for (const letter of squishText) {
+        suitIndex = parseSuit(variant, letter);
+        rank = parseRank(letter);
+        if (suitIndex !== null) suitIndices.push(suitIndex);
+        else if (rank !== null) ranks.push(rank);
       }
+      if (suitIndices.length + ranks.length > 0) return { suitIndices, ranks };
     }
+    const suitText = extractSuitText(identityMatch);
+    if (suitText !== undefined) suitIndex = parseSuit(variant, suitText);
+    const rankText = extractRankText(identityMatch);
+    if (rankText !== undefined) rank = parseRank(rankText);
   }
-  for (const rank of ranks) {
-    if (rank.tokens.includes(text)) {
-      return suits.map((suit) => [suit.index, rank.rank]);
-    }
-  }
-
-  // The remaining identity-pattern match is the compact form (for example, "ry12").
-  const suitIndexes = suits.filter((suit) => suit.tokens.some((token) => (
-    token.length === 1 && text.includes(token)
-  ))).map((suit) => suit.index);
-  const matchingRanks = ranks.filter((rank) => rank.tokens.some((token) => (
-    token.length === 1 && text.includes(token)
-  ))).map((rank) => rank.rank);
-  const possibleSuits = suitIndexes.length === 0
-    ? suits.map((suit) => suit.index)
-    : suitIndexes;
-  const possibleRanks = matchingRanks.length === 0 ? variant.ranks : matchingRanks;
-
-  return possibleSuits.flatMap((suitIndex) => (
-    possibleRanks.map((rank) => [suitIndex, rank] as const)
-  ));
-}
-
-/** Pure note classification retained from the pinned client note boundary. */
-export function noteIdentity(text: string, variant: Variant): CardNote {
-  const normalized = text.toLowerCase();
   return {
-    possibilities: identityPossibilities(normalized, variant),
-    knownTrash: includesNote(KNOWN_TRASH_NOTES, normalized),
-    needsFix: includesNote(NEEDS_FIX_NOTES, normalized),
-    questionMark: includesNote(QUESTION_MARK_NOTES, normalized),
-    exclamationMark: includesNote(EXCLAMATION_MARK_NOTES, normalized),
-    chopMoved: includesNote(CHOP_MOVED_NOTES, normalized),
-    finessed: includesNote(FINESSED_NOTES, normalized),
-    discardPermission: includesNote(DISCARD_PERMISSION_NOTES, normalized),
-    blank: includesNote(BLANK_NOTES, normalized),
-    unclued: includesNote(UNCLUED_NOTES, normalized),
-    clued: includesNote(CLUED_NOTES, normalized),
-    text,
+    suitIndices: suitIndex === null ? [] : [suitIndex],
+    ranks: rank === null ? [] : [rank],
   };
 }
 
-export const getNoteIdentity = noteIdentity;
+function identityMapToArray(
+  variant: Variant,
+  identityMap: ReadonlyArray<readonly boolean[]>,
+): readonly SuitRankTuple[] {
+  const possibilities: SuitRankTuple[] = [];
+  for (const rank of variant.ranks) {
+    const suitArray = identityMap[rank];
+    if (suitArray === undefined) continue;
+    for (const [index, possible] of suitArray.entries()) {
+      if (possible) possibilities.push([index as SuitIndex, rank]);
+    }
+  }
+  return possibilities;
+}
+
+function getPossibilitiesFromKeyword(
+  variant: Variant,
+  keyword: string,
+): readonly SuitRankTuple[] {
+  const { positiveCardIdentities, negativeCardIdentities } =
+    getCardIdentitiesFromKeyword(variant, keyword);
+  const identityMap: boolean[][] = [];
+  const positiveRanks = new Set(
+    positiveCardIdentities.length > 0 ? [] : variant.ranks,
+  );
+  for (const rank of variant.ranks) {
+    identityMap[rank] = newArray(
+      variant.suits.length,
+      positiveRanks.has(rank),
+    ) as boolean[];
+  }
+  for (const identities of [positiveCardIdentities, negativeCardIdentities]) {
+    const isPositive = identities === positiveCardIdentities;
+    for (const cardIdentities of identities) {
+      const ranks = cardIdentities.ranks.length > 0
+        ? cardIdentities.ranks
+        : variant.ranks;
+      const suitIndices = cardIdentities.suitIndices.length > 0
+        ? cardIdentities.suitIndices
+        : [...eRange(variant.suits.length)];
+      for (const rank of ranks) {
+        for (const suitIndex of suitIndices) {
+          const rankMap = identityMap[rank];
+          if (rankMap !== undefined) rankMap[suitIndex] = isPositive;
+        }
+      }
+    }
+  }
+  return identityMapToArray(variant, identityMap);
+}
+
+function getCardIdentitiesFromKeyword(variant: Variant, keyword: string) {
+  const positiveCardIdentities: CardIdentities[] = [];
+  const negativeCardIdentities: CardIdentities[] = [];
+  for (const rawSegment of keyword.split(',')) {
+    const segment = rawSegment.trim();
+    const isNegative = segment.startsWith('!');
+    const identityText = isNegative ? segment.slice(1).trim() : segment;
+    const identities = parseIdentities(variant, identityText);
+    (isNegative ? negativeCardIdentities : positiveCardIdentities).push(identities);
+  }
+  return { positiveCardIdentities, negativeCardIdentities };
+}
+
+export function getPossibilitiesFromKeywords(
+  variant: Variant,
+  keywords: readonly string[],
+): readonly SuitRankTuple[] {
+  let possibilities: readonly SuitRankTuple[] = [];
+  for (const keyword of keywords.length > 0 ? keywords : ['']) {
+    if (keyword === '!') continue;
+    const next = getPossibilitiesFromKeyword(variant, keyword);
+    const intersection = next.filter(([nextSuit, nextRank]) => (
+      possibilities.some(([oldSuit, oldRank]) => (
+        nextSuit === oldSuit && nextRank === oldRank
+      ))
+    ));
+    possibilities = intersection.length === 0 ? next : intersection;
+  }
+  return possibilities;
+}
+
+function extractSuitText(match: RegExpMatchArray): string | undefined {
+  return match[1] ?? match[4] ?? match[5] ?? undefined;
+}
+
+function extractRankText(match: RegExpMatchArray): string | undefined {
+  return match[2] ?? match[3] ?? match[6] ?? undefined;
+}
+
+function extractSquishText(match: RegExpMatchArray): string | undefined {
+  const text = match[7]?.trim();
+  return text !== undefined && !ALL_RESERVED_NOTES.has(text.toLowerCase())
+    ? text
+    : undefined;
+}

@@ -328,7 +328,7 @@ describe('deterministic lobby runtime', () => {
     socket.emitMessage('connected {"tableID":123,"list":[true,false]}');
     const room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected live game');
-    expect(room.clientState.notes.ourNotes[0]).toMatchObject({ text: 'kt', knownTrash: true });
+    expect(room.clientState.notes.ourNotes[0]).toMatchObject({ text: 'r1', knownTrash: false });
     expect(room.clientState.notes.allNotes[0]).toEqual([
       { name: 'Ada', text: 'kt', isSpectator: true },
     ]);
@@ -352,7 +352,7 @@ describe('deterministic lobby runtime', () => {
     }));
     const afterStale = store.getState().room.room;
     if (afterStale.kind !== 'live_game') throw new Error('Expected live game');
-    expect(afterStale.clientState.notes.ourNotes[0]?.text).toBe('kt');
+    expect(afterStale.clientState.notes.ourNotes[0]?.text).toBe('r1');
     expect(afterStale.connected).toEqual([true, false]);
   });
 

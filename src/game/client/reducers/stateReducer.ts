@@ -123,10 +123,10 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
     case 'init': {
       state.datetimeStarted = action.datetimeStarted;
       state.datetimeFinished = action.datetimeFinished;
-      state.notes = castDraft(notesReducer(state.notes, {
+      state.notes = castDraft(notesReducer(original(state.notes), {
         type: 'setEffMod',
         mod: action.sharedReplayEffMod,
-      }, state.metadata));
+      }, state.metadata, state.playing, state.finished));
 
       if (action.spectating) {
         state.playing = false;
@@ -157,12 +157,40 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
       break;
     }
 
-    case 'editNote':
-    case 'noteListPlayer':
     case 'noteList':
-    case 'receiveNote':
-    case 'setEffMod': {
-      state.notes = castDraft(notesReducer(state.notes, action, state.metadata));
+    case 'receiveNote': {
+      state.notes = castDraft(notesReducer(
+        original(state.notes),
+        action,
+        state.metadata,
+        state.playing,
+        state.finished,
+      ));
+      break;
+    }
+
+    case 'setEffMod':
+    case 'editNote':
+    case 'noteListPlayer': {
+      state.notes = castDraft(notesReducer(
+        original(state.notes),
+        action,
+        state.metadata,
+        state.playing,
+        state.finished,
+      ));
+      if (state.playing && !state.finished) {
+        state.ongoingGame = castDraft(gameReducer(
+          original(state.ongoingGame),
+          action,
+          state.playing,
+          state.shadowing,
+          state.finished,
+          false,
+          state.metadata,
+          state.notes.ourNotes,
+        ));
+      }
       break;
     }
 

@@ -53,7 +53,7 @@ export function GameScreen() {
   const ourHand = ourPlayerIndex === null
     ? []
     : displayedGame?.hands[ourPlayerIndex] ?? [];
-  const editableCardOrders = liveRoom?.role === 'spectator'
+  const selectableCardOrders = clientState?.finished || liveRoom?.role === 'spectator'
     ? displayedGame?.hands.flatMap((hand) => hand) ?? []
     : ourHand;
   const clueTargetIndexes = playerLiveRoom?.clientState.metadata.playerNames
@@ -61,19 +61,24 @@ export function GameScreen() {
     .filter((playerIndex) => playerIndex !== ourPlayerIndex) ?? [];
 
   useEffect(() => {
-    if (editableCardOrders.length === 0) {
+    if (selectableCardOrders.length === 0) {
       setSelectedCardOrder(null);
     } else if (
       selectedCardOrder === null
-      || !editableCardOrders.some((order) => order === selectedCardOrder)
+      || !selectableCardOrders.some((order) => order === selectedCardOrder)
     ) {
-      setSelectedCardOrder(editableCardOrders[0] ?? null);
+      setSelectedCardOrder(selectableCardOrders[0] ?? null);
     }
-  }, [editableCardOrders, selectedCardOrder]);
+  }, [selectableCardOrders, selectedCardOrder]);
 
   const authoritativeNote = selectedCardOrder === null
     ? ''
     : clientState?.notes.ourNotes[selectedCardOrder]?.text ?? '';
+  const selectedCombinedNotes = selectedCardOrder === null
+    ? []
+    : clientState?.notes.allNotes[selectedCardOrder]?.filter(
+      (note) => note.text.trim().length > 0,
+    ) ?? [];
   useEffect(() => {
     setNoteText(authoritativeNote);
   }, [authoritativeNote, selectedCardOrder]);
@@ -268,6 +273,7 @@ export function GameScreen() {
           playerNames={metadata.playerNames}
           variantName={metadata.options.variantName}
         />
+        <ReadOnlyCardNotes notes={clientState.notes.allNotes} />
 
         <View style={styles.gameLog}>
           <Text style={styles.subheading}>Full game log</Text>
@@ -525,6 +531,16 @@ export function GameScreen() {
           style={styles.noteInput}
           value={noteText}
         />
+        {liveRoom.role === 'spectator' && selectedCombinedNotes.length > 0 && (
+          <View style={styles.combinedNotes}>
+            <Text style={styles.controlLabel}>Combined notes</Text>
+            {selectedCombinedNotes.map((note, index) => (
+              <Text key={`${note.name}-${index}`} style={styles.helper}>
+                {note.name}: {note.text}
+              </Text>
+            ))}
+          </View>
+        )}
         <View style={styles.buttonRow}>
           <View style={styles.buttonCell}>
             <Button
@@ -611,6 +627,33 @@ export function GameScreen() {
 function getPlayerPresence(connected: boolean | undefined, inactive: boolean): string {
   if (connected === false) return 'disconnected';
   return inactive ? 'away' : 'online';
+}
+
+function ReadOnlyCardNotes({
+  notes,
+}: {
+  notes: ReadonlyArray<readonly { name: string; text: string; isSpectator: boolean }[]>;
+}) {
+  const entries = notes.flatMap((cardNotes, order) => {
+    const nonEmpty = cardNotes.filter((note) => note.text.trim().length > 0);
+    return nonEmpty.length === 0 ? [] : [{ order, notes: nonEmpty }];
+  });
+  if (entries.length === 0) return null;
+  return (
+    <View style={styles.noteArea}>
+      <Text style={styles.subheading}>Card notes</Text>
+      {entries.map((entry) => (
+        <View key={entry.order} style={styles.combinedNotes}>
+          <Text style={styles.controlLabel}>Card order {entry.order}</Text>
+          {entry.notes.map((note, index) => (
+            <Text key={`${note.name}-${index}`} style={styles.helper}>
+              {note.name}: {note.text}
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function ReplayTable({ game, variantName }: { game: GameState; variantName: string }) {
@@ -804,6 +847,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 10,
   },
+  combinedNotes: { gap: 3 },
   visibleCardPosition: { color: '#626b73', fontSize: 11 },
   visibleCardIdentity: { fontWeight: '600' },
   controlLabel: { fontWeight: '600', marginTop: 2 },
