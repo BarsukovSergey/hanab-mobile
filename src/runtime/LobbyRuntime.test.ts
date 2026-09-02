@@ -559,7 +559,11 @@ describe('deterministic lobby runtime', () => {
     expect(isJoinEligible({ ...joinableTable, joined: true })).toBe(false);
     expect(isJoinEligible({ ...joinableTable, passwordProtected: true })).toBe(true);
     expect(isJoinEligible({ ...joinableTable, numPlayers: 5 })).toBe(false);
-    for (const unsupported of ['timed', 'speedrun', 'deckPlays', 'detrimentalCharacters'] as const) {
+    expect(isJoinEligible({
+      ...joinableTable,
+      options: { ...tableOptions, timed: true, timeBase: 120, timePerTurn: 20 },
+    })).toBe(true);
+    for (const unsupported of ['speedrun', 'deckPlays', 'detrimentalCharacters'] as const) {
       expect(isJoinEligible({
         ...joinableTable,
         options: { ...tableOptions, [unsupported]: true },
@@ -574,8 +578,9 @@ describe('deterministic lobby runtime', () => {
     expect(isReattendEligible({ ...ownRunningTable, joined: false })).toBe(false);
     expect(isReattendEligible({ ...ownRunningTable, sharedReplay: true })).toBe(false);
     expect(isReattendEligible({
-      ...ownRunningTable, options: { ...tableOptions, timed: true },
-    })).toBe(false);
+      ...ownRunningTable,
+      options: { ...tableOptions, timed: true, timeBase: 120, timePerTurn: 20 },
+    })).toBe(true);
   });
 
   test('unsupported pregame recovery unattends, clears recovery, and warns', async () => {
@@ -599,18 +604,19 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().lobby.notice).toMatchObject({ kind: 'warning' });
   });
 
-  test('unsupported bootstrap init unattends and never exposes live state', async () => {
+  test('timed bootstrap init is supported', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     addRunningTable(store);
     expect(runtime.spectate(123)).toBe(true);
     socket.emitMessage('tableStart {"tableID":123,"replay":false}');
     socket.emitMessage(`init ${JSON.stringify(makeInit({
       spectating: true,
-      options: { ...makeInit().options, timed: true },
+      options: { ...makeInit().options, timed: true, timeBase: 120, timePerTurn: 20 },
     }))}`);
-    expect(socket.sent.at(-1)).toBe('tableUnattend {"tableID":123}');
-    expect(store.getState().room.room).toEqual({ kind: 'none' });
-    expect(store.getState().lobby.notice).toMatchObject({ kind: 'warning' });
+    expect(socket.sent.at(-1)).toBe('getGameInfo2 {"tableID":123}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', bootstrap: { phase: 'waiting_history' },
+    });
   });
 
   test('runtime enforces the adjusted Clue Starved clue threshold', async () => {
@@ -1532,7 +1538,8 @@ describe('deterministic lobby runtime', () => {
     socket.emitMessage('joined {"tableID":321}');
 
     expect(runtime.updateTable('Changed', 4, {
-      variantName: '6 Suits', cardCycle: true, emptyClues: true,
+      variantName: '6 Suits', timed: true, timeBase: 90, timePerTurn: 15,
+      cardCycle: true, emptyClues: true,
       oneExtraCard: true, oneLessCard: false, allOrNothing: true,
     })).toBe(true);
     expect(store.getState().room.room).toMatchObject({
@@ -2083,10 +2090,10 @@ describe('deterministic lobby runtime', () => {
 
     expect(store.getState().session.inboundDiagnostics).toEqual([
       { command: 'welcome', classification: 'known' },
-      { command: 'clock', classification: 'unknown' },
+      { command: 'clock', classification: 'malformed' },
       { command: 'gameAction', classification: 'malformed' },
     ]);
-    expect(store.getState().session.protocolIssueCount).toBe(1);
+    expect(store.getState().session.protocolIssueCount).toBe(2);
     expect(store.getState().session.gameActionFramesSeen).toBe(1);
     expect(store.getState().session.gameActionDiagnostics).toEqual([]);
 

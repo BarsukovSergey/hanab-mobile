@@ -16,6 +16,7 @@ type MessageListener = (event: WebSocketMessageEvent) => void;
 class FakeSocket implements NetworkSocket {
   readyState = 0;
   readonly sent: string[] = [];
+  failSend = false;
   private readonly openListeners = new Set<() => void>();
   private readonly messageListeners = new Set<MessageListener>();
   private readonly errorListeners = new Set<() => void>();
@@ -43,7 +44,10 @@ class FakeSocket implements NetworkSocket {
     if (type === 'close') this.closeListeners.delete(listener);
   }
 
-  send(data: string): void { this.sent.push(data); }
+  send(data: string): void {
+    if (this.failSend) throw new Error('send failed');
+    this.sent.push(data);
+  }
   close(): void { this.readyState = 3; }
   emitOpen(): void {
     this.readyState = 1;
@@ -116,7 +120,10 @@ function initialHistory(currentPlayerIndex = 0) {
   };
 }
 
-async function makeLive(role: 'player' | 'spectator' = 'player') {
+async function makeLive(
+  role: 'player' | 'spectator' = 'player',
+  options: { timed?: boolean; currentPlayerIndex?: number } = {},
+) {
   const session = new FakeSession();
   const socket = new FakeSocket();
   session.sockets.push(socket);
@@ -127,15 +134,27 @@ async function makeLive(role: 'player' | 'spectator' = 'player') {
   socket.emitMessage(welcomeFrame);
   store.dispatch(lobbyActions.tableReceived({
     epoch: 1,
-    table: role === 'player'
-      ? playerTable
-      : { ...playerTable, numPlayers: 2, running: true },
+    table: {
+      ...(role === 'player'
+        ? playerTable
+        : { ...playerTable, numPlayers: 2, running: true }),
+      options: options.timed
+        ? { ...playerTable.options, timed: true, timeBase: 120, timePerTurn: 20 }
+        : playerTable.options,
+    },
   }));
   if (role === 'player') expect(runtime.join(123)).toBe(true);
   else expect(runtime.spectate(123)).toBe(true);
   socket.emitMessage('tableStart {"tableID":123,"replay":false}');
-  socket.emitMessage(`init ${JSON.stringify(makeInit({ spectating: role === 'spectator' }))}`);
-  socket.emitMessage(`gameActionList ${JSON.stringify(initialHistory())}`);
+  socket.emitMessage(`init ${JSON.stringify(makeInit({
+    spectating: role === 'spectator',
+    options: options.timed
+      ? { ...makeInit().options, timed: true, timeBase: 120, timePerTurn: 20 }
+      : makeInit().options,
+  }))}`);
+  socket.emitMessage(`gameActionList ${JSON.stringify(initialHistory(
+    options.currentPlayerIndex ?? 0,
+  ))}`);
   expect(store.getState().room.room).toMatchObject({ kind: 'live_game', role });
   return { session, socket, store, runtime };
 }
@@ -307,5 +326,119 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(store.getState().room.pendingGameplayAction).toBeNull();
     expect(store.getState().room.room).toEqual({ kind: 'none' });
     expect(second.sent).toEqual([]);
+  });
+
+  test('authoritative clocks freeze exactly on pause, ignore paused frames, and clear on unpause', async () => {
+    jest.setSystemTime(1_000);
+    const { runtime, socket, store } = await makeLive('player', { timed: true });
+    socket.emitMessage(
+      'clock {"tableID":123,"times":[10000,20000],"activePlayerIndex":0,"timeTaken":7000}',
+    );
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clock).toEqual({
+      times: [10_000, 20_000], activePlayerIndex: 0, timeTaken: 7_000, receivedAtMs: 1_000,
+    });
+    store.dispatch(roomActions.clockReceived({
+      connectionEpoch: 2, tableID: 123, gameLoadEpoch: room.gameLoadEpoch,
+      clock: { tableID: 123, times: [1, 2], activePlayerIndex: 0, timeTaken: 0 },
+      receivedAtMs: 2_000,
+    }));
+    store.dispatch(roomActions.pauseReceived({
+      connectionEpoch: 1, tableID: 123, gameLoadEpoch: room.gameLoadEpoch + 1,
+      pause: { tableID: 123, active: true, playerIndex: 0 }, receivedAtMs: 2_000,
+    }));
+    expect(store.getState().room.room).toBe(room);
+
+    socket.emitMessage(
+      'clock {"tableID":999,"times":[1,2],"activePlayerIndex":0,"timeTaken":0}',
+    );
+    socket.emitMessage(
+      'clock {"tableID":123,"times":[1],"activePlayerIndex":0,"timeTaken":0}',
+    );
+    socket.emitMessage(
+      'clock {"tableID":123,"times":[1,2],"activePlayerIndex":2,"timeTaken":0}',
+    );
+    expect(store.getState().room.room).toBe(room);
+
+    jest.setSystemTime(2_500);
+    socket.emitMessage('pause {"tableID":123,"active":true,"playerIndex":0}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause).toEqual({ active: true, playerIndex: 0, queued: false });
+    expect(room.clock).toEqual({
+      times: [8_500, 20_000], activePlayerIndex: 0, timeTaken: 7_000, receivedAtMs: 2_500,
+    });
+    const pausedRoom = room;
+    socket.emitMessage(
+      'clock {"tableID":123,"times":[9000,19000],"activePlayerIndex":1,"timeTaken":1}',
+    );
+    expect(store.getState().room.room).toBe(pausedRoom);
+    expect(runtime.play(0)).toBe(false);
+
+    socket.emitMessage('pause {"tableID":123,"active":false,"playerIndex":-1}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause).toEqual({ active: false, playerIndex: 0, queued: false });
+    expect(room.clock).toBeNull();
+  });
+
+  test('accepted turn clears the old clock', async () => {
+    const { socket, store } = await makeLive('player', { timed: true });
+    socket.emitMessage(
+      'clock {"tableID":123,"times":[10000,20000],"activePlayerIndex":0,"timeTaken":0}',
+    );
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}',
+    );
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clock).toBeNull();
+  });
+
+  test('pause commands select exact settings and queue state changes only after send succeeds', async () => {
+    const ownTurn = await makeLive('player', { timed: true });
+    const ownBefore = ownTurn.store.getState().room.room;
+    expect(ownTurn.runtime.pauseGame()).toBe(true);
+    expect(ownTurn.socket.sent.at(-1)).toBe(
+      'pause {"tableID":123,"setting":"pause"}',
+    );
+    expect(ownTurn.store.getState().room.room).toBe(ownBefore);
+    ownTurn.socket.emitMessage('pause {"tableID":123,"active":true,"playerIndex":0}');
+    expect(ownTurn.runtime.pauseGame()).toBe(true);
+    expect(ownTurn.socket.sent.at(-1)).toBe(
+      'pause {"tableID":123,"setting":"unpause"}',
+    );
+    const stillPaused = ownTurn.store.getState().room.room;
+    if (stillPaused.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(stillPaused.clientState.pause.active).toBe(true);
+
+    const waiting = await makeLive('player', { timed: true, currentPlayerIndex: 1 });
+    waiting.socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"clue","clue":{"type":0,"value":0},"giver":0,"list":[5],"target":1,"turn":0}}',
+    );
+    waiting.socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}',
+    );
+    waiting.socket.failSend = true;
+    expect(waiting.runtime.pauseGame()).toBe(false);
+    let room = waiting.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause.queued).toBe(false);
+    waiting.socket.failSend = false;
+    expect(waiting.runtime.pauseGame()).toBe(true);
+    expect(waiting.socket.sent.at(-1)).toBe(
+      'pause {"tableID":123,"setting":"pause-queue"}',
+    );
+    room = waiting.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause.queued).toBe(true);
+    expect(waiting.runtime.pauseGame()).toBe(true);
+    expect(waiting.socket.sent.at(-1)).toBe(
+      'pause {"tableID":123,"setting":"pause-unqueue"}',
+    );
+    room = waiting.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause.queued).toBe(false);
   });
 });

@@ -75,7 +75,7 @@ export function toInitAction(init: GameInit): ActionInit {
     sharedReplaySegment: init.sharedReplaySegment,
     sharedReplayLeader: init.sharedReplayLeader,
     paused: init.paused,
-    pausePlayerIndex: init.pausePlayerIndex as PlayerIndex,
+    pausePlayerIndex: (init.paused ? init.pausePlayerIndex : 0) as PlayerIndex,
     sharedReplayEffMod: init.sharedReplayEffMod,
   };
 }
@@ -110,5 +110,8 @@ export function toFinishOngoingGameAction(
 }
 
 export function initializeHeadlessState(metadata: GameMetadata, init: GameInit): State {
-  return stateReducer(initialState(metadata), toInitAction(init));
+  const initialized = stateReducer(initialState(metadata), toInitAction(init));
+  return init.pauseQueued
+    ? stateReducer(initialized, { type: 'pauseQueue', queued: true })
+    : initialized;
 }

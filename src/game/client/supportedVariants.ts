@@ -32,7 +32,6 @@ export type CompatibilityOptions = {
 
 export function areTableOptionsSupported(options: CompatibilityOptions): boolean {
   return isVariantNameSupported(options.variantName)
-    && !options.timed
     && !options.speedrun
     && !options.deckPlays
     && !options.detrimentalCharacters;

@@ -7,6 +7,8 @@ export type { NoteAction } from '../../upstream/types/gameActions';
 
 export type Action =
   | ActionInit
+  | ActionPause
+  | ActionPauseQueue
   | ActionListReceived
   | GameAction
   | NoteAction
@@ -45,6 +47,17 @@ export interface ActionInit {
 export interface ActionListReceived {
   readonly type: 'gameActionList';
   readonly actions: readonly GameAction[];
+}
+
+export interface ActionPause {
+  readonly type: 'pause';
+  readonly active: boolean;
+  readonly playerIndex: PlayerIndex;
+}
+
+export interface ActionPauseQueue {
+  readonly type: 'pauseQueue';
+  readonly queued: boolean;
 }
 
 export interface ActionCardIdentities {

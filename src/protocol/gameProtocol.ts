@@ -21,6 +21,27 @@ export const getGameInfo1CommandSchema = tableIDCommandSchema;
 export const getGameInfo2CommandSchema = tableIDCommandSchema;
 export const loadedCommandSchema = tableIDCommandSchema;
 
+export const pauseSchema = z.object({
+  tableID: idSchema,
+  active: z.boolean(),
+  playerIndex: z.number().int(),
+}).strict();
+export type Pause = z.infer<typeof pauseSchema>;
+
+export const clockSchema = z.object({
+  tableID: idSchema,
+  times: z.array(z.number().int()).readonly(),
+  activePlayerIndex: z.number().int(),
+  timeTaken: z.number().int(),
+}).strict().readonly();
+export type Clock = z.infer<typeof clockSchema>;
+
+export const pauseCommandSchema = z.object({
+  tableID: idSchema,
+  setting: z.enum(['pause', 'unpause', 'pause-queue', 'pause-unqueue']),
+}).strict();
+export type PauseSetting = z.infer<typeof pauseCommandSchema>['setting'];
+
 export const noteCommandSchema = z.object({
   tableID: idSchema,
   order: cardOrder,
@@ -173,6 +194,12 @@ export const gameInitSchema = z.object({
   }
   if (data.ourPlayerIndex >= count) {
     context.addIssue({ code: 'custom', message: 'ourPlayerIndex must name an active seat' });
+  }
+  if (data.paused && (data.pausePlayerIndex < 0 || data.pausePlayerIndex >= count)) {
+    context.addIssue({ code: 'custom', message: 'paused game must name an active pause seat' });
+  }
+  if (!data.paused && data.pausePlayerIndex !== -1 && data.pausePlayerIndex >= count) {
+    context.addIssue({ code: 'custom', message: 'unpaused pausePlayerIndex must be sentinel or seat' });
   }
 });
 
@@ -345,6 +372,10 @@ export function encodeLoadedFrame(tableID: number): string {
 
 export function encodeNoteFrame(tableID: number, order: number, note: string): string {
   return `note ${JSON.stringify(noteCommandSchema.parse({ tableID, order, note }))}`;
+}
+
+export function encodePauseFrame(tableID: number, setting: PauseSetting): string {
+  return `pause ${JSON.stringify(pauseCommandSchema.parse({ tableID, setting }))}`;
 }
 
 function encodeGameplayAction(action: unknown): string {

@@ -10,6 +10,8 @@ import {
   noteListPlayerSchema,
   noteListSchema,
   noteSchema,
+  pauseSchema,
+  clockSchema,
 } from './gameProtocol';
 import { isVariantNameSupported } from '../game/client/supportedVariants';
 
@@ -66,21 +68,48 @@ export const tableOptionsSchema = z.object({
 export type TableOptions = z.infer<typeof tableOptionsSchema>;
 
 export type MobileTableOptions = Pick<TableOptions,
-  'variantName' | 'cardCycle' | 'emptyClues' | 'oneExtraCard' | 'oneLessCard' | 'allOrNothing'>;
+  'variantName' | 'timed' | 'timeBase' | 'timePerTurn'
+  | 'cardCycle' | 'emptyClues' | 'oneExtraCard' | 'oneLessCard' | 'allOrNothing'>;
+
+function timedValuesAreValid(options: Pick<TableOptions,
+  'timed' | 'timeBase' | 'timePerTurn'>): boolean {
+  return options.timed
+    ? Number.isInteger(options.timeBase)
+      && options.timeBase >= 1
+      && options.timeBase <= 604_800
+      && Number.isInteger(options.timePerTurn)
+      && options.timePerTurn >= 1
+      && options.timePerTurn <= 86_400
+    : options.timeBase === 0 && options.timePerTurn === 0;
+}
 
 const mobileTableOptionsSchema = z.object({
   variantName: supportedVariantNameSchema,
+  timed: z.boolean(),
+  timeBase: z.number().int(),
+  timePerTurn: z.number().int(),
   cardCycle: z.boolean(),
   emptyClues: z.boolean(),
   oneExtraCard: z.boolean(),
   oneLessCard: z.boolean(),
   allOrNothing: z.boolean(),
-}).refine((options) => !(options.oneExtraCard && options.oneLessCard));
+}).superRefine((options, context) => {
+  if (options.oneExtraCard && options.oneLessCard) {
+    context.addIssue({ code: 'custom', message: 'extra and less card are mutually exclusive' });
+  }
+  if (options.timed) {
+    if (options.timeBase < 1 || options.timeBase > 604_800) {
+      context.addIssue({ code: 'custom', message: 'timeBase must be 1..604800 when timed' });
+    }
+    if (options.timePerTurn < 1 || options.timePerTurn > 86_400) {
+      context.addIssue({ code: 'custom', message: 'timePerTurn must be 1..86400 when timed' });
+    }
+  } else if (options.timeBase !== 0 || options.timePerTurn !== 0) {
+    context.addIssue({ code: 'custom', message: 'untimed values must be zero' });
+  }
+});
 
 const unavailableTableOptions = {
-  timed: false,
-  timeBase: 0,
-  timePerTurn: 0,
   speedrun: false,
   deckPlays: false,
   detrimentalCharacters: false,
@@ -92,7 +121,8 @@ export const tableCreateCommandSchema = z.object({
   password: z.string(),
   maxPlayers: z.number().int().min(2).max(6),
 }).refine(({ options }) => isVariantNameSupported(options.variantName)
-  && !(options.oneExtraCard && options.oneLessCard));
+  && !(options.oneExtraCard && options.oneLessCard)
+  && timedValuesAreValid(options));
 
 export type TableCreateCommand = z.infer<typeof tableCreateCommandSchema>;
 
@@ -141,7 +171,8 @@ export const tableUpdateCommandSchema = z.object({
   options: tableOptionsSchema,
   maxPlayers: z.number().int().min(2).max(6),
 }).refine(({ options }) => isVariantNameSupported(options.variantName)
-  && !(options.oneExtraCard && options.oneLessCard));
+  && !(options.oneExtraCard && options.oneLessCard)
+  && timedValuesAreValid(options));
 
 export const tableSetLeaderCommandSchema = z.object({
   tableID: idSchema,
@@ -289,6 +320,8 @@ const schemas = {
   noteListPlayer: noteListPlayerSchema,
   noteList: noteListSchema,
   note: noteSchema,
+  pause: pauseSchema,
+  clock: clockSchema,
   connected: connectedSchema,
   userInactive: userInactiveSchema,
   gameHistory: gameHistorySchema,
@@ -414,6 +447,9 @@ export function encodeTableCreateFrame(
 ): string {
   const exposed = mobileTableOptionsSchema.parse(typeof options === 'string' ? {
     variantName: options,
+    timed: false,
+    timeBase: 0,
+    timePerTurn: 0,
     cardCycle: false,
     emptyClues: false,
     oneExtraCard: false,
@@ -423,8 +459,18 @@ export function encodeTableCreateFrame(
   const payload = tableCreateCommandSchema.parse({
     name,
     options: {
-      ...unavailableTableOptions,
-      ...exposed,
+      variantName: exposed.variantName,
+      timed: exposed.timed,
+      timeBase: exposed.timeBase,
+      timePerTurn: exposed.timePerTurn,
+      speedrun: unavailableTableOptions.speedrun,
+      cardCycle: exposed.cardCycle,
+      deckPlays: unavailableTableOptions.deckPlays,
+      emptyClues: exposed.emptyClues,
+      oneExtraCard: exposed.oneExtraCard,
+      oneLessCard: exposed.oneLessCard,
+      allOrNothing: exposed.allOrNothing,
+      detrimentalCharacters: unavailableTableOptions.detrimentalCharacters,
     },
     password,
     maxPlayers,

@@ -4,18 +4,20 @@ import type { GameState } from '../../upstream/interfaces/GameState';
 import type { ReplayState } from './ReplayState';
 import type { NotesState } from './NotesState';
 import type { Spectator } from './Spectator';
+import type { PauseState } from './PauseState';
 
 /**
  * Platform-independent subset of the pinned upstream client State.
  *
- * Browser-only drag UI, premove, pause, and spectator presentation fields are deliberately
- * outside the mobile headless boundary. C14-A retains the platform-independent notes state.
+ * Browser-only drag UI, premove, and spectator presentation fields are deliberately outside the
+ * mobile headless boundary. C14 retains platform-independent notes and pause state.
  */
 export interface State {
   readonly visibleState: GameState | null; // Null during initialization
   readonly ongoingGame: GameState; // In a replay, this is the state of the final turn
   readonly replay: ReplayState;
   readonly notes: NotesState;
+  readonly pause: PauseState;
 
   // Equal to true if we are playing in an ongoing game. Equal to false is we are spectating an
   // ongoing game, in a dedicated solo replay, or in a shared replay.

@@ -27,7 +27,7 @@ describe('pinned upstream headless client state', () => {
 
     const coordinator = new GameBootstrapCoordinator(store, () => true);
     coordinator.startFromAuthoritativeRoom(1);
-    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
+    coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({ pauseQueued: true })));
     coordinator.receiveHistory(1, 1, gameActionListSchema.parse({
       tableID: 123,
       list: [
@@ -64,6 +64,14 @@ describe('pinned upstream headless client state', () => {
       ignoreNegative: false,
     });
     expect(room.clientState.visibleState).toBe(room.clientState.ongoingGame);
+    expect(room.clientState.pause).toEqual({ active: false, playerIndex: 0, queued: true });
+    const paused = stateReducer(room.clientState, {
+      type: 'pause', active: true, playerIndex: 1,
+    });
+    expect(paused.pause).toEqual({ active: true, playerIndex: 1, queued: false });
+    expect(stateReducer(paused, {
+      type: 'pauseQueue', queued: true,
+    }).pause.queued).toBe(true);
   });
 
   test('no parallel replay timeline or duplicated room game fields remain', () => {

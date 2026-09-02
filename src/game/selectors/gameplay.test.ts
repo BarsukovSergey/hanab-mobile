@@ -5,9 +5,19 @@ import {
   getGameTableSuits,
   getGameplayClueChoices,
   hasClueTokenForVariant,
+  getDisplayedClockTime,
 } from './gameplay';
 
 describe('getGameTableSuits', () => {
+  it('counts down only the active clock and ignores timeTaken', () => {
+    const clock = {
+      times: [12_000, 9_000], activePlayerIndex: 0, timeTaken: 8_000, receivedAtMs: 1_000,
+    };
+    expect(getDisplayedClockTime(clock, 0, false, 4_500)).toBe(8_500);
+    expect(getDisplayedClockTime(clock, 1, false, 4_500)).toBe(9_000);
+    expect(getDisplayedClockTime(clock, 0, true, 99_000)).toBe(12_000);
+    expect(getDisplayedClockTime(clock, 0, false, 0)).toBe(12_000);
+  });
   it('uses upstream clue names for variant and character semantics', () => {
     expect(getGameplayClueChoices('Odds and Evens (5 Suits)').ranks).toEqual([
       { value: 1, label: 'Odd' }, { value: 2, label: 'Even' },

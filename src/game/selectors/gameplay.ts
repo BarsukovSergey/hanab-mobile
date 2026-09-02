@@ -8,6 +8,36 @@ import {
   getAdjustedClueTokens,
   getUnadjustedClueTokens,
 } from '../upstream/rules/clueTokens';
+import { millisecondsToClockString } from '../upstream/rules/text';
+
+export type LiveClock = {
+  readonly times: readonly number[];
+  readonly activePlayerIndex: number;
+  readonly timeTaken: number;
+  readonly receivedAtMs: number;
+};
+
+export function getDisplayedClockTime(
+  clock: LiveClock,
+  playerIndex: number,
+  paused: boolean,
+  nowMs: number,
+): number | null {
+  const serverTime = clock.times[playerIndex];
+  if (serverTime === undefined) return null;
+  if (paused || playerIndex !== clock.activePlayerIndex) return serverTime;
+  return Math.max(0, serverTime - Math.max(0, nowMs - clock.receivedAtMs));
+}
+
+export function getDisplayedClockString(
+  clock: LiveClock,
+  playerIndex: number,
+  paused: boolean,
+  nowMs: number,
+): string | null {
+  const time = getDisplayedClockTime(clock, playerIndex, paused, nowMs);
+  return time === null ? null : millisecondsToClockString(time);
+}
 
 export type GameplayClueChoice = {
   value: number;

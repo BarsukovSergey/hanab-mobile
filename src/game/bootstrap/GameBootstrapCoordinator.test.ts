@@ -59,6 +59,31 @@ function initialHistory() {
 }
 
 describe('authoritative game bootstrap coordinator', () => {
+  test('stages only the latest matching pause after init and normalizes unpause sentinel', () => {
+    const store = readyStore('player');
+    const coordinator = new GameBootstrapCoordinator(store, () => true);
+    expect(coordinator.startFromAuthoritativeRoom(1)).toBe(1);
+    expect(coordinator.receivePause(1, {
+      tableID: 123, active: true, playerIndex: 0,
+    }, 1_000)).toBe(false);
+    expect(coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({
+      paused: true, pausePlayerIndex: 1,
+    })))).toBe(true);
+    expect(coordinator.receivePause(1, {
+      tableID: 999, active: true, playerIndex: 0,
+    }, 2_000)).toBe(false);
+    expect(coordinator.receivePause(1, {
+      tableID: 123, active: true, playerIndex: 0,
+    }, 3_000)).toBe(true);
+    expect(coordinator.receivePause(1, {
+      tableID: 123, active: false, playerIndex: -1,
+    }, 4_000)).toBe(true);
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.pause).toEqual({ active: false, playerIndex: 1, queued: false });
+  });
+
   test('shared replay bootstraps through spectator semantics without loaded', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));

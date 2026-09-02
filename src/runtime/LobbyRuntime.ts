@@ -20,6 +20,7 @@ import {
   encodePlayFrame,
   encodeRankClueFrame,
   encodeNoteFrame,
+  encodePauseFrame,
   noteCommandSchema,
   type ClientGameplayAction,
 } from '../protocol/gameProtocol';
@@ -107,6 +108,7 @@ export class LobbyRuntime {
     },
     private readonly welcomeTimeoutMs = DEFAULT_WELCOME_TIMEOUT_MS,
     private readonly retryDelaysMs: readonly number[] = DEFAULT_RETRY_DELAYS_MS,
+    private readonly nowMs: () => number = Date.now,
   ) {
     this.connectionEpoch = store.getState().session.connectionEpoch;
     this.gameBootstrap = new GameBootstrapCoordinator(
@@ -348,6 +350,9 @@ export class LobbyRuntime {
     const trimmedName = name.trim();
     const exposed = typeof options === 'string' ? {
       variantName: options,
+      timed: false,
+      timeBase: 0,
+      timePerTurn: 0,
       cardCycle: false,
       emptyClues: false,
       oneExtraCard: false,
@@ -602,6 +607,47 @@ export class LobbyRuntime {
     });
   }
 
+  pauseGame(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'live_game'
+      || room.role !== 'player'
+      || room.sharedReplay
+      || room.clientState.finished
+      || room.clientState.replay.active
+      || room.clientState.ongoingGame.turn.currentPlayerIndex === null
+      || !room.clientState.metadata.options.timed
+      || !this.isReadyCurrentRoom(room.tableID)
+    ) return false;
+    const pause = room.clientState.pause;
+    const ownTurn = room.clientState.ongoingGame.turn.currentPlayerIndex
+      === room.clientState.metadata.ourPlayerIndex;
+    const setting = pause.active
+      ? 'unpause'
+      : ownTurn
+        ? 'pause'
+        : pause.queued
+          ? 'pause-unqueue'
+          : 'pause-queue';
+    let sent = false;
+    try {
+      sent = this.sendEncoded(encodePauseFrame(room.tableID, setting));
+    } catch {
+      sent = false;
+    }
+    if (!sent) return false;
+    if (setting === 'pause-queue' || setting === 'pause-unqueue') {
+      this.store.dispatch(roomActions.pauseQueueChanged({
+        connectionEpoch: state.session.connectionEpoch,
+        tableID: room.tableID,
+        gameLoadEpoch: room.gameLoadEpoch,
+        queued: setting === 'pause-queue',
+      }));
+    }
+    return true;
+  }
+
   editNote(cardOrder: number, text: string): boolean {
     const state = this.store.getState();
     const room = state.room.room;
@@ -823,6 +869,12 @@ export class LobbyRuntime {
         }
         break;
       }
+      case 'pause':
+        this.gameBootstrap.receivePause(epoch, event.data, this.nowMs());
+        break;
+      case 'clock':
+        this.gameBootstrap.receiveClock(epoch, event.data, this.nowMs());
+        break;
       case 'gameHistory':
         this.gameBootstrap.receiveGameHistory(epoch, event.data);
         break;
@@ -1085,6 +1137,7 @@ export class LobbyRuntime {
       || room.kind !== 'live_game'
       || room.role !== 'player'
       || room.clientState.replay.active
+      || room.clientState.pause.active
       || room.clientState.ongoingGame.turn.currentPlayerIndex
         !== room.clientState.metadata.ourPlayerIndex
       || state.room.pendingGameplayAction !== null

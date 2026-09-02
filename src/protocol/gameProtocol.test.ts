@@ -14,6 +14,7 @@ import {
   finishOngoingGameSchema,
   gameHistorySchema,
   encodeNoteFrame,
+  encodePauseFrame,
 } from './gameProtocol';
 import { makeInit } from './gameProtocol.fixtures';
 
@@ -22,6 +23,37 @@ describe('pinned game bootstrap protocol', () => {
     expect(encodeGetGameInfo1Frame(123)).toBe('getGameInfo1 {"tableID":123}');
     expect(encodeGetGameInfo2Frame(123)).toBe('getGameInfo2 {"tableID":123}');
     expect(encodeLoadedFrame(123)).toBe('loaded {"tableID":123}');
+  });
+
+  test('strictly decodes clock and pause and encodes exact pause settings', () => {
+    expect(decodeServerFrame(
+      'clock {"tableID":123,"times":[120000,90000],"activePlayerIndex":1,"timeTaken":456}',
+    )).toMatchObject({ kind: 'event', event: { command: 'clock' } });
+    expect(decodeServerFrame(
+      'pause {"tableID":123,"active":true,"playerIndex":1}',
+    )).toMatchObject({ kind: 'event', event: { command: 'pause' } });
+    expect(decodeServerFrame(
+      'clock {"tableID":123,"times":[1.5],"activePlayerIndex":0,"timeTaken":0}',
+    )).toMatchObject({ kind: 'malformed', command: 'clock' });
+    expect(decodeServerFrame(
+      'pause {"tableID":123,"active":false,"playerIndex":-1,"extra":true}',
+    )).toMatchObject({ kind: 'malformed', command: 'pause' });
+    for (const setting of ['pause', 'unpause', 'pause-queue', 'pause-unqueue'] as const) {
+      expect(encodePauseFrame(123, setting)).toBe(
+        `pause {"tableID":123,"setting":"${setting}"}`,
+      );
+    }
+  });
+
+  test('validates paused seats and accepts the unpaused server sentinel', () => {
+    expect(gameInitSchema.safeParse(makeInit({ paused: true, pausePlayerIndex: 1 })).success)
+      .toBe(true);
+    expect(gameInitSchema.safeParse(makeInit({ paused: true, pausePlayerIndex: -1 })).success)
+      .toBe(false);
+    expect(gameInitSchema.safeParse(makeInit({ paused: true, pausePlayerIndex: 2 })).success)
+      .toBe(false);
+    expect(gameInitSchema.safeParse(makeInit({ paused: false, pausePlayerIndex: -1 })).success)
+      .toBe(true);
   });
 
   test('encodes exact typed Play, Discard, Color Clue, and Rank Clue action frames', () => {

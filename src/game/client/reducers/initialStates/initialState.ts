@@ -30,6 +30,7 @@ export function initialState(metadata: GameMetadata): State {
       allNotes: [],
       efficiencyModifier: 0,
     },
+    pause: { active: false, playerIndex: 0, queued: false },
 
     playing: true,
     shadowing: false,

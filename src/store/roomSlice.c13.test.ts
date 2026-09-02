@@ -39,6 +39,7 @@ function sharedReplayState(): RoomSliceState {
       liveActionCount: 0,
       gameHistory: null,
       connected: null,
+      clock: null,
       clientState: {
         metadata: {
           playerNames: ['Ada', 'Bob'],

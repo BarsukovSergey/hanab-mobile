@@ -16,6 +16,8 @@ import type {
   ClientGameplayAction,
   GameHistoryItem,
   WireGameAction,
+  Pause,
+  Clock,
 } from '../protocol/gameProtocol';
 import type { NoteAction } from '../game/client/types/actions';
 import { lobbyActions } from './lobbySlice';
@@ -55,6 +57,12 @@ export type RoomState =
       clientState: State;
       gameHistory: GameHistoryItem | null;
       connected: readonly boolean[] | null;
+      clock: {
+        times: readonly number[];
+        activePlayerIndex: number;
+        timeTaken: number;
+        receivedAtMs: number;
+      } | null;
     };
 
 type PendingJoin = {
@@ -833,6 +841,7 @@ export const roomSlice = createSlice({
         clientState: castDraft(clientState),
         gameHistory: null,
         connected: null,
+        clock: null,
       };
     },
     liveActionAccepted(
@@ -859,6 +868,7 @@ export const roomSlice = createSlice({
       ) return;
       state.room.clientState = castDraft(clientState);
       state.room.liveActionCount += 1;
+      if (acceptedAction.type === 'turn') state.room.clock = null;
       if (
         acceptedAction.type === 'turn'
         && state.pendingGameplayAction?.connectionEpoch === connectionEpoch
@@ -1024,6 +1034,98 @@ export const roomSlice = createSlice({
         || payload.list.length !== state.room.clientState.metadata.options.numPlayers
       ) return;
       state.room.connected = castDraft(payload.list);
+    },
+    clockReceived(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        clock: Clock;
+        receivedAtMs: number;
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+        || state.room.clientState.pause.active
+        || !state.room.clientState.metadata.options.timed
+        || payload.clock.times.length !== state.room.clientState.metadata.options.numPlayers
+        || payload.clock.activePlayerIndex < 0
+        || payload.clock.activePlayerIndex
+          >= state.room.clientState.metadata.options.numPlayers
+      ) return;
+      state.room.clock = castDraft({
+        times: payload.clock.times,
+        activePlayerIndex: payload.clock.activePlayerIndex,
+        timeTaken: payload.clock.timeTaken,
+        receivedAtMs: payload.receivedAtMs,
+      });
+    },
+    pauseReceived(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        pause: Pause;
+        receivedAtMs: number;
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      const numPlayers = current.metadata.options.numPlayers;
+      if (payload.pause.active
+        ? payload.pause.playerIndex < 0 || payload.pause.playerIndex >= numPlayers
+        : payload.pause.playerIndex !== -1) return;
+      const playerIndex = (payload.pause.active
+        ? payload.pause.playerIndex
+        : current.pause.playerIndex) as State['pause']['playerIndex'];
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'pause', active: payload.pause.active, playerIndex,
+      }));
+      if (payload.pause.active) {
+        const clock = state.room.clock;
+        if (clock !== null) {
+          const elapsed = Math.max(0, payload.receivedAtMs - clock.receivedAtMs);
+          const times = [...clock.times];
+          const old = times[clock.activePlayerIndex];
+          if (old !== undefined) times[clock.activePlayerIndex] = Math.max(0, old - elapsed);
+          state.room.clock = castDraft({ ...clock, times, receivedAtMs: payload.receivedAtMs });
+        }
+      } else {
+        state.room.clock = null;
+      }
+    },
+    pauseQueueChanged(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        queued: boolean;
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'pauseQueue', queued: payload.queued,
+      }));
     },
     followReplayLeader(
       state,

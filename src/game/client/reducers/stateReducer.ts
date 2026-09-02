@@ -123,6 +123,8 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
     case 'init': {
       state.datetimeStarted = action.datetimeStarted;
       state.datetimeFinished = action.datetimeFinished;
+      state.pause.active = action.paused;
+      state.pause.playerIndex = action.pausePlayerIndex;
       state.notes = castDraft(notesReducer(original(state.notes), {
         type: 'setEffMod',
         mod: action.sharedReplayEffMod,
@@ -154,6 +156,18 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
         }
       }
 
+      break;
+    }
+
+    case 'pause': {
+      state.pause.active = action.active;
+      state.pause.playerIndex = action.playerIndex;
+      if (action.active) state.pause.queued = false;
+      break;
+    }
+
+    case 'pauseQueue': {
+      state.pause.queued = action.queued;
       break;
     }
 

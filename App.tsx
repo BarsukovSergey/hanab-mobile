@@ -18,11 +18,16 @@ import { useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated, tableSelectors } from './src/store/store';
 import { GameScreen } from './src/ui/game/GameScreen';
 import { ChatPanel } from './src/ui/ChatPanel';
+import {
+  toggleMobileTableBooleanOption,
+  type BooleanMobileTableOption,
+} from './src/ui/tableOptions';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 
 const defaultMobileOptions: MobileTableOptions = {
-  variantName: 'No Variant', cardCycle: false, emptyClues: false,
+  variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+  cardCycle: false, emptyClues: false,
   oneExtraCard: false, oneLessCard: false, allOrNothing: false,
 };
 
@@ -64,6 +69,9 @@ export default function App() {
     setEditMaxPlayers(pregameRoom.data.maxPlayers);
     setEditOptions({
       variantName: pregameRoom.data.options.variantName,
+      timed: pregameRoom.data.options.timed,
+      timeBase: pregameRoom.data.options.timeBase,
+      timePerTurn: pregameRoom.data.options.timePerTurn,
       cardCycle: pregameRoom.data.options.cardCycle,
       emptyClues: pregameRoom.data.options.emptyClues,
       oneExtraCard: pregameRoom.data.options.oneExtraCard,
@@ -389,14 +397,8 @@ function TableOptionsEditor({
   const matchingVariants = SUPPORTED_VARIANT_NAMES.filter((name) => (
     name.toLocaleLowerCase().includes(variantSearch.trim().toLocaleLowerCase())
   )).slice(0, 20);
-  const toggle = (key: Exclude<keyof MobileTableOptions, 'variantName'>) => {
-    const value = !options[key];
-    onChange({
-      ...options,
-      [key]: value,
-      ...(key === 'oneExtraCard' && value ? { oneLessCard: false } : {}),
-      ...(key === 'oneLessCard' && value ? { oneExtraCard: false } : {}),
-    });
+  const toggle = (key: BooleanMobileTableOption) => {
+    onChange(toggleMobileTableBooleanOption(options, key));
   };
   return (
     <View style={styles.subsection}>
@@ -412,6 +414,7 @@ function TableOptionsEditor({
           onPress={() => onChange({ ...options, variantName: name })} />
       ))}
       {([
+        ['timed', 'Timed'],
         ['cardCycle', 'Card Cycle'],
         ['emptyClues', 'Empty Clues'],
         ['oneExtraCard', 'One Extra Card'],
@@ -421,6 +424,18 @@ function TableOptionsEditor({
         <Button key={key} title={`${options[key] ? '✓ ' : ''}${label}`}
           onPress={() => toggle(key)} />
       ))}
+      {options.timed && (
+        <>
+          <Text>Base Time (seconds)</Text>
+          <TextInput keyboardType="number-pad" onChangeText={(value) => onChange({
+            ...options, timeBase: Number(value),
+          })} style={styles.input} value={String(options.timeBase)} />
+          <Text>Per Turn (seconds)</Text>
+          <TextInput keyboardType="number-pad" onChangeText={(value) => onChange({
+            ...options, timePerTurn: Number(value),
+          })} style={styles.input} value={String(options.timePerTurn)} />
+        </>
+      )}
     </View>
   );
 }

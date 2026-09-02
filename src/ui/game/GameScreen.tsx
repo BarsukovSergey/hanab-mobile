@@ -4,6 +4,7 @@ import { Button, Pressable, StyleSheet, Text, TextInput, View } from 'react-nati
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import {
   getDisplayedClueTokens,
+  getDisplayedClockString,
   getGameTableSuits,
   getGameplayClueChoicesForPlayer,
   getVisibleCardIdentityLabel,
@@ -42,6 +43,7 @@ export function GameScreen() {
   const [selectedCardOrder, setSelectedCardOrder] = useState<number | null>(null);
   const [selectedClueTarget, setSelectedClueTarget] = useState<number | null>(null);
   const [noteText, setNoteText] = useState('');
+  const [clockNowMs, setClockNowMs] = useState(Date.now());
 
   const clientState = liveRoom?.clientState ?? null;
   const displayedGame = clientState?.visibleState ?? null;
@@ -91,6 +93,17 @@ export function GameScreen() {
       setSelectedClueTarget(clueTargetIndexes[0] ?? null);
     }
   }, [clueTargetIndexes, selectedClueTarget]);
+
+  const timedOngoing = clientState?.metadata.options.timed === true
+    && !clientState.finished
+    && clientState.ongoingGame.turn.currentPlayerIndex !== null
+    && !liveRoom?.sharedReplay;
+  useEffect(() => {
+    if (!timedOngoing || clientState?.pause.active || liveRoom?.clock === null) return undefined;
+    setClockNowMs(Date.now());
+    const timer = setInterval(() => setClockNowMs(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [timedOngoing, clientState?.pause.active, liveRoom?.clock?.receivedAtMs]);
 
   if (liveRoom === null) return null;
 
@@ -292,6 +305,7 @@ export function GameScreen() {
   const gameplayControlsEnabled = sessionPhase === 'ready'
     && isOurTurn
     && !replay.active
+    && !clientState.pause.active
     && roomState.pendingGameplayAction === null;
   const clueChoices = playerLiveRoom === null
     ? null
@@ -322,6 +336,18 @@ export function GameScreen() {
     && !clientState.finished
     && !liveRoom.sharedReplay
     && selectedCardOrder !== null;
+  const pauseLabel = clientState.pause.active
+    ? 'Unpause'
+    : isOurTurn
+      ? 'Pause'
+      : clientState.pause.queued
+        ? 'Cancel queued pause'
+        : 'Queue pause';
+  const clockText = (playerIndex: number) => liveRoom.clock === null
+    ? null
+    : getDisplayedClockString(
+      liveRoom.clock, playerIndex, clientState.pause.active, clockNowMs,
+    );
 
   return (
     <View style={styles.screen}>
@@ -351,6 +377,13 @@ export function GameScreen() {
         <Stat label="Strikes" value={displayedGame.strikes.length} />
         <Stat label="Deck" value={displayedGame.cardsRemainingInTheDeck} />
       </View>
+
+      {timedOngoing && clientState.pause.active && (
+        <Text style={styles.paused}>Paused</Text>
+      )}
+      {timedOngoing && playerLiveRoom !== null && (
+        <Button title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />
+      )}
 
       <View style={styles.tableArea}>
         <Text style={styles.subheading}>Table</Text>
@@ -389,6 +422,9 @@ export function GameScreen() {
         <>
           <View style={styles.playerHeadingRow}>
             <Text style={styles.subheading}>Your hand</Text>
+            {timedOngoing && clockText(metadata.ourPlayerIndex) !== null && (
+              <Text style={styles.clock}>{clockText(metadata.ourPlayerIndex)}</Text>
+            )}
             <Text style={styles.presenceText}>
               {getPlayerPresence(
                 liveRoom.connected?.[metadata.ourPlayerIndex],
@@ -473,6 +509,9 @@ export function GameScreen() {
             >
               <View style={styles.playerHeadingRow}>
                 <Text style={styles.playerName}>{metadata.playerNames[playerIndex]}</Text>
+                {timedOngoing && clockText(playerIndex) !== null && (
+                  <Text style={styles.clock}>{clockText(playerIndex)}</Text>
+                )}
                 <Text style={styles.presenceText}>
                   {getPlayerPresence(
                     liveRoom.connected?.[playerIndex],
@@ -782,6 +821,8 @@ const styles = StyleSheet.create({
   statLabel: { color: '#626b73', fontSize: 12 },
   pendingBanner: { backgroundColor: '#fff0c2', borderRadius: 8, padding: 12 },
   pendingText: { color: '#654a00', fontWeight: '600' },
+  paused: { color: '#9e2a2b', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  clock: { fontVariant: ['tabular-nums'], fontWeight: '700' },
   reviewArea: { backgroundColor: '#eef4ff', borderRadius: 10, gap: 8, padding: 12 },
   sharedReplayStatus: { gap: 6 },
   resultDetails: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 4, padding: 12 },

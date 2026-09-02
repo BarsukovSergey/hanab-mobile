@@ -200,12 +200,48 @@ describe('lobby protocol decoder', () => {
     );
   });
 
+  test('encodes timed create exactly and enforces every numeric bound', () => {
+    const options = {
+      variantName: 'No Variant', timed: true, timeBase: 120, timePerTurn: 20,
+      cardCycle: false, emptyClues: false, oneExtraCard: false,
+      oneLessCard: false, allOrNothing: false,
+    };
+    expect(encodeTableCreateFrame('Timed', 2, options)).toBe(
+      'tableCreate {"name":"Timed","options":{"variantName":"No Variant",'
+      + '"timed":true,"timeBase":120,"timePerTurn":20,"speedrun":false,'
+      + '"cardCycle":false,"deckPlays":false,"emptyClues":false,'
+      + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
+      + '"detrimentalCharacters":false},"password":"","maxPlayers":2}',
+    );
+    for (const [field, value] of [
+      ['timeBase', 1], ['timeBase', 604_800],
+      ['timePerTurn', 1], ['timePerTurn', 86_400],
+    ] as const) {
+      expect(() => encodeTableCreateFrame('Timed', 2, { ...options, [field]: value }))
+        .not.toThrow();
+    }
+    for (const [field, value] of [
+      ['timeBase', 0], ['timeBase', 604_801], ['timeBase', 1.5],
+      ['timePerTurn', 0], ['timePerTurn', 86_401], ['timePerTurn', 1.5],
+    ] as const) {
+      expect(() => encodeTableCreateFrame('Timed', 2, { ...options, [field]: value }))
+        .toThrow();
+    }
+    expect(() => encodeTableCreateFrame('Untimed', 2, {
+      ...options, timed: false, timeBase: 1, timePerTurn: 0,
+    })).toThrow();
+    expect(encodeTableCreateFrame('Untimed', 2, {
+      ...options, timed: false, timeBase: 0, timePerTurn: 0,
+    })).toContain('"timed":false,"timeBase":0,"timePerTurn":0');
+  });
+
   test('encodes protected create/join and never requires password persistence', () => {
     expect(encodeTableJoinFrame(123, 'open sesame')).toBe(
       'tableJoin {"tableID":123,"password":"open sesame"}',
     );
     expect(encodeTableCreateFrame('Secret', 5, {
-      variantName: 'No Variant', cardCycle: false, emptyClues: false,
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false,
       oneExtraCard: false, oneLessCard: false, allOrNothing: false,
     }, 'swordfish')).toContain('"password":"swordfish"');
   });
@@ -217,7 +253,8 @@ describe('lobby protocol decoder', () => {
       oneExtraCard: false, oneLessCard: false, allOrNothing: false,
       detrimentalCharacters: true, futureOption: 'keep',
     }, {
-      variantName: '6 Suits', cardCycle: true, emptyClues: true,
+      variantName: '6 Suits', timed: true, timeBase: 90, timePerTurn: 15,
+      cardCycle: true, emptyClues: true,
       oneExtraCard: true, oneLessCard: false, allOrNothing: true,
     })).toBe(
       'tableUpdate {"tableID":123,"name":"Changed","options":{'
@@ -232,7 +269,8 @@ describe('lobby protocol decoder', () => {
       oneExtraCard: false, oneLessCard: false, allOrNothing: false,
       detrimentalCharacters: false,
     }, {
-      variantName: 'No Variant', cardCycle: false, emptyClues: false,
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false,
       oneExtraCard: true, oneLessCard: true, allOrNothing: false,
     })).toThrow();
   });

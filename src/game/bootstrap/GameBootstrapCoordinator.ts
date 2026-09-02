@@ -20,6 +20,8 @@ import {
   type GameHistory,
   type GameInit,
   type IncrementalGameAction,
+  type Pause,
+  type Clock,
   type WireGameAction,
 } from '../../protocol/gameProtocol';
 import {
@@ -53,6 +55,7 @@ type ActiveLoad = {
   metadata: GameMetadata | null;
   clientState: State | null;
   timer: ReturnType<typeof setTimeout> | null;
+  stagedPause: Pause | null;
 };
 
 type SendFrame = (frame: string) => boolean;
@@ -177,6 +180,7 @@ export class GameBootstrapCoordinator {
       metadata: null,
       clientState: null,
       timer: null,
+      stagedPause: null,
     };
     this.active = load;
     this.store.dispatch(roomActions.bootstrapStarted({
@@ -273,6 +277,15 @@ export class GameBootstrapCoordinator {
         load.clientState,
         toGameActionListAction(history.list, load.metadata),
       );
+      if (load.stagedPause !== null) {
+        clientState = stateReducer(clientState, {
+          type: 'pause',
+          active: load.stagedPause.active,
+          playerIndex: (load.stagedPause.active
+            ? load.stagedPause.playerIndex
+            : clientState.pause.playerIndex) as PlayerIndex,
+        });
+      }
     } catch {
       return false;
     }
@@ -308,6 +321,87 @@ export class GameBootstrapCoordinator {
     event: IncrementalGameAction,
   ): boolean {
     return this.receiveIncrementalDetailed(connectionEpoch, event).accepted;
+  }
+
+  receivePause(connectionEpoch: number, event: Pause, receivedAtMs: number): boolean {
+    const load = this.active;
+    if (load !== null) {
+      if (
+        load.connectionEpoch !== connectionEpoch
+        || load.tableID !== event.tableID
+        || load.phase !== 'waiting_history'
+        || load.metadata === null
+        || load.clientState === null
+        || !this.pauseMatches(event, load.metadata.options.numPlayers)
+      ) return false;
+      load.stagedPause = event;
+      return true;
+    }
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      state.session.connectionEpoch !== connectionEpoch
+      || state.session.phase !== 'ready'
+      || state.room.connectionEpoch !== connectionEpoch
+      || room.kind !== 'live_game'
+      || room.tableID !== event.tableID
+      || room.clientState.finished
+      || room.clientState.replay.active
+      || room.clientState.ongoingGame.turn.currentPlayerIndex === null
+      || !this.pauseMatches(event, room.clientState.metadata.options.numPlayers)
+    ) return false;
+    this.store.dispatch(roomActions.pauseReceived({
+      connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      pause: event,
+      receivedAtMs,
+    }));
+    const updated = this.store.getState().room.room;
+    return updated.kind === 'live_game'
+      && updated.tableID === room.tableID
+      && updated.gameLoadEpoch === room.gameLoadEpoch
+      && updated.clientState.pause.active === event.active;
+  }
+
+  receiveClock(connectionEpoch: number, event: Clock, receivedAtMs: number): boolean {
+    if (this.active !== null) return false;
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      state.session.connectionEpoch !== connectionEpoch
+      || state.session.phase !== 'ready'
+      || state.room.connectionEpoch !== connectionEpoch
+      || room.kind !== 'live_game'
+      || room.tableID !== event.tableID
+      || room.sharedReplay
+      || room.clientState.finished
+      || room.clientState.replay.active
+      || room.clientState.ongoingGame.turn.currentPlayerIndex === null
+      || !room.clientState.metadata.options.timed
+      || room.clientState.pause.active
+      || event.times.length !== room.clientState.metadata.options.numPlayers
+      || event.activePlayerIndex < 0
+      || event.activePlayerIndex >= room.clientState.metadata.options.numPlayers
+    ) return false;
+    this.store.dispatch(roomActions.clockReceived({
+      connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      clock: event,
+      receivedAtMs,
+    }));
+    const updated = this.store.getState().room.room;
+    return updated.kind === 'live_game'
+      && updated.tableID === room.tableID
+      && updated.gameLoadEpoch === room.gameLoadEpoch
+      && updated.clock?.receivedAtMs === receivedAtMs;
+  }
+
+  private pauseMatches(event: Pause, numPlayers: number): boolean {
+    return event.active
+      ? event.playerIndex >= 0 && event.playerIndex < numPlayers
+      : event.playerIndex === -1;
   }
 
   receiveIncrementalDetailed(

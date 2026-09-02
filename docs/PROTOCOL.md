@@ -307,10 +307,53 @@ authenticated user's own `user` event with a different nonzero `tableID`: status
 the original-player role and status 3 preserves the spectator role. Status 0 does not confirm a
 restart. After confirmation, only matching `joined`, `game`, and `tableStart` events are accepted.
 
-Mobile participation is rejected when the variant is unsupported or when `timed`, `speedrun`,
-`deckPlays`, or `detrimentalCharacters` is enabled. Lobby table options are retained for this
+Mobile participation is rejected when the variant is unsupported or when `speedrun`, `deckPlays`,
+or `detrimentalCharacters` is enabled. Timed tables are supported by C14-B1. Lobby table options are retained for this
 eligibility check. Recovery and bootstrap fail closed by sending `tableUnattend`, clearing the
 pending/local room, and showing a warning.
+
+## C14-B1 timed games and pause
+
+Timed tables are supported when `timeBase` is an integer from 1 through 604800 seconds and
+`timePerTurn` is an integer from 1 through 86400 seconds. Untimed create/update values are exactly
+`timed:false`, `timeBase:0`, and `timePerTurn:0`. Speedrun, deckPlays, detrimental characters, and
+unsupported variants remain incompatible.
+
+The strict authoritative pause event is:
+
+```text
+pause {"tableID":123,"active":true,"playerIndex":0}
+pause {"tableID":123,"active":false,"playerIndex":-1}
+```
+
+An active pause must name a real player seat. Unpause must use `-1`; mobile normalizes that wire
+sentinel to the last valid pause seat in headless state. During bootstrap, only the latest matching
+pause received after accepted init and before history is staged and applied after history.
+
+The strict clock event is:
+
+```text
+clock {"tableID":123,"times":[120000,120000],"activePlayerIndex":0,"timeTaken":0}
+```
+
+All clock values are integer milliseconds. Mobile accepts clocks only for the current READY timed
+ongoing game with exact player cardinality and a valid active seat. `timeTaken` is retained but is
+not subtracted from display. The active clock counts down from receipt time locally; Redux does not
+tick. An authoritative pause freezes the active clock at pause receipt, unpause clears the clock,
+and the next turn clears the old clock while awaiting a fresh server clock.
+
+Pause commands encode exactly:
+
+```text
+pause {"tableID":123,"setting":"pause"}
+pause {"tableID":123,"setting":"unpause"}
+pause {"tableID":123,"setting":"pause-queue"}
+pause {"tableID":123,"setting":"pause-unqueue"}
+```
+
+Pause/unpause wait for authoritative server events. Queue/unqueue changes local queued state only
+after a successful one-shot send. Pause commands and gameplay commands are never queued, retried,
+or replayed across a connection boundary.
 
 ## Game bootstrap
 
