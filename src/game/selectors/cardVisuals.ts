@@ -12,21 +12,23 @@ export type CardSuitVisual = {
 };
 
 export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual[] {
-  return getVariant(variantName).suits.map((suit) => {
+  const variant = getVariant(variantName);
+  return variant.suits.map((suit, suitIndex) => {
     const fillColors = suit.fill === 'multi' && suit.fillColors.length > 0
       ? suit.fillColors
       : [suit.fill.length === 0 ? '#5d6570' : suit.fill];
     const fill = fillColors[0] ?? '#5d6570';
     const abbreviation = suit.abbreviation || suit.name.slice(0, 2);
+    const pip = variant.pips[suitIndex] ?? suit.pip;
     return {
       name: suit.name,
       fill,
       fillColors,
       colorblindFill: suit.fillColorblind,
       foreground: foregroundForFill(fill),
-      marker: pipMarker(suit.pip, abbreviation),
+      marker: pipMarker(pip, abbreviation),
       abbreviation,
-      pip: suit.pip,
+      pip,
     };
   });
 }
