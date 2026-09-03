@@ -50,7 +50,7 @@ export function getCardKnowledgeViewModel(
     variant.clueColors.find((candidate) => candidate.name === color.name)?.name
       ?? color.name
   ));
-  const positiveRanks = [...card.positiveRankClues];
+  const positiveRanks: readonly number[] = [...card.positiveRankClues];
 
   return {
     order: card.order,
@@ -74,7 +74,7 @@ export function getCardKnowledgeViewModel(
       state: !clueRanks.has(rank)
         ? 'hidden'
         : possibleRanks.has(rank) ? 'visible' : 'eliminated',
-      positive: positiveRanks.includes(rank),
+      positive: positiveRanks.some((positiveRank) => positiveRank === rank),
     })),
     suitDetermined: card.suitDetermined,
     rankDetermined: card.rankDetermined,
