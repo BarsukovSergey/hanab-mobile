@@ -48,7 +48,14 @@ export function UpstreamPipPaths({ pip, fillColors, suitName, duplicatePip = fal
   return <>
     {multi && (
       <Defs>
-        <LinearGradient id={`${idPrefix}-fill`} x1="0" x2="1" y1="0" y2="1">
+        <LinearGradient
+          gradientUnits="userSpaceOnUse"
+          id={`${idPrefix}-fill`}
+          x1={0}
+          x2={30}
+          y1={-100}
+          y2={100}
+        >
           {fillColors.map((color, index) => (
             <Stop
               key={`${color}-${index}`}
