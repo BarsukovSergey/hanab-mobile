@@ -79,14 +79,16 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function HanabThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>('system');
-  const scheme: ThemeScheme = preference === 'system' ? systemScheme ?? 'light' : preference;
+  const scheme: ThemeScheme = preference === 'system'
+    ? systemScheme === 'dark' ? 'dark' : 'light'
+    : preference;
   const theme = scheme === 'dark' ? DARK : LIGHT;
   const value = useMemo<ThemeContextValue>(() => ({
     theme,
     preference,
     setPreference: (next) => {
       setPreferenceState(next);
-      Appearance.setColorScheme(next === 'system' ? null : next);
+      Appearance.setColorScheme(next === 'system' ? 'unspecified' : next);
     },
   }), [preference, theme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
