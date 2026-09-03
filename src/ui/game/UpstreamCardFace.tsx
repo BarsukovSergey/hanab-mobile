@@ -32,6 +32,7 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
 
   const backgroundFill = paintReference(visual.background, 'card-background');
   const rankFill = paintReference(visual.rankPaint, 'card-rank');
+  const renderedRank = rank ?? 0;
   const showRank = rank !== null && (rank >= 1 && rank <= 5 || rank === START_CARD_RANK);
   const stackBase = rank === 0;
 
@@ -51,15 +52,15 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
         strokeWidth={8}
       />
 
-      {showRank && <RankText fill={rankFill} rank={rank} />}
-      {showRank && visual.deceptiveRank !== null && rank !== START_CARD_RANK && (
+      {showRank && <RankText fill={rankFill} rank={renderedRank} />}
+      {showRank && visual.deceptiveRank !== null && renderedRank !== START_CARD_RANK && (
         <G transform={`translate(${CARD_W / 4 + CARD_W / 50} ${CARD_H / 40}) scale(0.5)`}>
           <RankText fill={rankFill} rank={visual.deceptiveRank} />
         </G>
       )}
       {showRank && visual.showBottomRank && (
         <G transform={`translate(${CARD_W} ${CARD_H}) rotate(180)`}>
-          <RankText fill={rankFill} rank={rank} />
+          <RankText fill={rankFill} rank={renderedRank} />
         </G>
       )}
 
