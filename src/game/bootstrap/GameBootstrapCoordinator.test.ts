@@ -299,7 +299,7 @@ describe('authoritative game bootstrap coordinator', () => {
     ]);
   });
 
-  test('spectator LIVE reduction matches replay with the same appended action', () => {
+  test('spectator LIVE reduction matches replay except upstream note-derived stat timing', () => {
     const store = readyStore('spectator');
     const coordinator = new GameBootstrapCoordinator(store, () => true);
     coordinator.startFromAuthoritativeRoom(1);
@@ -316,11 +316,17 @@ describe('authoritative game bootstrap coordinator', () => {
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.liveActionCount).toBe(1);
     expect(room.clientState.replay.actions).toHaveLength(history.list.length + 1);
-    expect(room.clientState.ongoingGame).toEqual(replayAuthoritativeHistory(
+    const replayed = replayAuthoritativeHistory(
       room.clientState.metadata,
       'spectator',
       [...history.list, event.action],
-    ));
+    );
+    expect(replayed.stats.cardsGottenByNotes).toBeNull();
+    expect(room.clientState.ongoingGame.stats.cardsGottenByNotes).toBe(0);
+    expect(room.clientState.ongoingGame).toEqual({
+      ...replayed,
+      stats: { ...replayed.stats, cardsGottenByNotes: 0 },
+    });
   });
 
   test('authoritative live state and history advance while an old segment stays selected', () => {
