@@ -7,10 +7,12 @@ The mobile client does not maintain a second implementation of Hanabi Live card 
 1. checks out `Hanabi-Live/hanabi-live` at the exact commit in `upstreamPin.mjs` into `.cache/`;
 2. installs that checkout's dependencies and builds `packages/game`;
 3. runs the pinned upstream `drawCards` renderer with the local deterministic SVG backend;
-4. renders the variants currently accepted by `SUPPORTED_VARIANT_NAMES` in default, style-number, and colorblind modes;
-5. deduplicates identical SVGs by SHA-256 and writes `assets/cards/upstream/manifest.json` plus `assets/cards/upstream/cards/*.svg`.
+4. renders every variant currently accepted by `SUPPORTED_VARIANT_NAMES` with the mobile default card settings;
+5. deduplicates identical SVGs by SHA-256 and writes a compact manifest plus 32 JSON chunks under `assets/cards/upstream/`.
 
 The SVG backend only implements Canvas 2D output. Card rules, dimensions, colors, ranks, pips, and variant-specific presentation remain owned by the pinned upstream renderer.
+
+The current mobile UI does not expose Hanabi Live's `colorblindMode` or `styleNumbers` card preferences, so those alternate render modes are intentionally not bundled. They can be generated if mobile adds those settings later.
 
 `npm run cards:check` regenerates into a temporary directory and fails if the committed assets differ.
 
