@@ -80,7 +80,7 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
     },
   ]}>
     <UpstreamCardFace rank={rank} suitIndex={suitIndex} variantName={variantName} />
-    {clued && <View pointerEvents="none" style={styles.cluedInset} />}
+    {clued && size === 'hand' && <View pointerEvents="none" style={styles.cluedInset} />}
     {hasNote && <NoteIndicator compact={size === 'mini'} />}
   </View>;
 
