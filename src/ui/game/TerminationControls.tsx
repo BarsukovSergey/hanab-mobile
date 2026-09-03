@@ -1,7 +1,8 @@
-import { Alert, Button, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { terminationRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
+import { ActionButton } from '../designSystem';
 
 export function TerminationControls() {
   const sessionPhase = useAppSelector((state) => state.session.phase);
@@ -27,13 +28,16 @@ export function TerminationControls() {
     : false;
 
   return (
-    <View>
-      <Button
+    <View style={styles.row}>
+      <ActionButton
+        compact
         title={ourVote ? 'Cancel termination vote' : 'Vote to terminate'}
         onPress={() => terminationRuntime.voteForTermination()}
       />
-      <Button
+      <ActionButton
+        compact
         title="Terminate game"
+        tone="danger"
         onPress={() => Alert.alert(
           'Terminate game?',
           'This immediately ends the game for everyone.',
@@ -50,3 +54,7 @@ export function TerminationControls() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+});
