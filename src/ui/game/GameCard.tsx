@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { useHanabTheme } from '../designSystem';
+import { UpstreamCardFace } from './UpstreamCardFace';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
 
 type GameCardProps = {
@@ -64,6 +65,7 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, position, sele
   const { theme } = useHanabTheme();
   const suits = getCardSuitVisuals(variantName);
   const suit = suitIndex === null ? undefined : suits[suitIndex];
+  const useUpstreamFace = suit !== undefined && rank !== null && hasUpstreamSvgPip(suit.pip);
   const sizeStyles = size === 'mini' ? styles.visibleMini : size === 'table' ? styles.visibleTable : styles.visibleHand;
   const cornerRankStyle = size === 'mini' ? styles.miniCornerRank : size === 'table' ? styles.tableCornerRank : styles.handCornerRank;
   const pipSize = size === 'mini' ? 11 : size === 'table' ? 17 : 22;
@@ -73,20 +75,26 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, position, sele
   const content = <View style={[
     styles.visibleCard,
     sizeStyles,
-    { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
-    selected && styles.selectedVisible,
+    useUpstreamFace && styles.upstreamVisibleCard,
+    {
+      borderColor: selected ? theme.colors.accent : useUpstreamFace ? 'transparent' : '#0d0d0d',
+      borderWidth: selected ? 5 : useUpstreamFace ? 0 : 3,
+    },
   ]}>
-    {suit !== undefined && <SuitWash suit={suit} />}
+    {useUpstreamFace && <UpstreamCardFace rank={rank} suit={suit} />}
+    {!useUpstreamFace && <>
+      {suit !== undefined && <SuitWash suit={suit} />}
+      <View style={styles.visibleCorner}>
+        <Text style={[cornerRankStyle, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
+        {suit !== undefined && <SuitMarker suit={suit} compact={size === 'mini'} />}
+      </View>
+      <View style={styles.visibleBottomCorner}>
+        <Text style={[cornerRankStyle, styles.rotatedText, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
+      </View>
+      {suit !== undefined && rank !== null && <RankPipLayout rank={rank} size={pipSize} suit={suit} />}
+    </>}
     {clued && <View pointerEvents="none" style={styles.cluedInset} />}
-    <View style={styles.visibleCorner}>
-      <Text style={[cornerRankStyle, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
-      {suit !== undefined && <SuitMarker suit={suit} compact={size === 'mini'} />}
-    </View>
-    <View style={styles.visibleBottomCorner}>
-      <Text style={[cornerRankStyle, styles.rotatedText, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
-    </View>
     {hasNote && <NoteIndicator compact={size === 'mini'} />}
-    {suit !== undefined && rank !== null && <RankPipLayout rank={rank} size={pipSize} suit={suit} />}
     {position !== undefined && size === 'hand' && <Text style={[styles.visiblePosition, { color: foreground }, textShadow]}>{position + 1}</Text>}
   </View>;
   if (onPress === undefined && onLongPress === undefined) return content;
@@ -111,19 +119,20 @@ function SuitWash({ suit }: { suit: CardSuitVisual }) {
 }
 
 function RankPipLayout({ rank, size, suit }: { rank: number; size: number; suit: CardSuitVisual }) {
-  const pip = <SuitMarker suit={suit} size={size} />;
+  const normalPip = <SuitMarker suit={suit} size={size} />;
+  const centerPip = <SuitMarker suit={suit} size={size * 1.2} />;
   if (rank <= 0) return null;
-  if (rank === 1) return <View style={styles.pipField}><View style={styles.pipCenter}>{pip}</View></View>;
-  if (rank === 2) return <View style={styles.pipField}><View style={styles.pipTop}>{pip}</View><View style={styles.pipBottom}>{pip}</View></View>;
-  if (rank === 3) return <View style={styles.pipField}><View style={styles.pipTop}>{pip}</View><View style={styles.pipCenter}>{pip}</View><View style={styles.pipBottom}>{pip}</View></View>;
+  if (rank === 1) return <View style={styles.pipField}><View style={styles.pipCenter}><SuitMarker suit={suit} size={size * 1.8} /></View></View>;
+  if (rank === 2) return <View style={styles.pipField}><View style={styles.pipTop}><SuitMarker suit={suit} size={size * 1.4} /></View><View style={styles.pipBottom}><SuitMarker suit={suit} size={size * 1.4} /></View></View>;
+  if (rank === 3) return <View style={styles.pipField}><View style={styles.pipTop}>{normalPip}</View><View style={styles.pipCenter}>{centerPip}</View><View style={styles.pipBottom}>{normalPip}</View></View>;
   if (rank === 4) return <View style={styles.pipField}>
-    <View style={styles.pipTopLeft}>{pip}</View><View style={styles.pipTopRight}>{pip}</View>
-    <View style={styles.pipBottomLeft}>{pip}</View><View style={styles.pipBottomRight}>{pip}</View>
+    <View style={styles.pipTopLeft}>{normalPip}</View><View style={styles.pipTopRight}>{normalPip}</View>
+    <View style={styles.pipBottomLeft}>{normalPip}</View><View style={styles.pipBottomRight}>{normalPip}</View>
   </View>;
   return <View style={styles.pipField}>
-    <View style={styles.pipTopLeft}>{pip}</View><View style={styles.pipTopRight}>{pip}</View>
-    <View style={styles.pipCenter}>{pip}</View>
-    <View style={styles.pipBottomLeft}>{pip}</View><View style={styles.pipBottomRight}>{pip}</View>
+    <View style={styles.pipTopLeft}>{normalPip}</View><View style={styles.pipTopRight}>{normalPip}</View>
+    <View style={styles.pipCenter}>{centerPip}</View>
+    <View style={styles.pipBottomLeft}>{normalPip}</View><View style={styles.pipBottomRight}>{normalPip}</View>
   </View>;
 }
 
@@ -182,6 +191,7 @@ const styles = StyleSheet.create({
   suitPip: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#0d0d0d', borderRadius: 12, borderWidth: 1, height: 21, justifyContent: 'center', overflow: 'hidden', width: 21 }, positivePip: { borderColor: 'orange', borderWidth: 3 },
   rankPip: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 11, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 }, positiveRank: { borderColor: 'orange', borderWidth: 3 }, rankPipText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900' },
   visibleCard: { aspectRatio: 286 / 406, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 3, elevation: 3, justifyContent: 'center', overflow: 'hidden', shadowColor: '#000000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.32, shadowRadius: 3 },
+  upstreamVisibleCard: { backgroundColor: 'transparent' },
   selectedVisible: { borderWidth: 5 }, visibleHand: { height: 112 }, visibleTable: { height: 86 }, visibleMini: { borderRadius: 5, borderWidth: 2, height: 56 },
   suitWash: { ...StyleSheet.absoluteFill, flexDirection: 'row', opacity: 0.34 }, suitBand: { flex: 1 },
   cluedInset: { ...StyleSheet.absoluteFill, borderColor: 'orange', borderRadius: 5, borderWidth: 4, zIndex: 3 },
