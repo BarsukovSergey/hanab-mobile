@@ -53,7 +53,7 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
     <View style={styles.root}>
       <Panel style={styles.hero}>
         <View style={styles.heroCopy}>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HANAB LIVE</Text>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HANAB</Text>
           <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Lobby</Text>
           <Text style={[styles.heroDetail, { color: theme.colors.textMuted }]}>
             {tables.length} {tables.length === 1 ? 'table' : 'tables'} available
@@ -64,7 +64,7 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
 
       <View style={[styles.columns, wide && styles.columnsWide]}>
         <Panel style={[styles.column, wide && styles.createColumn]}>
-          <SectionHeading title="Create table" detail="Start a new room with the same options as hanab.live." />
+          <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
           <Field maxLength={45} onChangeText={setTableName} placeholder="Table name" value={tableName} />
           <Field
             autoCapitalize="none"
