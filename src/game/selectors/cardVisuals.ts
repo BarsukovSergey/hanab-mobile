@@ -9,6 +9,7 @@ export type CardSuitVisual = {
   marker: string;
   abbreviation: string;
   pip: string;
+  duplicatePip: boolean;
 };
 
 export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual[] {
@@ -29,6 +30,7 @@ export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual
       marker: pipMarker(pip, abbreviation),
       abbreviation,
       pip,
+      duplicatePip: variant.pips.slice(0, suitIndex).includes(pip),
     };
   });
 }
