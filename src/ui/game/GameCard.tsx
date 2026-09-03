@@ -1,8 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
-import { getVariant } from '../../game/upstream/gameData';
-import type { Suit } from '../../game/upstream/interfaces/Suit';
+import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { useHanabTheme } from '../designSystem';
 
 type GameCardProps = {
@@ -15,9 +14,9 @@ type GameCardProps = {
 
 export function GameCard({ position, knowledge, selected, onSelect, variantName }: GameCardProps) {
   const { theme } = useHanabTheme();
-  const variant = getVariant(variantName);
+  const suits = getCardSuitVisuals(variantName);
   const determinedSuit = knowledge.suitDetermined && knowledge.possibleSuitLabels.length === 1
-    ? variant.suits.find((suit) => suit.name === knowledge.possibleSuitLabels[0])
+    ? suits.find((suit) => suit.name === knowledge.possibleSuitLabels[0])
     : undefined;
   const determinedRank = knowledge.rankDetermined && knowledge.possibleRanks.length === 1
     ? knowledge.possibleRanks[0]
@@ -40,13 +39,13 @@ export function GameCard({ position, knowledge, selected, onSelect, variantName 
       ]}>
         <View style={styles.corner}>
           <Text style={styles.cornerRank}>{determinedRank ?? '?'}</Text>
-          <Text style={styles.cornerPip}>{determinedSuit === undefined ? '•' : pipGlyph(determinedSuit)}</Text>
+          <Text style={styles.cornerPip}>{determinedSuit?.marker ?? '•'}</Text>
         </View>
         <View style={styles.centerKnowledge}>
           <Text style={styles.position}>CARD {position + 1}</Text>
           {determinedSuit !== undefined && determinedRank !== null ? (
-            <View style={[styles.identityBadge, { backgroundColor: safeSuitFill(determinedSuit) }]}>
-              <Text style={styles.identityPip}>{pipGlyph(determinedSuit)}</Text>
+            <View style={[styles.identityBadge, { backgroundColor: determinedSuit.fill }]}>
+              <Text style={styles.identityPip}>{determinedSuit.marker}</Text>
               <Text style={styles.identityRank}>{determinedRank}</Text>
             </View>
           ) : (
@@ -80,19 +79,19 @@ export function VisibleHanabiCard({
   onPress?: () => void;
 }) {
   const { theme } = useHanabTheme();
-  const variant = getVariant(variantName);
-  const suit = suitIndex === null ? undefined : variant.suits[suitIndex];
+  const suits = getCardSuitVisuals(variantName);
+  const suit = suitIndex === null ? undefined : suits[suitIndex];
   const content = (
     <View style={[
       styles.visibleCard,
-      { backgroundColor: suit === undefined ? '#777777' : safeSuitFill(suit) },
+      { backgroundColor: suit?.fill ?? '#777777' },
       selected && { borderColor: theme.colors.accent, borderWidth: 3 },
     ]}>
       <View style={styles.visibleCorner}>
         <Text style={styles.visibleRank}>{rank ?? '?'}</Text>
-        <Text style={styles.visiblePip}>{suit === undefined ? '•' : pipGlyph(suit)}</Text>
+        <Text style={styles.visiblePip}>{suit?.marker ?? '•'}</Text>
       </View>
-      <Text style={styles.visibleCenterPip}>{suit === undefined ? '?' : pipGlyph(suit)}</Text>
+      <Text style={styles.visibleCenterPip}>{suit?.marker ?? '?'}</Text>
       <Text style={styles.visibleCenterRank}>{rank ?? '?'}</Text>
       {position !== undefined && <Text style={styles.visiblePosition}>{position + 1}</Text>}
     </View>
@@ -125,16 +124,16 @@ export function CardKnowledgeDetails({
 }
 
 function KnowledgePips({ knowledge, variantName }: { knowledge: CardKnowledgeViewModel; variantName: string }) {
-  const variant = getVariant(variantName);
-  const possibleSuits = variant.suits.filter((suit) => knowledge.possibleSuitLabels.includes(suit.name));
+  const suits = getCardSuitVisuals(variantName);
+  const possibleSuits = suits.filter((suit) => knowledge.possibleSuitLabels.includes(suit.name));
   return (
     <View style={styles.knowledgeRows}>
       <View style={styles.knowledgeRow}>
         {possibleSuits.map((suit) => {
           const positive = knowledge.positiveColorLabels.includes(suit.name);
           return (
-            <View key={suit.name} style={[styles.suitPip, { backgroundColor: safeSuitFill(suit) }, positive && styles.positivePip]}>
-              <Text style={styles.suitPipText}>{pipGlyph(suit)}</Text>
+            <View key={suit.name} style={[styles.suitPip, { backgroundColor: suit.fill }, positive && styles.positivePip]}>
+              <Text style={styles.suitPipText}>{suit.marker}</Text>
             </View>
           );
         })}
@@ -151,32 +150,6 @@ function KnowledgePips({ knowledge, variantName }: { knowledge: CardKnowledgeVie
       </View>
     </View>
   );
-}
-
-function safeSuitFill(suit: Suit): string {
-  if (suit.fill === 'multi' || suit.fill === undefined || suit.fill.length === 0) return '#5d6570';
-  return suit.fill;
-}
-
-function pipGlyph(suit: Suit): string {
-  switch (suit.pip) {
-    case 'hanabiRed1': return '●';
-    case 'hanabiYellow2': return '◆';
-    case 'hanabiGreen3': return '▲';
-    case 'hanabiBlue4': return '■';
-    case 'hanabiWhite5':
-    case 'hanabiAltWhite6': return '★';
-    case 'emptySet': return '∅';
-    case 'hashtag': return '#';
-    case 'infinity': return '∞';
-    case 'moon': return '☾';
-    case 'rainbow': return '◉';
-    case 'triangle': return '△';
-    case 'unoReverse': return '↺';
-    case 'katakanaHe': return 'ヘ';
-    case 'katakanaNu': return 'ヌ';
-    default: return suit.abbreviation ?? suit.name.slice(0, 1).toUpperCase();
-  }
 }
 
 const styles = StyleSheet.create({
