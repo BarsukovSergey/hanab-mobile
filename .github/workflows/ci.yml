@@ -21,4 +21,4 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: git diff --check HEAD^
+      - run: git diff --check HEAD^..HEAD
