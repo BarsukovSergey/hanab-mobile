@@ -9,11 +9,11 @@ type BackPresentationState = {
 };
 
 export function getBackAction(state: BackPresentationState): BackAction {
-  if (!state.authenticated) return 'system';
   if (state.roomKind === 'pregame'
     || state.roomKind === 'awaiting_game_bootstrap'
     || state.roomKind === 'live_game'
     || state.rematchPending) return 'consume';
+  if (!state.authenticated) return 'system';
   if (state.localScreen === 'history') return 'go_to_lobby';
   return 'system';
 }
