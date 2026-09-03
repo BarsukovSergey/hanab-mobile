@@ -22,7 +22,7 @@ export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual
       fillColors,
       colorblindFill: suit.fillColorblind,
       pip,
-      duplicatePip: variant.pips.slice(0, suitIndex).includes(pip),
+      duplicatePip: variant.pips.slice(0, suitIndex).some((previousPip) => previousPip === pip),
     };
   });
 }
