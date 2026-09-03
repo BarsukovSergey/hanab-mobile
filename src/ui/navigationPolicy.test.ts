@@ -23,6 +23,11 @@ describe('C16A Android Back policy', () => {
     (roomKind) => expect(getBackAction({ ...base, roomKind })).toBe('consume'),
   );
 
+  test('authoritative room remains protected while connection presentation is not ready', () => {
+    expect(getBackAction({ ...base, authenticated: false, roomKind: 'live_game' }))
+      .toBe('consume');
+  });
+
   test('rematch transition consumes Back', () => {
     expect(getBackAction({ ...base, rematchPending: true })).toBe('consume');
   });
