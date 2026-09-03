@@ -69,7 +69,6 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
   const { theme } = useHanabTheme();
   const suits = getCardSuitVisuals(variantName);
   const suit = suitIndex === null ? undefined : suits[suitIndex];
-  const renderable = suit !== undefined && rank !== null && hasUpstreamSvgPip(suit.pip);
   const sizeStyles = size === 'mini' ? styles.visibleMini : size === 'table' ? styles.visibleTable : styles.visibleHand;
 
   const content = <View style={[
@@ -80,9 +79,7 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
       borderWidth: selected ? 5 : 0,
     },
   ]}>
-    {renderable && suitIndex !== null
-      ? <UpstreamCardFace rank={rank} suitIndex={suitIndex} variantName={variantName} />
-      : <View style={styles.unsupportedFace}><Text style={styles.unsupportedFaceText}>?</Text></View>}
+    <UpstreamCardFace rank={rank} suitIndex={suitIndex} variantName={variantName} />
     {clued && <View pointerEvents="none" style={styles.cluedInset} />}
     {hasNote && <NoteIndicator compact={size === 'mini'} />}
   </View>;
@@ -222,8 +219,6 @@ const styles = StyleSheet.create({
   visibleHand: { height: 112 },
   visibleTable: { height: 86 },
   visibleMini: { borderRadius: 5, height: 56 },
-  unsupportedFace: { alignItems: 'center', backgroundColor: '#777777', flex: 1, justifyContent: 'center', width: '100%' },
-  unsupportedFaceText: { color: '#ffffff', fontSize: 28, fontWeight: '900' },
   semanticInset: { ...StyleSheet.absoluteFill, borderRadius: 5, borderWidth: 4, zIndex: 3 },
   cluedInset: { ...StyleSheet.absoluteFill, borderColor: 'orange', borderRadius: 5, borderWidth: 4, zIndex: 3 },
   noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 18, justifyContent: 'center', position: 'absolute', right: 5, top: 5, transform: [{ rotate: '-8deg' }], width: 18, zIndex: 6 },
