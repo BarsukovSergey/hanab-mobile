@@ -45,9 +45,9 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Game history details | DONE | C15 | Game ID, variant, players, timestamps, score and end condition physically verified on Android. |
 | Open old game as replay | DONE | C15 | Authoritative solo replay creation reuses the C12 replay engine; correct game ID, replay navigation and Lobby exit physically verified on Android. |
 | Seed comparison / other scores | DEFERRED | Post-1.0 | Optional history enhancement; not required for C15 or Hanab Mobile 1.0 core replay flow. |
-| App shell / scalable screen structure | PARTIAL | C16 | Avoid continuing to grow `App.tsx` as the long-term router. |
+| App shell / scalable screen structure | IMPLEMENTED / UNVERIFIED | C16 | Major authenticated surfaces extracted from `App.tsx`; explicit local Lobby/History navigation implemented; physical Android acceptance remains. |
 | Full visual redesign / design system | NOT IMPLEMENTED | C16 | Typography, color, spacing, components, game/table/chat/replay/history screens. |
-| Android Back / modal navigation semantics | NOT IMPLEMENTED | C16 | Must never accidentally emit gameplay/leave commands. |
+| Android Back / modal navigation semantics | IMPLEMENTED / UNVERIFIED | C16 | Hardware Back is local-only: History returns to Lobby; authoritative room/game transitions consume Back without emitting table/game commands; physical Android acceptance remains. |
 | Loading / empty / error-state polish | PARTIAL | C16 | Functional states exist; consistent UX polish remains. |
 | App icon / splash / branding polish | NOT IMPLEMENTED | C16 / C17 | Final assets before distribution. |
 | Permanent package/version strategy | NOT IMPLEMENTED | C17 | Package ID, versionCode/versionName and update compatibility. |
