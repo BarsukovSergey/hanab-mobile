@@ -51,11 +51,6 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
       )}
       <G transform={`translate(${CARD_W} ${CARD_H}) rotate(180)`}>
         <RankText fill={rankFill} rank={rank} />
-        {visual.deceptiveRank !== null && (
-          <G transform={`translate(${CARD_W / 4 + CARD_W / 50} ${CARD_H / 40}) scale(0.5)`}>
-            <RankText fill={rankFill} rank={visual.deceptiveRank} />
-          </G>
-        )}
       </G>
 
       <RankPips
