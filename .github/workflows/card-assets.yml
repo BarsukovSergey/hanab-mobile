@@ -6,7 +6,7 @@ on:
     branches: [feat/upstream-card-assets]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -35,3 +35,15 @@ jobs:
           name: upstream-card-assets
           path: assets/cards/upstream
           if-no-files-found: error
+      - name: Commit generated assets
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/cards/upstream
+          if git diff --cached --quiet; then
+            echo "Generated assets are already committed."
+          else
+            git commit -m "build: update generated upstream card assets"
+            git push
+          fi
