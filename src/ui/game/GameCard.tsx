@@ -28,7 +28,10 @@ export function GameCard({ position, knowledge, selected, onSelect, variantName 
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onSelect}
-      style={({ pressed }) => [styles.cardTouch, pressed && { opacity: 0.82 }]}
+      style={({ pressed }) => [
+        styles.cardTouch,
+        pressed && { opacity: 0.82 },
+      ]}
     >
       <View style={[
         styles.card,
@@ -42,12 +45,14 @@ export function GameCard({ position, knowledge, selected, onSelect, variantName 
         <View style={styles.centerKnowledge}>
           <Text style={styles.position}>CARD {position + 1}</Text>
           {determinedSuit !== undefined && determinedRank !== null ? (
-            <View style={[styles.identityBadge, { backgroundColor: safeSuitFill(determinedSuit) }]}> 
+            <View style={[styles.identityBadge, { backgroundColor: safeSuitFill(determinedSuit) }]}>
               <Text style={styles.identityPip}>{pipGlyph(determinedSuit)}</Text>
               <Text style={styles.identityRank}>{determinedRank}</Text>
             </View>
           ) : (
-            <View style={styles.unknownBadge}><Text style={styles.unknownMark}>?</Text></View>
+            <View style={styles.unknownBadge}>
+              <Text style={styles.unknownMark}>?</Text>
+            </View>
           )}
         </View>
         <View style={styles.knowledgeFooter}>
@@ -60,7 +65,12 @@ export function GameCard({ position, knowledge, selected, onSelect, variantName 
 }
 
 export function VisibleHanabiCard({
-  suitIndex, rank, variantName, position, selected = false, onPress,
+  suitIndex,
+  rank,
+  variantName,
+  position,
+  selected = false,
+  onPress,
 }: {
   suitIndex: number | null;
   rank: number | null;
@@ -87,6 +97,7 @@ export function VisibleHanabiCard({
       {position !== undefined && <Text style={styles.visiblePosition}>{position + 1}</Text>}
     </View>
   );
+
   if (onPress === undefined) return content;
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress}>
@@ -95,7 +106,10 @@ export function VisibleHanabiCard({
   );
 }
 
-export function CardKnowledgeDetails({ knowledge, variantName }: {
+export function CardKnowledgeDetails({
+  knowledge,
+  variantName,
+}: {
   knowledge: CardKnowledgeViewModel;
   variantName: string;
 }) {
@@ -167,7 +181,16 @@ function pipGlyph(suit: Suit): string {
 
 const styles = StyleSheet.create({
   cardTouch: { alignItems: 'center', gap: 4 },
-  card: { aspectRatio: 286 / 406, borderRadius: 9, borderWidth: 2, justifyContent: 'space-between', minWidth: 82, overflow: 'hidden', padding: 7, width: 92 },
+  card: {
+    aspectRatio: 286 / 406,
+    borderRadius: 9,
+    borderWidth: 2,
+    justifyContent: 'space-between',
+    minWidth: 82,
+    overflow: 'hidden',
+    padding: 7,
+    width: 92,
+  },
   selectedCard: { borderWidth: 4, padding: 5 },
   corner: { alignItems: 'center', alignSelf: 'flex-start' },
   cornerRank: { color: '#ffffff', fontSize: 21, fontWeight: '900', lineHeight: 22, textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
@@ -189,7 +212,16 @@ const styles = StyleSheet.create({
   positiveRank: { borderColor: '#ff9800', borderWidth: 3 },
   rankPipText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900' },
   selectedLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
-  visibleCard: { aspectRatio: 286 / 406, borderColor: '#0d0d0d', borderRadius: 8, borderWidth: 2, height: 112, justifyContent: 'center', overflow: 'hidden', padding: 6 },
+  visibleCard: {
+    aspectRatio: 286 / 406,
+    borderColor: '#0d0d0d',
+    borderRadius: 8,
+    borderWidth: 2,
+    height: 112,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    padding: 6,
+  },
   visibleCorner: { alignItems: 'center', left: 6, position: 'absolute', top: 5 },
   visibleRank: { color: '#fff', fontSize: 19, fontWeight: '900', lineHeight: 20, textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
   visiblePip: { color: '#fff', fontSize: 12, fontWeight: '900', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
