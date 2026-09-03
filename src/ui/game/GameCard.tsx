@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { CardKnowledgeViewModel, KnowledgePipState } from '../../game/selectors/cardKnowledge';
+import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
+import { getCardNoteVisual, getHandCardBorderColor } from '../../game/selectors/cardNoteVisuals';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
+import { useAppSelector } from '../../store/hooks';
 import { useHanabTheme } from '../designSystem';
 import { UpstreamCardFace } from './UpstreamCardFace';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
@@ -20,6 +22,13 @@ type VisibleCardSize = 'hand' | 'table' | 'mini';
 
 export function GameCard({ position, knowledge, selected, hasNote = false, onSelect, onLongPress, variantName }: GameCardProps) {
   const { theme } = useHanabTheme();
+  const parsedNote = useAppSelector((state) => (
+    state.room.room.kind === 'live_game'
+      ? state.room.room.clientState.notes.ourNotes[knowledge.order]
+      : undefined
+  ));
+  const noteVisual = getCardNoteVisual(parsedNote);
+  const semanticBorder = getHandCardBorderColor(knowledge.hasClueApplied, noteVisual);
 
   return <Pressable
     accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`}
@@ -36,7 +45,7 @@ export function GameCard({ position, knowledge, selected, hasNote = false, onSel
       selected && styles.selectedFrame,
     ]}>
       <View style={styles.hiddenCard}>
-        {knowledge.hasClueApplied && <View pointerEvents="none" style={styles.cluedInset} />}
+        {semanticBorder !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: semanticBorder }]} />}
         {hasNote && <NoteIndicator />}
         <HiddenKnowledgeOverlay knowledge={knowledge} variantName={variantName} />
         <Text style={styles.cardPosition}>{position + 1}</Text>
@@ -215,6 +224,7 @@ const styles = StyleSheet.create({
   visibleMini: { borderRadius: 5, height: 56 },
   unsupportedFace: { alignItems: 'center', backgroundColor: '#777777', flex: 1, justifyContent: 'center', width: '100%' },
   unsupportedFaceText: { color: '#ffffff', fontSize: 28, fontWeight: '900' },
+  semanticInset: { ...StyleSheet.absoluteFill, borderRadius: 5, borderWidth: 4, zIndex: 3 },
   cluedInset: { ...StyleSheet.absoluteFill, borderColor: 'orange', borderRadius: 5, borderWidth: 4, zIndex: 3 },
   noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 18, justifyContent: 'center', position: 'absolute', right: 5, top: 5, transform: [{ rotate: '-8deg' }], width: 18, zIndex: 6 },
   noteIndicatorCompact: { height: 12, right: 3, top: 3, width: 12 },
