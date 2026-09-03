@@ -19,14 +19,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run cards:generate
+      - run: npm run cards:check
       - name: Summarize generated assets
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
           const manifest = JSON.parse(fs.readFileSync('assets/cards/upstream/manifest.json', 'utf8'));
-          const files = fs.readdirSync('assets/cards/upstream/cards').filter((name) => name.endsWith('.svg'));
+          const chunks = fs.readdirSync('assets/cards/upstream/chunks').filter((name) => name.endsWith('.json'));
           console.log(`variants=${Object.keys(manifest.variants).length}`);
-          console.log(`uniqueSvgFiles=${files.length}`);
+          console.log(`uniqueSvgAssets=${manifest.assets.length}`);
+          console.log(`chunks=${chunks.length}`);
           NODE
       - uses: actions/upload-artifact@v4
         with:
