@@ -128,7 +128,7 @@ function HiddenKnowledgeOverlay({ knowledge, variantName }: { knowledge: CardKno
           size={25}
           suitName={suit.name}
         />
-        {pipState.state === 'eliminated' && <EliminationX />}
+        {pipState.state === 'eliminated' && <EliminationX outlined />}
       </View>;
     })}
     <View style={styles.hiddenRankRow}>
@@ -146,8 +146,12 @@ function HiddenKnowledgeOverlay({ knowledge, variantName }: { knowledge: CardKno
   </View>;
 }
 
-function EliminationX({ compact = false }: { compact?: boolean }) {
+function EliminationX({ compact = false, outlined = false }: { compact?: boolean; outlined?: boolean }) {
   return <View pointerEvents="none" style={[styles.eliminationX, compact && styles.eliminationXCompact]}>
+    {outlined && <>
+      <View style={[styles.eliminationOutlineStroke, styles.eliminationSlash]} />
+      <View style={[styles.eliminationOutlineStroke, styles.eliminationBackslash]} />
+    </>}
     <View style={[styles.eliminationStroke, compact && styles.eliminationStrokeCompact, styles.eliminationSlash]} />
     <View style={[styles.eliminationStroke, compact && styles.eliminationStrokeCompact, styles.eliminationBackslash]} />
   </View>;
@@ -197,7 +201,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.82 },
   hiddenFrame: { aspectRatio: 286 / 406, backgroundColor: '#0d0d0d', borderRadius: 9, borderWidth: 3, elevation: 3, shadowColor: '#000000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.35, shadowRadius: 3, width: 88 },
   selectedFrame: { borderWidth: 5 },
-  hiddenCard: { backgroundColor: '#777777', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
+  hiddenCard: { backgroundColor: '#808080', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   hiddenSuitPip: { alignItems: 'center', height: 28, justifyContent: 'center', marginLeft: -14, marginTop: -14, position: 'absolute', width: 28 },
   hiddenRankRow: { bottom: '4%', height: '15%', left: 0, position: 'absolute', right: 0 },
   hiddenRankPip: { alignItems: 'center', height: 22, justifyContent: 'center', marginLeft: -7, position: 'absolute', top: 0, width: 14 },
@@ -206,6 +210,7 @@ const styles = StyleSheet.create({
   positiveSuitHalo: { backgroundColor: 'rgba(238, 188, 29, 0.3)', borderColor: '#0d0d0d', borderRadius: 14, borderWidth: 1, height: 28, left: 0, position: 'absolute', top: 0, width: 28 },
   eliminationX: { height: 28, left: 0, position: 'absolute', top: 0, width: 28 },
   eliminationXCompact: { height: 18, left: '50%', marginLeft: -9, marginTop: -9, top: '50%', width: 18 },
+  eliminationOutlineStroke: { backgroundColor: '#ffffff', height: 6, left: 0, position: 'absolute', top: 11, width: 28 },
   eliminationStroke: { backgroundColor: '#000000', height: 3, left: 1, position: 'absolute', top: 12, width: 26 },
   eliminationStrokeCompact: { height: 2, left: 1, top: 8, width: 16 },
   eliminationSlash: { transform: [{ rotate: '45deg' }] },
