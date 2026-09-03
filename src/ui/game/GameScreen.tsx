@@ -25,6 +25,8 @@ const END: Record<number, string> = {
   9: 'All or Nothing softlock', 10: 'Terminated by vote',
 };
 
+type NoteEntry = { name: string; text: string; isSpectator: boolean };
+
 export function GameScreen() {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
@@ -144,6 +146,11 @@ export function GameScreen() {
     const duration = durationBetween(clientState.datetimeStarted ?? '', clientState.datetimeFinished ?? '');
     const canQuick = sessionPhase === 'ready' && isQuickRematchEligible(clientState, roomState.pendingRestartTableID);
     const canRemake = sessionPhase === 'ready' && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID);
+    const selectedReplayNotes = noteCard === null ? [] : clientState.notes.allNotes[noteCard]?.filter((entry) => entry.text.trim().length > 0) ?? [];
+    const openReplayNote = (order: number) => { setNoteCard(order); setNoteEditorOpen(true); };
+    const selectedReplayLabel = noteCard === null
+      ? 'Card notes'
+      : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
     const summary = <View style={styles.column}>
       <Panel style={styles.gameOver}>
         <Text style={[styles.gameOverText, { color: theme.colors.danger }]}>GAME OVER</Text>
@@ -172,12 +179,23 @@ export function GameScreen() {
       </Panel>}
     </View>;
     const replayView = <View style={styles.column}>{review}
-      <TablePanel game={game} hasNote={hasCardNote} variantName={metadata.options.variantName} title="Replay table" />
-      <ReplayHands game={game} notes={clientState.notes.allNotes} playerNames={metadata.playerNames} variantName={metadata.options.variantName} />
-      <ReadOnlyNotes game={game} notes={clientState.notes.allNotes} playerNames={metadata.playerNames} variantName={metadata.options.variantName} />
+      <TablePanel game={game} hasNote={hasCardNote} onOpenNote={openReplayNote} variantName={metadata.options.variantName} title="Replay table" />
+      <ReplayHands game={game} notes={clientState.notes.allNotes} onOpenNote={openReplayNote} playerNames={metadata.playerNames} variantName={metadata.options.variantName} />
+      <ReadOnlyNotes game={game} notes={clientState.notes.allNotes} onOpenNote={openReplayNote} playerNames={metadata.playerNames} variantName={metadata.options.variantName} />
       <GameLog entries={ongoingGame.log} title="Full game log" />
     </View>;
-    return <View style={[styles.screen, wide && styles.wide]}>{summary}{replayView}</View>;
+    return <>
+      <View style={[styles.screen, wide && styles.wide]}>{summary}{replayView}</View>
+      <Modal animationType="fade" onRequestClose={() => setNoteEditorOpen(false)} statusBarTranslucent transparent visible={noteEditorOpen}>
+        <View style={styles.modalBackdrop}><View style={[styles.noteModal, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+          <Panel><SectionHeading title="Card notes" detail={selectedReplayLabel} />
+            {selectedReplayNotes.length === 0 ? <Text style={[styles.muted, { color: theme.colors.textMuted }]}>No notes on this card.</Text>
+              : selectedReplayNotes.map((entry, i) => <NoteReadout entry={entry} key={`${entry.name}-${i}`} />)}
+          </Panel>
+          <ActionButton title="Close" onPress={() => setNoteEditorOpen(false)} />
+        </View></View>
+      </Modal>
+    </>;
   }
 
   const isOurTurn = playerRoom !== null && game.turn.currentPlayerIndex === ourIndex;
@@ -207,10 +225,7 @@ export function GameScreen() {
     {liveRoom.role === 'spectator' && <View style={styles.noteReaders}>
       <Text style={[styles.label, { color: theme.colors.textMuted }]}>VISIBLE NOTES</Text>
       {combinedNotes.length === 0 ? <Text style={[styles.muted, { color: theme.colors.textMuted }]}>No notes on this card.</Text>
-        : combinedNotes.map((entry, i) => <View key={`${entry.name}-${i}`} style={styles.noteEntry}>
-          <Text style={[styles.noteAuthor, { color: theme.colors.text }]}>{entry.name}{entry.isSpectator ? ' · spectator' : ''}</Text>
-          <Text style={[styles.body, { color: theme.colors.text }]}>{entry.text}</Text>
-        </View>)}
+        : combinedNotes.map((entry, i) => <NoteReadout entry={entry} key={`${entry.name}-${i}`} />)}
     </View>}
     <View style={styles.buttons}>
       <ActionButton compact disabled={!notesEditable || note === authoritativeNote} title="Save" tone="primary" onPress={saveNote} />
@@ -266,7 +281,7 @@ export function GameScreen() {
             {displayedHand.map((order, position) => {
               const card = game.deck[order];
               const spectatorCanTap = liveRoom.role === 'spectator';
-              return <VisibleHanabiCard key={order} hasNote={hasCardNote(order)} onLongPress={() => openNote(order)}
+              return <VisibleHanabiCard key={order} clued={card?.hasClueApplied ?? false} hasNote={hasCardNote(order)} onLongPress={() => openNote(order)}
                 onPress={spectatorCanTap ? () => openNote(order) : () => setSelectedTarget(i)} position={position}
                 rank={card?.rank ?? null} selected={liveRoom.role === 'spectator' && noteCard === order} suitIndex={card?.suitIndex ?? null}
                 variantName={metadata.options.variantName} />;
@@ -317,7 +332,7 @@ function TablePanel({ game, variantName, title, hasNote, onOpenNote }: {
       return <View key={suit.suitIndex} style={styles.stackColumn}>
         <Text style={[styles.stackName, { color: theme.colors.textMuted }]} numberOfLines={1}>{suit.suitName}</Text>
         {topOrder === undefined || card === undefined ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong }]}><Text style={[styles.emptyStackText, { color: theme.colors.textMuted }]}>—</Text></View>
-          : <VisibleHanabiCard hasNote={hasNote?.(topOrder) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(topOrder)}
+          : <VisibleHanabiCard clued={card.hasClueApplied} hasNote={hasNote?.(topOrder) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(topOrder)}
             onPress={onOpenNote === undefined ? undefined : () => onOpenNote(topOrder)} rank={card.rank} size="table" suitIndex={card.suitIndex} variantName={variantName} />}
       </View>;
     })}</View>
@@ -331,7 +346,7 @@ function TablePanel({ game, variantName, title, hasNote, onOpenNote }: {
         <View style={styles.discardCards}>{orders.map((order) => {
           const card = game.deck[order];
           if (card === undefined) return null;
-          return <VisibleHanabiCard key={order} hasNote={hasNote?.(order) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(order)}
+          return <VisibleHanabiCard key={order} clued={card.hasClueApplied} hasNote={hasNote?.(order) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(order)}
             onPress={onOpenNote === undefined ? undefined : () => onOpenNote(order)} rank={card.rank} size="mini" suitIndex={card.suitIndex} variantName={variantName} />;
         })}</View>
       </View>;
@@ -339,30 +354,34 @@ function TablePanel({ game, variantName, title, hasNote, onOpenNote }: {
   </Panel>;
 }
 
-function ReplayHands({ game, playerNames, variantName, notes }: {
+function ReplayHands({ game, playerNames, variantName, notes, onOpenNote }: {
   game: GameState;
   playerNames: readonly string[];
   variantName: string;
-  notes: ReadonlyArray<readonly { name: string; text: string; isSpectator: boolean }[]>;
+  notes: ReadonlyArray<readonly NoteEntry[]>;
+  onOpenNote: (order: number) => void;
 }) {
   const { theme } = useHanabTheme();
-  return <Panel><SectionHeading title="Replay hands" detail="Desktop left-to-right order" /><View style={styles.players}>{playerNames.map((name, i) => <View key={name}
+  return <Panel><SectionHeading title="Replay hands" detail="Desktop left-to-right order; tap a noted card to read it." /><View style={styles.players}>{playerNames.map((name, i) => <View key={name}
     style={[styles.player, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><Text style={[styles.playerName, { color: theme.colors.text }]}>{name}</Text>
     <ScrollView horizontal contentContainerStyle={styles.hand} showsHorizontalScrollIndicator={false}>{getDisplayedHandOrders(game.hands[i]).map((order, position) => {
       const card = game.deck[order];
       const knowledge = card === undefined ? null : getCardKnowledgeViewModel(variantName, card);
       const hasNote = notes[order]?.some((entry) => entry.text.trim().length > 0) ?? false;
-      return <View key={order} style={styles.replayCard}><VisibleHanabiCard hasNote={hasNote} position={position} rank={card?.rank ?? null} suitIndex={card?.suitIndex ?? null} variantName={variantName} />
+      return <View key={order} style={styles.replayCard}><VisibleHanabiCard clued={card?.hasClueApplied ?? false} hasNote={hasNote}
+        onLongPress={hasNote ? () => onOpenNote(order) : undefined} onPress={hasNote ? () => onOpenNote(order) : undefined}
+        position={position} rank={card?.rank ?? null} suitIndex={card?.suitIndex ?? null} variantName={variantName} />
         {knowledge !== null && <CardKnowledgeDetails knowledge={knowledge} variantName={variantName} />}</View>;
     })}</ScrollView>
   </View>)}</View></Panel>;
 }
 
-function ReadOnlyNotes({ notes, game, playerNames, variantName }: {
-  notes: ReadonlyArray<readonly { name: string; text: string; isSpectator: boolean }[]>;
+function ReadOnlyNotes({ notes, game, playerNames, variantName, onOpenNote }: {
+  notes: ReadonlyArray<readonly NoteEntry[]>;
   game: GameState;
   playerNames: readonly string[];
   variantName: string;
+  onOpenNote: (order: number) => void;
 }) {
   const { theme } = useHanabTheme();
   const entries = notes.flatMap((cardNotes, order) => {
@@ -370,15 +389,21 @@ function ReadOnlyNotes({ notes, game, playerNames, variantName }: {
     return nonEmpty.length === 0 ? [] : [{ order, notes: nonEmpty }];
   });
   if (entries.length === 0) return null;
-  return <Panel><SectionHeading title="Card notes" detail="Notes stay attached to their cards through the replay." />
-    <View style={styles.noteReaders}>{entries.map((entry) => <View key={entry.order} style={[styles.replayNote, { borderColor: theme.colors.border }]}>
+  return <Panel><SectionHeading title="Card notes" detail="Tap any entry to jump to that card's note viewer." />
+    <View style={styles.noteReaders}>{entries.map((entry) => <Pressable key={entry.order} onPress={() => onOpenNote(entry.order)}
+      style={[styles.replayNote, { borderColor: theme.colors.border }]}>
       <Text style={[styles.label, { color: theme.colors.textMuted }]}>{getCardLocationLabel(game, playerNames, variantName, entry.order)}</Text>
-      {entry.notes.map((noteEntry, i) => <View key={`${noteEntry.name}-${i}`} style={styles.noteEntry}>
-        <Text style={[styles.noteAuthor, { color: theme.colors.text }]}>{noteEntry.name}{noteEntry.isSpectator ? ' · spectator' : ''}</Text>
-        <Text style={[styles.body, { color: theme.colors.text }]}>{noteEntry.text}</Text>
-      </View>)}
-    </View>)}</View>
+      {entry.notes.map((noteEntry, i) => <NoteReadout entry={noteEntry} key={`${noteEntry.name}-${i}`} />)}
+    </Pressable>)}</View>
   </Panel>;
+}
+
+function NoteReadout({ entry }: { entry: NoteEntry }) {
+  const { theme } = useHanabTheme();
+  return <View style={styles.noteEntry}>
+    <Text style={[styles.noteAuthor, { color: theme.colors.text }]}>{entry.name}{entry.isSpectator ? ' · spectator' : ''}</Text>
+    <Text style={[styles.body, { color: theme.colors.text }]}>{entry.text}</Text>
+  </View>;
 }
 
 function getCardLocationLabel(game: GameState, playerNames: readonly string[], variantName: string, order: number) {
@@ -412,7 +437,7 @@ const styles = StyleSheet.create({
   score: { alignItems: 'center', minWidth: 64 }, scoreValue: { fontSize: 30, fontWeight: '900' }, stats: { flexDirection: 'row', gap: 8, width: '100%' }, stat: { alignItems: 'center', borderRadius: 10, flex: 1, padding: 9 }, statValue: { fontSize: 20, fontWeight: '900' },
   gameOver: { alignItems: 'center' }, gameOverText: { fontSize: 24, fontWeight: '900', letterSpacing: 1.2 }, finalScore: { fontSize: 48, fontWeight: '900', lineHeight: 52 },
   stacks: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, stackColumn: { alignItems: 'center', gap: 5, minWidth: 62 }, stackName: { fontSize: 10, fontWeight: '800', maxWidth: 86 },
-  emptyStack: { alignItems: 'center', aspectRatio: 286 / 406, borderRadius: 7, borderStyle: 'dashed', borderWidth: 2, height: 84, justifyContent: 'center' }, emptyStackText: { fontSize: 22, fontWeight: '900' },
+  emptyStack: { alignItems: 'center', aspectRatio: 286 / 406, borderRadius: 7, borderStyle: 'dashed', borderWidth: 2, height: 86, justifyContent: 'center' }, emptyStackText: { fontSize: 22, fontWeight: '900' },
   discardHeader: { alignItems: 'baseline', flexDirection: 'row', gap: 8, justifyContent: 'space-between' }, discardGroups: { gap: 8 }, discardGroup: { gap: 5 }, discardCards: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   hand: { alignItems: 'flex-start', flexDirection: 'row', gap: 7, paddingBottom: 2, paddingRight: 2 }, action: { borderRadius: 12, gap: 7, padding: 11 }, players: { gap: 9 }, player: { borderRadius: 12, borderWidth: 1, gap: 10, padding: 10 }, target: { borderWidth: 2, padding: 9 }, playerName: { fontSize: 15, fontWeight: '900' },
   clock: { fontVariant: ['tabular-nums'], fontSize: 14, fontWeight: '900' }, note: { minHeight: 92, textAlignVertical: 'top' }, notePreview: { fontSize: 13, fontWeight: '700', lineHeight: 18 }, noteReaders: { gap: 8 }, noteEntry: { gap: 2 }, noteAuthor: { fontSize: 12, fontWeight: '900' },
