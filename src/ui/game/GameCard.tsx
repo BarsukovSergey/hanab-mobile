@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { useHanabTheme } from '../designSystem';
+import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
 
 type GameCardProps = {
   position: number;
@@ -128,6 +129,9 @@ function RankPipLayout({ rank, size, suit }: { rank: number; size: number; suit:
 
 function SuitMarker({ suit, compact = false, size }: { suit: CardSuitVisual; compact?: boolean; size?: number }) {
   const markerSize = size ?? (compact ? 10 : 18);
+  if (hasUpstreamSvgPip(suit.pip)) {
+    return <UpstreamPip fillColors={suit.fillColors} pip={suit.pip} size={markerSize} />;
+  }
   const shadow = suit.foreground === '#0d0d0d' ? '#ffffff' : '#000000';
   return <Text style={{
     color: suit.foreground,
