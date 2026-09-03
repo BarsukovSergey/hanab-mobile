@@ -28,6 +28,7 @@ function foregroundForFill(fill: string): string {
   const hex = normalized.match(/^#([0-9a-f]{6})$/);
   if (hex === null) return '#ffffff';
   const value = hex[1];
+  if (value === undefined) return '#ffffff';
   const r = Number.parseInt(value.slice(0, 2), 16);
   const g = Number.parseInt(value.slice(2, 4), 16);
   const b = Number.parseInt(value.slice(4, 6), 16);
