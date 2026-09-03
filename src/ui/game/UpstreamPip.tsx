@@ -39,7 +39,7 @@ export function UpstreamPip({ pip, fillColors, size }: {
   );
 }
 
-function CanonicalPipPath({ pip, fill }: { pip: string; fill: string }) {
+export function CanonicalPipPath({ pip, fill }: { pip: string; fill: string }) {
   const common = { fill, stroke: '#000000', strokeLinejoin: 'round' as const, strokeWidth: 3 };
   switch (pip) {
     case 'hanabiRed1':
