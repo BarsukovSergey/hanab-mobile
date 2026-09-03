@@ -1,7 +1,7 @@
 # Pinned upstream headless client core
 
 - Repository: `https://github.com/Hanabi-Live/hanabi-live.git`
-- Exact commit: `054e859b97ebacc514ca37470e6bdfae5a93d467`
+- Exact commit: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`
 - Original paths: `packages/client/src/game/{types,reducers}`
 - C12-A roots: `State.ts`, `ReplayState.ts`, `SharedReplayState.ts`, `actions.ts`,
   `initialState.ts`, `stateReducer.ts`, `stateReducerHelpers.ts`, and `replayReducer.ts`.
