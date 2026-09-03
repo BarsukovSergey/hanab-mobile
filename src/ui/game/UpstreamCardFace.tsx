@@ -1,11 +1,24 @@
-import { Defs, G, LinearGradient, Path, Rect, Stop, Svg, Text as SvgText } from 'react-native-svg';
+import { Defs, G, LinearGradient, Path, Stop, Svg, Text as SvgText } from 'react-native-svg';
 
 import { getVisibleCardVisual, type CardPaint } from '../../game/selectors/visibleCardVisuals';
 import { UpstreamPipPaths } from './UpstreamPip';
 
 const CARD_W = 286;
 const CARD_H = 406;
-const BORDER_RADIUS = CARD_W * 0.08;
+const CARD_PADDING = 4;
+const CARD_RADIUS = CARD_W * 0.08;
+const CARD_BORDER_PATH = [
+  `M ${CARD_PADDING} ${CARD_RADIUS + CARD_PADDING}`,
+  `L ${CARD_PADDING} ${CARD_H - CARD_RADIUS - CARD_PADDING}`,
+  `Q 0 ${CARD_H} ${CARD_RADIUS + CARD_PADDING} ${CARD_H - CARD_PADDING}`,
+  `L ${CARD_W - CARD_RADIUS - CARD_PADDING} ${CARD_H - CARD_PADDING}`,
+  `Q ${CARD_W} ${CARD_H} ${CARD_W - CARD_PADDING} ${CARD_H - CARD_RADIUS - CARD_PADDING}`,
+  `L ${CARD_W - CARD_PADDING} ${CARD_RADIUS + CARD_PADDING}`,
+  `Q ${CARD_W} 0 ${CARD_W - CARD_RADIUS - CARD_PADDING} ${CARD_PADDING}`,
+  `L ${CARD_RADIUS + CARD_PADDING} ${CARD_PADDING}`,
+  `Q 0 0 ${CARD_PADDING} ${CARD_RADIUS + CARD_PADDING}`,
+  'Z',
+].join(' ');
 
 export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: number; suitIndex: number; variantName: string }) {
   const visual = getVisibleCardVisual(variantName, suitIndex, rank);
@@ -19,29 +32,30 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
       <PaintDef id="card-background" paint={visual.background} />
       <PaintDef id="card-rank" paint={visual.rankPaint} />
 
-      <Rect fill="#ffffff" height={CARD_H - 8} rx={BORDER_RADIUS} ry={BORDER_RADIUS} width={CARD_W - 8} x={4} y={4} />
+      <Path d={CARD_BORDER_PATH} fill="#ffffff" />
       <DualColorTriangles fills={visual.clueColorFills} />
-      <Rect
+      <Path
+        d={CARD_BORDER_PATH}
         fill={backgroundFill}
         fillOpacity={0.3}
-        height={CARD_H - 8}
-        rx={BORDER_RADIUS}
-        ry={BORDER_RADIUS}
         stroke={backgroundFill}
         strokeOpacity={0.7}
         strokeWidth={8}
-        width={CARD_W - 8}
-        x={4}
-        y={4}
       />
 
-      <SvgText fill={rankFill} fontFamily="Arial" fontSize={128} fontWeight="bold" stroke="#000000" strokeLinejoin="round" strokeWidth={2} x={19} y={110}>
-        {rank}
-      </SvgText>
+      <RankText fill={rankFill} rank={rank} />
+      {visual.deceptiveRank !== null && (
+        <G transform={`translate(${CARD_W / 4 + CARD_W / 50} ${CARD_H / 40}) scale(0.5)`}>
+          <RankText fill={rankFill} rank={visual.deceptiveRank} />
+        </G>
+      )}
       <G transform={`translate(${CARD_W} ${CARD_H}) rotate(180)`}>
-        <SvgText fill={rankFill} fontFamily="Arial" fontSize={128} fontWeight="bold" stroke="#000000" strokeLinejoin="round" strokeWidth={2} x={19} y={110}>
-          {rank}
-        </SvgText>
+        <RankText fill={rankFill} rank={rank} />
+        {visual.deceptiveRank !== null && (
+          <G transform={`translate(${CARD_W / 4 + CARD_W / 50} ${CARD_H / 40}) scale(0.5)`}>
+            <RankText fill={rankFill} rank={visual.deceptiveRank} />
+          </G>
+        )}
       </G>
 
       <RankPips
@@ -53,6 +67,20 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
       />
     </Svg>
   );
+}
+
+function RankText({ fill, rank }: { fill: string; rank: number }) {
+  return <SvgText
+    fill={fill}
+    fontFamily="Arial"
+    fontSize={128}
+    fontWeight="bold"
+    stroke="#000000"
+    strokeLinejoin="round"
+    strokeWidth={2}
+    x={19}
+    y={110}
+  >{rank}</SvgText>;
 }
 
 function PaintDef({ id, paint }: { id: string; paint: CardPaint }) {
