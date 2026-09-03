@@ -1,0 +1,35 @@
+name: Card assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/upstream-card-assets]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run cards:generate
+      - name: Summarize generated assets
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('assets/cards/upstream/manifest.json', 'utf8'));
+          const files = fs.readdirSync('assets/cards/upstream/cards').filter((name) => name.endsWith('.svg'));
+          console.log(`variants=${Object.keys(manifest.variants).length}`);
+          console.log(`uniqueSvgFiles=${files.length}`);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-card-assets
+          path: assets/cards/upstream
+          if-no-files-found: error
