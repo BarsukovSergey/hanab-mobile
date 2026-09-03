@@ -7,6 +7,7 @@ export type CardPaint =
 export type VisibleCardVisual = {
   background: CardPaint;
   clueColorFills: readonly string[];
+  deceptiveRank: number | null;
   duplicatePip: boolean;
   pip: string;
   pipFillColors: readonly string[];
@@ -26,10 +27,16 @@ export function getVisibleCardVisual(variantName: string, suitIndex: number, ran
   const rawFillColors = suit.fill === 'multi' && suit.fillColors.length > 0
     ? suit.fillColors
     : [suit.fill.length === 0 ? '#5d6570' : suit.fill];
+  const deceptiveRank = variant.specialRankDeceptive
+    && rank === variant.specialRank
+    && !suit.noClueRanks
+    ? variant.clueRanks[suitIndex % variant.clueRanks.length] ?? null
+    : null;
 
   return {
     background: backgroundPaint(suit.name, suit.fill, rawFillColors),
     clueColorFills: suit.clueColors.map((color) => color.fill),
+    deceptiveRank,
     duplicatePip: variant.pips.slice(0, suitIndex).includes(pip),
     pip,
     pipFillColors: suit.name === 'Black' ? ['#212121'] : rawFillColors,
