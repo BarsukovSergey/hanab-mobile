@@ -190,7 +190,7 @@ function RankPips({ duplicatePip, fillColors, pip, rank, suitName }: {
     return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="unknown-rank" opacity={0.1} pip={pip} scale={1.2} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
   }
   if (rank === START_CARD_RANK) {
-    return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="start" pip={pip} scale={1.2} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
+    return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="start" pip={pip} scale={1.2} strokeWidth={2} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
   }
   if (rank < 3 || rank > 5) return null;
 
@@ -207,7 +207,7 @@ function RankPips({ duplicatePip, fillColors, pip, rank, suitName }: {
   </>;
 }
 
-function PlacedPip({ duplicatePip, fillColors, id, opacity = 1, pip, rotation = 0, scale, suitName, x, y }: {
+function PlacedPip({ duplicatePip, fillColors, id, opacity = 1, pip, rotation = 0, scale, strokeWidth = 5, suitName, x, y }: {
   duplicatePip: boolean;
   fillColors: readonly string[];
   id: string;
@@ -215,6 +215,7 @@ function PlacedPip({ duplicatePip, fillColors, id, opacity = 1, pip, rotation = 
   pip: string;
   rotation?: number;
   scale: number;
+  strokeWidth?: number;
   suitName: string;
   x: number;
   y: number;
@@ -226,6 +227,7 @@ function PlacedPip({ duplicatePip, fillColors, id, opacity = 1, pip, rotation = 
         fillColors={fillColors}
         idPrefix={`card-${id}-${pip}`}
         pip={pip}
+        strokeWidth={strokeWidth}
         suitName={suitName}
       />
     </G>
