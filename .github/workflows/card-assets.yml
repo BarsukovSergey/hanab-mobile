@@ -2,14 +2,12 @@ name: Card assets
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/upstream-card-assets]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  generate:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,32 +16,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run cards:generate
       - run: npm run cards:check
-      - name: Summarize generated assets
-        run: |
-          node - <<'NODE'
-          const fs = require('node:fs');
-          const manifest = JSON.parse(fs.readFileSync('assets/cards/upstream/manifest.json', 'utf8'));
-          const chunks = fs.readdirSync('assets/cards/upstream/chunks').filter((name) => name.endsWith('.json'));
-          console.log(`variants=${Object.keys(manifest.variants).length}`);
-          console.log(`uniqueSvgAssets=${manifest.assets.length}`);
-          console.log(`chunks=${chunks.length}`);
-          NODE
-      - uses: actions/upload-artifact@v4
-        with:
-          name: upstream-card-assets
-          path: assets/cards/upstream
-          if-no-files-found: error
-      - name: Commit generated assets
-        if: github.event_name == 'push'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/cards/upstream
-          if git diff --cached --quiet; then
-            echo "Generated assets are already committed."
-          else
-            git commit -m "build: update generated upstream card assets"
-            git push
-          fi
