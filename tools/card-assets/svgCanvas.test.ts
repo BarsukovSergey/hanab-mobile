@@ -1,3 +1,4 @@
+import { describe, expect, it } from '@jest/globals';
 import { createSvgCardRendererBackend, SvgCanvasContext } from './svgCanvas';
 
 function renderGradient(): string {
