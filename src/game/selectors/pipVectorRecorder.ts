@@ -10,6 +10,7 @@ export type PipGradient = {
 export type PipVectorShape = {
   d: string;
   fill?: string;
+  fillRule?: 'nonzero' | 'evenodd';
   gradient?: PipGradient;
   stroke?: string;
   strokeWidth?: number;
@@ -74,9 +75,7 @@ export function recordPipVector(draw: (ctx: PipDrawingContext, colors?: readonly
   recorder.fillStyle = options.fill;
   draw(recorder, options.colors);
 
-  if (options.colors === undefined) {
-    recorder.fill();
-  }
+  if (options.colors === undefined) recorder.fill();
   recorder.lineWidth = 3;
   recorder.strokeStyle = '#000000';
   recorder.stroke();
@@ -133,13 +132,7 @@ class PipVectorRecorder implements PipDrawingContext {
   }
 
   save(): void {
-    this.stack.push({
-      matrix: this.matrix,
-      fillStyle: this.fillStyle,
-      strokeStyle: this.strokeStyle,
-      lineWidth: this.lineWidth,
-      lineJoin: this.lineJoin,
-    });
+    this.stack.push({ matrix: this.matrix, fillStyle: this.fillStyle, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth, lineJoin: this.lineJoin });
   }
 
   restore(): void {
@@ -152,15 +145,16 @@ class PipVectorRecorder implements PipDrawingContext {
     this.lineJoin = saved.lineJoin;
   }
 
-  fill(_fillRule?: PipFillRule): void {
+  fill(fillRule: PipFillRule = 'nonzero'): void {
     const d = this.path.trim();
     if (d.length === 0) return;
     if (typeof this.fillStyle === 'string') {
-      this.shapes.push({ d, fill: this.fillStyle });
+      this.shapes.push({ d, fill: this.fillStyle, fillRule });
       return;
     }
     this.shapes.push({
       d,
+      fillRule,
       gradient: {
         id: this.fillStyle.id,
         x1: this.fillStyle.x1,
@@ -179,7 +173,7 @@ class PipVectorRecorder implements PipDrawingContext {
       d,
       fill: 'none',
       stroke: this.strokeStyle,
-      strokeWidth: this.lineWidth,
+      strokeWidth: this.lineWidth * effectiveStrokeScale(this.matrix),
       strokeLinejoin: this.lineJoin,
     });
   }
@@ -199,6 +193,13 @@ class PipVectorRecorder implements PipDrawingContext {
     };
     return gradient;
   }
+}
+
+function effectiveStrokeScale(matrix: Matrix): number {
+  const [a, b, c, d] = matrix;
+  const xScale = Math.hypot(a, b);
+  const yScale = Math.hypot(c, d);
+  return (xScale + yScale) / 2;
 }
 
 function multiply(left: Matrix, right: Matrix): Matrix {
