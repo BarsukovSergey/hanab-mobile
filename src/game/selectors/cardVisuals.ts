@@ -3,20 +3,30 @@ import { getVariant } from '../upstream/gameData';
 export type CardSuitVisual = {
   name: string;
   fill: string;
+  fillColors: readonly string[];
+  colorblindFill: string;
   foreground: string;
   marker: string;
+  abbreviation: string;
+  pip: string;
 };
 
 export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual[] {
   return getVariant(variantName).suits.map((suit) => {
-    const fill = suit.fill === 'multi' || suit.fill.length === 0
-      ? suit.fillColors[0] ?? '#5d6570'
-      : suit.fill;
+    const fillColors = suit.fill === 'multi' && suit.fillColors.length > 0
+      ? suit.fillColors
+      : [suit.fill.length === 0 ? '#5d6570' : suit.fill];
+    const fill = fillColors[0] ?? '#5d6570';
+    const abbreviation = suit.abbreviation || suit.name.slice(0, 2);
     return {
       name: suit.name,
       fill,
+      fillColors,
+      colorblindFill: suit.fillColorblind,
       foreground: foregroundForFill(fill),
-      marker: pipMarker(suit.pip, suit.abbreviation || suit.name.slice(0, 1).toUpperCase()),
+      marker: pipMarker(suit.pip, abbreviation),
+      abbreviation,
+      pip: suit.pip,
     };
   });
 }
@@ -40,8 +50,8 @@ function pipMarker(pip: string, fallback: string): string {
   switch (pip) {
     case 'hanabiRed1': return '●';
     case 'hanabiYellow2': return '◆';
-    case 'hanabiGreen3': return '▲';
-    case 'hanabiBlue4': return '■';
+    case 'hanabiGreen3': return '✣';
+    case 'hanabiBlue4': return '✦';
     case 'hanabiWhite5':
     case 'hanabiAltWhite6': return '★';
     case 'emptySet': return '∅';
