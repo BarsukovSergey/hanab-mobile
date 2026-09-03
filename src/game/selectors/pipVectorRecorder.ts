@@ -20,9 +20,10 @@ export type PipVector = {
   shapes: readonly PipVectorShape[];
 };
 
+type PipFillRule = 'nonzero' | 'evenodd';
 type Matrix = readonly [number, number, number, number, number, number];
 
-type RecordingGradient = {
+export type RecordingGradient = {
   readonly kind: 'gradient';
   readonly id: string;
   readonly x1: number;
@@ -60,7 +61,7 @@ export interface PipDrawingContext {
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
   save(): void;
   restore(): void;
-  fill(fillRule?: CanvasFillRule): void;
+  fill(fillRule?: PipFillRule): void;
   stroke(): void;
   createLinearGradient(x1: number, y1: number, x2: number, y2: number): RecordingGradient;
 }
@@ -151,7 +152,7 @@ class PipVectorRecorder implements PipDrawingContext {
     this.lineJoin = saved.lineJoin;
   }
 
-  fill(_fillRule?: CanvasFillRule): void {
+  fill(_fillRule?: PipFillRule): void {
     const d = this.path.trim();
     if (d.length === 0) return;
     if (typeof this.fillStyle === 'string') {
