@@ -17,17 +17,7 @@ type GameModule = {
   getVariant: (name: string) => unknown;
 };
 
-type CardMode = {
-  name: 'default' | 'style-numbers' | 'colorblind';
-  colorblindMode: boolean;
-  styleNumbers: boolean;
-};
-
-const MODES: readonly CardMode[] = [
-  { name: 'default', colorblindMode: false, styleNumbers: false },
-  { name: 'style-numbers', colorblindMode: false, styleNumbers: true },
-  { name: 'colorblind', colorblindMode: true, styleNumbers: false },
-];
+type VariantCardHashes = Record<string, string>;
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -43,6 +33,12 @@ function asModule<T>(module: T | { default: T }): T {
     return module.default;
   }
   return module as T;
+}
+
+function getChunkName(hash: string): string {
+  const secondNibble = Number.parseInt(hash[1]!, 16);
+  const bucketStart = secondNibble < 8 ? '0' : '8';
+  return `${hash[0]}${bucketStart}`;
 }
 
 async function main(): Promise<void> {
@@ -66,67 +62,86 @@ async function main(): Promise<void> {
   const importedGameModule = await import(gameUrl) as GameModule | { default: GameModule };
   const gameModule = asModule(importedGameModule);
 
-  const cardsDir = path.join(outputDir, 'cards');
-  await mkdir(cardsDir, { recursive: true });
+  const variantHashes = new Map<string, VariantCardHashes>();
+  const svgByHash = new Map<string, string>();
+  const cardKeySet = new Set<string>();
 
-  const manifest: {
-    upstreamCommit: string;
-    renderer: {
-      width: number;
-      height: number;
-      enableShadows: false;
-      modes: readonly string[];
-    };
-    variants: Record<string, Record<string, Record<string, string>>>;
-  } = {
+  for (const variantName of [...SUPPORTED_VARIANT_NAMES].sort()) {
+    const variant = gameModule.getVariant(variantName);
+    const images = drawCardsModule.drawCards(
+      variant,
+      false,
+      false,
+      false,
+      createSvgCardRendererBackend(constantsModule.CARD_W, constantsModule.CARD_H),
+    );
+    const hashes: VariantCardHashes = {};
+
+    for (const [cardKey, svg] of [...images.entries()].sort(([left], [right]) => (
+      left.localeCompare(right)
+    ))) {
+      const hash = sha256(svg);
+      hashes[cardKey] = hash;
+      cardKeySet.add(cardKey);
+      if (!svgByHash.has(hash)) {
+        svgByHash.set(hash, svg);
+      }
+    }
+
+    variantHashes.set(variantName, hashes);
+  }
+
+  const cardKeys = [...cardKeySet].sort();
+  const assets = [...svgByHash.keys()].sort();
+  const cardKeyIndexes = new Map(cardKeys.map((key, index) => [key, index]));
+  const assetIndexes = new Map(assets.map((hash, index) => [hash, index]));
+
+  const manifestVariants: Record<string, readonly (readonly [number, number])[]> = {};
+  for (const [variantName, hashes] of variantHashes) {
+    manifestVariants[variantName] = Object.entries(hashes).map(([cardKey, hash]) => [
+      cardKeyIndexes.get(cardKey)!,
+      assetIndexes.get(hash)!,
+    ] as const);
+  }
+
+  const manifest = {
     upstreamCommit,
     renderer: {
       width: constantsModule.CARD_W,
       height: constantsModule.CARD_H,
+      colorblindMode: false,
+      styleNumbers: false,
       enableShadows: false,
-      modes: MODES.map((mode) => mode.name),
     },
-    variants: {},
-  };
+    cardKeys,
+    assets,
+    variants: manifestVariants,
+  } as const;
 
-  const writtenAssets = new Set<string>();
+  const chunks = new Map<string, Record<string, string>>();
+  for (const hash of assets) {
+    const chunkName = getChunkName(hash);
+    const chunk = chunks.get(chunkName) ?? {};
+    chunk[hash] = svgByHash.get(hash)!;
+    chunks.set(chunkName, chunk);
+  }
 
-  for (const variantName of SUPPORTED_VARIANT_NAMES) {
-    const variant = gameModule.getVariant(variantName);
-    const variantEntry: Record<string, Record<string, string>> = {};
+  const chunksDir = path.join(outputDir, 'chunks');
+  await mkdir(chunksDir, { recursive: true });
 
-    for (const mode of MODES) {
-      const images = drawCardsModule.drawCards(
-        variant,
-        mode.colorblindMode,
-        mode.styleNumbers,
-        false,
-        createSvgCardRendererBackend(constantsModule.CARD_W, constantsModule.CARD_H),
-      );
-      const modeEntry: Record<string, string> = {};
-
-      for (const [cardKey, svg] of [...images.entries()].sort(([left], [right]) => (
-        left.localeCompare(right)
-      ))) {
-        const hash = sha256(svg);
-        const fileName = `${hash}.svg`;
-        modeEntry[cardKey] = `cards/${fileName}`;
-
-        if (!writtenAssets.has(fileName)) {
-          await writeFile(path.join(cardsDir, fileName), svg, 'utf8');
-          writtenAssets.add(fileName);
-        }
-      }
-
-      variantEntry[mode.name] = modeEntry;
-    }
-
-    manifest.variants[variantName] = variantEntry;
+  for (const [chunkName, chunk] of [...chunks.entries()].sort(([left], [right]) => (
+    left.localeCompare(right)
+  ))) {
+    await writeFile(
+      path.join(chunksDir, `${chunkName}.json`),
+      `${JSON.stringify(chunk)}\n`,
+      'utf8',
+    );
   }
 
   await writeFile(
     path.join(outputDir, 'manifest.json'),
-    `${JSON.stringify(manifest, null, 2)}\n`,
+    `${JSON.stringify(manifest)}\n`,
     'utf8',
   );
 }
