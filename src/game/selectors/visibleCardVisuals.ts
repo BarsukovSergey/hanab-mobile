@@ -34,7 +34,9 @@ export function getVisibleCardVisual(variantName: string, suitIndex: number, ran
     : null;
 
   return {
-    background: backgroundPaint(suit.name, suit.fill, rawFillColors),
+    background: suit.prism
+      ? prismPaint(variantName, suitIndex, rank)
+      : backgroundPaint(suit.name, suit.fill, rawFillColors),
     clueColorFills: suit.clueColors.map((color) => color.fill),
     deceptiveRank,
     duplicatePip: variant.pips.slice(0, suitIndex).includes(pip),
@@ -88,13 +90,18 @@ function rankPaint(variantName: string, suitIndex: number, rank: number): CardPa
     if (noClueRanks) return { type: 'solid', color: getSuit(dark ? 'Dark Brown' : 'Brown').fill };
   }
 
-  if (suit.prism) {
-    const color = variant.clueColors[(rank - 1) % variant.clueColors.length];
-    if (color !== undefined) return { type: 'solid', color: mixHex(color.fill, suit.oneOfEach ? '#000000' : '#ffffff', 0.5) ?? suit.fill };
-  }
-
+  if (suit.prism) return prismPaint(variantName, suitIndex, rank);
   if (suit.fill !== 'multi') return { type: 'solid', color: suit.fill };
   return { type: 'gradient', colors: suit.fillColors, x1: 0, y1: 14, x2: 0, y2: 110 };
+}
+
+function prismPaint(variantName: string, suitIndex: number, rank: number): CardPaint {
+  const variant = getVariant(variantName);
+  const suit = variant.suits[suitIndex];
+  if (suit === undefined || rank === 0) return { type: 'solid', color: suit?.fill ?? '#5d6570' };
+  const color = variant.clueColors[(rank - 1) % variant.clueColors.length];
+  if (color === undefined) return { type: 'solid', color: suit.fill };
+  return { type: 'solid', color: mixHex(color.fill, suit.oneOfEach ? '#000000' : '#ffffff', 0.5) ?? suit.fill };
 }
 
 function mixHex(a: string, b: string, amountA: number): string | null {
