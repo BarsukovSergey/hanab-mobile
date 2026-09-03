@@ -45,9 +45,9 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Game history details | DONE | C15 | Game ID, variant, players, timestamps, score and end condition physically verified on Android. |
 | Open old game as replay | DONE | C15 | Authoritative solo replay creation reuses the C12 replay engine; correct game ID, replay navigation and Lobby exit physically verified on Android. |
 | Seed comparison / other scores | DEFERRED | Post-1.0 | Optional history enhancement; not required for C15 or Hanab Mobile 1.0 core replay flow. |
-| App shell / scalable screen structure | IMPLEMENTED / UNVERIFIED | C16 | Major authenticated surfaces extracted from `App.tsx`; explicit local Lobby/History navigation implemented; physical Android acceptance remains. |
+| App shell / scalable screen structure | DONE | C16 | Major authenticated surfaces extracted from `App.tsx`; explicit local Lobby/History navigation physically verified on Android. |
 | Full visual redesign / design system | NOT IMPLEMENTED | C16 | Typography, color, spacing, components, game/table/chat/replay/history screens. |
-| Android Back / modal navigation semantics | IMPLEMENTED / UNVERIFIED | C16 | Role-aware hardware Back: players stay protected, spectators use existing authoritative leave/unattend flows, and historical replay Back returns to History after confirmed exit; physical Android re-acceptance remains. |
+| Android Back / modal navigation semantics | DONE | C16 | Role-aware hardware Back physically verified: players stay protected, spectators use authoritative leave/unattend flows, historical replay Back returns to History, and explicit Lobby returns to Lobby. |
 | Loading / empty / error-state polish | PARTIAL | C16 | Functional states exist; consistent UX polish remains. |
 | App icon / splash / branding polish | NOT IMPLEMENTED | C16 / C17 | Final assets before distribution. |
 | Permanent package/version strategy | NOT IMPLEMENTED | C17 | Package ID, versionCode/versionName and update compatibility. |
@@ -70,6 +70,7 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 - C13 — CLOSED / GO. Table/variant parity and pregame lifecycle physically verified.
 - C14 — CLOSED / GO. Notes, presence, live log, timed clocks, pause/queue, vote/termination and reconnect/review timing physically verified.
 - C15 — CLOSED / GO. History browsing, pagination, metadata, authoritative solo replay loading, replay navigation and Lobby exit physically verified on Android; unsupported-history Watch remains covered by automated compatibility tests because no matching historical game was available during physical acceptance.
+- C16A — CLOSED / GO. App shell extraction and role-aware Android Back/navigation semantics physically verified on Android; dev selector and replay-state invariant-check noise cleaned up before visual redesign.
 
 ## 1.0 milestone order
 
