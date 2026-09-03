@@ -41,10 +41,10 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Terminate game / vote to terminate | DONE | C14 | Authoritative self-vote echo, vote toggle, threshold termination, and confirmed direct termination physically verified. |
 | Player connected / away state | DONE | C14 | In-game presence/away transitions physically verified; visual polish remains C16. |
 | Full live action log UX | DONE | C12 / C14 | Live action updates and replay/postgame log behavior physically verified; visual polish remains C16. |
-| Game history list / pagination | IMPLEMENTED / UNVERIFIED | C15 | `historyGet` + local history screen; physical acceptance remains. |
-| Game history details | IMPLEMENTED / UNVERIFIED | C15 | Score/options/players/end condition/timestamps/seed metadata; physical acceptance remains. |
-| Open old game as replay | IMPLEMENTED / UNVERIFIED | C15 | Reuses the C12 replay engine through authoritative solo replay creation; physical acceptance remains. |
-| Seed comparison / other scores | NOT IMPLEMENTED | C15 optional | Useful but not required for the first history/replay slice. |
+| Game history list / pagination | DONE | C15 | Automatic first page and `historyGet` pagination physically verified on Android. |
+| Game history details | DONE | C15 | Game ID, variant, players, timestamps, score and end condition physically verified on Android. |
+| Open old game as replay | DONE | C15 | Authoritative solo replay creation reuses the C12 replay engine; correct game ID, replay navigation and Lobby exit physically verified on Android. |
+| Seed comparison / other scores | DEFERRED | Post-1.0 | Optional history enhancement; not required for C15 or Hanab Mobile 1.0 core replay flow. |
 | App shell / scalable screen structure | PARTIAL | C16 | Avoid continuing to grow `App.tsx` as the long-term router. |
 | Full visual redesign / design system | NOT IMPLEMENTED | C16 | Typography, color, spacing, components, game/table/chat/replay/history screens. |
 | Android Back / modal navigation semantics | NOT IMPLEMENTED | C16 | Must never accidentally emit gameplay/leave commands. |
@@ -69,6 +69,7 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 - C12 — CLOSED / GO. In-game review, postgame, shared replay, quick rematch and recovery physically verified.
 - C13 — CLOSED / GO. Table/variant parity and pregame lifecycle physically verified.
 - C14 — CLOSED / GO. Notes, presence, live log, timed clocks, pause/queue, vote/termination and reconnect/review timing physically verified.
+- C15 — CLOSED / GO. History browsing, pagination, metadata, authoritative solo replay loading, replay navigation and Lobby exit physically verified on Android; unsupported-history Watch remains covered by automated compatibility tests because no matching historical game was available during physical acceptance.
 
 ## 1.0 milestone order
 
