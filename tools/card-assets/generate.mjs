@@ -9,7 +9,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const CACHE_DIR = path.join(ROOT, '.cache', 'hanabi-live-card-assets');
 const OUTPUT_DIR = path.join(ROOT, 'assets', 'cards', 'upstream');
 const RUNNER = path.join(ROOT, 'tools', 'card-assets', 'runUpstream.ts');
-const READY_MARKER = path.join(CACHE_DIR, '.hanab-mobile-card-assets-ready');
+const READY_MARKER = path.join(CACHE_DIR, '.git', 'hanab-mobile-card-assets-ready');
 const checkOnly = process.argv.includes('--check');
 
 function executable(name) {
