@@ -48,7 +48,7 @@ export function GameScreen() {
 
   useEffect(() => {
     if (selectable.length === 0) setSelectedCard(null);
-    else if (selectedCard === null || !selectable.includes(selectedCard)) setSelectedCard(selectable[0] ?? null);
+    else if (selectedCard === null || !selectable.some((order) => order === selectedCard)) setSelectedCard(selectable[0] ?? null);
   }, [selectable, selectedCard]);
   useEffect(() => {
     if (selectedTarget === null || !clueTargets.includes(selectedTarget)) setSelectedTarget(clueTargets[0] ?? null);
