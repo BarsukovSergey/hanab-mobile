@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { lobbyRuntime } from '../runtime/application';
 import { useAppSelector } from '../store/hooks';
+import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
 import { TerminationControls } from './game/TerminationControls';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 const EMPTY_MESSAGES: readonly never[] = [];
 
 export function ChatPanel({ room, title }: Props) {
+  const { theme } = useHanabTheme();
   const [draft, setDraft] = useState('');
   const historyRef = useRef<ScrollView>(null);
   const ready = useAppSelector((state) => state.session.phase === 'ready');
@@ -28,16 +30,16 @@ export function ChatPanel({ room, title }: Props) {
   }, [messages.length, room]);
 
   return (
-    <View style={styles.panel}>
+    <Panel>
       <TerminationControls />
-      <Text style={styles.heading}>{title}</Text>
+      <SectionHeading title={title} detail={ready ? 'Connected' : 'Chat reconnecting…'} />
       <ScrollView
         contentContainerStyle={styles.historyContent}
         nestedScrollEnabled
         ref={historyRef}
-        style={styles.history}
+        style={[styles.history, { backgroundColor: theme.colors.surfaceMuted }]}
       >
-        {messages.length === 0 && <Text style={styles.empty}>No messages yet.</Text>}
+        {messages.length === 0 && <EmptyState>No messages yet.</EmptyState>}
         {messages.map((message, index) => {
           const date = new Date(message.datetime);
           const time = Number.isNaN(date.getTime())
@@ -45,14 +47,15 @@ export function ChatPanel({ room, title }: Props) {
             : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const author = message.server ? 'Server' : message.who ?? 'Hanab';
           return (
-            <Text key={`${message.datetime}-${index}`} style={styles.message}>
-              <Text style={styles.meta}>{time.length > 0 ? `${time} ` : ''}{author}: </Text>
+            <Text key={`${message.datetime}-${index}`} style={[styles.message, { color: theme.colors.text }]}>
+              <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
+                {time.length > 0 ? `${time} ` : ''}{author}: </Text>
               {message.msg}
             </Text>
           );
         })}
       </ScrollView>
-      <TextInput
+      <Field
         editable={ready}
         maxLength={300}
         multiline
@@ -62,26 +65,20 @@ export function ChatPanel({ room, title }: Props) {
         style={styles.input}
         value={draft}
       />
-      <View style={styles.send}>
-        <Button disabled={!ready || trimmed.length === 0} title="Send" onPress={send} />
+      <View style={styles.footer}>
+        <Text style={[styles.counter, { color: theme.colors.textMuted }]}>{draft.length}/300</Text>
+        <ActionButton compact disabled={!ready || trimmed.length === 0} title="Send" tone="primary" onPress={send} />
       </View>
-      <Text style={styles.counter}>{draft.length}/300</Text>
-    </View>
+    </Panel>
   );
 }
 
 const styles = StyleSheet.create({
-  panel: { backgroundColor: '#f3f5f7', borderRadius: 10, gap: 8, padding: 12 },
-  heading: { fontSize: 18, fontWeight: '700' },
-  history: { maxHeight: 260 },
-  historyContent: { gap: 6 },
-  empty: { color: '#626b73', fontStyle: 'italic' },
-  message: { color: '#202830', lineHeight: 20 },
-  meta: { color: '#46515c', fontWeight: '700' },
-  input: {
-    backgroundColor: '#fff', borderColor: '#aab1b8', borderRadius: 8,
-    borderWidth: 1, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8,
-  },
-  send: { alignSelf: 'flex-end', minWidth: 96 },
-  counter: { alignSelf: 'flex-end', color: '#626b73', fontSize: 11 },
+  history: { borderRadius: 10, maxHeight: 260, paddingHorizontal: 10 },
+  historyContent: { gap: 7, paddingVertical: 10 },
+  message: { fontSize: 14, lineHeight: 20 },
+  meta: { fontWeight: '800' },
+  input: { minHeight: 72, textAlignVertical: 'top' },
+  footer: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  counter: { fontSize: 11 },
 });

@@ -1,24 +1,50 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
-  AppState, BackHandler, Button, KeyboardAvoidingView, Platform, ScrollView,
-  Text, TextInput, View,
+  AppState,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
 import { ChatPanel } from './src/ui/ChatPanel';
+import {
+  ActionButton,
+  Field,
+  HanabThemeProvider,
+  Notice,
+  Panel,
+  SectionHeading,
+  ThemeSwitcher,
+  useHanabTheme,
+  useResponsiveLayout,
+} from './src/ui/designSystem';
 import { GameScreen } from './src/ui/game/GameScreen';
 import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
-import { shellStyles as styles } from './src/ui/shellStyles';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 
 export default function App() {
+  return (
+    <HanabThemeProvider>
+      <AppContent />
+    </HanabThemeProvider>
+  );
+}
+
+function AppContent() {
+  const { theme } = useHanabTheme();
+  const { contentMaxWidth } = useResponsiveLayout();
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
   const [loginPending, setLoginPending] = useState(false);
@@ -156,9 +182,11 @@ export default function App() {
 
   if (signOutPending) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.heading}>Signing out…</Text>
-        <Text>Closing the realtime session and clearing local game data.</Text>
+      <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
+        <Panel style={styles.centerCard}>
+          <SectionHeading title="Signing out…" detail="Closing the realtime session and clearing local game data." />
+        </Panel>
+        <StatusBar style={theme.dark ? 'light' : 'dark'} />
       </View>
     );
   }
@@ -166,68 +194,96 @@ export default function App() {
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
     return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}>
-        <View style={styles.authBar}>
-          <Text style={styles.authName}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
-          <View style={styles.authActions}>
-            <Button disabled={roomState.pendingUnattendTableID !== null}
-              title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[styles.flex, { backgroundColor: theme.colors.background }]}
+      >
+        <View style={[styles.gameBar, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <View style={styles.brandCopy}>
+            <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
+            <Text style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <ThemeSwitcher compact />
+            <ActionButton
+              compact
+              disabled={roomState.pendingUnattendTableID !== null}
+              title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving…'}
               onPress={() => {
                 setReturnAfterUnattend(null);
                 setLocalScreen('lobby');
                 lobbyRuntime.unattendLiveGame(liveTableID);
-              }} />
-            <Button title="Sign out" onPress={() => void signOut()} />
+              }}
+            />
+            <ActionButton compact title="Sign out" tone="ghost" onPress={() => void signOut()} />
           </View>
         </View>
-        <ScrollView contentContainerStyle={styles.gameContainer} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.gameContainer, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
           <GameScreen />
           <ChatPanel room={`table${liveTableID}`} title="Table chat" />
         </ScrollView>
-        <StatusBar style="auto" />
+        <StatusBar style={theme.dark ? 'light' : 'dark'} />
       </KeyboardAvoidingView>
     );
   }
 
   let content: ReactNode;
   if (probe === 'checking') {
-    content = <Text>Checking session...</Text>;
+    content = <Panel><SectionHeading title="Checking session…" detail="Looking for an existing hanab.live session." /></Panel>;
   } else if (probe === 'missing') {
     content = (
-      <View style={styles.section}>
-        <Text style={styles.heading}>Login</Text>
-        {statusMessage.length > 0 && <Text style={styles.error}>{statusMessage}</Text>}
-        <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setUsername}
-          placeholder="Username" style={styles.input} value={username} />
-        <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setPassword}
-          placeholder="Password" secureTextEntry style={styles.input} value={password} />
-        <Button disabled={loginPending || username.trim().length === 0 || password.length === 0}
-          title={loginPending ? 'Logging in...' : 'Login'} onPress={() => void submitLogin()} />
-      </View>
+      <Panel style={styles.loginCard}>
+        <View style={styles.loginIntro}>
+          <Text style={[styles.loginEyebrow, { color: theme.colors.accent }]}>HANAB MOBILE</Text>
+          <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in to play</Text>
+          <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
+        </View>
+        {statusMessage.length > 0 && <Notice tone="error">{statusMessage}</Notice>}
+        <Field
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={setUsername}
+          placeholder="Username"
+          value={username}
+        />
+        <Field
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={setPassword}
+          placeholder="Password"
+          secureTextEntry
+          value={password}
+        />
+        <ActionButton
+          disabled={loginPending || username.trim().length === 0 || password.length === 0}
+          title={loginPending ? 'Logging in…' : 'Login'}
+          tone="primary"
+          onPress={() => void submitLogin()}
+        />
+      </Panel>
     );
   } else if (probe === 'indeterminate') {
     content = (
-      <View style={styles.section}>
-        <Text style={styles.heading}>Unable to check session</Text>
-        <Text style={styles.error}>{statusMessage || 'Network request failed.'}</Text>
-        <Button title="Retry" onPress={() => void runProbe()} />
-      </View>
+      <Panel>
+        <SectionHeading title="Unable to check session" detail="The server could not confirm your current session." />
+        <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>
+        <ActionButton title="Retry" tone="primary" onPress={() => void runProbe()} />
+      </Panel>
     );
   } else if (session.phase === 'failed' || session.phase === 'closed') {
     content = (
-      <View style={styles.section}>
-        <Text style={styles.heading}>Connection lost</Text>
-        {session.error !== null && <Text style={styles.error}>{session.error}</Text>}
-        <Button title="Retry" onPress={() => { lobbyRuntime.disconnect(); void runProbe(); }} />
-      </View>
+      <Panel>
+        <SectionHeading title="Connection lost" detail="Reconnect to continue using the lobby." />
+        {session.error !== null && <Notice tone="error">{session.error}</Notice>}
+        <ActionButton title="Retry" tone="primary" onPress={() => { lobbyRuntime.disconnect(); void runProbe(); }} />
+      </Panel>
     );
   } else if (session.phase !== 'ready' || !hydrated) {
-    content = <Text>Connecting to lobby...</Text>;
+    content = <Panel><SectionHeading title="Connecting to lobby…" detail="Synchronizing tables and chat." /></Panel>;
   } else if (roomState.room.kind === 'awaiting_game_bootstrap') {
-    content = <Text style={styles.heading}>Loading game...</Text>;
+    content = <Panel><SectionHeading title="Loading game…" detail="Receiving the authoritative game state." /></Panel>;
   } else if (roomState.rematchTransition !== null) {
-    content = <Text style={styles.heading}>Starting rematch...</Text>;
+    content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
   } else if (roomState.room.kind === 'pregame') {
     content = <PregameScreen />;
   } else if (localScreen === 'history') {
@@ -249,23 +305,77 @@ export default function App() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>Hanab</Text>
-          {probe === 'valid' && session.authenticatedUser !== null && (
-            <Button title="Sign out" onPress={() => void signOut()} />
-          )}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.flex, { backgroundColor: theme.colors.background }]}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.appHeader}>
+          <View style={styles.brandCopy}>
+            <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
+            {probe === 'valid' && session.authenticatedUser !== null && (
+              <Text style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser.username}</Text>
+            )}
+          </View>
+          <View style={styles.headerActions}>
+            <ThemeSwitcher compact />
+            {probe === 'valid' && session.authenticatedUser !== null && (
+              <ActionButton compact title="Sign out" tone="ghost" onPress={() => void signOut()} />
+            )}
+          </View>
         </View>
         {lobbyNotice !== null && (
-          <Text style={lobbyNotice.kind === 'error' ? styles.error : undefined}>
-            {lobbyNotice.message}
-          </Text>
+          <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>
         )}
         {content}
-        <StatusBar style="auto" />
       </ScrollView>
+      <StatusBar style={theme.dark ? 'light' : 'dark'} />
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  container: {
+    alignSelf: 'center',
+    gap: 16,
+    paddingBottom: 36,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 42 : 54,
+    width: '100%',
+  },
+  gameContainer: {
+    alignSelf: 'center',
+    flexGrow: 1,
+    gap: 16,
+    paddingBottom: 28,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    width: '100%',
+  },
+  centered: { flex: 1, justifyContent: 'center', padding: 20 },
+  centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
+  appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  gameBar: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingBottom: 9,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'android' ? 38 : 48,
+  },
+  brandCopy: { flexShrink: 1, gap: 1 },
+  brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
+  authName: { fontSize: 12, fontWeight: '700' },
+  headerActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'flex-end' },
+  loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
+  loginIntro: { gap: 4, marginBottom: 4 },
+  loginEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  loginTitle: { fontSize: 30, fontWeight: '900', letterSpacing: -0.6 },
+  loginDetail: { fontSize: 14, lineHeight: 20 },
+});

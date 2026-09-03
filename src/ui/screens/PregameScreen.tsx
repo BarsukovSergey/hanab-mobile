@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Button, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { ChatPanel } from '../ChatPanel';
-import { shellStyles } from '../shellStyles';
+import {
+  ActionButton,
+  Field,
+  Panel,
+  Pill,
+  SectionHeading,
+  useHanabTheme,
+  useResponsiveLayout,
+} from '../designSystem';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 
 export function PregameScreen() {
+  const { theme } = useHanabTheme();
+  const { wide } = useResponsiveLayout();
   const session = useAppSelector((state) => state.session);
   const roomState = useAppSelector((state) => state.room);
   const room = roomState.room.kind === 'pregame' ? roomState.room : null;
@@ -39,48 +49,117 @@ export function PregameScreen() {
 
   if (room === null) return null;
   const isOwner = room.role === 'player' && session.authenticatedUser?.userID === room.data.owner;
+
   return (
-    <View style={shellStyles.section}>
-      <Text style={shellStyles.heading}>{room.data.name}</Text>
-      <Text>{room.data.options.variantName}</Text>
-      <Text>{room.role === 'spectator' ? 'Spectating pregame' : 'Joined as player'}</Text>
-      <Text>{room.data.players.length}/{room.data.maxPlayers} players</Text>
-      {room.data.players.map((player) => (
-        <Text key={player.index}>{player.name}{player.you ? ' (you)' : ''}{player.present ? '' : ' (away)'}</Text>
-      ))}
-      {isOwner && (<>
-        <View style={shellStyles.subsection}>
-          <Text style={shellStyles.heading}>Edit table</Text>
-          <TextInput maxLength={45} onChangeText={setEditName} placeholder="Table name"
-            style={shellStyles.input} value={editName} />
-          <Text>Max players: {editMaxPlayers}</Text>
-          <View style={shellStyles.buttonRow}>
-            <Button disabled={editMaxPlayers <= 2} title="−"
-              onPress={() => setEditMaxPlayers((count) => count - 1)} />
-            <Button disabled={editMaxPlayers >= 6} title="+"
-              onPress={() => setEditMaxPlayers((count) => count + 1)} />
+    <View style={styles.root}>
+      <Panel style={styles.hero}>
+        <View style={styles.heroCopy}>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>PREGAME</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>{room.data.name}</Text>
+          <View style={styles.pills}>
+            <Pill active>{room.data.options.variantName}</Pill>
+            <Pill>{room.role === 'spectator' ? 'Spectator' : 'Player'}</Pill>
+            {isOwner && <Pill>Leader</Pill>}
           </View>
-          <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
-          <Button disabled={roomState.pendingUpdate !== null || editName.trim().length === 0}
-            title={roomState.pendingUpdate === null ? 'Apply changes' : 'Applying...'}
-            onPress={() => lobbyRuntime.updateTable(editName, editMaxPlayers, editOptions)} />
         </View>
-        <Text style={shellStyles.heading}>Transfer leader</Text>
-        {room.data.players.filter((player) => !player.you).map((player) => (
-          <Button key={`leader-${player.name}`} disabled={roomState.pendingLeaderName !== null}
-            title={roomState.pendingLeaderName === player.name
-              ? `Transferring to ${player.name}...` : `Make ${player.name} leader`}
-            onPress={() => lobbyRuntime.setTableLeader(player.name)} />
-        ))}
-        <Button disabled={room.data.players.length < 2
-            || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
-          title={roomState.pendingStart === null ? 'Start' : 'Starting...'}
-          onPress={() => lobbyRuntime.startGame()} />
-      </>)}
-      <Button disabled={roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
-        title={roomState.pendingLeaveTableID === null ? 'Leave' : 'Leaving...'}
-        onPress={() => lobbyRuntime.leave(room.tableID)} />
-      <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />
+        <ActionButton
+          compact
+          disabled={roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
+          title={roomState.pendingLeaveTableID === null ? 'Leave' : 'Leaving…'}
+          onPress={() => lobbyRuntime.leave(room.tableID)}
+        />
+      </Panel>
+
+      <View style={[styles.columns, wide && styles.columnsWide]}>
+        <View style={styles.column}>
+          <Panel>
+            <SectionHeading
+              title="Players"
+              detail={`${room.data.players.length}/${room.data.maxPlayers} seats filled`}
+            />
+            <View style={styles.players}>
+              {room.data.players.map((player) => (
+                <View key={player.index} style={[styles.playerRow, { borderColor: theme.colors.border }]}>
+                  <View style={styles.playerCopy}>
+                    <Text style={[styles.playerName, { color: theme.colors.text }]}>
+                      {player.name}{player.you ? ' (you)' : ''}
+                    </Text>
+                    <Text style={[styles.playerState, { color: player.present ? theme.colors.success : theme.colors.warning }]}>
+                      {player.present ? 'Present' : 'Away'}
+                    </Text>
+                  </View>
+                  {isOwner && !player.you && (
+                    <ActionButton
+                      compact
+                      disabled={roomState.pendingLeaderName !== null}
+                      title={roomState.pendingLeaderName === player.name ? 'Transferring…' : 'Make leader'}
+                      onPress={() => lobbyRuntime.setTableLeader(player.name)}
+                    />
+                  )}
+                </View>
+              ))}
+            </View>
+            {isOwner && (
+              <ActionButton
+                disabled={room.data.players.length < 2
+                  || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
+                title={roomState.pendingStart === null ? 'Start game' : 'Starting…'}
+                tone="primary"
+                onPress={() => lobbyRuntime.startGame()}
+              />
+            )}
+          </Panel>
+          <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />
+        </View>
+
+        {isOwner && (
+          <Panel style={styles.column}>
+            <SectionHeading title="Table settings" detail="Changes are applied authoritatively to the room." />
+            <Field maxLength={45} onChangeText={setEditName} placeholder="Table name" value={editName} />
+            <View style={styles.stepperRow}>
+              <View style={styles.stepperCopy}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
+                <Text style={[styles.stepperValue, { color: theme.colors.text }]}>{editMaxPlayers}</Text>
+              </View>
+              <View style={styles.actionsRow}>
+                <ActionButton compact disabled={editMaxPlayers <= 2} title="−"
+                  onPress={() => setEditMaxPlayers((count) => count - 1)} />
+                <ActionButton compact disabled={editMaxPlayers >= 6} title="+"
+                  onPress={() => setEditMaxPlayers((count) => count + 1)} />
+              </View>
+            </View>
+            <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
+            <ActionButton
+              disabled={roomState.pendingUpdate !== null || editName.trim().length === 0}
+              title={roomState.pendingUpdate === null ? 'Apply changes' : 'Applying…'}
+              tone="primary"
+              onPress={() => lobbyRuntime.updateTable(editName, editMaxPlayers, editOptions)}
+            />
+          </Panel>
+        )}
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { gap: 16 },
+  hero: { alignItems: 'center', flexDirection: 'row', gap: 16, justifyContent: 'space-between' },
+  heroCopy: { flex: 1, gap: 5 },
+  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  title: { fontSize: 26, fontWeight: '900' },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  columns: { gap: 16 },
+  columnsWide: { alignItems: 'flex-start', flexDirection: 'row' },
+  column: { flex: 1, gap: 16, minWidth: 0 },
+  players: { gap: 8 },
+  playerRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingTop: 9 },
+  playerCopy: { flex: 1, gap: 2 },
+  playerName: { fontSize: 15, fontWeight: '800' },
+  playerState: { fontSize: 12, fontWeight: '700' },
+  stepperRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  stepperCopy: { gap: 2 },
+  label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  stepperValue: { fontSize: 24, fontWeight: '800' },
+  actionsRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+});

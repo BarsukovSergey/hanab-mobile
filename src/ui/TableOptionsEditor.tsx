@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { Button, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { SUPPORTED_VARIANT_NAMES } from '../game/client/supportedVariants';
 import type { MobileTableOptions } from '../protocol/lobbyProtocol';
+import {
+  Field,
+  SectionHeading,
+  useHanabTheme,
+} from './designSystem';
 import { toggleMobileTableBooleanOption, type BooleanMobileTableOption } from './tableOptions';
-import { shellStyles } from './shellStyles';
 
 export function TableOptionsEditor({ options, onChange }: {
   options: MobileTableOptions;
   onChange: (options: MobileTableOptions) => void;
 }) {
+  const { theme } = useHanabTheme();
   const [variantSearch, setVariantSearch] = useState('');
   const matchingVariants = SUPPORTED_VARIANT_NAMES.filter((name) => (
     name.toLocaleLowerCase().includes(variantSearch.trim().toLocaleLowerCase())
@@ -17,33 +22,99 @@ export function TableOptionsEditor({ options, onChange }: {
   const toggle = (key: BooleanMobileTableOption) => {
     onChange(toggleMobileTableBooleanOption(options, key));
   };
+  const toggles = [
+    ['timed', 'Timed'], ['cardCycle', 'Card Cycle'], ['emptyClues', 'Empty Clues'],
+    ['oneExtraCard', 'One Extra Card'], ['oneLessCard', 'One Less Card'],
+    ['allOrNothing', 'All or Nothing'],
+  ] as const;
+
   return (
-    <View style={shellStyles.subsection}>
-      <Text>Variant</Text>
-      <TextInput autoCapitalize="none" onChangeText={setVariantSearch}
-        placeholder="Search variants" value={variantSearch} />
-      {matchingVariants.map((name) => (
-        <Button key={name} title={`${options.variantName === name ? '✓ ' : ''}${name}`}
-          onPress={() => onChange({ ...options, variantName: name })} />
-      ))}
-      {([
-        ['timed', 'Timed'], ['cardCycle', 'Card Cycle'], ['emptyClues', 'Empty Clues'],
-        ['oneExtraCard', 'One Extra Card'], ['oneLessCard', 'One Less Card'],
-        ['allOrNothing', 'All or Nothing'],
-      ] as const).map(([key, label]) => (
-        <Button key={key} title={`${options[key] ? '✓ ' : ''}${label}`}
-          onPress={() => toggle(key)} />
-      ))}
-      {options.timed && (<>
-        <Text>Base Time (seconds)</Text>
-        <TextInput keyboardType="number-pad" onChangeText={(value) => onChange({
-          ...options, timeBase: Number(value),
-        })} style={shellStyles.input} value={String(options.timeBase)} />
-        <Text>Per Turn (seconds)</Text>
-        <TextInput keyboardType="number-pad" onChangeText={(value) => onChange({
-          ...options, timePerTurn: Number(value),
-        })} style={shellStyles.input} value={String(options.timePerTurn)} />
-      </>)}
+    <View style={[styles.root, { borderColor: theme.colors.border }]}>
+      <SectionHeading title="Variant & rules" detail={`Selected: ${options.variantName}`} />
+      <Field
+        autoCapitalize="none"
+        autoCorrect={false}
+        onChangeText={setVariantSearch}
+        placeholder="Search variants"
+        value={variantSearch}
+      />
+      <View style={styles.chips}>
+        {matchingVariants.map((name) => {
+          const active = options.variantName === name;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              key={name}
+              onPress={() => onChange({ ...options, variantName: name })}
+              style={({ pressed }) => [
+                styles.chip,
+                {
+                  backgroundColor: active ? theme.colors.accent : theme.colors.surfaceRaised,
+                  borderColor: active ? theme.colors.accent : theme.colors.border,
+                },
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: active ? theme.colors.accentText : theme.colors.text }]}>
+                {active ? '✓ ' : ''}{name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Optional rules</Text>
+      <View style={styles.chips}>
+        {toggles.map(([key, label]) => {
+          const active = options[key];
+          return (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: active }}
+              key={key}
+              onPress={() => toggle(key)}
+              style={({ pressed }) => [
+                styles.chip,
+                {
+                  backgroundColor: active ? theme.colors.accent : theme.colors.surfaceRaised,
+                  borderColor: active ? theme.colors.accent : theme.colors.border,
+                },
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: active ? theme.colors.accentText : theme.colors.text }]}>
+                {active ? '✓ ' : ''}{label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {options.timed && (
+        <View style={styles.timedRow}>
+          <View style={styles.timedField}>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Base time (seconds)</Text>
+            <Field keyboardType="number-pad" onChangeText={(value) => onChange({
+              ...options, timeBase: Number(value),
+            })} value={String(options.timeBase)} />
+          </View>
+          <View style={styles.timedField}>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Per turn (seconds)</Text>
+            <Field keyboardType="number-pad" onChangeText={(value) => onChange({
+              ...options, timePerTurn: Number(value),
+            })} value={String(options.timePerTurn)} />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { borderTopWidth: 1, gap: 10, paddingTop: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  chip: { borderRadius: 999, borderWidth: 1, minHeight: 36, justifyContent: 'center', paddingHorizontal: 11, paddingVertical: 7 },
+  chipText: { fontSize: 13, fontWeight: '700' },
+  label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
+  timedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  timedField: { flex: 1, gap: 5, minWidth: 150 },
+});

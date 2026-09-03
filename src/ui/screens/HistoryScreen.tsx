@@ -1,9 +1,18 @@
-import { Button, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { areTableOptionsSupported } from '../../game/client/supportedVariants';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
-import { shellStyles } from '../shellStyles';
+import {
+  ActionButton,
+  EmptyState,
+  Notice,
+  Panel,
+  Pill,
+  SectionHeading,
+  useHanabTheme,
+  useResponsiveLayout,
+} from '../designSystem';
 
 const END_CONDITIONS = [
   'In progress', 'Normal', 'Strikeout', 'Timeout', 'Terminated by player',
@@ -18,44 +27,82 @@ export function HistoryScreen({
   onBack: () => void;
   onWatchReplay: (databaseID: number) => void;
 }) {
+  const { theme } = useHanabTheme();
+  const { wide } = useResponsiveLayout();
   const history = useAppSelector((state) => state.history);
   const replayPending = history.pendingReplayCreate !== null;
   return (
-    <View style={shellStyles.section}>
-      <View style={shellStyles.titleRow}>
-        <Text style={shellStyles.heading}>Game History</Text>
-        <Button title="Back to Lobby" onPress={onBack} />
-      </View>
-      {!history.initialPageReceived && <Text>Loading game history...</Text>}
-      {history.error !== null && <Text style={shellStyles.error}>{history.error}</Text>}
+    <View style={styles.root}>
+      <Panel style={styles.header}>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>REPLAYS</Text>
+          <SectionHeading title="Game history" detail="Open a finished game using the same authoritative replay path." />
+        </View>
+        <ActionButton compact title="Back to lobby" onPress={onBack} />
+      </Panel>
+
+      {!history.initialPageReceived && <Notice>Loading game history…</Notice>}
+      {history.error !== null && <Notice tone="error">{history.error}</Notice>}
       {history.initialPageReceived && history.items.length === 0 && (
-        <Text>No finished games yet.</Text>
+        <Panel><EmptyState>No finished games yet.</EmptyState></Panel>
       )}
-      {history.items.map((item) => {
-        const supported = areTableOptionsSupported(item.options);
-        const finished = new Date(item.datetimeFinished);
-        const finishedLabel = Number.isNaN(finished.getTime())
-          ? item.datetimeFinished
-          : finished.toLocaleString();
-        return (
-          <View style={shellStyles.tableRow} key={item.id}>
-            <Text style={shellStyles.tableName}>Game #{item.id} · {item.options.variantName}</Text>
-            <Text>{item.playerNames.join(', ')}</Text>
-            <Text>{finishedLabel}</Text>
-            <Text>Score: {item.score} · {END_CONDITIONS[item.endCondition]}</Text>
-            {!supported && <Text>This game uses unsupported options.</Text>}
-            <Button disabled={!supported || replayPending}
-              title={replayPending ? 'Opening replay...' : 'Watch Replay'}
-              onPress={() => onWatchReplay(item.id)} />
-          </View>
-        );
-      })}
+
+      <View style={[styles.grid, wide && styles.gridWide]}>
+        {history.items.map((item) => {
+          const supported = areTableOptionsSupported(item.options);
+          const finished = new Date(item.datetimeFinished);
+          const finishedLabel = Number.isNaN(finished.getTime())
+            ? item.datetimeFinished
+            : finished.toLocaleString();
+          return (
+            <Panel key={item.id} style={[styles.gameCard, wide && styles.gameCardWide]}>
+              <View style={styles.gameHeader}>
+                <View style={styles.gameCopy}>
+                  <Text style={[styles.gameTitle, { color: theme.colors.text }]}>Game #{item.id}</Text>
+                  <Text style={[styles.variant, { color: theme.colors.textMuted }]}>{item.options.variantName}</Text>
+                </View>
+                <Pill active={supported}>Score {item.score}</Pill>
+              </View>
+              <Text style={[styles.players, { color: theme.colors.text }]}>{item.playerNames.join(', ')}</Text>
+              <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{finishedLabel}</Text>
+              <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{END_CONDITIONS[item.endCondition]}</Text>
+              {!supported && <Notice tone="error">This game uses unsupported options.</Notice>}
+              <ActionButton
+                disabled={!supported || replayPending}
+                title={replayPending ? 'Opening replay…' : 'Watch replay'}
+                tone={supported ? 'primary' : 'secondary'}
+                onPress={() => onWatchReplay(item.id)}
+              />
+            </Panel>
+          );
+        })}
+      </View>
+
       {history.hasMore && (
-        <Button disabled={history.pendingRequest !== null}
-          title={history.pendingRequest === null ? 'Load More' : 'Loading more...'}
-          onPress={() => lobbyRuntime.loadMoreHistory()} />
+        <ActionButton
+          disabled={history.pendingRequest !== null}
+          title={history.pendingRequest === null ? 'Load more' : 'Loading more…'}
+          onPress={() => lobbyRuntime.loadMoreHistory()}
+        />
       )}
-      {history.pendingRequest !== null && <Text>Loading another page...</Text>}
+      {history.pendingRequest !== null && <Text style={{ color: theme.colors.textMuted }}>Loading another page…</Text>}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { gap: 16 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  headerCopy: { flex: 1, gap: 3 },
+  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  grid: { gap: 12 },
+  gridWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  gameCard: { gap: 10 },
+  gameCardWide: { flexBasis: '48%', flexGrow: 1, minWidth: 320 },
+  gameHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  gameCopy: { flex: 1, gap: 2 },
+  gameTitle: { fontSize: 18, fontWeight: '900' },
+  variant: { fontSize: 13 },
+  players: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  meta: { fontSize: 12, lineHeight: 17 },
+});
