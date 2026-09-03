@@ -19,10 +19,11 @@ export function createAppStore() {
     },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware({
       serializableCheck: {
-        // Replay snapshots are a large tree of plain serializable game data. Re-checking every
-        // historical GameState after every dispatch makes the development invariant middleware
-        // dominate dispatch time, while the rest of Redux state/actions remain fully checked.
-        ignoredPaths: ['room.room.clientState.replay.states'],
+        // The headless game client is a large tree of plain serializable upstream-derived state.
+        // Re-scanning that entire tree after every game dispatch dominates development runtime
+        // without adding useful coverage; the surrounding Redux state and every action remain
+        // checked for serializability.
+        ignoredPaths: ['room.room.clientState'],
       },
     }),
   });
