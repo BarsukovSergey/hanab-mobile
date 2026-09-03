@@ -7,6 +7,8 @@ const CARD_W = 286;
 const CARD_H = 406;
 const CARD_PADDING = 4;
 const CARD_RADIUS = CARD_W * 0.08;
+const UNKNOWN_CARD_RANK = 6;
+const START_CARD_RANK = 7;
 const CARD_BORDER_PATH = [
   `M ${CARD_PADDING} ${CARD_RADIUS + CARD_PADDING}`,
   `L ${CARD_PADDING} ${CARD_H - CARD_RADIUS - CARD_PADDING}`,
@@ -20,32 +22,37 @@ const CARD_BORDER_PATH = [
   'Z',
 ].join(' ');
 
-export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: number; suitIndex: number; variantName: string }) {
-  const visual = getVisibleCardVisual(variantName, suitIndex, rank);
-  if (visual === null) return null;
+export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: number | null; suitIndex: number | null; variantName: string }) {
+  if (suitIndex === null && rank === null) return <UnknownBareCard />;
+  if (suitIndex === null) return <UnknownSuitCard rank={rank} />;
+
+  const visualRank = rank ?? UNKNOWN_CARD_RANK;
+  const visual = getVisibleCardVisual(variantName, suitIndex, visualRank);
+  if (visual === null) return <UnknownBareCard />;
 
   const backgroundFill = paintReference(visual.background, 'card-background');
   const rankFill = paintReference(visual.rankPaint, 'card-rank');
-  const showRank = rank >= 1 && rank <= 5;
+  const showRank = rank !== null && (rank >= 1 && rank <= 5 || rank === START_CARD_RANK);
+  const stackBase = rank === 0;
 
   return (
     <Svg height="100%" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width="100%">
       <PaintDef id="card-background" paint={visual.background} />
       <PaintDef id="card-rank" paint={visual.rankPaint} />
 
-      <Path d={CARD_BORDER_PATH} fill="#ffffff" />
+      {!stackBase && <Path d={CARD_BORDER_PATH} fill="#ffffff" />}
       <DualColorTriangles fills={visual.clueColorFills} />
       <Path
         d={CARD_BORDER_PATH}
         fill={backgroundFill}
-        fillOpacity={0.3}
+        fillOpacity={stackBase ? 1 : 0.3}
         stroke={backgroundFill}
-        strokeOpacity={0.7}
+        strokeOpacity={stackBase ? 1 : 0.7}
         strokeWidth={8}
       />
 
       {showRank && <RankText fill={rankFill} rank={rank} />}
-      {showRank && visual.deceptiveRank !== null && (
+      {showRank && visual.deceptiveRank !== null && rank !== START_CARD_RANK && (
         <G transform={`translate(${CARD_W / 4 + CARD_W / 50} ${CARD_H / 40}) scale(0.5)`}>
           <RankText fill={rankFill} rank={visual.deceptiveRank} />
         </G>
@@ -60,11 +67,29 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
         duplicatePip={visual.duplicatePip}
         fillColors={visual.pipFillColors}
         pip={visual.pip}
-        rank={rank}
+        rank={visualRank}
         suitName={visual.suitName}
       />
     </Svg>
   );
+}
+
+function UnknownBareCard() {
+  return <Svg height="100%" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width="100%">
+    <Path d={CARD_BORDER_PATH} fill="#ffffff" />
+    <Path d={CARD_BORDER_PATH} fill="#000000" fillOpacity={0.5} stroke="#000000" strokeOpacity={0.6} strokeWidth={8} />
+  </Svg>;
+}
+
+function UnknownSuitCard({ rank }: { rank: number | null }) {
+  if (rank === null) return <UnknownBareCard />;
+  const showRank = rank >= 1 && rank <= 5 || rank === START_CARD_RANK;
+  return <Svg height="100%" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width="100%">
+    <Path d={CARD_BORDER_PATH} fill="#ffffff" />
+    <Path d={CARD_BORDER_PATH} fill="#cccccc" fillOpacity={0.3} stroke="#cccccc" strokeOpacity={0.7} strokeWidth={8} />
+    {showRank && <RankText fill="#cccccc" rank={rank} />}
+    {showRank && <G transform={`translate(${CARD_W} ${CARD_H}) rotate(180)`}><RankText fill="#cccccc" rank={rank} /></G>}
+  </Svg>;
 }
 
 function RankText({ fill, rank }: { fill: string; rank: number }) {
@@ -78,7 +103,7 @@ function RankText({ fill, rank }: { fill: string; rank: number }) {
     strokeWidth={2}
     x={19}
     y={110}
-  >{rank}</SvgText>;
+  >{rank === START_CARD_RANK ? 'S' : rank}</SvgText>;
 }
 
 function PaintDef({ id, paint }: { id: string; paint: CardPaint }) {
@@ -148,6 +173,9 @@ function RankPips({ duplicatePip, fillColors, pip, rank, suitName }: {
   rank: number;
   suitName: string;
 }) {
+  if (rank === 0) {
+    return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="stack" pip={pip} scale={1} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
+  }
   if (rank === 1) {
     return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="center" pip={pip} scale={0.72} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
   }
@@ -156,6 +184,12 @@ function RankPips({ duplicatePip, fillColors, pip, rank, suitName }: {
       <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="top" pip={pip} scale={0.56} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2 - 90} />
       <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="bottom" pip={pip} rotation={180} scale={0.56} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2 + 90} />
     </>;
+  }
+  if (rank === UNKNOWN_CARD_RANK) {
+    return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="unknown-rank" opacity={0.1} pip={pip} scale={1.2} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
+  }
+  if (rank === START_CARD_RANK) {
+    return <PlacedPip duplicatePip={duplicatePip} fillColors={fillColors} id="start" pip={pip} scale={1.2} suitName={suitName} x={CARD_W / 2} y={CARD_H / 2} />;
   }
   if (rank < 3 || rank > 5) return null;
 
@@ -172,10 +206,11 @@ function RankPips({ duplicatePip, fillColors, pip, rank, suitName }: {
   </>;
 }
 
-function PlacedPip({ duplicatePip, fillColors, id, pip, rotation = 0, scale, suitName, x, y }: {
+function PlacedPip({ duplicatePip, fillColors, id, opacity = 1, pip, rotation = 0, scale, suitName, x, y }: {
   duplicatePip: boolean;
   fillColors: readonly string[];
   id: string;
+  opacity?: number;
   pip: string;
   rotation?: number;
   scale: number;
@@ -184,7 +219,7 @@ function PlacedPip({ duplicatePip, fillColors, id, pip, rotation = 0, scale, sui
   y: number;
 }) {
   return (
-    <G transform={`translate(${x} ${y}) rotate(${rotation}) scale(${scale})`}>
+    <G opacity={opacity} transform={`translate(${x} ${y}) rotate(${rotation}) scale(${scale})`}>
       <UpstreamPipPaths
         duplicatePip={duplicatePip}
         fillColors={fillColors}
