@@ -31,12 +31,13 @@ export function UpstreamPip({ pip, fillColors, size, suitName = '', duplicatePip
   );
 }
 
-export function UpstreamPipPaths({ pip, fillColors, suitName, duplicatePip = false, idPrefix }: {
+export function UpstreamPipPaths({ pip, fillColors, suitName, duplicatePip = false, idPrefix, strokeWidth }: {
   pip: string;
   fillColors: readonly string[];
   suitName: string;
   duplicatePip?: boolean;
   idPrefix: string;
+  strokeWidth?: number;
 }) {
   const fill = suitName === 'Black' ? '#212121' : fillColors[0] ?? '#5d6570';
   const multi = fillColors.length > 1;
@@ -75,13 +76,13 @@ export function UpstreamPipPaths({ pip, fillColors, suitName, duplicatePip = fal
         strokeWidth={1}
       />}
       {isVanillaUpstreamPip(pip)
-        ? <CanonicalPipPath fill={commonFill} pip={pip} />
-        : recorded !== null && <RecordedPipPaths idPrefix={idPrefix} vector={recorded} />}
+        ? <CanonicalPipPath fill={commonFill} pip={pip} strokeWidth={strokeWidth} />
+        : recorded !== null && <RecordedPipPaths idPrefix={idPrefix} strokeWidth={strokeWidth} vector={recorded} />}
     </G>
   </>;
 }
 
-function RecordedPipPaths({ idPrefix, vector }: { idPrefix: string; vector: PipVector }) {
+function RecordedPipPaths({ idPrefix, vector, strokeWidth }: { idPrefix: string; vector: PipVector; strokeWidth?: number }) {
   const gradients = vector.shapes.flatMap((shape) => shape.gradient === undefined ? [] : [shape.gradient]);
   return <>
     {gradients.length > 0 && <Defs>{gradients.map((gradient) => (
@@ -107,14 +108,14 @@ function RecordedPipPaths({ idPrefix, vector }: { idPrefix: string; vector: PipV
         key={`${idPrefix}-shape-${index}`}
         stroke={shape.stroke}
         strokeLinejoin={shape.strokeLinejoin}
-        strokeWidth={shape.strokeWidth}
+        strokeWidth={shape.stroke === undefined ? shape.strokeWidth : strokeWidth ?? shape.strokeWidth}
       />
     ))}
   </>;
 }
 
-export function CanonicalPipPath({ pip, fill }: { pip: string; fill: string }) {
-  const common = { fill, stroke: '#000000', strokeLinejoin: 'round' as const, strokeWidth: 3 };
+export function CanonicalPipPath({ pip, fill, strokeWidth = 3 }: { pip: string; fill: string; strokeWidth?: number }) {
+  const common = { fill, stroke: '#000000', strokeLinejoin: 'round' as const, strokeWidth };
   switch (pip) {
     case 'hanabiRed1':
       return (
