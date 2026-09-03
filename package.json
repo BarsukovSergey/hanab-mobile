@@ -8,7 +8,9 @@
     "android": "expo run:android",
     "android:release": "expo run:android --variant release",
     "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "cards:generate": "node tools/card-assets/generate.mjs",
+    "cards:check": "node tools/card-assets/generate.mjs --check"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
