@@ -10,11 +10,13 @@ type Props = {
   title: string;
 };
 
+const EMPTY_MESSAGES: readonly never[] = [];
+
 export function ChatPanel({ room, title }: Props) {
   const [draft, setDraft] = useState('');
   const historyRef = useRef<ScrollView>(null);
   const ready = useAppSelector((state) => state.session.phase === 'ready');
-  const messages = useAppSelector((state) => state.chat.messagesByRoom[room] ?? []);
+  const messages = useAppSelector((state) => state.chat.messagesByRoom[room] ?? EMPTY_MESSAGES);
   const trimmed = draft.trim();
 
   const send = () => {
