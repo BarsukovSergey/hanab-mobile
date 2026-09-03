@@ -11,7 +11,13 @@ const END_CONDITIONS = [
   'All or Nothing failed', 'All or Nothing softlock', 'Terminated by vote',
 ] as const;
 
-export function HistoryScreen({ onBack }: { onBack: () => void }) {
+export function HistoryScreen({
+  onBack,
+  onWatchReplay,
+}: {
+  onBack: () => void;
+  onWatchReplay: (databaseID: number) => void;
+}) {
   const history = useAppSelector((state) => state.history);
   const replayPending = history.pendingReplayCreate !== null;
   return (
@@ -40,7 +46,7 @@ export function HistoryScreen({ onBack }: { onBack: () => void }) {
             {!supported && <Text>This game uses unsupported options.</Text>}
             <Button disabled={!supported || replayPending}
               title={replayPending ? 'Opening replay...' : 'Watch Replay'}
-              onPress={() => lobbyRuntime.watchHistoricalGame(item.id)} />
+              onPress={() => onWatchReplay(item.id)} />
           </View>
         );
       })}

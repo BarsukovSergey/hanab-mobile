@@ -7,6 +7,7 @@ describe('C16A Android Back policy', () => {
     localScreen: 'lobby' as const,
     authenticated: true,
     roomKind: 'none' as const,
+    roomRole: null,
     rematchPending: false,
   };
 
@@ -18,14 +19,33 @@ describe('C16A Android Back policy', () => {
     expect(getBackAction(base)).toBe('system');
   });
 
-  test.each(['pregame', 'awaiting_game_bootstrap', 'live_game'] as const)(
-    '%s consumes Back',
-    (roomKind) => expect(getBackAction({ ...base, roomKind })).toBe('consume'),
-  );
+  test('pregame player consumes Back', () => {
+    expect(getBackAction({ ...base, roomKind: 'pregame', roomRole: 'player' })).toBe('consume');
+  });
 
-  test('authoritative room remains protected while connection presentation is not ready', () => {
-    expect(getBackAction({ ...base, authenticated: false, roomKind: 'live_game' }))
+  test('pregame spectator leaves with Back', () => {
+    expect(getBackAction({ ...base, roomKind: 'pregame', roomRole: 'spectator' }))
+      .toBe('leave_pregame');
+  });
+
+  test('awaiting bootstrap consumes Back', () => {
+    expect(getBackAction({ ...base, roomKind: 'awaiting_game_bootstrap', roomRole: 'spectator' }))
       .toBe('consume');
+  });
+
+  test('live player consumes Back', () => {
+    expect(getBackAction({ ...base, roomKind: 'live_game', roomRole: 'player' })).toBe('consume');
+  });
+
+  test('live spectator or replay unattends with Back', () => {
+    expect(getBackAction({ ...base, roomKind: 'live_game', roomRole: 'spectator' }))
+      .toBe('unattend');
+  });
+
+  test('authoritative live room remains protected while connection presentation is not ready', () => {
+    expect(getBackAction({
+      ...base, authenticated: false, roomKind: 'live_game', roomRole: 'player',
+    })).toBe('consume');
   });
 
   test('rematch transition consumes Back', () => {

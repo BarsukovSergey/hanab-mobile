@@ -26,10 +26,12 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [localScreen, setLocalScreen] = useState<LocalScreen>('lobby');
+  const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
   const session = useAppSelector((state) => state.session);
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
+  const pendingReplayCreate = useAppSelector((state) => state.history.pendingReplayCreate);
 
   const runProbe = useCallback(async () => {
     setProbe('checking');
@@ -62,25 +64,52 @@ export default function App() {
   useEffect(() => {
     if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {
       setLocalScreen('lobby');
+      return;
     }
-  }, [roomState.room.kind, roomState.rematchTransition]);
+    if (returnAfterUnattend !== null && pendingReplayCreate === null) {
+      setLocalScreen(returnAfterUnattend);
+      setReturnAfterUnattend(null);
+    }
+  }, [pendingReplayCreate, returnAfterUnattend, roomState.rematchTransition, roomState.room.kind]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      const roomRole = roomState.room.kind === 'pregame'
+        || roomState.room.kind === 'awaiting_game_bootstrap'
+        || roomState.room.kind === 'live_game'
+        ? roomState.room.role
+        : null;
       const action = getBackAction({
         localScreen,
         authenticated: probe === 'valid' && session.phase === 'ready' && hydrated,
         roomKind: roomState.room.kind,
+        roomRole,
         rematchPending: roomState.rematchTransition !== null,
       });
       if (action === 'go_to_lobby') {
         setLocalScreen('lobby');
         return true;
       }
+      if (action === 'leave_pregame') {
+        if (roomState.room.kind === 'pregame' && roomState.pendingLeaveTableID === null) {
+          lobbyRuntime.leave(roomState.room.tableID);
+        }
+        return true;
+      }
+      if (action === 'unattend') {
+        if (roomState.room.kind === 'live_game' && roomState.pendingUnattendTableID === null) {
+          lobbyRuntime.unattendLiveGame(roomState.room.tableID);
+        }
+        return true;
+      }
       return action === 'consume';
     });
     return () => subscription.remove();
-  }, [hydrated, localScreen, probe, roomState.rematchTransition, roomState.room.kind, session.phase]);
+  }, [
+    hydrated, localScreen, probe, roomState.pendingLeaveTableID,
+    roomState.pendingUnattendTableID, roomState.rematchTransition,
+    roomState.room, session.phase,
+  ]);
 
   const submitLogin = async () => {
     setLoginPending(true);
@@ -92,6 +121,7 @@ export default function App() {
       if (result.kind === 'valid') {
         setProbe('valid');
         setLocalScreen('lobby');
+        setReturnAfterUnattend(null);
         void lobbyRuntime.connect();
       } else {
         setProbe(result.kind === 'missing' ? 'missing' : 'indeterminate');
@@ -114,6 +144,7 @@ export default function App() {
     if (result.kind === 'signedOut') {
       setProbe('missing');
       setLocalScreen('lobby');
+      setReturnAfterUnattend(null);
       setUsername('');
       setPassword('');
     } else {
@@ -142,7 +173,11 @@ export default function App() {
           <View style={styles.authActions}>
             <Button disabled={roomState.pendingUnattendTableID !== null}
               title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
-              onPress={() => lobbyRuntime.unattendLiveGame(liveTableID)} />
+              onPress={() => {
+                setReturnAfterUnattend(null);
+                setLocalScreen('lobby');
+                lobbyRuntime.unattendLiveGame(liveTableID);
+              }} />
             <Button title="Sign out" onPress={() => void signOut()} />
           </View>
         </View>
@@ -196,7 +231,19 @@ export default function App() {
   } else if (roomState.room.kind === 'pregame') {
     content = <PregameScreen />;
   } else if (localScreen === 'history') {
-    content = <HistoryScreen onBack={() => setLocalScreen('lobby')} />;
+    content = (
+      <HistoryScreen
+        onBack={() => {
+          setReturnAfterUnattend(null);
+          setLocalScreen('lobby');
+        }}
+        onWatchReplay={(databaseID) => {
+          if (lobbyRuntime.watchHistoricalGame(databaseID)) {
+            setReturnAfterUnattend('history');
+          }
+        }}
+      />
+    );
   } else {
     content = <LobbyScreen onOpenHistory={() => setLocalScreen('history')} />;
   }
