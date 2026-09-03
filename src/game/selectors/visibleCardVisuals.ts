@@ -12,6 +12,7 @@ export type VisibleCardVisual = {
   pip: string;
   pipFillColors: readonly string[];
   rankPaint: CardPaint;
+  showBottomRank: boolean;
   suitName: string;
 };
 
@@ -43,6 +44,7 @@ export function getVisibleCardVisual(variantName: string, suitIndex: number, ran
     pip,
     pipFillColors: suit.name === 'Black' ? ['#212121'] : rawFillColors,
     rankPaint: rankPaint(variantName, suitIndex, rank),
+    showBottomRank: !variant.upOrDown && !suit.reversed,
     suitName: suit.name,
   };
 }
