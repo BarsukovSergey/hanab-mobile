@@ -32,7 +32,7 @@ describe('card knowledge view model', () => {
   test('represents an untouched fresh card with full clue-only possibilities', () => {
     const knowledge = getCardKnowledgeViewModel(variant.name, freshCard(7));
 
-    expect(knowledge).toEqual({
+    expect(knowledge).toMatchObject({
       order: 7,
       hasClueApplied: false,
       positiveColorLabels: [],
@@ -42,6 +42,8 @@ describe('card knowledge view model', () => {
       suitDetermined: false,
       rankDetermined: false,
     });
+    expect(knowledge.suitPips.every((pip) => pip.state === 'visible')).toBe(true);
+    expect(knowledge.rankPips.every((pip) => pip.state === 'visible')).toBe(true);
   });
 
   test('retains a rank clue when a color clue is added to the same card', () => {
@@ -56,6 +58,8 @@ describe('card knowledge view model', () => {
     expect(rankKnowledge.possibleSuitLabels).toEqual(
       variant.suits.map((suit) => suit.name),
     );
+    expect(rankKnowledge.rankPips.find((pip) => pip.rank === 2)).toMatchObject({ state: 'visible', positive: true });
+    expect(rankKnowledge.rankPips.filter((pip) => pip.rank !== 2).every((pip) => pip.state === 'hidden')).toBe(true);
 
     const colorAndRankClued = applyClue(rankClued, newColorClue(color), true);
     const accumulated = getCardKnowledgeViewModel(variant.name, colorAndRankClued);
@@ -81,6 +85,20 @@ describe('card knowledge view model', () => {
       variant.suits.map((suit) => suit.name).filter((name) => name !== color.name),
     );
     expect(knowledge.possibleRanks).toEqual([...variant.ranks]);
+    expect(knowledge.suitPips.find((pip) => pip.label === color.name)?.state).toBe('hidden');
+  });
+
+  test('marks empathy-eliminated possibilities instead of hiding clue-visible pips', () => {
+    const card = freshCard(12);
+    const firstSuit = variant.suits[0];
+    expect(firstSuit).toBeDefined();
+    if (firstSuit === undefined) return;
+    const narrowed = {
+      ...card,
+      possibleCards: card.possibleCards.filter(([suitIndex]) => suitIndex !== 0),
+    };
+    const knowledge = getCardKnowledgeViewModel(variant.name, narrowed);
+    expect(knowledge.suitPips[0]).toMatchObject({ label: firstSuit.name, state: 'eliminated' });
   });
 
   test('gives a freshly drawn order fresh knowledge instead of inheriting the old card', () => {
