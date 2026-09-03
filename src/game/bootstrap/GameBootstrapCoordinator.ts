@@ -36,6 +36,7 @@ import { stateReducer } from '../client/reducers/stateReducer';
 import type { State } from '../client/types/State';
 import { roomActions } from '../../store/roomSlice';
 import { lobbyActions } from '../../store/lobbySlice';
+import { historyActions } from '../../store/historySlice';
 import type { AppStore } from '../../store/store';
 import type { IncrementalRejectionReason } from '../../store/sessionSlice';
 import { areTableOptionsSupported } from '../client/supportedVariants';
@@ -48,7 +49,8 @@ type ActiveLoad = {
   gameLoadEpoch: number;
   tableID: number;
   role: Role;
-  sharedReplay: boolean;
+  replay: boolean;
+  expectedDatabaseID: number | null;
   phase: 'waiting_init' | 'waiting_history' | 'failed';
   info1Attempted: boolean;
   info2Attempted: boolean;
@@ -71,6 +73,7 @@ export type BootstrapTimers = {
 
 const DEFAULT_BOOTSTRAP_TIMEOUT_MS = 15_000;
 const UNSUPPORTED_TABLE_WARNING = 'This table uses options that Hanab Mobile does not support.';
+const HISTORICAL_REPLAY_WARNING = 'The requested replay did not match the authoritative game.';
 
 function makeMetadata(init: GameInit, username: string): GameMetadata {
   const { variantID: _variantID, ...wireOptions } = init.options;
@@ -173,7 +176,8 @@ export class GameBootstrapCoordinator {
       gameLoadEpoch,
       tableID: room.tableID,
       role: room.role,
-      sharedReplay: room.sharedReplay,
+      replay: room.replay,
+      expectedDatabaseID: room.expectedDatabaseID,
       phase: 'waiting_init',
       info1Attempted: false,
       info2Attempted: false,
@@ -217,18 +221,33 @@ export class GameBootstrapCoordinator {
         epoch: connectionEpoch,
         notice: { kind: 'warning', message: UNSUPPORTED_TABLE_WARNING },
       }));
+      if (load.expectedDatabaseID !== null) {
+        this.store.dispatch(historyActions.operationFailed({
+          connectionEpoch,
+          message: UNSUPPORTED_TABLE_WARNING,
+        }));
+      }
       return false;
     }
-    if (
+    const mismatch = (
       init.shadowing
-      || init.replay !== load.sharedReplay
-      || init.sharedReplay !== load.sharedReplay
-      || (!load.sharedReplay && load.role === 'player' && init.spectating)
-      || (!load.sharedReplay && load.role === 'spectator' && !init.spectating)
-    ) return false;
+      || init.replay !== load.replay
+      || (!load.replay && init.sharedReplay)
+      || (load.expectedDatabaseID !== null && init.databaseID !== load.expectedDatabaseID)
+      || (load.expectedDatabaseID !== null && init.sharedReplay)
+      || (!load.replay && load.role === 'player' && init.spectating)
+      || (!load.replay && load.role === 'spectator' && !init.spectating)
+    );
+    if (mismatch) {
+      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
+      return false;
+    }
 
     const username = this.store.getState().session.authenticatedUser?.username;
-    if (username === undefined) return false;
+    if (username === undefined) {
+      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
+      return false;
+    }
 
     let metadata: GameMetadata;
     let clientState: State;
@@ -236,6 +255,7 @@ export class GameBootstrapCoordinator {
       metadata = makeMetadata(init, username);
       clientState = initializeHeadlessState(metadata, init);
     } catch {
+      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
       return false;
     }
 
@@ -287,6 +307,7 @@ export class GameBootstrapCoordinator {
         });
       }
     } catch {
+      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
       return false;
     }
     if (this.active !== load || load.phase !== 'waiting_history') return false;
@@ -295,7 +316,7 @@ export class GameBootstrapCoordinator {
     // Send it after the authoritative history has reduced successfully, matching
     // the official client's post-initialization handshake, and before exposing LIVE.
     if (
-      !load.sharedReplay
+      !load.replay
       && load.role === 'player'
       && !this.sendFrame(encodeLoadedFrame(load.tableID))
     ) {
@@ -577,6 +598,25 @@ export class GameBootstrapCoordinator {
       connectionEpoch: load.connectionEpoch,
       tableID: load.tableID,
       gameLoadEpoch: load.gameLoadEpoch,
+    }));
+  }
+
+  private rejectHistoricalReplay(load: ActiveLoad): void {
+    if (this.active !== load) return;
+    this.sendFrame(encodeTableUnattendFrame(load.tableID));
+    this.clearTimer(load);
+    this.active = null;
+    this.store.dispatch(roomActions.unsupportedRoomRejected({
+      epoch: load.connectionEpoch,
+      tableID: load.tableID,
+    }));
+    this.store.dispatch(historyActions.operationFailed({
+      connectionEpoch: load.connectionEpoch,
+      message: HISTORICAL_REPLAY_WARNING,
+    }));
+    this.store.dispatch(lobbyActions.noticeReceived({
+      epoch: load.connectionEpoch,
+      notice: { kind: 'warning', message: HISTORICAL_REPLAY_WARNING },
     }));
   }
 

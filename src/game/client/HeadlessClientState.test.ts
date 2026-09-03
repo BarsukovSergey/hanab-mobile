@@ -17,7 +17,7 @@ describe('pinned upstream headless client state', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 1,
-      welcome: { userID: 1, username: 'Ada', playingAtTables: [] },
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] },
     }));
     store.dispatch(roomActions.joinRequested({ epoch: 1, tableID: 123 }));
     store.dispatch(roomActions.tableStartReceived({
@@ -98,7 +98,7 @@ describe('pinned upstream headless client state', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 1,
-      welcome: { userID: 1, username: 'Ada', playingAtTables: [] },
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] },
     }));
     store.dispatch(roomActions.joinRequested({ epoch: 1, tableID: 123 }));
     store.dispatch(roomActions.tableStartReceived({

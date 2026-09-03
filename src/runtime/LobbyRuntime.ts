@@ -28,6 +28,8 @@ import {
   decodeServerFrame,
   encodeChatFrame,
   encodeInactiveFrame,
+  encodeHistoryGetFrame,
+  encodeReplayCreateFrame,
   encodeClientFrame,
   encodeReplayActionFrame,
   encodeTableRestartFrame,
@@ -49,6 +51,7 @@ import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
 import { terminationActions } from '../store/terminationSlice';
+import { historyActions } from '../store/historySlice';
 import type { AppStore } from '../store/store';
 
 const SOCKET_OPEN = 1;
@@ -252,6 +255,60 @@ export class LobbyRuntime {
     return this.sendEncoded(frame);
   }
 
+  loadMoreHistory(): boolean {
+    const state = this.store.getState();
+    const history = state.history;
+    if (
+      state.session.phase !== 'ready'
+      || history.connectionEpoch !== state.session.connectionEpoch
+      || !history.initialPageReceived
+      || !history.hasMore
+      || history.pendingRequest !== null
+    ) return false;
+    const request = {
+      connectionEpoch: state.session.connectionEpoch,
+      offset: history.items.length,
+      amount: 10 as const,
+    };
+    if (!this.sendEncoded(encodeHistoryGetFrame(request.offset, request.amount))) return false;
+    this.store.dispatch(historyActions.pageRequested(request));
+    return this.store.getState().history.pendingRequest?.offset === request.offset;
+  }
+
+  watchHistoricalGame(databaseID: number): boolean {
+    const state = this.store.getState();
+    const item = state.history.items.find((candidate) => candidate.id === databaseID);
+    const room = state.room;
+    if (
+      state.session.phase !== 'ready'
+      || state.history.connectionEpoch !== state.session.connectionEpoch
+      || !Number.isInteger(databaseID)
+      || databaseID <= 0
+      || item === undefined
+      || !areTableOptionsSupported(item.options)
+      || room.room.kind !== 'none'
+      || room.pendingRecovery !== null
+      || room.pendingSpectateTableID !== null
+      || room.pendingJoin !== null
+      || room.pendingCreate !== null
+      || room.pendingLeaveTableID !== null
+      || room.pendingUnattendTableID !== null
+      || room.pendingStart !== null
+      || room.pendingUpdate !== null
+      || room.pendingLeaderName !== null
+      || room.pendingRestartTableID !== null
+      || room.rematchTransition !== null
+      || room.pendingGameplayAction !== null
+      || state.history.pendingReplayCreate !== null
+    ) return false;
+    if (!this.sendEncoded(encodeReplayCreateFrame(databaseID))) return false;
+    this.store.dispatch(historyActions.replayCreateRequested({
+      connectionEpoch: state.session.connectionEpoch,
+      databaseID,
+    }));
+    return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
+  }
+
   spectate(tableID: number): boolean {
     const state = this.store.getState();
     const table = state.lobby.tables.entities[tableID];
@@ -263,6 +320,7 @@ export class LobbyRuntime {
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
       || state.room.pendingCreate !== null
+      || state.history.pendingReplayCreate !== null
     ) {
       return false;
     }
@@ -296,6 +354,7 @@ export class LobbyRuntime {
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
       || state.room.pendingCreate !== null
+      || state.history.pendingReplayCreate !== null
       || (table.passwordProtected && (password === undefined || password.length === 0))
     ) {
       return false;
@@ -325,6 +384,7 @@ export class LobbyRuntime {
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
       || state.room.pendingCreate !== null
+      || state.history.pendingReplayCreate !== null
     ) {
       return false;
     }
@@ -374,6 +434,7 @@ export class LobbyRuntime {
       || state.room.pendingSpectateTableID !== null
       || state.room.pendingJoin !== null
       || state.room.pendingCreate !== null
+      || state.history.pendingReplayCreate !== null
     ) return false;
 
     let frame: string;
@@ -850,10 +911,31 @@ export class LobbyRuntime {
         this.store.dispatch(roomActions.leftReceived({ epoch, left: event.data }));
         break;
       case 'tableStart':
-        this.store.dispatch(roomActions.tableStartReceived({
-          epoch,
-          tableStart: event.data,
-        }));
+        {
+          const pendingReplay = this.store.getState().history.pendingReplayCreate;
+          if (
+            event.data.replay
+            && pendingReplay?.connectionEpoch === epoch
+            && this.store.getState().room.room.kind === 'none'
+          ) {
+            this.store.dispatch(roomActions.historicalReplayTableStartReceived({
+              epoch,
+              tableStart: event.data,
+              expectedDatabaseID: pendingReplay.databaseID,
+            }));
+            const room = this.store.getState().room.room;
+            if (
+              room.kind === 'awaiting_game_bootstrap'
+              && room.tableID === event.data.tableID
+              && room.expectedDatabaseID === pendingReplay.databaseID
+            ) this.store.dispatch(historyActions.replayCreateAccepted(pendingReplay));
+          } else {
+            this.store.dispatch(roomActions.tableStartReceived({
+              epoch,
+              tableStart: event.data,
+            }));
+          }
+        }
         this.gameBootstrap.startFromAuthoritativeRoom(epoch);
         break;
       case 'init': {
@@ -877,6 +959,10 @@ export class LobbyRuntime {
         this.gameBootstrap.receiveClock(epoch, event.data, this.nowMs());
         break;
       case 'gameHistory':
+        this.store.dispatch(historyActions.pageReceived({
+          connectionEpoch: epoch,
+          history: event.data,
+        }));
         this.gameBootstrap.receiveGameHistory(epoch, event.data);
         break;
       case 'cardIdentities':
@@ -1015,6 +1101,7 @@ export class LobbyRuntime {
       case 'warning':
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
+        this.clearCurrentHistoryPending(epoch, event.data.warning);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
           notice: { kind: 'warning', message: event.data.warning.slice(0, MAX_STATUS_LENGTH) },
@@ -1023,6 +1110,7 @@ export class LobbyRuntime {
       case 'error':
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
+        this.clearCurrentHistoryPending(epoch, event.data.error);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
           notice: { kind: 'error', message: event.data.error.slice(0, MAX_STATUS_LENGTH) },
@@ -1041,6 +1129,17 @@ export class LobbyRuntime {
       error: event.code === 1000 ? null : `WebSocket closed (${event.code})`,
     }));
     this.scheduleRetry();
+  }
+
+  private clearCurrentHistoryPending(epoch: number, message: string): void {
+    const history = this.store.getState().history;
+    if (
+      history.connectionEpoch === epoch
+      && (history.pendingRequest !== null || history.pendingReplayCreate !== null)
+    ) this.store.dispatch(historyActions.operationFailed({
+      connectionEpoch: epoch,
+      message: message.slice(0, MAX_STATUS_LENGTH),
+    }));
   }
 
   private failCurrent(owned: OwnedConnection, error: string): void {
@@ -1306,8 +1405,12 @@ export class LobbyRuntime {
       return false;
     }
 
-    owned.socket.send(frame);
-    return true;
+    try {
+      owned.socket.send(frame);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private dispose(owned: OwnedConnection, closeSocket: boolean): void {

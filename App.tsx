@@ -5,7 +5,10 @@ import {
   Text, TextInput, View,
 } from 'react-native';
 
-import { SUPPORTED_VARIANT_NAMES } from './src/game/client/supportedVariants';
+import {
+  areTableOptionsSupported,
+  SUPPORTED_VARIANT_NAMES,
+} from './src/game/client/supportedVariants';
 import type { MobileTableOptions } from './src/protocol/lobbyProtocol';
 import {
   isJoinEligible,
@@ -47,11 +50,13 @@ export default function App() {
   const [editName, setEditName] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState(5);
   const [editOptions, setEditOptions] = useState<MobileTableOptions>(defaultMobileOptions);
+  const [showHistory, setShowHistory] = useState(false);
   const session = useAppSelector((state) => state.session);
   const hydrated = useAppSelector(selectLobbyHydrated);
   const tables = useAppSelector(tableSelectors.selectAll);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
+  const history = useAppSelector((state) => state.history);
   const spectateTables = tables.filter(isSpectateEligible);
   const joinTables = tables.filter((table) => (
     isJoinEligible(table) || isPregameSpectateEligible(table)
@@ -272,12 +277,62 @@ export default function App() {
         <ChatPanel room={`table${pregameRoom.tableID}`} title="Pre-game chat" />
       </View>
     );
+  } else if (showHistory) {
+    const replayPending = history.pendingReplayCreate !== null;
+    content = (
+      <View style={styles.section}>
+        <View style={styles.titleRow}>
+          <Text style={styles.heading}>Game History</Text>
+          <Button title="Back to Lobby" onPress={() => setShowHistory(false)} />
+        </View>
+        {!history.initialPageReceived && <Text>Loading game history...</Text>}
+        {history.error !== null && <Text style={styles.error}>{history.error}</Text>}
+        {history.initialPageReceived && history.items.length === 0 && (
+          <Text>No finished games yet.</Text>
+        )}
+        {history.items.map((item) => {
+          const supported = areTableOptionsSupported(item.options);
+          const finished = new Date(item.datetimeFinished);
+          const finishedLabel = Number.isNaN(finished.getTime())
+            ? item.datetimeFinished
+            : finished.toLocaleString();
+          const endConditions = [
+            'In progress', 'Normal', 'Strikeout', 'Timeout', 'Terminated by player',
+            'Speedrun failed', 'Idle timeout', 'Character softlock',
+            'All or Nothing failed', 'All or Nothing softlock', 'Terminated by vote',
+          ];
+          return (
+            <View style={styles.tableRow} key={item.id}>
+              <Text style={styles.tableName}>Game #{item.id} · {item.options.variantName}</Text>
+              <Text>{item.playerNames.join(', ')}</Text>
+              <Text>{finishedLabel}</Text>
+              <Text>Score: {item.score} · {endConditions[item.endCondition]}</Text>
+              {!supported && <Text>This game uses unsupported options.</Text>}
+              <Button
+                disabled={!supported || replayPending}
+                title={replayPending ? 'Opening replay...' : 'Watch Replay'}
+                onPress={() => lobbyRuntime.watchHistoricalGame(item.id)}
+              />
+            </View>
+          );
+        })}
+        {history.hasMore && (
+          <Button
+            disabled={history.pendingRequest !== null}
+            title={history.pendingRequest === null ? 'Load More' : 'Loading more...'}
+            onPress={() => lobbyRuntime.loadMoreHistory()}
+          />
+        )}
+        {history.pendingRequest !== null && <Text>Loading another page...</Text>}
+      </View>
+    );
   } else {
     content = (
       <>
         <View style={styles.section}>
           <Text style={styles.heading}>Lobby</Text>
           <Text>{tables.length} tables available</Text>
+          <Button title="Game History" onPress={() => setShowHistory(true)} />
         </View>
         <View style={styles.section}>
           <Text style={styles.heading}>Create table</Text>

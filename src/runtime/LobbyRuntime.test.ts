@@ -11,6 +11,7 @@ import { noteCommandSchema } from '../protocol/gameProtocol';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
+import { sessionActions } from '../store/sessionSlice';
 import { createAppStore, userSelectors } from '../store/store';
 import {
   isJoinEligible,
@@ -31,6 +32,7 @@ type ListenerMap = {
 
 class FakeSocket implements NetworkSocket {
   readyState = 0;
+  failSend = false;
   readonly sent: string[] = [];
   readonly closeCalls: Array<{ code?: number; reason?: string }> = [];
   private readonly listeners: ListenerMap = {
@@ -53,7 +55,10 @@ class FakeSocket implements NetworkSocket {
     (this.listeners[type] as Set<never>).delete(listener);
   }
 
-  send(data: string): void { this.sent.push(data); }
+  send(data: string): void {
+    if (this.failSend) throw new Error('send failed');
+    this.sent.push(data);
+  }
   close(code?: number, reason?: string): void {
     this.closeCalls.push({ code, reason });
     this.readyState = 3;
@@ -106,7 +111,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const welcomeFrame = 'welcome {"userID":1,"username":"Ada","playingAtTables":[]}';
+const welcomeFrame = 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}';
 const userFrame = 'user {"userID":1,"name":"Ada","status":0,"hyphenated":false,"inactive":false}';
 const tableOptions = {
   variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
@@ -166,6 +171,19 @@ function createdPregameFrame(
     passwordProtected: false,
     maxPlayers,
   })}`;
+}
+
+function historicalGame(id: number, optionChanges: Record<string, unknown> = {}) {
+  return {
+    id,
+    options: {
+      numPlayers: 2, startingPlayer: 0, variantID: 0, ...tableOptions, ...optionChanges,
+    },
+    seed: `seed-${id}`, score: 20, numTurns: 30, endCondition: 1,
+    datetimeStarted: '2026-09-01T00:00:00Z',
+    datetimeFinished: '2026-09-01T00:10:00Z', numGamesOnThisSeed: 1,
+    playerNames: ['Ada', 'Bob'], incrementNumGames: true, tags: '',
+  };
 }
 
 async function makeReadyRuntime() {
@@ -591,7 +609,7 @@ describe('deterministic lobby runtime', () => {
     const runtime = new LobbyRuntime(session, store);
     await runtime.connect();
     socket.emitOpen();
-    socket.emitMessage('welcome {"userID":1,"username":"Ada","playingAtTables":[123]}');
+    socket.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}');
     socket.emitMessage(createdPregameFrame(
       ['Ada'], 123, 'Unsupported', { ...tableOptions, speedrun: true },
     ));
@@ -853,7 +871,8 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 456,
       role: 'player',
-      sharedReplay: false,
+      replay: false,
+      expectedDatabaseID: null,
       bootstrap: { phase: 'waiting_init' },
     });
     expect(socket.sent.at(-1)).toBe('getGameInfo1 {"tableID":456}');
@@ -973,7 +992,7 @@ describe('deterministic lobby runtime', () => {
     await runtime.connect();
     socket.emitOpen();
     socket.emitMessage(
-      'welcome {"userID":1,"username":"Ada","playingAtTables":[123]}',
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}',
     );
 
     expect(socket.sent).toEqual(['tableReattend {"tableID":123}']);
@@ -1034,8 +1053,8 @@ describe('deterministic lobby runtime', () => {
       await runtime.connect();
       socket.emitOpen();
       socket.emitMessage(role === 'player'
-        ? 'welcome {"userID":1,"username":"Ada","playingAtTables":[123]}'
-        : 'welcome {"userID":1,"username":"Ada","playingAtTables":[],'
+        ? 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}'
+        : 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],'
           + '"disconSpectatingTable":123,"disconShadowingSeat":-1}');
 
       const game = role === 'player'
@@ -1060,7 +1079,7 @@ describe('deterministic lobby runtime', () => {
     await runtime.connect();
     socket.emitOpen();
     socket.emitMessage(
-      'welcome {"userID":1,"username":"Ada","playingAtTables":[123],'
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123],'
       + '"disconSpectatingTable":123,"disconShadowingSeat":-1}',
     );
 
@@ -1080,7 +1099,7 @@ describe('deterministic lobby runtime', () => {
     await runtime.connect();
     socket.emitOpen();
     socket.emitMessage(
-      'welcome {"userID":1,"username":"Ada","playingAtTables":[],'
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],'
       + '"disconSpectatingTable":123,"disconShadowingSeat":1}',
     );
 
@@ -1326,7 +1345,8 @@ describe('deterministic lobby runtime', () => {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
         role: 'spectator',
-        sharedReplay: false,
+        replay: false,
+        expectedDatabaseID: null,
         tableStartReceived: true,
         bootstrap: {
           gameLoadEpoch: 1,
@@ -1973,7 +1993,8 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
-      sharedReplay: false,
+      replay: false,
+      expectedDatabaseID: null,
       tableStartReceived: true,
       bootstrap: {
         gameLoadEpoch: 1,
@@ -2009,7 +2030,8 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
-      sharedReplay: false,
+      replay: false,
+      expectedDatabaseID: null,
       bootstrap: {
         gameLoadEpoch: 1,
         phase: 'waiting_init',
@@ -2047,7 +2069,8 @@ describe('deterministic lobby runtime', () => {
       kind: 'awaiting_game_bootstrap',
       tableID: 123,
       role: 'player',
-      sharedReplay: false,
+      replay: false,
+      expectedDatabaseID: null,
       tableStartReceived: true,
       bootstrap: {
         gameLoadEpoch: 1,
@@ -2278,5 +2301,107 @@ describe('deterministic lobby runtime', () => {
       accepted: true,
       rejectionReason: null,
     }]);
+  });
+
+  test('automatic history page is not requested twice and Load More is exact and one-shot', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":20,"playingAtTables":[]}');
+    expect(socket.sent).toEqual([]);
+    socket.emitMessage(`gameHistory ${JSON.stringify(
+      Array.from({ length: 10 }, (_, i) => historicalGame(20 - i)),
+    )}`);
+    expect(runtime.loadMoreHistory()).toBe(true);
+    expect(runtime.loadMoreHistory()).toBe(false);
+    expect(socket.sent).toEqual(['historyGet {"offset":10,"amount":10}']);
+    socket.emitMessage(`gameHistory ${JSON.stringify(
+      Array.from({ length: 10 }, (_, i) => historicalGame(10 - i)),
+    )}`);
+    expect(store.getState().history.items).toHaveLength(20);
+    expect(store.getState().history.hasMore).toBe(false);
+  });
+
+  test('history and replay send failures leave no fake pending state', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: 1,
+      welcome: { userID: 1, username: 'Ada', totalGames: 11, playingAtTables: [] },
+    }));
+    socket.emitMessage(`gameHistory ${JSON.stringify(
+      Array.from({ length: 10 }, (_, i) => historicalGame(11 - i)),
+    )}`);
+    socket.failSend = true;
+    expect(runtime.loadMoreHistory()).toBe(false);
+    expect(runtime.watchHistoricalGame(11)).toBe(false);
+    expect(store.getState().history.pendingRequest).toBeNull();
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+  });
+
+  test('historical Watch waits for a new authoritative replay table and bootstraps solo', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: 1,
+      welcome: { userID: 1, username: 'Ada', totalGames: 1, playingAtTables: [] },
+    }));
+    socket.emitMessage(`gameHistory ${JSON.stringify([historicalGame(77)])}`);
+    expect(runtime.watchHistoricalGame(999)).toBe(false);
+    expect(runtime.watchHistoricalGame(77)).toBe(true);
+    expect(socket.sent).toEqual([
+      'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
+    ]);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().history.pendingReplayCreate).toMatchObject({ databaseID: 77 });
+
+    socket.emitMessage('tableStart {"tableID":9001,"replay":true}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', tableID: 9001, role: 'spectator',
+      replay: true, expectedDatabaseID: 77,
+    });
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      tableID: 9001, replay: true, sharedReplay: false, spectating: false,
+      databaseID: 77, datetimeFinished: '2026-09-01T00:10:00Z',
+    }))}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify({ tableID: 9001, list: [] })}`);
+    expect(socket.sent).toEqual([
+      'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
+      'getGameInfo1 {"tableID":9001}',
+      'getGameInfo2 {"tableID":9001}',
+    ]);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', tableID: 9001, role: 'spectator', sharedReplay: false,
+      clientState: { replay: { active: true, shared: null } },
+    });
+    expect(runtime.unattendLiveGame(9001)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableUnattend {"tableID":9001}');
+  });
+
+  test('Watch rejects unsupported or conflicting history and mismatched init fails closed', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: 1,
+      welcome: { userID: 1, username: 'Ada', totalGames: 2, playingAtTables: [] },
+    }));
+    socket.emitMessage(`gameHistory ${JSON.stringify([
+      historicalGame(80, { speedrun: true }), historicalGame(79),
+    ])}`);
+    expect(runtime.watchHistoricalGame(80)).toBe(false);
+    store.dispatch(roomActions.spectateRequested({ epoch: 1, tableID: 123 }));
+    expect(runtime.watchHistoricalGame(79)).toBe(false);
+    store.dispatch(roomActions.commandPendingCleared({ epoch: 1 }));
+    expect(runtime.watchHistoricalGame(79)).toBe(true);
+    socket.emitMessage('tableStart {"tableID":9002,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      tableID: 9002, replay: true, sharedReplay: false, spectating: false,
+      databaseID: 999,
+    }))}`);
+    expect(socket.sent.at(-1)).toBe('tableUnattend {"tableID":9002}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().lobby.notice?.kind).toBe('warning');
   });
 });

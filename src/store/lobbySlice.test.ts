@@ -41,6 +41,7 @@ const table = (id: number, name = `table-${id}`): LobbyTable => ({
 const welcome: Welcome = {
   userID: 1,
   username: 'Ada',
+  totalGames: 0,
   playingAtTables: [],
 };
 

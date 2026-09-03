@@ -35,7 +35,8 @@ export type RoomState =
       kind: 'awaiting_game_bootstrap';
       tableID: number;
       role: 'player' | 'spectator';
-      sharedReplay: boolean;
+      replay: boolean;
+      expectedDatabaseID: number | null;
       tableStartReceived: true;
       bootstrap:
         | 'pending_c5'
@@ -699,7 +700,9 @@ export const roomSlice = createSlice({
         &&
         (state.room.kind === 'awaiting_game_bootstrap' || state.room.kind === 'live_game')
         && state.room.tableID === tableStart.tableID
-        && state.room.sharedReplay === tableStart.replay
+        && (state.room.kind === 'awaiting_game_bootstrap'
+          ? state.room.replay === tableStart.replay
+          : state.room.sharedReplay === tableStart.replay)
       ) {
         role = state.room.role;
       } else if (
@@ -746,7 +749,41 @@ export const roomSlice = createSlice({
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
         role,
-        sharedReplay: tableStart.replay,
+        replay: tableStart.replay,
+        expectedDatabaseID: null,
+        tableStartReceived: true,
+        bootstrap: 'pending_c5',
+      };
+    },
+    historicalReplayTableStartReceived(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        tableStart: TableStart;
+        expectedDatabaseID: number;
+      }>,
+    ) {
+      const { epoch, tableStart, expectedDatabaseID } = action.payload;
+      if (
+        state.connectionEpoch !== epoch
+        || state.room.kind !== 'none'
+        || !tableStart.replay
+        || !Number.isInteger(expectedDatabaseID)
+        || expectedDatabaseID <= 0
+        || state.pendingRecovery !== null
+        || state.pendingSpectateTableID !== null
+        || state.pendingJoin !== null
+        || state.pendingCreate !== null
+        || state.rematchTransition !== null
+      ) return;
+      clearC4BState(state);
+      state.pendingGameplayAction = null;
+      state.room = {
+        kind: 'awaiting_game_bootstrap',
+        tableID: tableStart.tableID,
+        role: 'spectator',
+        replay: true,
+        expectedDatabaseID,
         tableStartReceived: true,
         bootstrap: 'pending_c5',
       };
@@ -833,7 +870,7 @@ export const roomSlice = createSlice({
         kind: 'live_game',
         tableID,
         role: state.room.role,
-        sharedReplay: state.room.sharedReplay,
+        sharedReplay: clientState.replay.shared !== null,
         gameLoadEpoch,
         bootstrapPhase: 'live',
         historyActionCount,

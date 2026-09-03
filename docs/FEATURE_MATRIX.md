@@ -41,9 +41,9 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Terminate game / vote to terminate | DONE | C14 | Authoritative self-vote echo, vote toggle, threshold termination, and confirmed direct termination physically verified. |
 | Player connected / away state | DONE | C14 | In-game presence/away transitions physically verified; visual polish remains C16. |
 | Full live action log UX | DONE | C12 / C14 | Live action updates and replay/postgame log behavior physically verified; visual polish remains C16. |
-| Game history list / pagination | NOT IMPLEMENTED | C15 | `historyGet` + local history screen. |
-| Game history details | NOT IMPLEMENTED | C15 | Score/options/players/end condition/timestamps/seed metadata. |
-| Open old game as replay | NOT IMPLEMENTED | C15 | Reuse C12 replay engine; create/load replay from game ID. |
+| Game history list / pagination | IMPLEMENTED / UNVERIFIED | C15 | `historyGet` + local history screen; physical acceptance remains. |
+| Game history details | IMPLEMENTED / UNVERIFIED | C15 | Score/options/players/end condition/timestamps/seed metadata; physical acceptance remains. |
+| Open old game as replay | IMPLEMENTED / UNVERIFIED | C15 | Reuses the C12 replay engine through authoritative solo replay creation; physical acceptance remains. |
 | Seed comparison / other scores | NOT IMPLEMENTED | C15 optional | Useful but not required for the first history/replay slice. |
 | App shell / scalable screen structure | PARTIAL | C16 | Avoid continuing to grow `App.tsx` as the long-term router. |
 | Full visual redesign / design system | NOT IMPLEMENTED | C16 | Typography, color, spacing, components, game/table/chat/replay/history screens. |

@@ -80,7 +80,7 @@ class FakeSession implements NetworkSession {
   }
 }
 
-const welcomeFrame = 'welcome {"userID":1,"username":"Ada","playingAtTables":[]}';
+const welcomeFrame = 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}';
 const playerTable = {
   id: 123,
   name: 'Table',

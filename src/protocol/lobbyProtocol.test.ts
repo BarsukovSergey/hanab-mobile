@@ -4,6 +4,8 @@ import {
   decodeServerFrame,
   encodeChatFrame,
   encodeInactiveFrame,
+  encodeHistoryGetFrame,
+  encodeReplayCreateFrame,
   encodeReplayActionFrame,
   encodeTableRestartFrame,
   encodeTableSetLeaderFrame,
@@ -26,6 +28,20 @@ const user = {
 };
 
 describe('lobby protocol decoder', () => {
+  test('retains required totalGames and encodes exact C15 commands', () => {
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[]}',
+    )).toMatchObject({
+      kind: 'event', event: { command: 'welcome', data: { totalGames: 12 } },
+    });
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","playingAtTables":[]}',
+    )).toMatchObject({ kind: 'malformed', command: 'welcome' });
+    expect(encodeHistoryGetFrame(10)).toBe('historyGet {"offset":10,"amount":10}');
+    expect(encodeReplayCreateFrame(77)).toBe(
+      'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
+    );
+  });
   test('validates exact pinned chat and chatList payloads', () => {
     const chat = {
       msg: 'hello &amp; goodbye',

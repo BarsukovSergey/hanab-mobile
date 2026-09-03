@@ -16,6 +16,7 @@ import { GameBootstrapCoordinator, replayAuthoritativeHistory } from './GameBoot
 const welcome = {
   userID: 1,
   username: 'Ada',
+  totalGames: 0,
   playingAtTables: [],
 };
 

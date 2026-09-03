@@ -296,12 +296,24 @@ export type LobbyTable = z.infer<typeof lobbyTableSchema>;
 export const welcomeSchema = z.object({
   userID: idSchema,
   username: z.string().min(1),
+  totalGames: z.number().int().nonnegative(),
   playingAtTables: z.array(idSchema),
   disconSpectatingTable: idSchema.optional(),
   disconShadowingSeat: z.number().int().optional(),
 });
 
 export type Welcome = z.infer<typeof welcomeSchema>;
+
+export const historyGetCommandSchema = z.object({
+  offset: z.number().int().nonnegative(),
+  amount: z.literal(10),
+}).strict();
+
+export const replayCreateCommandSchema = z.object({
+  source: z.literal('id'),
+  databaseID: z.number().int().positive(),
+  visibility: z.literal('solo'),
+}).strict();
 
 const schemas = {
   welcome: welcomeSchema,
@@ -517,4 +529,14 @@ export function encodeChatFrame(msg: string, room: string): string {
 
 export function encodeInactiveFrame(inactive: boolean): string {
   return encodeClientFrame('inactive', inactiveCommandSchema.parse({ inactive }));
+}
+
+export function encodeHistoryGetFrame(offset: number, amount = 10): string {
+  return encodeClientFrame('historyGet', historyGetCommandSchema.parse({ offset, amount }));
+}
+
+export function encodeReplayCreateFrame(databaseID: number): string {
+  return encodeClientFrame('replayCreate', replayCreateCommandSchema.parse({
+    source: 'id', databaseID, visibility: 'solo',
+  }));
 }

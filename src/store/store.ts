@@ -5,6 +5,7 @@ import { chatSlice } from './chatSlice';
 import { roomSlice } from './roomSlice';
 import { sessionSlice } from './sessionSlice';
 import { terminationSlice } from './terminationSlice';
+import { historySlice } from './historySlice';
 
 export function createAppStore() {
   return configureStore({
@@ -14,6 +15,7 @@ export function createAppStore() {
       room: roomSlice.reducer,
       chat: chatSlice.reducer,
       termination: terminationSlice.reducer,
+      history: historySlice.reducer,
     },
   });
 }
