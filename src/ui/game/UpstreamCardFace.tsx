@@ -26,6 +26,7 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
 
   const backgroundFill = paintReference(visual.background, 'card-background');
   const rankFill = paintReference(visual.rankPaint, 'card-rank');
+  const showRank = rank >= 1 && rank <= 5;
 
   return (
     <Svg height="100%" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width="100%">
@@ -43,15 +44,17 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: { rank: numbe
         strokeWidth={8}
       />
 
-      <RankText fill={rankFill} rank={rank} />
-      {visual.deceptiveRank !== null && (
+      {showRank && <RankText fill={rankFill} rank={rank} />}
+      {showRank && visual.deceptiveRank !== null && (
         <G transform={`translate(${CARD_W / 4 + CARD_W / 50} ${CARD_H / 40}) scale(0.5)`}>
           <RankText fill={rankFill} rank={visual.deceptiveRank} />
         </G>
       )}
-      <G transform={`translate(${CARD_W} ${CARD_H}) rotate(180)`}>
-        <RankText fill={rankFill} rank={rank} />
-      </G>
+      {showRank && visual.showBottomRank && (
+        <G transform={`translate(${CARD_W} ${CARD_H}) rotate(180)`}>
+          <RankText fill={rankFill} rank={rank} />
+        </G>
+      )}
 
       <RankPips
         duplicatePip={visual.duplicatePip}
@@ -89,7 +92,11 @@ function PaintDef({ id, paint }: { id: string; paint: CardPaint }) {
     y2={paint.y2}
   >
     {paint.colors.map((color, index) => (
-      <Stop key={`${id}-${color}-${index}`} offset={index / (paint.colors.length - 1)} stopColor={color} />
+      <Stop
+        key={`${id}-${color}-${index}`}
+        offset={paint.colors.length <= 1 ? 0 : index / (paint.colors.length - 1)}
+        stopColor={color}
+      />
     ))}
   </LinearGradient></Defs>;
 }
