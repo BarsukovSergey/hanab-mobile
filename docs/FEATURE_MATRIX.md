@@ -47,7 +47,7 @@ A milestone is not closed while one of its rows is accidentally unaccounted for:
 | Seed comparison / other scores | DEFERRED | Post-1.0 | Optional history enhancement; not required for C15 or Hanab Mobile 1.0 core replay flow. |
 | App shell / scalable screen structure | IMPLEMENTED / UNVERIFIED | C16 | Major authenticated surfaces extracted from `App.tsx`; explicit local Lobby/History navigation implemented; physical Android acceptance remains. |
 | Full visual redesign / design system | NOT IMPLEMENTED | C16 | Typography, color, spacing, components, game/table/chat/replay/history screens. |
-| Android Back / modal navigation semantics | IMPLEMENTED / UNVERIFIED | C16 | Hardware Back is local-only: History returns to Lobby; authoritative room/game transitions consume Back without emitting table/game commands; physical Android acceptance remains. |
+| Android Back / modal navigation semantics | IMPLEMENTED / UNVERIFIED | C16 | Role-aware hardware Back: players stay protected, spectators use existing authoritative leave/unattend flows, and historical replay Back returns to History after confirmed exit; physical Android re-acceptance remains. |
 | Loading / empty / error-state polish | PARTIAL | C16 | Functional states exist; consistent UX polish remains. |
 | App icon / splash / branding polish | NOT IMPLEMENTED | C16 / C17 | Final assets before distribution. |
 | Permanent package/version strategy | NOT IMPLEMENTED | C17 | Package ID, versionCode/versionName and update compatibility. |
