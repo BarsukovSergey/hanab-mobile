@@ -39,7 +39,7 @@ export function getVisibleCardVisual(variantName: string, suitIndex: number, ran
       : backgroundPaint(suit.name, suit.fill, rawFillColors),
     clueColorFills: suit.clueColors.map((color) => color.fill),
     deceptiveRank,
-    duplicatePip: variant.pips.slice(0, suitIndex).includes(pip),
+    duplicatePip: variant.pips.slice(0, suitIndex).some((previousPip) => previousPip === pip),
     pip,
     pipFillColors: suit.name === 'Black' ? ['#212121'] : rawFillColors,
     rankPaint: rankPaint(variantName, suitIndex, rank),
