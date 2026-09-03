@@ -1,3 +1,4 @@
+import { START_CARD_RANK } from '../upstream/constants';
 import { getSuit, getVariant } from '../upstream/gameData';
 
 export type CardPaint =
@@ -101,7 +102,10 @@ function prismPaint(variantName: string, suitIndex: number, rank: number): CardP
   const variant = getVariant(variantName);
   const suit = variant.suits[suitIndex];
   if (suit === undefined || rank === 0) return { type: 'solid', color: suit?.fill ?? '#5d6570' };
-  const color = variant.clueColors[(rank - 1) % variant.clueColors.length];
+  const prismColorIndex = rank === START_CARD_RANK
+    ? variant.clueColors.length - 1
+    : (rank - 1) % variant.clueColors.length;
+  const color = variant.clueColors[prismColorIndex];
   if (color === undefined) return { type: 'solid', color: suit.fill };
   return { type: 'solid', color: mixHex(color.fill, suit.oneOfEach ? '#000000' : '#ffffff', 0.5) ?? suit.fill };
 }
