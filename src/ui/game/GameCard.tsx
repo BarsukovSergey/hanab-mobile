@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
-import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
+import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { useHanabTheme } from '../designSystem';
 
 type GameCardProps = {
@@ -23,16 +23,22 @@ export function GameCard({ position, knowledge, selected, hasNote = false, onSel
     ? suits.find((suit) => suit.name === knowledge.possibleSuitLabels[0])
     : undefined;
   const determinedRank = knowledge.rankDetermined && knowledge.possibleRanks.length === 1 ? knowledge.possibleRanks[0] : null;
+  const clued = knowledge.hasClueApplied;
 
   return <Pressable accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`} accessibilityRole="button"
     accessibilityState={{ selected }} delayLongPress={350} onLongPress={onLongPress} onPress={onSelect}
     style={({ pressed }) => [styles.cardTouch, pressed && styles.pressed]}>
-    <View style={[styles.hiddenFrame, { borderColor: selected ? theme.colors.accent : '#0d0d0d' }, selected && styles.selectedFrame]}>
+    <View style={[
+      styles.hiddenFrame,
+      { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
+      selected && styles.selectedFrame,
+    ]}>
       <View style={styles.hiddenCard}>
-        <View style={styles.hiddenCorner}>
+        {clued && <View pointerEvents="none" style={styles.cluedInset} />}
+        {determinedSuit !== undefined && <View style={styles.hiddenCorner}>
           <Text style={styles.hiddenCornerRank}>{determinedRank ?? ''}</Text>
-          <Text style={styles.hiddenCornerPip}>{determinedSuit?.marker ?? ''}</Text>
-        </View>
+          <SuitMarker suit={determinedSuit} compact />
+        </View>}
         {hasNote && <NoteIndicator />}
         <View style={styles.hiddenCenter}><KnowledgeSuitPips knowledge={knowledge} variantName={variantName} /></View>
         <View style={styles.hiddenBottom}><KnowledgeRankPips knowledge={knowledge} /></View>
@@ -42,13 +48,14 @@ export function GameCard({ position, knowledge, selected, hasNote = false, onSel
   </Pressable>;
 }
 
-export function VisibleHanabiCard({ suitIndex, rank, variantName, position, selected = false, hasNote = false, onPress, onLongPress, size = 'hand' }: {
+export function VisibleHanabiCard({ suitIndex, rank, variantName, position, selected = false, hasNote = false, clued = false, onPress, onLongPress, size = 'hand' }: {
   suitIndex: number | null;
   rank: number | null;
   variantName: string;
   position?: number;
   selected?: boolean;
   hasNote?: boolean;
+  clued?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
   size?: VisibleCardSize;
@@ -56,24 +63,29 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, position, sele
   const { theme } = useHanabTheme();
   const suits = getCardSuitVisuals(variantName);
   const suit = suitIndex === null ? undefined : suits[suitIndex];
-  const foreground = suit?.foreground ?? '#ffffff';
-  const shadow = foreground === '#0d0d0d' ? '#ffffff' : '#000000';
   const sizeStyles = size === 'mini' ? styles.visibleMini : size === 'table' ? styles.visibleTable : styles.visibleHand;
-  const rankStyle = size === 'mini' ? styles.miniRank : size === 'table' ? styles.tableRank : styles.handRank;
-  const pipStyle = size === 'mini' ? styles.miniPip : size === 'table' ? styles.tablePip : styles.handPip;
   const cornerRankStyle = size === 'mini' ? styles.miniCornerRank : size === 'table' ? styles.tableCornerRank : styles.handCornerRank;
-  const cornerPipStyle = size === 'mini' ? styles.miniCornerPip : size === 'table' ? styles.tableCornerPip : styles.handCornerPip;
+  const pipSize = size === 'mini' ? 11 : size === 'table' ? 17 : 22;
+  const foreground = suit?.foreground ?? '#0d0d0d';
+  const shadow = foreground === '#0d0d0d' ? '#ffffff' : '#000000';
   const textShadow = { textShadowColor: shadow, textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 } as const;
-  const content = <View style={[styles.visibleCard, sizeStyles, { backgroundColor: suit?.fill ?? '#777777' }, selected && { borderColor: theme.colors.accent, borderWidth: 4 }]}>
+  const content = <View style={[
+    styles.visibleCard,
+    sizeStyles,
+    { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
+    selected && styles.selectedVisible,
+  ]}>
+    {suit !== undefined && <SuitWash suit={suit} />}
+    {clued && <View pointerEvents="none" style={styles.cluedInset} />}
     <View style={styles.visibleCorner}>
       <Text style={[cornerRankStyle, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
-      <Text style={[cornerPipStyle, { color: foreground }, textShadow]}>{suit?.marker ?? '•'}</Text>
+      {suit !== undefined && <SuitMarker suit={suit} compact={size === 'mini'} />}
+    </View>
+    <View style={styles.visibleBottomCorner}>
+      <Text style={[cornerRankStyle, styles.rotatedText, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
     </View>
     {hasNote && <NoteIndicator compact={size === 'mini'} />}
-    <View style={styles.visibleCenter}>
-      <Text style={[pipStyle, { color: foreground }, textShadow]}>{suit?.marker ?? '?'}</Text>
-      <Text style={[rankStyle, { color: foreground }, textShadow]}>{rank ?? '?'}</Text>
-    </View>
+    {suit !== undefined && rank !== null && <RankPipLayout rank={rank} size={pipSize} suit={suit} />}
     {position !== undefined && size === 'hand' && <Text style={[styles.visiblePosition, { color: foreground }, textShadow]}>{position + 1}</Text>}
   </View>;
   if (onPress === undefined && onLongPress === undefined) return content;
@@ -91,13 +103,52 @@ export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: Ca
   </View>;
 }
 
+function SuitWash({ suit }: { suit: CardSuitVisual }) {
+  return <View pointerEvents="none" style={styles.suitWash}>
+    {suit.fillColors.map((fill, index) => <View key={`${fill}-${index}`} style={[styles.suitBand, { backgroundColor: fill }]} />)}
+  </View>;
+}
+
+function RankPipLayout({ rank, size, suit }: { rank: number; size: number; suit: CardSuitVisual }) {
+  const pip = <SuitMarker suit={suit} size={size} />;
+  if (rank <= 0) return null;
+  if (rank === 1) return <View style={styles.pipField}><View style={styles.pipCenter}>{pip}</View></View>;
+  if (rank === 2) return <View style={styles.pipField}><View style={styles.pipTop}>{pip}</View><View style={styles.pipBottom}>{pip}</View></View>;
+  if (rank === 3) return <View style={styles.pipField}><View style={styles.pipTop}>{pip}</View><View style={styles.pipCenter}>{pip}</View><View style={styles.pipBottom}>{pip}</View></View>;
+  if (rank === 4) return <View style={styles.pipField}>
+    <View style={styles.pipTopLeft}>{pip}</View><View style={styles.pipTopRight}>{pip}</View>
+    <View style={styles.pipBottomLeft}>{pip}</View><View style={styles.pipBottomRight}>{pip}</View>
+  </View>;
+  return <View style={styles.pipField}>
+    <View style={styles.pipTopLeft}>{pip}</View><View style={styles.pipTopRight}>{pip}</View>
+    <View style={styles.pipCenter}>{pip}</View>
+    <View style={styles.pipBottomLeft}>{pip}</View><View style={styles.pipBottomRight}>{pip}</View>
+  </View>;
+}
+
+function SuitMarker({ suit, compact = false, size }: { suit: CardSuitVisual; compact?: boolean; size?: number }) {
+  const markerSize = size ?? (compact ? 10 : 18);
+  const shadow = suit.foreground === '#0d0d0d' ? '#ffffff' : '#000000';
+  return <Text style={{
+    color: suit.foreground,
+    fontSize: markerSize,
+    fontWeight: '900',
+    lineHeight: markerSize + 2,
+    textAlign: 'center',
+    textShadowColor: shadow,
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
+  }}>{suit.marker}</Text>;
+}
+
 function KnowledgeSuitPips({ knowledge, variantName }: { knowledge: CardKnowledgeViewModel; variantName: string }) {
   const suits = getCardSuitVisuals(variantName);
   const possibleSuits = suits.filter((suit) => knowledge.possibleSuitLabels.includes(suit.name));
   return <View style={styles.knowledgeRow}>{possibleSuits.map((suit) => {
     const positive = knowledge.positiveColorLabels.includes(suit.name);
-    return <View key={suit.name} style={[styles.suitPip, { backgroundColor: suit.fill }, positive && styles.positivePip]}>
-      <Text style={[styles.suitPipText, { color: suit.foreground }]}>{suit.marker}</Text>
+    return <View key={suit.name} style={[styles.suitPip, positive && styles.positivePip]}>
+      <SuitWash suit={suit} />
+      <SuitMarker suit={suit} compact />
     </View>;
   })}</View>;
 }
@@ -118,20 +169,24 @@ function NoteIndicator({ compact = false }: { compact?: boolean }) {
 const styles = StyleSheet.create({
   cardTouch: { alignItems: 'center' }, pressed: { opacity: 0.82 },
   hiddenFrame: { aspectRatio: 286 / 406, backgroundColor: '#0d0d0d', borderRadius: 9, borderWidth: 3, elevation: 3, shadowColor: '#000000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.35, shadowRadius: 3, width: 88 },
-  selectedFrame: { borderWidth: 5 }, hiddenCard: { backgroundColor: '#888888', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
+  selectedFrame: { borderWidth: 5 }, hiddenCard: { backgroundColor: '#777777', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   hiddenCorner: { alignItems: 'center', left: 5, minWidth: 20, position: 'absolute', top: 5, zIndex: 2 },
   hiddenCornerRank: { color: '#ffffff', fontSize: 19, fontWeight: '900', lineHeight: 20, textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
-  hiddenCornerPip: { color: '#ffffff', fontSize: 12, fontWeight: '900', lineHeight: 14, textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
   hiddenCenter: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingHorizontal: 5 }, hiddenBottom: { alignItems: 'center', minHeight: 30, paddingBottom: 7, paddingHorizontal: 4 },
   cardPosition: { bottom: 4, color: '#e8e8e8', fontSize: 9, fontWeight: '900', position: 'absolute', right: 5 },
   knowledgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center' },
-  suitPip: { alignItems: 'center', borderColor: '#0d0d0d', borderRadius: 12, borderWidth: 1, height: 21, justifyContent: 'center', width: 21 }, positivePip: { borderColor: 'orange', borderWidth: 3 }, suitPipText: { fontSize: 10, fontWeight: '900' },
+  suitPip: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#0d0d0d', borderRadius: 12, borderWidth: 1, height: 21, justifyContent: 'center', overflow: 'hidden', width: 21 }, positivePip: { borderColor: 'orange', borderWidth: 3 },
   rankPip: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 11, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 }, positiveRank: { borderColor: 'orange', borderWidth: 3 }, rankPipText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900' },
-  visibleCard: { aspectRatio: 286 / 406, borderColor: '#0d0d0d', borderRadius: 8, borderWidth: 3, elevation: 3, justifyContent: 'center', overflow: 'hidden', shadowColor: '#000000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.32, shadowRadius: 3 },
-  visibleHand: { height: 108 }, visibleTable: { height: 84 }, visibleMini: { borderRadius: 5, borderWidth: 2, height: 54 },
-  visibleCorner: { alignItems: 'center', left: 5, position: 'absolute', top: 4 }, handCornerRank: { fontSize: 19, fontWeight: '900', lineHeight: 20 }, handCornerPip: { fontSize: 12, fontWeight: '900', lineHeight: 14 }, tableCornerRank: { fontSize: 15, fontWeight: '900', lineHeight: 16 }, tableCornerPip: { fontSize: 10, fontWeight: '900', lineHeight: 11 }, miniCornerRank: { fontSize: 10, fontWeight: '900', lineHeight: 10 }, miniCornerPip: { fontSize: 7, fontWeight: '900', lineHeight: 8 },
-  visibleCenter: { alignItems: 'center', justifyContent: 'center' }, handPip: { fontSize: 28, fontWeight: '900', lineHeight: 29 }, handRank: { fontSize: 29, fontWeight: '900', lineHeight: 30 }, tablePip: { fontSize: 21, fontWeight: '900', lineHeight: 22 }, tableRank: { fontSize: 23, fontWeight: '900', lineHeight: 24 }, miniPip: { fontSize: 13, fontWeight: '900', lineHeight: 13 }, miniRank: { fontSize: 14, fontWeight: '900', lineHeight: 15 },
-  visiblePosition: { bottom: 4, fontSize: 9, fontWeight: '900', position: 'absolute', right: 5 },
-  noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 18, justifyContent: 'center', position: 'absolute', right: 5, top: 5, transform: [{ rotate: '-8deg' }], width: 18, zIndex: 4 }, noteIndicatorCompact: { height: 12, right: 3, top: 3, width: 12 }, noteIndicatorText: { color: '#0d0d0d', fontSize: 13, fontWeight: '900', lineHeight: 14 }, noteIndicatorTextCompact: { fontSize: 8, lineHeight: 9 },
+  visibleCard: { aspectRatio: 286 / 406, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 3, elevation: 3, justifyContent: 'center', overflow: 'hidden', shadowColor: '#000000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.32, shadowRadius: 3 },
+  selectedVisible: { borderWidth: 5 }, visibleHand: { height: 112 }, visibleTable: { height: 86 }, visibleMini: { borderRadius: 5, borderWidth: 2, height: 56 },
+  suitWash: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', opacity: 0.34 }, suitBand: { flex: 1 },
+  cluedInset: { ...StyleSheet.absoluteFillObject, borderColor: 'orange', borderRadius: 5, borderWidth: 4, zIndex: 3 },
+  visibleCorner: { alignItems: 'center', left: 6, position: 'absolute', top: 5, zIndex: 4 }, visibleBottomCorner: { bottom: 5, position: 'absolute', right: 6, zIndex: 4 }, rotatedText: { transform: [{ rotate: '180deg' }] },
+  handCornerRank: { fontSize: 21, fontWeight: '900', lineHeight: 22 }, tableCornerRank: { fontSize: 16, fontWeight: '900', lineHeight: 17 }, miniCornerRank: { fontSize: 10, fontWeight: '900', lineHeight: 11 },
+  pipField: { ...StyleSheet.absoluteFillObject, bottom: '13%', left: '19%', right: '19%', top: '16%' },
+  pipTop: { alignItems: 'center', left: 0, position: 'absolute', right: 0, top: '8%' }, pipCenter: { alignItems: 'center', left: 0, position: 'absolute', right: 0, top: '45%' }, pipBottom: { alignItems: 'center', bottom: '8%', left: 0, position: 'absolute', right: 0 },
+  pipTopLeft: { left: '5%', position: 'absolute', top: '12%' }, pipTopRight: { position: 'absolute', right: '5%', top: '12%' }, pipBottomLeft: { bottom: '12%', left: '5%', position: 'absolute' }, pipBottomRight: { bottom: '12%', position: 'absolute', right: '5%' },
+  visiblePosition: { bottom: 4, fontSize: 9, fontWeight: '900', left: 5, position: 'absolute', zIndex: 5 },
+  noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 18, justifyContent: 'center', position: 'absolute', right: 5, top: 5, transform: [{ rotate: '-8deg' }], width: 18, zIndex: 6 }, noteIndicatorCompact: { height: 12, right: 3, top: 3, width: 12 }, noteIndicatorText: { color: '#0d0d0d', fontSize: 13, fontWeight: '900', lineHeight: 14 }, noteIndicatorTextCompact: { fontSize: 8, lineHeight: 9 },
   details: { gap: 5 }, detailMuted: { fontSize: 11, fontStyle: 'italic' },
 });
