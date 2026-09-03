@@ -1,42 +1,109 @@
 import { Defs, G, LinearGradient, Path, Stop, Svg } from 'react-native-svg';
 
-const VANILLA_PIPS = new Set([
-  'hanabiRed1',
-  'hanabiYellow2',
-  'hanabiGreen3',
-  'hanabiBlue4',
-  'hanabiWhite5',
-]);
+import {
+  getRecordedPipVector,
+  isUpstreamPipRenderable,
+  isVanillaUpstreamPip,
+} from '../../game/selectors/pipVectors';
+import type { PipVector } from '../../game/selectors/pipVectorRecorder';
 
 export function hasUpstreamSvgPip(pip: string): boolean {
-  return VANILLA_PIPS.has(pip);
+  return isUpstreamPipRenderable(pip);
 }
 
-export function UpstreamPip({ pip, fillColors, size }: {
+export function UpstreamPip({ pip, fillColors, size, suitName = '', duplicatePip = false }: {
   pip: string;
   fillColors: readonly string[];
   size: number;
+  suitName?: string;
+  duplicatePip?: boolean;
 }) {
-  const fill = fillColors[0] ?? '#5d6570';
-  const fillValue = fillColors.length > 1 ? 'url(#pipFill)' : fill;
   return (
     <Svg height={size} viewBox="-100 -100 200 200" width={size}>
-      {fillColors.length > 1 && (
-        <Defs>
-          <LinearGradient id="pipFill" x1="0" x2="1" y1="0" y2="1">
-            {fillColors.map((color, index) => (
-              <Stop
-                key={`${color}-${index}`}
-                offset={fillColors.length === 1 ? 0 : index / (fillColors.length - 1)}
-                stopColor={color}
-              />
-            ))}
-          </LinearGradient>
-        </Defs>
-      )}
-      <CanonicalPipPath fill={fillValue} pip={pip} />
+      <UpstreamPipPaths
+        duplicatePip={duplicatePip}
+        fillColors={fillColors}
+        idPrefix={`pip-${pip}`}
+        pip={pip}
+        suitName={suitName}
+      />
     </Svg>
   );
+}
+
+export function UpstreamPipPaths({ pip, fillColors, suitName, duplicatePip = false, idPrefix }: {
+  pip: string;
+  fillColors: readonly string[];
+  suitName: string;
+  duplicatePip?: boolean;
+  idPrefix: string;
+}) {
+  const fill = suitName === 'Black' ? '#212121' : fillColors[0] ?? '#5d6570';
+  const multi = fillColors.length > 1;
+  const commonFill = multi ? `url(#${idPrefix}-fill)` : fill;
+  const recorded = isVanillaUpstreamPip(pip) ? null : getRecordedPipVector(pip, fillColors, suitName);
+
+  if (!isVanillaUpstreamPip(pip) && recorded === null) return null;
+
+  return <>
+    {multi && (
+      <Defs>
+        <LinearGradient id={`${idPrefix}-fill`} x1="0" x2="1" y1="0" y2="1">
+          {fillColors.map((color, index) => (
+            <Stop
+              key={`${color}-${index}`}
+              offset={fillColors.length === 1 ? 0 : index / (fillColors.length - 1)}
+              stopColor={color}
+            />
+          ))}
+        </LinearGradient>
+      </Defs>
+    )}
+    <G transform={duplicatePip ? 'scale(0.8)' : undefined}>
+      {duplicatePip && <Path
+        d="M 90 0 A 90 90 0 1 0 -90 0 A 90 90 0 1 0 90 0 M 80 0 A 80 80 0 1 1 -80 0 A 80 80 0 1 1 80 0 Z"
+        fill={commonFill}
+        fillRule="evenodd"
+        stroke="#000000"
+        strokeWidth={1}
+      />}
+      {isVanillaUpstreamPip(pip)
+        ? <CanonicalPipPath fill={commonFill} pip={pip} />
+        : recorded !== null && <RecordedPipPaths idPrefix={idPrefix} vector={recorded} />}
+    </G>
+  </>;
+}
+
+function RecordedPipPaths({ idPrefix, vector }: { idPrefix: string; vector: PipVector }) {
+  const gradients = vector.shapes.flatMap((shape) => shape.gradient === undefined ? [] : [shape.gradient]);
+  return <>
+    {gradients.length > 0 && <Defs>{gradients.map((gradient) => (
+      <LinearGradient
+        gradientUnits="userSpaceOnUse"
+        id={`${idPrefix}-${gradient.id}`}
+        key={`${idPrefix}-${gradient.id}`}
+        x1={gradient.x1}
+        x2={gradient.x2}
+        y1={gradient.y1}
+        y2={gradient.y2}
+      >
+        {gradient.stops.map((stop, index) => (
+          <Stop key={`${stop.offset}-${index}`} offset={stop.offset} stopColor={stop.color} />
+        ))}
+      </LinearGradient>
+    ))}</Defs>}
+    {vector.shapes.map((shape, index) => (
+      <Path
+        d={shape.d}
+        fill={shape.gradient === undefined ? shape.fill : `url(#${idPrefix}-${shape.gradient.id})`}
+        fillRule={shape.fillRule}
+        key={`${idPrefix}-shape-${index}`}
+        stroke={shape.stroke}
+        strokeLinejoin={shape.strokeLinejoin}
+        strokeWidth={shape.strokeWidth}
+      />
+    ))}
+  </>;
 }
 
 export function CanonicalPipPath({ pip, fill }: { pip: string; fill: string }) {
