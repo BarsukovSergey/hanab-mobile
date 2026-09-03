@@ -4,6 +4,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",
+    "preandroid": "expo prebuild --platform android --no-install",
     "android": "expo run:android",
     "android:release": "expo run:android --variant release",
     "typecheck": "tsc --noEmit",
