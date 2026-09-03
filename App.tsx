@@ -193,6 +193,7 @@ function AppContent() {
 
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
+    const liveConnectionProblem = session.phase === 'failed' || session.phase === 'closed';
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -218,6 +219,12 @@ function AppContent() {
             <ActionButton compact title="Sign out" tone="ghost" onPress={() => void signOut()} />
           </View>
         </View>
+        {liveConnectionProblem && (
+          <View style={styles.liveConnectionNotice}>
+            <Notice tone="error">{session.error ?? 'Connection lost. Game actions are disabled until the realtime session reconnects.'}</Notice>
+            <ActionButton compact title="Reconnect" tone="primary" onPress={() => void lobbyRuntime.connect()} />
+          </View>
+        )}
         <ScrollView contentContainerStyle={[styles.gameContainer, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
           <GameScreen />
           <ChatPanel room={`table${liveTableID}`} title="Table chat" />
@@ -234,7 +241,7 @@ function AppContent() {
     content = (
       <Panel style={styles.loginCard}>
         <View style={styles.loginIntro}>
-          <Text style={[styles.loginEyebrow, { color: theme.colors.accent }]}>HANAB MOBILE</Text>
+          <Text style={[styles.loginEyebrow, { color: theme.colors.accent }]}>HANAB</Text>
           <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in to play</Text>
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
         </View>
@@ -355,6 +362,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 14,
     width: '100%',
+  },
+  liveConnectionNotice: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 10,
   },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
