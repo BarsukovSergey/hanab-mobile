@@ -51,7 +51,19 @@ describe('gameplayInteractionReducer', () => {
     const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
     expect(gameplayInteractionReducer(held, { type: 'open-note', order: 20 }).empathyPlayer).toBeNull();
     expect(gameplayInteractionReducer(held, { type: 'select-clue-target', playerIndex: 2 }).empathyPlayer).toBeNull();
+    expect(gameplayInteractionReducer(held, { type: 'select-card', order: 12 }).empathyPlayer).toBeNull();
     expect(gameplayInteractionReducer(held, { type: 'cancel-transient' }).empathyPlayer).toBeNull();
+  });
+
+  test('cancels empathy on every authoritative hand sync even when the player remains valid', () => {
+    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
+    const synced = gameplayInteractionReducer(held, {
+      type: 'sync-hands',
+      ownOrders: [10, 11, 12],
+      clueTargets: [1, 2],
+      visibleOrders: [10, 11, 12, 20, 21],
+    });
+    expect(synced.empathyPlayer).toBeNull();
   });
 
   test('drops stale interaction references without silently selecting replacements', () => {
@@ -78,12 +90,12 @@ describe('gameplayInteractionReducer', () => {
     });
   });
 
-  test('preserves still-valid explicit selections through authoritative updates', () => {
+  test('preserves durable still-valid selections while clearing momentary empathy through authoritative updates', () => {
     const selected = {
       selectedCard: 11,
       clueTarget: 2,
       cluePreview: { type: 'color' as const, value: 0 },
-      empathyPlayer: null,
+      empathyPlayer: 1,
       noteCard: 20,
     };
     expect(gameplayInteractionReducer(selected, {
@@ -91,6 +103,9 @@ describe('gameplayInteractionReducer', () => {
       ownOrders: [10, 11, 12],
       clueTargets: [1, 2],
       visibleOrders: [10, 11, 12, 20, 21],
-    })).toEqual(selected);
+    })).toEqual({
+      ...selected,
+      empathyPlayer: null,
+    });
   });
 });
