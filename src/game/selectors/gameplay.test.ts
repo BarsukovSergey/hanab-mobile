@@ -27,9 +27,14 @@ describe('getGameTableSuits', () => {
     expect(getGameplayClueChoices('No Variant', 'Quacker').colors[0]?.label).toBe('Quack');
   });
 
+  it('carries the Empty Clues modifier through clue presentation data', () => {
+    expect(getGameplayClueChoices('No Variant').allowEmptyClues).toBe(false);
+    expect(getGameplayClueChoices('No Variant', '', true).allowEmptyClues).toBe(true);
+  });
+
   it('uses the actual clue giver character when presenting an authoritative clue', () => {
     const metadata = {
-      options: { variantName: 'No Variant' },
+      options: { variantName: 'No Variant', emptyClues: false },
       ourPlayerIndex: 0,
       characterAssignments: [null, 34],
     } as unknown as Parameters<typeof getGameplayClueChoicesForPlayerIndex>[0];
