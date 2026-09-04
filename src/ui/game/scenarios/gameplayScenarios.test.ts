@@ -156,6 +156,47 @@ describe('gameplay scenario harness', () => {
     expect(synchronized.noteCard).toBeNull();
   });
 
+  test('keeps empathy momentary while rendering the upstream owner-perspective knowledge in stable geometry', () => {
+    const clueFlow = new Map(getClueFlowScenarios().map((scenario) => [scenario.id, scenario]));
+    const committed = liveScenario(clueFlow, 'clue-committed');
+    const game = committed.clientState.ongoingGame;
+    const order = clueFlowFixtureOrders.bobRed;
+    const card = game.deck[order];
+    expect(card).toBeDefined();
+    if (card === undefined) return;
+
+    const variantName = committed.clientState.metadata.options.variantName;
+    const normal = getCardKnowledgeViewModel(variantName, card, undefined, false);
+    const empathy = getCardKnowledgeViewModel(variantName, card, undefined, false, true);
+    expect(normal).toMatchObject({ displaySuitIndex: 0, displayRank: 1, borderColor: 'orange' });
+    expect(empathy).toMatchObject({ displaySuitIndex: 0, displayRank: null, borderColor: 'orange' });
+    expect(empathy.positiveColorLabels).toContain('Red');
+
+    const layoutInput = {
+      viewportWidth: 390,
+      viewportHeight: 844,
+      handSizes: game.hands.map((hand) => hand.length),
+      ourPlayerIndex: committed.clientState.metadata.ourPlayerIndex,
+    };
+    const beforeHold = getGameplayLayout(layoutInput);
+    const held = gameplayInteractionReducer(initialGameplayInteractionState, {
+      type: 'hold-empathy',
+      playerIndex: 1,
+    });
+    expect(held.empathyPlayer).toBe(1);
+    expect(getGameplayLayout(layoutInput)).toEqual(beforeHold);
+
+    const released = gameplayInteractionReducer(held, { type: 'hold-empathy', playerIndex: null });
+    expect(released.empathyPlayer).toBeNull();
+    const synchronized = gameplayInteractionReducer(held, {
+      type: 'sync-hands',
+      ownOrders: game.hands[0] ?? [],
+      clueTargets: [1, 2],
+      visibleOrders: getLiveNoteOrders(game),
+    });
+    expect(synchronized.empathyPlayer).toBeNull();
+  });
+
   test('runs canonical viewport targets through the production layout calculation', () => {
     const expectedOrientations = new Map<string, 'portrait' | 'landscape'>([
       ['three-player-base', 'portrait'],
