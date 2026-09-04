@@ -20,7 +20,7 @@ describe('getGameplayLayout', () => {
     expect(layout.ownCardHeight).toBeGreaterThan(layout.opponentCardHeight);
   });
 
-  test('uses separate lanes and two opponent columns in landscape phone geometry', () => {
+  test('uses a wider own lane and compact two-column opponent area on landscape phones', () => {
     const layout = getGameplayLayout({
       viewportWidth: 844,
       viewportHeight: 390,
@@ -30,8 +30,22 @@ describe('getGameplayLayout', () => {
 
     expect(layout.orientation).toBe('landscape');
     expect(layout.opponentColumns).toBe(2);
-    expect(layout.ownLaneWidth).toBeLessThan(layout.opponentLaneWidth);
+    expect(layout.ownLaneWidth).toBeGreaterThan(layout.opponentLaneWidth);
     expect(layout.ownLaneWidth + layout.opponentLaneWidth).toBeLessThan(layout.contentWidth);
+    expect(layout.ownCardHeight).toBeLessThanOrEqual(72);
+    expect(layout.opponentCardHeight).toBeLessThanOrEqual(48);
+  });
+
+  test('keeps two opponent hands stacked instead of squeezing them side-by-side', () => {
+    const layout = getGameplayLayout({
+      viewportWidth: 780,
+      viewportHeight: 390,
+      handSizes: [5, 5, 5],
+      ourPlayerIndex: 0,
+    });
+
+    expect(layout.orientation).toBe('landscape');
+    expect(layout.opponentColumns).toBe(1);
   });
 
   test('shrinks rather than overflowing when an extra card modifier produces six cards', () => {
