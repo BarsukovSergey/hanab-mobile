@@ -224,14 +224,30 @@ export function GameScreen() {
     interactionDispatch({ type: 'open-note', order });
     setNoteEditorOpen(true);
   };
+  const persistNote = (value: string) => {
+    if (noteCard === null || value.length > 300 || !visibleOrders.includes(noteCard)) return false;
+    const sent = lobbyRuntime.send('note', {
+      tableID: liveRoom.tableID,
+      order: noteCard,
+      note: value,
+    });
+    if (!sent) return false;
+    dispatch(roomActions.noteActionAccepted({
+      connectionEpoch: roomState.connectionEpoch,
+      tableID: liveRoom.tableID,
+      gameLoadEpoch: liveRoom.gameLoadEpoch,
+      noteAction: { type: 'editNote', order: noteCard, text: value },
+    }));
+    return true;
+  };
   const saveNote = (value: string) => {
-    if (noteCard !== null && lobbyRuntime.editNote(noteCard, value)) {
+    if (persistNote(value)) {
       setNote(value);
       setNoteEditorOpen(false);
     }
   };
   const clearNote = () => {
-    if (noteCard !== null && lobbyRuntime.editNote(noteCard, '')) {
+    if (persistNote('')) {
       setNote('');
       setNoteEditorOpen(false);
     }
@@ -300,16 +316,16 @@ export function GameScreen() {
               />;
             })}
           </View>
-          <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text numberOfLines={1} style={[styles.actionLabel, { color: theme.colors.text }]}>
-              {selectedCard === null ? 'Select a card' : `Card ${displayedOurHand.findIndex((order) => order === selectedCard) + 1}`}
-            </Text>
-            <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!cardEnabled} title="Play" tone="primary" onPress={() => { if (selectedCard !== null) lobbyRuntime.play(selectedCard); }} />
-              <ActionButton compact disabled={!cardEnabled} title="Discard" onPress={() => { if (selectedCard !== null) lobbyRuntime.discard(selectedCard); }} />
-              <ActionButton compact disabled={selectedCard === null} title="Note" onPress={() => { if (selectedCard !== null) openNote(selectedCard); }} />
-            </View>
-          </View>
+          {selectedCard === null
+            ? <Text style={[styles.selectHint, { color: theme.colors.textMuted }]}>Tap a card to play, discard, or note it.</Text>
+            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}>
+              <Text numberOfLines={1} style={[styles.actionLabel, { color: theme.colors.text }]}>Card {displayedOurHand.findIndex((order) => order === selectedCard) + 1}</Text>
+              <View style={styles.actionButtons}>
+                <ActionButton compact disabled={!cardEnabled} title="Play" tone="primary" onPress={() => lobbyRuntime.play(selectedCard)} />
+                <ActionButton compact disabled={!cardEnabled} title="Discard" onPress={() => lobbyRuntime.discard(selectedCard)} />
+                <ActionButton compact title="Note" onPress={() => openNote(selectedCard)} />
+              </View>
+            </View>}
         </View>}
       </View>
 
@@ -340,8 +356,10 @@ export function GameScreen() {
                 {displayedHand.map((order, position) => {
                   const card = game.deck[order];
                   if (card === undefined) return null;
+                  const cardNote = clientState.notes.ourNotes[order];
+                  const presentation = getCardKnowledgeViewModel(metadata.options.variantName, card, cardNote, false);
                   const empathyKnowledge = empathizing
-                    ? getCardKnowledgeViewModel(metadata.options.variantName, card, clientState.notes.ourNotes[order], false, true)
+                    ? getCardKnowledgeViewModel(metadata.options.variantName, card, cardNote, false, true)
                     : null;
                   return <VisibleHanabiCard
                     clueMarker={getCommittedClueMarker(lastClue, order, card.numPositiveClues, clueChoices)}
@@ -355,6 +373,7 @@ export function GameScreen() {
                     onPressOut={() => interactionDispatch({ type: 'hold-empathy', playerIndex: null })}
                     position={position}
                     rank={card.rank}
+                    semanticBorder={presentation.borderColor}
                     suitIndex={card.suitIndex}
                     variantName={metadata.options.variantName}
                   />;
@@ -477,6 +496,7 @@ const styles = StyleSheet.create({
   handHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   handTitle: { fontSize: 14, fontWeight: '900' },
   hand: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'center', minWidth: 0, width: '100%' },
+  selectHint: { fontSize: 10, lineHeight: 14, textAlign: 'center' },
   actionBar: { alignItems: 'center', borderRadius: 10, flexDirection: 'row', gap: 8, justifyContent: 'space-between', padding: 7 },
   actionLabel: { flex: 1, fontSize: 12, fontWeight: '800', minWidth: 0 },
   actionButtons: { flexDirection: 'row', gap: 5 },
