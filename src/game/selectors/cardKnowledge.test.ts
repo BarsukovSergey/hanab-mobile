@@ -146,6 +146,25 @@ describe('card knowledge view model', () => {
     expect(knowledge.suitPips[0]).toMatchObject({ label: firstSuit.name, state: 'eliminated' });
   });
 
+  test('uses owner knowledge instead of the open identity in empathy mode', () => {
+    const card = freshCard(11);
+    const visible = {
+      ...card,
+      suitIndex: 0,
+      rank: 2,
+      suitDetermined: false,
+      rankDetermined: false,
+      possibleCardsForEmpathy: card.possibleCardsForEmpathy.filter(([suitIndex]) => suitIndex !== 0),
+    };
+
+    const normal = getCardKnowledgeViewModel(variant.name, visible);
+    const empathy = getCardKnowledgeViewModel(variant.name, visible, undefined, false, true);
+
+    expect(normal).toMatchObject({ displaySuitIndex: 0, displayRank: 2 });
+    expect(empathy).toMatchObject({ displaySuitIndex: null, displayRank: null });
+    expect(empathy.suitPips[0]?.state).toBe('eliminated');
+  });
+
   test('gives a freshly drawn order fresh knowledge instead of inheriting the old card', () => {
     const oldCard = applyClue(freshCard(13), newRankClue(3), true);
     const drawnCard = freshCard(14);
