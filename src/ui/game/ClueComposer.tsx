@@ -32,6 +32,7 @@ export function ClueComposer({
     : previewState.type === 'color'
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
+  const validPreview = preview !== null && preview.touchedOrders.length > 0;
 
   if (targetName === null) {
     return <View style={[
@@ -74,11 +75,15 @@ export function ClueComposer({
     </View> : <View style={styles.confirmRow}>
       <View style={styles.previewCopy}>
         <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{previewLabel}</Text>
-        <Text style={[styles.previewDetail, { color: theme.colors.textMuted }]}>
-          {preview === null ? 'Invalid clue preview' : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
+        <Text style={[styles.previewDetail, { color: validPreview ? theme.colors.textMuted : theme.colors.danger }]}>
+          {preview === null
+            ? 'Invalid clue preview'
+            : preview.touchedOrders.length === 0
+              ? 'No cards touched — this clue cannot be given'
+              : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
         </Text>
       </View>
-      <ActionButton disabled={!enabled || preview === null} title="Give clue" tone="primary" onPress={onConfirm} />
+      <ActionButton disabled={!enabled || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
     </View>}
   </View>;
 }
