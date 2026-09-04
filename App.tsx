@@ -218,11 +218,11 @@ function AppContent() {
           landscapePhone && styles.gameBarLandscape,
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
-          <View style={styles.brandCopy}>
-            <Text style={[styles.gameBrand, landscapePhone && styles.gameBrandLandscape, { color: theme.colors.text }]}>Hanab</Text>
-            {!landscapePhone && <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>}
-          </View>
-          <View style={styles.headerActions}>
+          {!landscapePhone && <View style={styles.brandCopy}>
+            <Text style={[styles.gameBrand, { color: theme.colors.text }]}>Hanab</Text>
+            <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
+          </View>}
+          <View style={[styles.headerActions, landscapePhone && styles.headerActionsLandscape]}>
             <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
             <ActionButton
               compact
@@ -291,7 +291,7 @@ function AppContent() {
           <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in to play</Text>
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
         </View>
-        {statusMessage.length > 0 && <Notice tone="error">{statusMessage}</Notice>}
+        {statusMessage.length > 0 && <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>}
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
         <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
@@ -353,19 +353,19 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
-  gameContainerLandscape: { gap: 6, paddingBottom: 8, paddingHorizontal: 8, paddingTop: 6 },
+  gameContainerLandscape: { gap: 4, paddingBottom: 6, paddingHorizontal: 6, paddingTop: 4 },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: Platform.OS === 'android' ? 34 : 44 },
-  gameBarLandscape: { minHeight: 42, paddingBottom: 4, paddingHorizontal: 8, paddingTop: Platform.OS === 'android' ? 6 : 8 },
+  gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: 6, paddingTop: Platform.OS === 'android' ? 3 : 5 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
   gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
-  gameBrandLandscape: { fontSize: 16 },
   authName: { fontSize: 11, fontWeight: '700' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
+  headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
   menuActions: { gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   loginIntro: { gap: 4, marginBottom: 4 },
