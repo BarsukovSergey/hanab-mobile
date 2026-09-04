@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { getLastCluePresentation } from '../../game/selectors/lastClue';
-import { getGameplayClueChoices } from '../../game/selectors/gameplay';
+import { getGameplayClueChoicesForPlayerIndex } from '../../game/selectors/gameplay';
 import { useAppSelector } from '../../store/hooks';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { getDisplayedHandOrders } from './gamePresentation';
@@ -21,8 +21,8 @@ export function LastClueNotice() {
   if (clue === null) return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={slotStyle} />;
 
   const names = room.clientState.metadata.playerNames;
-  const variantName = room.clientState.metadata.options.variantName;
-  const choices = getGameplayClueChoices(variantName);
+  const metadata = room.clientState.metadata;
+  const choices = getGameplayClueChoicesForPlayerIndex(metadata, clue.giverPlayerIndex);
   const targetHand = getDisplayedHandOrders(visibleState.hands[clue.targetPlayerIndex] ?? []);
   const touchedPositions = clue.touchedOrders
     .map((order) => targetHand.findIndex((candidate) => candidate === order) + 1)
