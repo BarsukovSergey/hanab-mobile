@@ -11,10 +11,25 @@ describe('gameplayInteractionReducer', () => {
     expect(state).toMatchObject({ selectedCard: 12, noteCard: 12 });
   });
 
-  test('keeps clue targeting independent from card notes', () => {
+  test('keeps clue targeting independent from an already selected card', () => {
     const selected = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-card', order: 12 });
     const targeted = gameplayInteractionReducer(selected, { type: 'select-clue-target', playerIndex: 2 });
     expect(targeted).toMatchObject({ selectedCard: 12, noteCard: 12, clueTarget: 2 });
+  });
+
+  test('clears stale clue mode when a card action takes over', () => {
+    const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 2 });
+    const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'rank', value: 3 });
+    expect(gameplayInteractionReducer(previewed, { type: 'select-card', order: 12 })).toMatchObject({
+      selectedCard: 12,
+      clueTarget: null,
+      cluePreview: null,
+    });
+    expect(gameplayInteractionReducer(previewed, { type: 'open-note', order: 20 })).toMatchObject({
+      noteCard: 20,
+      clueTarget: null,
+      cluePreview: null,
+    });
   });
 
   test('clears clue preview when the clue target changes', () => {
