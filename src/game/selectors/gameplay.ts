@@ -47,6 +47,7 @@ export type GameplayClueChoice = {
 export type GameplayClueChoices = {
   colors: readonly GameplayClueChoice[];
   ranks: readonly GameplayClueChoice[];
+  allowEmptyClues: boolean;
 };
 
 export type GameTableSuit = {
@@ -62,6 +63,7 @@ type ClueMetadata = Pick<GameMetadata, 'options' | 'ourPlayerIndex' | 'character
 export function getGameplayClueChoices(
   variantName: string,
   characterName = '',
+  allowEmptyClues = false,
 ): GameplayClueChoices {
   const variant = getVariant(variantName);
   return {
@@ -73,6 +75,7 @@ export function getGameplayClueChoices(
       value,
       label: getClueName(ClueType.Rank, value, variant, characterName),
     })),
+    allowEmptyClues,
   };
 }
 
@@ -80,6 +83,7 @@ export function getGameplayClueChoicesForPlayer(metadata: ClueMetadata): Gamepla
   return getGameplayClueChoices(
     metadata.options.variantName,
     getCharacterNameForPlayer(metadata.ourPlayerIndex, metadata.characterAssignments),
+    metadata.options.emptyClues,
   );
 }
 
@@ -93,7 +97,7 @@ export function getGameplayClueChoicesForPlayerIndex(
   const characterName = characterID === undefined || characterID === null
     ? ''
     : getCharacter(characterID).name;
-  return getGameplayClueChoices(metadata.options.variantName, characterName);
+  return getGameplayClueChoices(metadata.options.variantName, characterName, metadata.options.emptyClues);
 }
 
 export function getClueColorFill(variantName: string, value: number): string | null {
