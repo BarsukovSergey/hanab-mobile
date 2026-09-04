@@ -31,6 +31,8 @@ const CUSTOM_PIPS: Readonly<Record<string, DrawPip>> = {
   triangle: drawTriangle,
 };
 
+const recordedPipVectorCache = new Map<string, PipVector>();
+
 export function isUpstreamPipRenderable(pip: string): boolean {
   return VANILLA_PIPS.has(pip) || CUSTOM_PIPS[pip] !== undefined;
 }
@@ -42,9 +44,16 @@ export function isVanillaUpstreamPip(pip: string): boolean {
 export function getRecordedPipVector(pip: string, fillColors: readonly string[], suitName: string): PipVector | null {
   const draw = CUSTOM_PIPS[pip];
   if (draw === undefined) return null;
+
+  const cacheKey = `${pip}\u0000${suitName}\u0000${fillColors.join('\u0001')}`;
+  const cached = recordedPipVectorCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const fill = suitName === 'Black' ? '#212121' : fillColors[0] ?? '#5d6570';
-  return recordPipVector(draw, {
+  const vector = recordPipVector(draw, {
     colors: fillColors.length > 1 ? fillColors : undefined,
     fill,
   });
+  recordedPipVectorCache.set(cacheKey, vector);
+  return vector;
 }
