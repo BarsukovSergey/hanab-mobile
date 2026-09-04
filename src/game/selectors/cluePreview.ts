@@ -45,3 +45,10 @@ export function getCluePreview(
     touchedOrders,
   };
 }
+
+export function isCluePreviewConfirmable(
+  preview: CluePreview | null,
+  allowEmptyClues: boolean,
+): boolean {
+  return preview !== null && (allowEmptyClues || preview.touchedOrders.length > 0);
+}
