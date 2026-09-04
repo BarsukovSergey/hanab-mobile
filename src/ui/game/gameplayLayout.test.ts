@@ -20,7 +20,7 @@ describe('getGameplayLayout', () => {
     expect(layout.ownCardHeight).toBeGreaterThan(layout.opponentCardHeight);
   });
 
-  test('uses a wider own lane and compact two-column opponent area on landscape phones', () => {
+  test('uses a wider own lane and readable two-column opponent area on landscape phones', () => {
     const layout = getGameplayLayout({
       viewportWidth: 844,
       viewportHeight: 390,
@@ -32,8 +32,10 @@ describe('getGameplayLayout', () => {
     expect(layout.opponentColumns).toBe(2);
     expect(layout.ownLaneWidth).toBeGreaterThan(layout.opponentLaneWidth);
     expect(layout.ownLaneWidth + layout.opponentLaneWidth).toBeLessThan(layout.contentWidth);
-    expect(layout.ownCardHeight).toBeLessThanOrEqual(72);
-    expect(layout.opponentCardHeight).toBeLessThanOrEqual(48);
+    expect(layout.ownCardHeight).toBeGreaterThanOrEqual(58);
+    expect(layout.ownCardHeight).toBeLessThanOrEqual(88);
+    expect(layout.opponentCardHeight).toBeGreaterThanOrEqual(42);
+    expect(layout.opponentCardHeight).toBeLessThanOrEqual(60);
   });
 
   test('keeps two opponent hands stacked instead of squeezing them side-by-side', () => {
