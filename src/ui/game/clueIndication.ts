@@ -10,13 +10,13 @@ export function getCommittedClueMarker(
   clue: LastCluePresentation | null,
   order: number,
   numPositiveClues: number,
-  choices: GameplayClueChoices,
+  choices: GameplayClueChoices | null,
 ): ClueCardMarker | null {
   if (clue === null || !clue.touchedOrders.includes(order)) return null;
 
   const choice = clue.clueType === 'rank'
-    ? choices.ranks.find((candidate) => candidate.value === clue.value)
-    : choices.colors.find((candidate) => candidate.value === clue.value);
+    ? choices?.ranks.find((candidate) => candidate.value === clue.value)
+    : choices?.colors.find((candidate) => candidate.value === clue.value);
   const fallback = clue.clueType === 'rank' ? String(clue.value) : `C${clue.value + 1}`;
   const label = choice?.label ?? fallback;
 
