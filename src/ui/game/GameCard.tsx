@@ -73,7 +73,6 @@ export function GameCard({
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
         {clueMarker !== null && <CommittedClueMarker marker={clueMarker} />}
         {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
-        <Text style={styles.cardPosition}>{position + 1}</Text>
       </View>
     </View>
   </Pressable>;
@@ -139,12 +138,11 @@ export function VisibleHanabiCard({
     {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
     {clueMarker !== null && <CommittedClueMarker marker={clueMarker} />}
     {hasNote && <NoteIndicator compact={compactIndicator} />}
-    {empathyActive && position !== undefined && <Text style={styles.cardPosition}>{position + 1}</Text>}
   </View>;
 
   if (onPress === undefined && onLongPress === undefined && onPressOut === undefined) return content;
   return <Pressable
-    accessibilityLabel={`${suit?.name ?? 'Unknown'} ${faceRank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
+    accessibilityLabel={`${position === undefined ? '' : `Card ${position + 1}, `}${suit?.name ?? 'Unknown'} ${faceRank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
     accessibilityState={{ selected }}
     delayLongPress={350}
@@ -212,8 +210,15 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
 }
 
 function CommittedClueMarker({ marker }: { marker: ClueCardMarker }) {
-  return <View pointerEvents="none" style={[styles.clueMarker, marker.retouched && styles.clueMarkerRetouched]}>
-    <Text style={styles.clueMarkerText}>↓ {marker.label}</Text>
+  const arrowColor = marker.retouched ? '#737373' : '#ffffff';
+  return <View pointerEvents="none" style={styles.clueMarker}>
+    <Text style={[styles.clueArrow, { color: arrowColor }]}>↓</Text>
+    <View style={[
+      styles.clueCircle,
+      marker.kind === 'rank' ? styles.rankClueCircle : { backgroundColor: marker.fill ?? '#ffffff' },
+    ]}>
+      {marker.kind === 'rank' && <Text numberOfLines={1} style={styles.rankClueText}>{marker.label}</Text>}
+    </View>
   </View>;
 }
 
@@ -270,7 +275,7 @@ const styles = StyleSheet.create({
   selectedFrame: { borderWidth: 4 },
   hiddenCard: { backgroundColor: '#747a76', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   empathyCard: { backgroundColor: '#747a76' },
-  knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '7%', paddingHorizontal: '8%', paddingTop: '42%', position: 'absolute', right: 0, top: 0 },
+  knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '10%', paddingHorizontal: '8%', paddingTop: '42%', position: 'absolute', right: 0, top: 0 },
   knowledgeStrip: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   suitStrip: { gap: 1 },
   rankStrip: { gap: 0 },
@@ -282,7 +287,6 @@ const styles = StyleSheet.create({
   eliminationStroke: { backgroundColor: '#111111', left: 0, position: 'absolute' },
   eliminationSlash: { transform: [{ rotate: '45deg' }] },
   eliminationBackslash: { transform: [{ rotate: '-45deg' }] },
-  cardPosition: { bottom: 2, color: 'rgba(255,255,255,0.55)', fontSize: 7, fontWeight: '800', position: 'absolute', right: 3 },
   knowledgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
   legendPip: { alignItems: 'center', height: 24, justifyContent: 'center', position: 'relative', width: 24 },
   legendRank: { alignItems: 'center', height: 20, justifyContent: 'center', position: 'relative', width: 20 },
@@ -293,9 +297,11 @@ const styles = StyleSheet.create({
   visibleMini: { borderRadius: 5, height: 56 },
   semanticInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 3 },
   previewInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 7 },
-  clueMarker: { alignItems: 'center', backgroundColor: 'rgba(15,15,15,0.72)', borderRadius: 4, left: 3, minWidth: 20, paddingHorizontal: 3, paddingVertical: 2, position: 'absolute', top: 3, zIndex: 9 },
-  clueMarkerRetouched: { backgroundColor: 'rgba(95,95,95,0.78)' },
-  clueMarkerText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 10, maxWidth: 38, textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
+  clueMarker: { alignItems: 'center', left: 3, position: 'absolute', top: 1, zIndex: 9 },
+  clueArrow: { fontSize: 14, fontWeight: '900', lineHeight: 13, textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
+  clueCircle: { alignItems: 'center', borderColor: '#111111', borderRadius: 7, borderWidth: 1, height: 14, justifyContent: 'center', width: 14 },
+  rankClueCircle: { backgroundColor: '#111111', borderColor: '#ffffff' },
+  rankClueText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 9, maxWidth: 11 },
   noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 16, justifyContent: 'center', position: 'absolute', right: 4, top: 4, transform: [{ rotate: '-8deg' }], width: 16, zIndex: 10 },
   noteIndicatorCompact: { height: 11, right: 2, top: 2, width: 11 },
   noteIndicatorText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900', lineHeight: 12 },
