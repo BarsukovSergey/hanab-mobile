@@ -1,5 +1,10 @@
 import { GameBootstrapCoordinator } from '../../../game/bootstrap/GameBootstrapCoordinator';
-import { gameActionListSchema, gameInitSchema } from '../../../protocol/gameProtocol';
+import {
+  gameActionListSchema,
+  gameInitSchema,
+  incrementalGameActionSchema,
+  noteCommandSchema,
+} from '../../../protocol/gameProtocol';
 import { makeInit } from '../../../protocol/gameProtocol.fixtures';
 import { roomActions } from '../../../store/roomSlice';
 import { sessionActions } from '../../../store/sessionSlice';
@@ -22,7 +27,7 @@ export type GameplayScenario = {
   readonly store: AppStore;
   readonly expectedInteraction: GameplayInteractionState;
   readonly expectedCurrentPlayerIndex: number;
-  readonly family: 'base' | 'clue-flow' | 'responsive';
+  readonly family: 'base' | 'clue-flow' | 'note-flow' | 'responsive';
 };
 
 type ScenarioSpec = {
@@ -36,12 +41,15 @@ type ScenarioSpec = {
   expectedInteraction?: GameplayInteractionState;
   history?: readonly unknown[];
   characterAssignments?: readonly number[];
+  acceptedNote?: { order: number; text: string };
+  incrementalActions?: readonly unknown[];
 };
 
 const PLAYER_NAMES = ['Alice', 'Bob', 'Cathy', 'Donald', 'Emily', 'Frank'] as const;
 const PORTRAIT_PHONE = { width: 390, height: 844 } as const;
 const LANDSCAPE_PHONE = { width: 720, height: 360 } as const;
 const BOB_RED_ORDER = 5;
+const NOTE_TEXT = 'Finesse | r1';
 let cachedScenarios: readonly GameplayScenario[] | null = null;
 
 export function getGameplayScenarios(): readonly GameplayScenario[] {
@@ -99,6 +107,69 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
       history: makeClueCleanupHistory(),
     }),
     buildScenario({
+      id: 'note-edit-source',
+      title: 'Note · opponent edit',
+      description: 'Bob’s first card is a live editable opponent card. Tap it to open the production note editor.',
+      numPlayers: 3,
+      viewport: PORTRAIT_PHONE,
+      family: 'note-flow',
+      expectedInteraction: {
+        ...initialGameplayInteractionState,
+        noteCard: BOB_RED_ORDER,
+      },
+    }),
+    buildScenario({
+      id: 'note-saved',
+      title: 'Note · saved',
+      description: 'The local accepted note action is stored outside replay history and is visible on Bob’s live card.',
+      numPlayers: 3,
+      viewport: PORTRAIT_PHONE,
+      family: 'note-flow',
+      acceptedNote: { order: BOB_RED_ORDER, text: NOTE_TEXT },
+    }),
+    buildScenario({
+      id: 'note-survives-turn',
+      title: 'Note · next turn',
+      description: 'The saved opponent note survives an authoritative turn advance while the card remains in Bob’s hand.',
+      numPlayers: 3,
+      viewport: PORTRAIT_PHONE,
+      family: 'note-flow',
+      expectedCurrentPlayerIndex: 1,
+      acceptedNote: { order: BOB_RED_ORDER, text: NOTE_TEXT },
+      incrementalActions: [
+        { type: 'turn', num: 1, currentPlayerIndex: 1 },
+      ],
+    }),
+    buildScenario({
+      id: 'note-card-left-hand',
+      title: 'Note · card left hand',
+      description: 'Bob discards the noted card and draws a replacement. Saved note knowledge may remain by card order, but live editing must no longer target that card.',
+      numPlayers: 3,
+      viewport: LANDSCAPE_PHONE,
+      family: 'note-flow',
+      expectedCurrentPlayerIndex: 2,
+      acceptedNote: { order: BOB_RED_ORDER, text: NOTE_TEXT },
+      incrementalActions: [
+        { type: 'turn', num: 1, currentPlayerIndex: 1 },
+        {
+          type: 'discard',
+          playerIndex: 1,
+          order: BOB_RED_ORDER,
+          suitIndex: 0,
+          rank: 1,
+          failed: false,
+        },
+        {
+          type: 'draw',
+          playerIndex: 1,
+          order: 15,
+          suitIndex: 0,
+          rank: 2,
+        },
+        { type: 'turn', num: 2, currentPlayerIndex: 2 },
+      ],
+    }),
+    buildScenario({
       id: 'six-player-landscape',
       title: '6P dense · landscape',
       description: 'Six-player narrow Android-like landscape geometry with four-card hands.',
@@ -114,8 +185,17 @@ export function getClueFlowScenarios(): readonly GameplayScenario[] {
   return getGameplayScenarios().filter((scenario) => scenario.family === 'clue-flow');
 }
 
+export function getNoteFlowScenarios(): readonly GameplayScenario[] {
+  return getGameplayScenarios().filter((scenario) => scenario.family === 'note-flow');
+}
+
 export const clueFlowFixtureOrders = {
   bobRed: BOB_RED_ORDER,
+} as const;
+
+export const noteFlowFixture = {
+  opponentOrder: BOB_RED_ORDER,
+  text: NOTE_TEXT,
 } as const;
 
 function buildScenario(spec: ScenarioSpec): GameplayScenario {
@@ -165,6 +245,28 @@ function buildScenario(spec: ScenarioSpec): GameplayScenario {
     list: history,
   }));
   if (!historyAccepted) throw new Error(`Scenario ${spec.id} history was rejected.`);
+
+  if (spec.acceptedNote !== undefined) {
+    const parsed = noteCommandSchema.parse({
+      tableID,
+      order: spec.acceptedNote.order,
+      note: spec.acceptedNote.text,
+    });
+    store.dispatch(roomActions.noteActionAccepted({
+      connectionEpoch,
+      tableID,
+      gameLoadEpoch,
+      noteAction: { type: 'editNote', order: parsed.order, text: parsed.note },
+    }));
+  }
+
+  for (const action of spec.incrementalActions ?? []) {
+    const event = incrementalGameActionSchema.parse({ tableID, action });
+    const accepted = coordinator.receiveIncrementalDetailed(connectionEpoch, event);
+    if (!accepted.accepted) {
+      throw new Error(`Scenario ${spec.id} incremental action was rejected: ${accepted.rejectionReason}.`);
+    }
+  }
 
   const room = store.getState().room.room;
   if (room.kind !== 'live_game') throw new Error(`Scenario ${spec.id} did not reach live_game.`);
