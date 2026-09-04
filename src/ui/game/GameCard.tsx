@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -34,14 +35,25 @@ export function GameCard({
   variantName,
 }: GameCardProps) {
   const { theme } = useHanabTheme();
+  const longPressed = useRef(false);
 
   return <Pressable
     accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
     accessibilityState={{ selected }}
     delayLongPress={350}
-    onLongPress={onLongPress}
-    onPress={onSelect}
+    onLongPress={onLongPress === undefined ? undefined : () => {
+      longPressed.current = true;
+      onLongPress();
+    }}
+    onPress={() => {
+      if (longPressed.current) {
+        longPressed.current = false;
+        return;
+      }
+      onSelect();
+    }}
+    onPressIn={() => { longPressed.current = false; }}
     onPressOut={onPressOut}
     style={({ pressed }) => [styles.cardTouch, pressed && styles.pressed]}
   >
@@ -92,6 +104,7 @@ export function VisibleHanabiCard({
   height?: number;
 }) {
   const { theme } = useHanabTheme();
+  const longPressed = useRef(false);
   const suits = getCardSuitVisuals(variantName);
   const suit = suitIndex === null ? undefined : suits[suitIndex];
   const sizeStyles = size === 'mini' ? styles.visibleMini : size === 'table' ? styles.visibleTable : styles.visibleHand;
@@ -118,8 +131,18 @@ export function VisibleHanabiCard({
     accessibilityRole="button"
     accessibilityState={{ selected }}
     delayLongPress={350}
-    onLongPress={onLongPress}
-    onPress={onPress}
+    onLongPress={onLongPress === undefined ? undefined : () => {
+      longPressed.current = true;
+      onLongPress();
+    }}
+    onPress={onPress === undefined ? undefined : () => {
+      if (longPressed.current) {
+        longPressed.current = false;
+        return;
+      }
+      onPress();
+    }}
+    onPressIn={() => { longPressed.current = false; }}
     onPressOut={onPressOut}
     style={({ pressed }) => pressed && styles.pressed}
   >{content}</Pressable>;
