@@ -52,30 +52,31 @@ export function NoteEditor({
           <ActionButton compact title="Close" tone="ghost" onPress={onClose} />
         </View>
         <Field
-          blurOnSubmit
+          blurOnSubmit={editable}
           editable={editable}
-          enterKeyHint="done"
-          maxLength={300}
-          multiline={false}
-          onChangeText={change}
-          onSubmitEditing={submit}
-          placeholder={editable ? 'Add a private note' : 'Read-only note'}
-          returnKeyType="done"
-          style={styles.input}
-          submitBehavior="blurAndSubmit"
+          enterKeyHint={editable ? 'done' : undefined}
+          maxLength={editable ? 300 : undefined}
+          multiline={!editable}
+          onChangeText={editable ? change : undefined}
+          onSubmitEditing={editable ? submit : undefined}
+          placeholder={editable ? 'Add a private note' : 'No notes on this card'}
+          returnKeyType={editable ? 'done' : undefined}
+          style={[styles.input, !editable && styles.readOnlyInput]}
+          submitBehavior={editable ? 'blurAndSubmit' : 'newline'}
           value={value}
         />
-        <View style={styles.quickRow}>{QUICK_TOKENS.map(([label, token]) => <ActionButton
-          compact
-          disabled={!editable}
-          key={token}
-          title={label}
-          onPress={() => onChange(appendNoteToken(value, token))}
-        />)}</View>
-        <View style={styles.actions}>
-          <ActionButton disabled={!editable} title="Save" tone="primary" onPress={submit} />
-          <ActionButton disabled={!editable || value.length === 0} title="Clear" onPress={onClear} />
-        </View>
+        {editable && <>
+          <View style={styles.quickRow}>{QUICK_TOKENS.map(([label, token]) => <ActionButton
+            compact
+            key={token}
+            title={label}
+            onPress={() => onChange(appendNoteToken(value, token))}
+          />)}</View>
+          <View style={styles.actions}>
+            <ActionButton title="Save" tone="primary" onPress={submit} />
+            <ActionButton disabled={value.length === 0} title="Clear" onPress={onClear} />
+          </View>
+        </>}
       </View>
     </View>
   </Modal>;
@@ -89,6 +90,7 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
   title: { fontSize: 17, fontWeight: '900' },
   input: { minHeight: 44 },
+  readOnlyInput: { minHeight: 88, textAlignVertical: 'top' },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   actions: { flexDirection: 'row', gap: 8 },
 });
