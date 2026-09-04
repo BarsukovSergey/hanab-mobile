@@ -39,6 +39,8 @@ export function gameplayInteractionReducer(
         ...state,
         selectedCard: action.order,
         noteCard: action.order ?? state.noteCard,
+        clueTarget: null,
+        cluePreview: null,
         empathyPlayer: null,
       };
     case 'select-clue-target':
@@ -66,6 +68,8 @@ export function gameplayInteractionReducer(
       return {
         ...state,
         noteCard: action.order,
+        clueTarget: null,
+        cluePreview: null,
         empathyPlayer: null,
       };
     case 'hold-empathy':
