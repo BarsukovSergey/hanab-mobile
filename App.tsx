@@ -4,6 +4,7 @@ import {
   AppState,
   BackHandler,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,7 +23,6 @@ import {
   Notice,
   Panel,
   SectionHeading,
-  ThemeSwitcher,
   useHanabTheme,
   useResponsiveLayout,
 } from './src/ui/designSystem';
@@ -31,8 +31,10 @@ import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
+import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
+type LiveSheet = 'chat' | 'settings' | null;
 
 export default function App() {
   return (
@@ -53,6 +55,7 @@ function AppContent() {
   const [password, setPassword] = useState('');
   const [localScreen, setLocalScreen] = useState<LocalScreen>('lobby');
   const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
+  const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const session = useAppSelector((state) => state.session);
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
@@ -99,7 +102,15 @@ function AppContent() {
   }, [pendingReplayCreate, returnAfterUnattend, roomState.rematchTransition, roomState.room.kind]);
 
   useEffect(() => {
+    if (roomState.room.kind !== 'live_game') setLiveSheet(null);
+  }, [roomState.room.kind]);
+
+  useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (liveSheet !== null) {
+        setLiveSheet(null);
+        return true;
+      }
       const roomRole = roomState.room.kind === 'pregame'
         || roomState.room.kind === 'awaiting_game_bootstrap'
         || roomState.room.kind === 'live_game'
@@ -132,7 +143,7 @@ function AppContent() {
     });
     return () => subscription.remove();
   }, [
-    hydrated, localScreen, probe, roomState.pendingLeaveTableID,
+    hydrated, liveSheet, localScreen, probe, roomState.pendingLeaveTableID,
     roomState.pendingUnattendTableID, roomState.rematchTransition,
     roomState.room, session.phase,
   ]);
@@ -171,6 +182,7 @@ function AppContent() {
       setProbe('missing');
       setLocalScreen('lobby');
       setReturnAfterUnattend(null);
+      setLiveSheet(null);
       setUsername('');
       setPassword('');
     } else {
@@ -201,22 +213,23 @@ function AppContent() {
       >
         <View style={[styles.gameBar, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.brandCopy}>
-            <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
-            <Text style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
+            <Text style={[styles.gameBrand, { color: theme.colors.text }]}>Hanab</Text>
+            <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
           </View>
           <View style={styles.headerActions}>
-            <ThemeSwitcher compact />
+            <ActionButton compact title="Chat" tone="ghost" onPress={() => setLiveSheet('chat')} />
+            <ActionButton compact title="Settings" tone="ghost" onPress={() => setLiveSheet('settings')} />
             <ActionButton
               compact
               disabled={roomState.pendingUnattendTableID !== null}
               title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving…'}
               onPress={() => {
+                setLiveSheet(null);
                 setReturnAfterUnattend(null);
                 setLocalScreen('lobby');
                 lobbyRuntime.unattendLiveGame(liveTableID);
               }}
             />
-            <ActionButton compact title="Sign out" tone="ghost" onPress={() => void signOut()} />
           </View>
         </View>
         {liveConnectionProblem && (
@@ -227,8 +240,21 @@ function AppContent() {
         )}
         <ScrollView contentContainerStyle={[styles.gameContainer, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
           <GameScreen />
-          <ChatPanel room={`table${liveTableID}`} title="Table chat" />
         </ScrollView>
+        <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
+          <View style={styles.sheetBackdrop}>
+            <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+              {liveSheet === 'chat'
+                ? <>
+                  <ChatPanel room={`table${liveTableID}`} title="Table chat" />
+                  <ActionButton title="Close" onPress={() => setLiveSheet(null)} />
+                </>
+                : liveSheet === 'settings'
+                  ? <SettingsScreen onBack={() => setLiveSheet(null)} />
+                  : null}
+            </View>
+          </View>
+        </Modal>
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
       </KeyboardAvoidingView>
     );
@@ -246,45 +272,20 @@ function AppContent() {
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
         </View>
         {statusMessage.length > 0 && <Notice tone="error">{statusMessage}</Notice>}
-        <Field
-          autoCapitalize="none"
-          autoCorrect={false}
-          onChangeText={setUsername}
-          placeholder="Username"
-          value={username}
-        />
-        <Field
-          autoCapitalize="none"
-          autoCorrect={false}
-          onChangeText={setPassword}
-          placeholder="Password"
-          secureTextEntry
-          value={password}
-        />
-        <ActionButton
-          disabled={loginPending || username.trim().length === 0 || password.length === 0}
-          title={loginPending ? 'Logging in…' : 'Login'}
-          tone="primary"
-          onPress={() => void submitLogin()}
-        />
+        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
+        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
+        <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
+          title={loginPending ? 'Logging in…' : 'Login'} tone="primary" onPress={() => void submitLogin()} />
       </Panel>
     );
   } else if (probe === 'indeterminate') {
-    content = (
-      <Panel>
-        <SectionHeading title="Unable to check session" detail="The server could not confirm your current session." />
-        <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>
-        <ActionButton title="Retry" tone="primary" onPress={() => void runProbe()} />
-      </Panel>
-    );
+    content = <Panel><SectionHeading title="Unable to check session" detail="The server could not confirm your current session." />
+      <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>
+      <ActionButton title="Retry" tone="primary" onPress={() => void runProbe()} /></Panel>;
   } else if (session.phase === 'failed' || session.phase === 'closed') {
-    content = (
-      <Panel>
-        <SectionHeading title="Connection lost" detail="Reconnect to continue using the lobby." />
-        {session.error !== null && <Notice tone="error">{session.error}</Notice>}
-        <ActionButton title="Retry" tone="primary" onPress={() => { lobbyRuntime.disconnect(); void runProbe(); }} />
-      </Panel>
-    );
+    content = <Panel><SectionHeading title="Connection lost" detail="Reconnect to continue using the lobby." />
+      {session.error !== null && <Notice tone="error">{session.error}</Notice>}
+      <ActionButton title="Retry" tone="primary" onPress={() => { lobbyRuntime.disconnect(); void runProbe(); }} /></Panel>;
   } else if (session.phase !== 'ready' || !hydrated) {
     content = <Panel><SectionHeading title="Connecting to lobby…" detail="Synchronizing tables and chat." /></Panel>;
   } else if (roomState.room.kind === 'awaiting_game_bootstrap') {
@@ -294,32 +295,18 @@ function AppContent() {
   } else if (roomState.room.kind === 'pregame') {
     content = <PregameScreen />;
   } else if (localScreen === 'history') {
-    content = (
-      <HistoryScreen
-        onBack={() => {
-          setReturnAfterUnattend(null);
-          setLocalScreen('lobby');
-        }}
-        onWatchReplay={(databaseID) => {
-          if (lobbyRuntime.watchHistoricalGame(databaseID)) {
-            setReturnAfterUnattend('history');
-          }
-        }}
-      />
-    );
+    content = <HistoryScreen onBack={() => { setReturnAfterUnattend(null); setLocalScreen('lobby'); }}
+      onWatchReplay={(databaseID) => { if (lobbyRuntime.watchHistoricalGame(databaseID)) setReturnAfterUnattend('history'); }} />;
+  } else if (localScreen === 'settings') {
+    content = <SettingsScreen onBack={() => setLocalScreen('lobby')} />;
   } else {
     content = <LobbyScreen onOpenHistory={() => setLocalScreen('history')} />;
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[styles.flex, { backgroundColor: theme.colors.background }]}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]}
-        keyboardShouldPersistTaps="handled"
-      >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.flex, { backgroundColor: theme.colors.background }]}>
+      <ScrollView contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
         <View style={styles.appHeader}>
           <View style={styles.brandCopy}>
             <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
@@ -328,15 +315,13 @@ function AppContent() {
             )}
           </View>
           <View style={styles.headerActions}>
-            <ThemeSwitcher compact />
-            {probe === 'valid' && session.authenticatedUser !== null && (
+            {probe === 'valid' && session.authenticatedUser !== null && <>
+              <ActionButton compact title="Settings" tone="ghost" onPress={() => setLocalScreen('settings')} />
               <ActionButton compact title="Sign out" tone="ghost" onPress={() => void signOut()} />
-            )}
+            </>}
           </View>
         </View>
-        {lobbyNotice !== null && (
-          <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>
-        )}
+        {lobbyNotice !== null && <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>}
         {content}
       </ScrollView>
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
@@ -346,50 +331,23 @@ function AppContent() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: {
-    alignSelf: 'center',
-    gap: 16,
-    paddingBottom: 36,
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 42 : 54,
-    width: '100%',
-  },
-  gameContainer: {
-    alignSelf: 'center',
-    flexGrow: 1,
-    gap: 16,
-    paddingBottom: 28,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    width: '100%',
-  },
-  liveConnectionNotice: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-  },
+  container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
+  gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
+  liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  gameBar: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-    paddingBottom: 9,
-    paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'android' ? 38 : 48,
-  },
-  brandCopy: { flexShrink: 1, gap: 1 },
+  gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: Platform.OS === 'android' ? 34 : 44 },
+  brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
-  authName: { fontSize: 12, fontWeight: '700' },
-  headerActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'flex-end' },
+  gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
+  authName: { fontSize: 11, fontWeight: '700' },
+  headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   loginIntro: { gap: 4, marginBottom: 4 },
   loginEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   loginTitle: { fontSize: 30, fontWeight: '900', letterSpacing: -0.6 },
   loginDetail: { fontSize: 14, lineHeight: 20 },
+  sheetBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.58)', flex: 1, justifyContent: 'center', padding: 14 },
+  sheet: { borderRadius: 16, borderWidth: 1, gap: 10, maxHeight: '90%', maxWidth: 720, padding: 10, width: '100%' },
 });
