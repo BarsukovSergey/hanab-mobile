@@ -11,6 +11,7 @@ import {
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
 } from '../../game/selectors/gameplay';
+import { getLastCluePresentation } from '../../game/selectors/lastClue';
 import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -21,6 +22,7 @@ import { CompactTable } from './CompactTable';
 import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
+import { getCommittedClueMarker } from './clueIndication';
 import { beginNoteEdit } from './noteEditing';
 import {
   gameplayInteractionReducer,
@@ -206,6 +208,7 @@ export function GameScreen() {
   const isOurTurn = playerRoom !== null && game.turn.currentPlayerIndex === ourIndex;
   const enabled = sessionPhase === 'ready' && isOurTurn && !replay.active && !clientState.pause.active && roomState.pendingGameplayAction === null;
   const clueChoices = playerRoom === null ? null : getGameplayClueChoicesForPlayer(playerRoom.clientState.metadata);
+  const lastClue = getLastCluePresentation(replay.actions);
   const currentIndex = game.turn.currentPlayerIndex;
   const currentName = currentIndex === null ? 'No current player' : metadata.playerNames[currentIndex] ?? `Player ${currentIndex + 1}`;
   const pending = roomState.pendingGameplayAction?.action ?? null;
@@ -284,6 +287,7 @@ export function GameScreen() {
               const card = game.deck[order];
               if (card === undefined) return null;
               return <GameCard
+                clueMarker={getCommittedClueMarker(lastClue, order, card.numPositiveClues, clueChoices)}
                 hasNote={hasCardNote(order)}
                 height={gameplayLayout.ownCardHeight}
                 key={order}
@@ -340,6 +344,7 @@ export function GameScreen() {
                     ? getCardKnowledgeViewModel(metadata.options.variantName, card, clientState.notes.ourNotes[order], false, true)
                     : null;
                   return <VisibleHanabiCard
+                    clueMarker={getCommittedClueMarker(lastClue, order, card.numPositiveClues, clueChoices)}
                     empathyKnowledge={empathyKnowledge}
                     hasNote={hasCardNote(order)}
                     height={gameplayLayout.opponentCardHeight}
