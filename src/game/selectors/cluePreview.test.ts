@@ -52,13 +52,17 @@ describe('isCluePreviewConfirmable', () => {
     targetPlayerIndex: 1,
     touchedOrders: [],
   };
+  const touchedPreview = { ...emptyPreview, touchedOrders: [7] };
 
-  test('requires at least one touched card before confirmation', () => {
-    expect(isCluePreviewConfirmable(emptyPreview)).toBe(false);
-    expect(isCluePreviewConfirmable({ ...emptyPreview, touchedOrders: [7] })).toBe(true);
+  test('matches the Empty Clues confirmation matrix', () => {
+    expect(isCluePreviewConfirmable(emptyPreview, false)).toBe(false);
+    expect(isCluePreviewConfirmable(touchedPreview, false)).toBe(true);
+    expect(isCluePreviewConfirmable(emptyPreview, true)).toBe(true);
+    expect(isCluePreviewConfirmable(touchedPreview, true)).toBe(true);
   });
 
-  test('never confirms an invalid preview', () => {
-    expect(isCluePreviewConfirmable(null)).toBe(false);
+  test('never confirms an invalid preview even when Empty Clues is enabled', () => {
+    expect(isCluePreviewConfirmable(null, false)).toBe(false);
+    expect(isCluePreviewConfirmable(null, true)).toBe(false);
   });
 });
