@@ -59,6 +59,7 @@ export function getCardKnowledgeViewModel(
   card: CardState,
   note: CardNote | undefined = undefined,
   finished = false,
+  empathy = false,
 ): CardKnowledgeViewModel {
   const variant = getVariant(variantName);
   const cardNote = note ?? EMPTY_NOTE;
@@ -66,17 +67,18 @@ export function getCardKnowledgeViewModel(
     cardIdentity: { suitIndex: card.suitIndex, rank: card.rank },
     state: card,
     note: cardNote,
-    empathy: false,
+    empathy,
     isStackBase: false,
     finished,
   });
   const border = getCardBorderPresentation(card, cardNote, finished);
-  const pips = getCardPipPresentation(variant, card, cardNote, false);
+  const pips = getCardPipPresentation(variant, card, cardNote, empathy);
+  const cluePossibilities = empathy ? card.possibleCardsFromClues : card.possibleCardsFromClues;
   const clueSuitIndexes = new Set<number>(
-    card.possibleCardsFromClues.map(([suitIndex]) => suitIndex),
+    cluePossibilities.map(([suitIndex]) => suitIndex),
   );
   const clueRanks = new Set<number>(
-    card.possibleCardsFromClues.map(([, rank]) => rank),
+    cluePossibilities.map(([, rank]) => rank),
   );
   const positiveColorLabels = card.positiveColorClues.map((color) => (
     variant.clueColors.find((candidate) => candidate.name === color.name)?.name
