@@ -294,7 +294,7 @@ export function GameScreen() {
           </View>
           {selectedCard === null
             ? <Text style={[styles.selectHint, { color: theme.colors.textMuted }]}>Tap a card to play, discard, or note it.</Text>
-            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}> 
+            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}>
               <Text numberOfLines={1} style={[styles.actionLabel, { color: theme.colors.text }]}>Card {displayedOurHand.findIndex((order) => order === selectedCard) + 1}</Text>
               <View style={styles.actionButtons}>
                 <ActionButton compact disabled={!cardEnabled} title="Play" tone="primary" onPress={() => lobbyRuntime.play(selectedCard)} />
@@ -335,7 +335,7 @@ export function GameScreen() {
                   {target && !empathizing && <Pill active>Clue</Pill>}
                 </View>
               </Pressable>
-              <View style={[styles.hand, { gap: gameplayLayout.cardGap }]}>
+              <View style={[styles.hand, { gap: gameplayLayout.cardGap }]}> 
                 {displayedHand.map((order, position) => {
                   const card = game.deck[order];
                   if (card === undefined) return null;
