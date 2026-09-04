@@ -27,7 +27,7 @@ describe('getGameTableSuits', () => {
   });
 
   it('exposes exact variant clue fills without leaking upstream imports into UI', () => {
-    expect(getClueColorFill('No Variant', 0)).toBe('#ff0000');
+    expect(getClueColorFill('No Variant', 0)).toBe('#e60000');
     expect(getClueColorFill('No Variant', 99)).toBeNull();
   });
 
