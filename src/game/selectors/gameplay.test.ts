@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  getClueColorFill,
   getDisplayedClueTokens,
   getGameTableSuits,
   getGameplayClueChoices,
@@ -23,6 +24,11 @@ describe('getGameTableSuits', () => {
       { value: 1, label: 'Odd' }, { value: 2, label: 'Even' },
     ]);
     expect(getGameplayClueChoices('No Variant', 'Quacker').colors[0]?.label).toBe('Quack');
+  });
+
+  it('exposes exact variant clue fills without leaking upstream imports into UI', () => {
+    expect(getClueColorFill('No Variant', 0)).toBe('#ff0000');
+    expect(getClueColorFill('No Variant', 99)).toBeNull();
   });
 
   it('maps authoritative play and discard orders to visible suit labels', () => {
