@@ -73,12 +73,11 @@ export function getCardKnowledgeViewModel(
   });
   const border = getCardBorderPresentation(card, cardNote, finished);
   const pips = getCardPipPresentation(variant, card, cardNote, empathy);
-  const cluePossibilities = empathy ? card.possibleCardsFromClues : card.possibleCardsFromClues;
   const clueSuitIndexes = new Set<number>(
-    cluePossibilities.map(([suitIndex]) => suitIndex),
+    card.possibleCardsFromClues.map(([suitIndex]) => suitIndex),
   );
   const clueRanks = new Set<number>(
-    cluePossibilities.map(([, rank]) => rank),
+    card.possibleCardsFromClues.map(([, rank]) => rank),
   );
   const positiveColorLabels = card.positiveColorClues.map((color) => (
     variant.clueColors.find((candidate) => candidate.name === color.name)?.name
