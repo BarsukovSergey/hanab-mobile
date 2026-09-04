@@ -13,12 +13,11 @@ export function LastClueNotice() {
   const room = useAppSelector((state) => state.room.room);
   if (room.kind !== 'live_game' || room.clientState.finished || room.clientState.replay.active) return null;
 
-  const slotStyle = landscapePhone ? styles.slotLandscape : styles.slot;
   const visibleState = room.clientState.visibleState;
-  if (visibleState === null) return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={slotStyle} />;
+  if (visibleState === null) return null;
 
   const clue = getLastCluePresentation(room.clientState.replay.actions);
-  if (clue === null) return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={slotStyle} />;
+  if (clue === null) return null;
 
   const names = room.clientState.metadata.playerNames;
   const variantName = room.clientState.metadata.options.variantName;
@@ -33,25 +32,22 @@ export function LastClueNotice() {
     ? choices.ranks.find((candidate) => candidate.value === clue.value)
     : choices.colors.find((candidate) => candidate.value === clue.value);
   const clueLabel = choice?.label ?? (clue.clueType === 'rank' ? `rank ${clue.value}` : `color ${clue.value + 1}`);
-  const touched = touchedPositions.length === 0 ? 'no cards' : touchedPositions.map((position) => `↓${position}`).join(' ');
+  const touched = touchedPositions.length === 0 ? 'no cards' : `cards ${touchedPositions.join(', ')}`;
 
   return <View style={[
-    slotStyle,
     styles.notice,
     landscapePhone && styles.noticeLandscape,
     { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent },
   ]}>
     <Text numberOfLines={1} style={[styles.text, landscapePhone && styles.textLandscape, { color: theme.colors.text }]}>
-      {giver} → {target} · {clueLabel} · {touched}
+      {giver} → {target}: {clueLabel} · {touched}
     </Text>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  slot: { minHeight: 30 },
-  slotLandscape: { minHeight: 20 },
-  notice: { borderLeftWidth: 3, borderRadius: 7, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 4 },
-  noticeLandscape: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  notice: { borderLeftWidth: 3, borderRadius: 7, justifyContent: 'center', minHeight: 28, paddingHorizontal: 8, paddingVertical: 4 },
+  noticeLandscape: { minHeight: 20, paddingHorizontal: 6, paddingVertical: 2 },
   text: { fontSize: 10, fontWeight: '800' },
   textLandscape: { fontSize: 9 },
 });
