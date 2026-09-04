@@ -8,8 +8,10 @@ import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { VisibleHanabiCard } from './GameCard';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
-
-const CARD_ASPECT_RATIO = 286 / 406;
+import {
+  getCompactTableFireworksLayout,
+  HANABI_TABLE_CARD_ASPECT_RATIO,
+} from './tableLayout';
 
 export function CompactTable({
   game,
@@ -27,12 +29,11 @@ export function CompactTable({
   const suitVisuals = getCardSuitVisuals(variantName);
   const discard = getDiscardSummary(variantName, game);
   const [fireworksWidth, setFireworksWidth] = useState(310);
-  const gap = landscapePhone ? 3 : 4;
-  const gaps = Math.max(0, suits.length - 1) * gap;
-  const cardWidth = Math.max(26, (fireworksWidth - gaps) / Math.max(1, suits.length));
-  const maxStackHeight = landscapePhone ? 54 : 68;
-  const minStackHeight = landscapePhone ? 36 : 40;
-  const stackHeight = Math.max(minStackHeight, Math.min(maxStackHeight, cardWidth / CARD_ASPECT_RATIO));
+  const fireworksLayout = getCompactTableFireworksLayout(
+    fireworksWidth,
+    suits.length,
+    landscapePhone,
+  );
 
   return <View style={[
     styles.surface,
@@ -48,7 +49,7 @@ export function CompactTable({
         const nextWidth = event.nativeEvent.layout.width;
         if (nextWidth > 0 && Math.abs(nextWidth - fireworksWidth) > 1) setFireworksWidth(nextWidth);
       }}
-      style={[styles.fireworks, { gap }]}
+      style={[styles.fireworks, { gap: fireworksLayout.gap }]}
     >
       {suits.map((suit) => {
         const stack = game.playStacks[suit.suitIndex] ?? [];
@@ -57,7 +58,7 @@ export function CompactTable({
         const visual = suitVisuals[suit.suitIndex];
         return <View key={suit.suitIndex} style={styles.firework}>
           {card === undefined
-            ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong, height: stackHeight }]}>
+            ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong, height: fireworksLayout.stackHeight }]}>
               {visual !== undefined && hasUpstreamSvgPip(visual.pip) && <View style={styles.emptyStackPip}>
                 <UpstreamPip
                   duplicatePip={visual.duplicatePip}
@@ -69,7 +70,7 @@ export function CompactTable({
               </View>}
             </View>
             : <VisibleHanabiCard
-              height={stackHeight}
+              height={fireworksLayout.stackHeight}
               rank={card.rank}
               suitIndex={card.suitIndex}
               variantName={variantName}
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   variant: { flexShrink: 1, fontSize: 9, fontWeight: '700', textAlign: 'right' },
   fireworks: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'center', width: '100%' },
   firework: { alignItems: 'center', flex: 1, gap: 1, minWidth: 0 },
-  emptyStack: { alignItems: 'center', aspectRatio: CARD_ASPECT_RATIO, borderRadius: 6, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center' },
+  emptyStack: { alignItems: 'center', aspectRatio: HANABI_TABLE_CARD_ASPECT_RATIO, borderRadius: 6, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center' },
   emptyStackPip: { opacity: 0.52 },
   suitName: { fontSize: 7, fontWeight: '800', maxWidth: '100%' },
   discard: { borderRadius: 9, borderWidth: 1, gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
