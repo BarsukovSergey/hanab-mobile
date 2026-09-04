@@ -1,6 +1,12 @@
+export type GameplayCluePreviewState = {
+  type: 'color' | 'rank';
+  value: number;
+} | null;
+
 export type GameplayInteractionState = {
   selectedCard: number | null;
   clueTarget: number | null;
+  cluePreview: GameplayCluePreviewState;
   empathyPlayer: number | null;
   noteCard: number | null;
 };
@@ -8,6 +14,8 @@ export type GameplayInteractionState = {
 export type GameplayInteractionAction =
   | { type: 'select-card'; order: number | null }
   | { type: 'select-clue-target'; playerIndex: number | null }
+  | { type: 'preview-clue'; clueType: 'color' | 'rank'; value: number }
+  | { type: 'clear-clue-preview' }
   | { type: 'open-note'; order: number | null }
   | { type: 'hold-empathy'; playerIndex: number | null }
   | { type: 'sync-hands'; ownOrders: readonly number[]; clueTargets: readonly number[]; visibleOrders: readonly number[] };
@@ -15,6 +23,7 @@ export type GameplayInteractionAction =
 export const initialGameplayInteractionState: GameplayInteractionState = {
   selectedCard: null,
   clueTarget: null,
+  cluePreview: null,
   empathyPlayer: null,
   noteCard: null,
 };
@@ -34,6 +43,19 @@ export function gameplayInteractionReducer(
       return {
         ...state,
         clueTarget: action.playerIndex,
+        cluePreview: action.playerIndex === state.clueTarget ? state.cluePreview : null,
+      };
+    case 'preview-clue':
+      return state.clueTarget === null
+        ? state
+        : {
+          ...state,
+          cluePreview: { type: action.clueType, value: action.value },
+        };
+    case 'clear-clue-preview':
+      return {
+        ...state,
+        cluePreview: null,
       };
     case 'open-note':
       return {
@@ -61,7 +83,8 @@ export function gameplayInteractionReducer(
       const empathyPlayer = state.empathyPlayer !== null && action.clueTargets.includes(state.empathyPlayer)
         ? state.empathyPlayer
         : null;
-      return { selectedCard, clueTarget, empathyPlayer, noteCard };
+      const cluePreview = clueTarget === state.clueTarget ? state.cluePreview : null;
+      return { selectedCard, clueTarget, cluePreview, empathyPlayer, noteCard };
     }
     default:
       return state;
