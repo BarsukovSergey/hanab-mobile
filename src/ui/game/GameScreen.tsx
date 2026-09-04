@@ -253,7 +253,12 @@ export function GameScreen() {
         {displayedOurHand.map((order, position) => {
           const card = game.deck[order];
           if (card === undefined) return <Text key={order}>Card unavailable</Text>;
-          return <GameCard key={order} knowledge={getCardKnowledgeViewModel(metadata.options.variantName, card)} position={position}
+          return <GameCard key={order} knowledge={getCardKnowledgeViewModel(
+            metadata.options.variantName,
+            card,
+            clientState.notes.ourNotes[order],
+            clientState.finished,
+          )} position={position}
             hasNote={hasCardNote(order)} selected={selectedCard === order} variantName={metadata.options.variantName}
             onLongPress={() => openNote(order)} onSelect={() => { setSelectedCard(order); setNoteCard(order); }} />;
         })}
@@ -281,9 +286,16 @@ export function GameScreen() {
             {displayedHand.map((order, position) => {
               const card = game.deck[order];
               const spectatorCanTap = liveRoom.role === 'spectator';
-              return <VisibleHanabiCard key={order} clued={card?.hasClueApplied ?? false} hasNote={hasCardNote(order)} onLongPress={() => openNote(order)}
+              const knowledge = card === undefined ? null : getCardKnowledgeViewModel(
+                metadata.options.variantName,
+                card,
+                clientState.notes.ourNotes[order],
+                clientState.finished,
+              );
+              return <VisibleHanabiCard key={order} hasNote={hasCardNote(order)} onLongPress={() => openNote(order)}
                 onPress={spectatorCanTap ? () => openNote(order) : () => setSelectedTarget(i)} position={position}
-                rank={card?.rank ?? null} selected={liveRoom.role === 'spectator' && noteCard === order} suitIndex={card?.suitIndex ?? null}
+                rank={card?.rank ?? null} selected={liveRoom.role === 'spectator' && noteCard === order}
+                semanticBorder={knowledge?.borderColor ?? null} suitIndex={card?.suitIndex ?? null}
                 variantName={metadata.options.variantName} />;
             })}
           </ScrollView>
@@ -332,7 +344,7 @@ function TablePanel({ game, variantName, title, hasNote, onOpenNote }: {
       return <View key={suit.suitIndex} style={styles.stackColumn}>
         <Text style={[styles.stackName, { color: theme.colors.textMuted }]} numberOfLines={1}>{suit.suitName}</Text>
         {topOrder === undefined || card === undefined ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong }]}><Text style={[styles.emptyStackText, { color: theme.colors.textMuted }]}>—</Text></View>
-          : <VisibleHanabiCard clued={card.hasClueApplied} hasNote={hasNote?.(topOrder) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(topOrder)}
+          : <VisibleHanabiCard hasNote={hasNote?.(topOrder) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(topOrder)}
             onPress={onOpenNote === undefined ? undefined : () => onOpenNote(topOrder)} rank={card.rank} size="table" suitIndex={card.suitIndex} variantName={variantName} />}
       </View>;
     })}</View>
@@ -346,7 +358,7 @@ function TablePanel({ game, variantName, title, hasNote, onOpenNote }: {
         <View style={styles.discardCards}>{orders.map((order) => {
           const card = game.deck[order];
           if (card === undefined) return null;
-          return <VisibleHanabiCard key={order} clued={card.hasClueApplied} hasNote={hasNote?.(order) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(order)}
+          return <VisibleHanabiCard key={order} hasNote={hasNote?.(order) ?? false} onLongPress={onOpenNote === undefined ? undefined : () => onOpenNote(order)}
             onPress={onOpenNote === undefined ? undefined : () => onOpenNote(order)} rank={card.rank} size="mini" suitIndex={card.suitIndex} variantName={variantName} />;
         })}</View>
       </View>;
@@ -366,11 +378,12 @@ function ReplayHands({ game, playerNames, variantName, notes, onOpenNote }: {
     style={[styles.player, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><Text style={[styles.playerName, { color: theme.colors.text }]}>{name}</Text>
     <ScrollView horizontal contentContainerStyle={styles.hand} showsHorizontalScrollIndicator={false}>{getDisplayedHandOrders(game.hands[i]).map((order, position) => {
       const card = game.deck[order];
-      const knowledge = card === undefined ? null : getCardKnowledgeViewModel(variantName, card);
+      const knowledge = card === undefined ? null : getCardKnowledgeViewModel(variantName, card, undefined, true);
       const hasNote = notes[order]?.some((entry) => entry.text.trim().length > 0) ?? false;
-      return <View key={order} style={styles.replayCard}><VisibleHanabiCard clued={card?.hasClueApplied ?? false} hasNote={hasNote}
+      return <View key={order} style={styles.replayCard}><VisibleHanabiCard hasNote={hasNote}
         onLongPress={hasNote ? () => onOpenNote(order) : undefined} onPress={hasNote ? () => onOpenNote(order) : undefined}
-        position={position} rank={card?.rank ?? null} suitIndex={card?.suitIndex ?? null} variantName={variantName} />
+        position={position} rank={card?.rank ?? null} semanticBorder={knowledge?.borderColor ?? null}
+        suitIndex={card?.suitIndex ?? null} variantName={variantName} />
         {knowledge !== null && <CardKnowledgeDetails knowledge={knowledge} variantName={variantName} />}</View>;
     })}</ScrollView>
   </View>)}</View></Panel>;
