@@ -5,11 +5,11 @@ import { Provider } from 'react-redux';
 import { suppressGameplayRuntimeCommands } from '../../../runtime/application';
 import { ActionButton, Panel, SectionHeading, useHanabTheme } from '../../designSystem';
 import { GameScreen } from '../GameScreen';
-import { getGameplayScenarios } from './gameplayScenarios';
+import { getGameplayGalleryScenarios } from './gameplayScenarios';
 
 export function GameplayScenarioGallery({ onBack }: { onBack: () => void }) {
   const { theme } = useHanabTheme();
-  const scenarios = useMemo(() => getGameplayScenarios(), []);
+  const scenarios = useMemo(() => getGameplayGalleryScenarios(), []);
   const [selectedID, setSelectedID] = useState(scenarios[0]?.id ?? '');
   const scenario = useMemo(
     () => scenarios.find((candidate) => candidate.id === selectedID) ?? scenarios[0],
@@ -41,7 +41,7 @@ export function GameplayScenarioGallery({ onBack }: { onBack: () => void }) {
         Canonical layout target: {scenario.viewport.width} x {scenario.viewport.height}. Gallery render uses the current device viewport.
       </Text>
       <Text style={[styles.warning, { color: theme.colors.warning }]}>
-        Scenario stores are isolated and gameplay/postgame runtime commands are suppressed while this gallery is open. Local selection, preview, empathy, notes, and discard inspection remain safe to exercise.
+        Scenario stores are isolated and gameplay/postgame runtime commands are suppressed while this gallery is open. Local selection, preview, empathy, notes, discard inspection, and finished/replay rendering remain safe to exercise.
       </Text>
     </Panel>
 
