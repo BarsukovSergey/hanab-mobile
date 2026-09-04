@@ -1,4 +1,4 @@
-import { getVariant } from '../upstream/gameData';
+import { getCharacter, getVariant } from '../upstream/gameData';
 import { ClueType } from '../upstream/enums/ClueType';
 import type { GameState } from '../upstream/interfaces/GameState';
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
@@ -77,17 +77,23 @@ export function getGameplayClueChoices(
 }
 
 export function getGameplayClueChoicesForPlayer(metadata: ClueMetadata): GameplayClueChoices {
-  return getGameplayClueChoicesForPlayerIndex(metadata, metadata.ourPlayerIndex);
+  return getGameplayClueChoices(
+    metadata.options.variantName,
+    getCharacterNameForPlayer(metadata.ourPlayerIndex, metadata.characterAssignments),
+  );
 }
 
 export function getGameplayClueChoicesForPlayerIndex(
   metadata: ClueMetadata,
   playerIndex: number,
 ): GameplayClueChoices {
-  return getGameplayClueChoices(
-    metadata.options.variantName,
-    getCharacterNameForPlayer(playerIndex, metadata.characterAssignments),
-  );
+  const characterID = Number.isInteger(playerIndex) && playerIndex >= 0
+    ? metadata.characterAssignments[playerIndex]
+    : undefined;
+  const characterName = characterID === undefined || characterID === null
+    ? ''
+    : getCharacter(characterID).name;
+  return getGameplayClueChoices(metadata.options.variantName, characterName);
 }
 
 export function getClueColorFill(variantName: string, value: number): string | null {
