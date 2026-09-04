@@ -22,6 +22,7 @@ export type GameplayLayout = {
 };
 
 const PHONE_HORIZONTAL_CHROME = 32;
+const LANDSCAPE_HORIZONTAL_CHROME = 64;
 const TABLET_MAX_CONTENT_WIDTH = 1120;
 const OWN_MAX_HEIGHT = 112;
 const OPPONENT_MAX_HEIGHT = 76;
@@ -42,7 +43,8 @@ export function getGameplayLayout({
   const landscapePhone = orientation === 'landscape' && height < 700;
   const cardGap = width < 360 ? 4 : landscapePhone ? 4 : width < 700 ? 6 : 7;
   const opponentRowGap = landscapePhone ? 5 : width < 360 ? 5 : 7;
-  const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - PHONE_HORIZONTAL_CHROME));
+  const horizontalChrome = landscapePhone ? LANDSCAPE_HORIZONTAL_CHROME : PHONE_HORIZONTAL_CHROME;
+  const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - horizontalChrome));
   const landscapeUsableWidth = Math.max(1, contentWidth - LANDSCAPE_GUTTER);
   // Keep the geometry model in lockstep with GameScreen's 1.35:1 flex split. If these drift,
   // opponent cards can be sized for a lane that is wider than the lane actually rendered.
