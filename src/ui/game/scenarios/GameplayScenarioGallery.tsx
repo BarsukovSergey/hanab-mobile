@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Provider } from 'react-redux';
 
+import { suppressGameplayRuntimeCommands } from '../../../runtime/application';
 import { ActionButton, Panel, SectionHeading, useHanabTheme } from '../../designSystem';
 import { GameScreen } from '../GameScreen';
 import { getGameplayScenarios } from './gameplayScenarios';
@@ -14,6 +15,8 @@ export function GameplayScenarioGallery({ onBack }: { onBack: () => void }) {
     () => scenarios.find((candidate) => candidate.id === selectedID) ?? scenarios[0],
     [scenarios, selectedID],
   );
+
+  useEffect(() => suppressGameplayRuntimeCommands(), []);
 
   if (scenario === undefined) return null;
 
@@ -38,7 +41,7 @@ export function GameplayScenarioGallery({ onBack }: { onBack: () => void }) {
         Canonical layout target: {scenario.viewport.width} x {scenario.viewport.height}. Gallery render uses the current device viewport.
       </Text>
       <Text style={[styles.warning, { color: theme.colors.warning }]}>
-        Scenario stores are isolated from the live runtime. Use this surface for rendering and local interaction states; authoritative sends are intentionally not simulated yet.
+        Scenario stores are isolated and gameplay/postgame runtime commands are suppressed while this gallery is open. Local selection, preview, empathy, notes, and discard inspection remain safe to exercise.
       </Text>
     </Panel>
 
