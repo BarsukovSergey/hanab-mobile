@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { getVariant } from '../../game/upstream/gameData';
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
+import { getClueColorFill } from '../../game/selectors/gameplay';
 import { useHanabTheme } from '../designSystem';
 import type { ClueCardMarker } from './clueIndication';
 import { UpstreamCardFace } from './UpstreamCardFace';
@@ -213,7 +213,7 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
 function CommittedClueMarker({ marker, variantName }: { marker: ClueCardMarker; variantName: string }) {
   const arrowColor = marker.retouched ? '#737373' : '#ffffff';
   const clueFill = marker.kind === 'color'
-    ? getVariant(variantName).clueColors[marker.value]?.fill ?? '#ffffff'
+    ? getClueColorFill(variantName, marker.value) ?? '#ffffff'
     : '#111111';
   return <View pointerEvents="none" style={styles.clueMarker}>
     <Text style={[styles.clueArrow, { color: arrowColor }]}>↓</Text>
