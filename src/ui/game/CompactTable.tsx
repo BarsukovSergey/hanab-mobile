@@ -54,9 +54,20 @@ export function CompactTable({
         const stack = game.playStacks[suit.suitIndex] ?? [];
         const topOrder = stack[stack.length - 1];
         const card = topOrder === undefined ? undefined : game.deck[topOrder];
+        const visual = suitVisuals[suit.suitIndex];
         return <View key={suit.suitIndex} style={styles.firework}>
           {card === undefined
-            ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong, height: stackHeight }]} />
+            ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong, height: stackHeight }]}>
+              {visual !== undefined && hasUpstreamSvgPip(visual.pip) && <View style={styles.emptyStackPip}>
+                <UpstreamPip
+                  duplicatePip={visual.duplicatePip}
+                  fillColors={visual.fillColors}
+                  pip={visual.pip}
+                  size={landscapePhone ? 12 : 15}
+                  suitName={visual.name}
+                />
+              </View>}
+            </View>
             : <VisibleHanabiCard
               height={stackHeight}
               rank={card.rank}
@@ -128,7 +139,8 @@ const styles = StyleSheet.create({
   variant: { flexShrink: 1, fontSize: 9, fontWeight: '700', textAlign: 'right' },
   fireworks: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'center', width: '100%' },
   firework: { alignItems: 'center', flex: 1, gap: 1, minWidth: 0 },
-  emptyStack: { aspectRatio: CARD_ASPECT_RATIO, borderRadius: 6, borderStyle: 'dashed', borderWidth: 2 },
+  emptyStack: { alignItems: 'center', aspectRatio: CARD_ASPECT_RATIO, borderRadius: 6, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center' },
+  emptyStackPip: { opacity: 0.52 },
   suitName: { fontSize: 7, fontWeight: '800', maxWidth: '100%' },
   discard: { borderRadius: 9, borderWidth: 1, gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   discardLandscape: { gap: 2, paddingHorizontal: 6, paddingVertical: 3 },
