@@ -6,7 +6,7 @@ The scenario harness exists to make gameplay work scenario-driven instead of dis
 
 - A scenario must bootstrap through the same `GameBootstrapCoordinator` and pinned upstream reducers as production. Do not hand-write a parallel `GameState` engine for fixtures.
 - The developer gallery renders the production `GameScreen` against an isolated scenario Redux store.
-- Scenario stores never replace the application singleton store and do not simulate authoritative network sends. The harness is for deterministic rendering, local interaction states, and authoritative snapshots built from server-shaped history.
+- Scenario stores never replace the application singleton store and do not simulate authoritative network sends. The harness is for deterministic rendering, local interaction states, authoritative snapshots built from server-shaped history, and accepted non-replay actions such as notes.
 - Canonical viewport dimensions belong to the scenario registry and are exercised through the same pure `getGameplayLayout` calculation as production. The gallery itself renders on the current device viewport.
 - A gameplay feature is not considered closed merely because one happy-path component test passes. Its scenario should capture the important authoritative state, transient interaction state, responsive geometry, and lifecycle expectations.
 
@@ -24,6 +24,13 @@ Clue-flow acceptance family:
 - `clue-retouched-quacker`: the same card is positively clued again by Cathy with Quacker assigned; the marker must use the actual giver semantics (`Quack`) and render as a retouch.
 - `clue-cleanup-after-discard`: the next authoritative discard clears the last-clue marker while the card's accumulated upstream clue knowledge and orange semantic border remain.
 
+Opponent-note acceptance family:
+
+- `note-edit-source`: an opponent hand card is a valid live note target.
+- `note-saved`: the accepted edit updates local note state without entering replay history.
+- `note-survives-turn`: the note survives an authoritative turn advance while the card remains in hand.
+- `note-card-left-hand`: the noted card is discarded and replaced; stored note knowledge may remain by card order, but the live editor must stop targeting the card immediately.
+
 ## Clue-flow acceptance contract
 
 The clue family intentionally separates transient interaction from authoritative lifecycle:
@@ -36,10 +43,21 @@ The clue family intentionally separates transient interaction from authoritative
 6. the next play or discard clears only the transient last-clue presentation, not the card's semantic clue knowledge;
 7. portrait and landscape snapshots pass through production layout math.
 
-These invariants are executable in `gameplayScenarios.test.ts`; prose here documents why the snapshots exist.
+## Opponent-note acceptance contract
+
+Live note editing follows hand membership, not generic card visibility:
+
+1. own and opponent hand cards are editable live note targets;
+2. an accepted note edit updates `clientState.notes` but does not mutate replay actions;
+3. turn advance does not invalidate the note or editor target while the card remains in a hand;
+4. when the card leaves every live hand, the stored note may remain attached to its card order for knowledge/history purposes, but `noteCard` is cleared and the live editor closes;
+5. discard/play/hole visibility does not make a card live-note-editable again;
+6. `LobbyRuntime.editNote()` remains the command boundary and rejects cards that are no longer in a live hand.
+
+These invariants are executable in `gameplayScenarios.test.ts` and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
 
 ## Expansion order
 
-Add scenarios when they close a real gameplay risk, not just to increase fixture count. High-value next cases are empathy hold/release, opponent notes, extra-card hands, many-suit fireworks, discard viewer, reconnect/restored state, rotation lifecycle, and finished/replay states.
+Add scenarios when they close a real gameplay risk, not just to increase fixture count. High-value next cases are empathy hold/release, extra-card hands, many-suit fireworks, discard viewer, reconnect/restored state, rotation lifecycle, and finished/replay states.
 
 For each scenario, prefer executable assertions over prose whenever the invariant can be expressed deterministically.
