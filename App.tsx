@@ -47,7 +47,8 @@ export default function App() {
 
 function AppContent() {
   const { theme } = useHanabTheme();
-  const { contentMaxWidth } = useResponsiveLayout();
+  const { contentMaxWidth, width, height } = useResponsiveLayout();
+  const landscapePhone = width > height && height < 700;
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
   const [loginPending, setLoginPending] = useState(false);
@@ -212,10 +213,14 @@ function AppContent() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.flex, { backgroundColor: theme.colors.background }]}
       >
-        <View style={[styles.gameBar, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={[
+          styles.gameBar,
+          landscapePhone && styles.gameBarLandscape,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}>
           <View style={styles.brandCopy}>
-            <Text style={[styles.gameBrand, { color: theme.colors.text }]}>Hanab</Text>
-            <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
+            <Text style={[styles.gameBrand, landscapePhone && styles.gameBrandLandscape, { color: theme.colors.text }]}>Hanab</Text>
+            {!landscapePhone && <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>}
           </View>
           <View style={styles.headerActions}>
             <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
@@ -238,7 +243,11 @@ function AppContent() {
             <ActionButton compact title="Reconnect" tone="primary" onPress={() => void lobbyRuntime.connect()} />
           </View>
         )}
-        <ScrollView contentContainerStyle={[styles.gameContainer, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[
+          styles.gameContainer,
+          landscapePhone && styles.gameContainerLandscape,
+          { maxWidth: contentMaxWidth },
+        ]} keyboardShouldPersistTaps="handled">
           <LastClueNotice />
           <GameScreen />
         </ScrollView>
@@ -344,14 +353,17 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
+  gameContainerLandscape: { gap: 6, paddingBottom: 8, paddingHorizontal: 8, paddingTop: 6 },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: Platform.OS === 'android' ? 34 : 44 },
+  gameBarLandscape: { minHeight: 42, paddingBottom: 4, paddingHorizontal: 8, paddingTop: Platform.OS === 'android' ? 6 : 8 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
   gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
+  gameBrandLandscape: { fontSize: 16 },
   authName: { fontSize: 11, fontWeight: '700' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   menuActions: { gap: 7 },
