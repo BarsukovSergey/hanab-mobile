@@ -1,4 +1,5 @@
 import { GameBootstrapCoordinator } from '../../../game/bootstrap/GameBootstrapCoordinator';
+import { getGameplayCardsPerHand } from '../../../game/selectors/gameplay';
 import {
   gameActionListSchema,
   gameInitSchema,
@@ -43,10 +44,12 @@ type ScenarioSpec = {
   characterAssignments?: readonly number[];
   acceptedNote?: { order: number; text: string };
   incrementalActions?: readonly unknown[];
+  optionOverrides?: Readonly<Record<string, unknown>>;
 };
 
 const PLAYER_NAMES = ['Alice', 'Bob', 'Cathy', 'Donald', 'Emily', 'Frank'] as const;
 const PORTRAIT_PHONE = { width: 390, height: 844 } as const;
+const NARROW_PORTRAIT_PHONE = { width: 320, height: 568 } as const;
 const LANDSCAPE_PHONE = { width: 720, height: 360 } as const;
 const BOB_RED_ORDER = 5;
 const NOTE_TEXT = 'Finesse | r1';
@@ -169,12 +172,22 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
       ],
     }),
     buildScenario({
+      id: 'three-player-extra-card',
+      title: '3P +1 card · narrow portrait',
+      description: 'One Extra Card enabled on a narrow portrait phone. Upstream hand rules produce six-card hands and production layout must fit them without per-hand horizontal scrolling.',
+      numPlayers: 3,
+      viewport: NARROW_PORTRAIT_PHONE,
+      family: 'responsive',
+      optionOverrides: { oneExtraCard: true },
+    }),
+    buildScenario({
       id: 'six-player-landscape',
-      title: '6P dense · landscape',
-      description: 'Six-player narrow Android-like landscape geometry with four-card hands.',
+      title: '6P +1 dense · landscape',
+      description: 'Six-player One Extra Card table on a narrow Android-like landscape viewport. Upstream hand rules produce four-card hands.',
       numPlayers: 6,
       viewport: LANDSCAPE_PHONE,
       family: 'responsive',
+      optionOverrides: { oneExtraCard: true },
     }),
   ];
   return cachedScenarios;
@@ -220,21 +233,23 @@ function buildScenario(spec: ScenarioSpec): GameplayScenario {
   const gameLoadEpoch = coordinator.startFromAuthoritativeRoom(connectionEpoch);
   if (gameLoadEpoch === null) throw new Error(`Failed to start scenario ${spec.id}.`);
 
-  const initAccepted = coordinator.receiveInit(connectionEpoch, gameLoadEpoch, gameInitSchema.parse(makeInit({
+  const init = gameInitSchema.parse(makeInit({
     tableID,
     playerNames,
     ourPlayerIndex: 0,
     seed: `scenario-${spec.id}`,
     options: {
       ...baseOptions,
+      ...spec.optionOverrides,
       numPlayers: spec.numPlayers,
     },
     characterAssignments: spec.characterAssignments ?? [],
     characterMetadata: [],
-  })));
+  }));
+  const initAccepted = coordinator.receiveInit(connectionEpoch, gameLoadEpoch, init);
   if (!initAccepted) throw new Error(`Scenario ${spec.id} init was rejected.`);
 
-  const handSize = spec.numPlayers <= 3 ? 5 : 4;
+  const handSize = getGameplayCardsPerHand({ options: init.options });
   const history = spec.history ?? [
     ...makeDeal(spec.numPlayers, handSize),
     { type: 'turn', num: 0, currentPlayerIndex: 0 },
