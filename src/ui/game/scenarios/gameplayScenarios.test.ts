@@ -210,6 +210,7 @@ describe('gameplay scenario harness', () => {
       ['note-card-left-hand', 'landscape'],
       ['three-player-extra-card', 'portrait'],
       ['six-player-landscape', 'landscape'],
+      ['rainbow-table-surface', 'portrait'],
     ]);
 
     for (const scenario of scenarios) {
