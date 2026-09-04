@@ -148,7 +148,7 @@ describe('card knowledge view model', () => {
 
   test('uses owner knowledge instead of the open identity in empathy mode', () => {
     const card = freshCard(11);
-    const visible = {
+    const visible: CardState = {
       ...card,
       suitIndex: 0,
       rank: 2,
