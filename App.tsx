@@ -35,7 +35,7 @@ import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
-type LiveSheet = 'chat' | 'settings' | null;
+type LiveSheet = 'menu' | 'chat' | 'settings' | null;
 
 export default function App() {
   return (
@@ -218,8 +218,7 @@ function AppContent() {
             <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
           </View>
           <View style={styles.headerActions}>
-            <ActionButton compact title="Chat" tone="ghost" onPress={() => setLiveSheet('chat')} />
-            <ActionButton compact title="Settings" tone="ghost" onPress={() => setLiveSheet('settings')} />
+            <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
             <ActionButton
               compact
               disabled={roomState.pendingUnattendTableID !== null}
@@ -246,14 +245,24 @@ function AppContent() {
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
           <View style={styles.sheetBackdrop}>
             <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
-              {liveSheet === 'chat'
+              {liveSheet === 'menu'
                 ? <>
-                  <ChatPanel room={`table${liveTableID}`} title="Table chat" />
-                  <ActionButton title="Close" onPress={() => setLiveSheet(null)} />
+                  <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
+                  <View style={styles.menuActions}>
+                    <ActionButton title="Table chat" onPress={() => setLiveSheet('chat')} />
+                    <ActionButton title="Settings" onPress={() => setLiveSheet('settings')} />
+                    <ActionButton title="Sign out" tone="ghost" onPress={() => void signOut()} />
+                  </View>
+                  <ActionButton title="Close" tone="ghost" onPress={() => setLiveSheet(null)} />
                 </>
-                : liveSheet === 'settings'
-                  ? <SettingsScreen onBack={() => setLiveSheet(null)} />
-                  : null}
+                : liveSheet === 'chat'
+                  ? <>
+                    <ChatPanel room={`table${liveTableID}`} title="Table chat" />
+                    <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
+                  </>
+                  : liveSheet === 'settings'
+                    ? <SettingsScreen onBack={() => setLiveSheet('menu')} />
+                    : null}
             </View>
           </View>
         </Modal>
@@ -273,7 +282,7 @@ function AppContent() {
           <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in to play</Text>
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
         </View>
-        {statusMessage.length > 0 && <Notice tone="error">{statusMessage}</Notice>}
+        {statusMessage.length > 0 && <Notice tone={lobbyNotice?.kind === 'error' ? 'error' : 'neutral'}>{statusMessage}</Notice>}
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
         <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
@@ -345,6 +354,7 @@ const styles = StyleSheet.create({
   gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
   authName: { fontSize: 11, fontWeight: '700' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
+  menuActions: { gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   loginIntro: { gap: 4, marginBottom: 4 },
   loginEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
