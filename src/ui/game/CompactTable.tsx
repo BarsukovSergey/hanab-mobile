@@ -27,11 +27,11 @@ export function CompactTable({
   const suitVisuals = getCardSuitVisuals(variantName);
   const discard = getDiscardSummary(variantName, game);
   const [fireworksWidth, setFireworksWidth] = useState(310);
-  const gap = landscapePhone ? 3 : 5;
+  const gap = landscapePhone ? 3 : 4;
   const gaps = Math.max(0, suits.length - 1) * gap;
   const cardWidth = Math.max(26, (fireworksWidth - gaps) / Math.max(1, suits.length));
-  const maxStackHeight = landscapePhone ? 54 : 82;
-  const minStackHeight = landscapePhone ? 36 : 46;
+  const maxStackHeight = landscapePhone ? 54 : 68;
+  const minStackHeight = landscapePhone ? 36 : 40;
   const stackHeight = Math.max(minStackHeight, Math.min(maxStackHeight, cardWidth / CARD_ASPECT_RATIO));
 
   return <View style={[
@@ -121,22 +121,22 @@ function compactSuitName(name: string): string {
 }
 
 const styles = StyleSheet.create({
-  surface: { borderRadius: 14, borderWidth: 1, gap: 7, padding: 9 },
+  surface: { borderRadius: 12, borderWidth: 1, gap: 5, padding: 7 },
   surfaceLandscape: { gap: 3, padding: 5 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
-  label: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  variant: { flexShrink: 1, fontSize: 10, fontWeight: '700', textAlign: 'right' },
+  label: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  variant: { flexShrink: 1, fontSize: 9, fontWeight: '700', textAlign: 'right' },
   fireworks: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'center', width: '100%' },
-  firework: { alignItems: 'center', flex: 1, gap: 2, minWidth: 0 },
-  emptyStack: { aspectRatio: CARD_ASPECT_RATIO, borderRadius: 7, borderStyle: 'dashed', borderWidth: 2 },
-  suitName: { fontSize: 8, fontWeight: '800', maxWidth: '100%' },
-  discard: { borderRadius: 10, borderWidth: 1, gap: 5, paddingHorizontal: 8, paddingVertical: 6 },
+  firework: { alignItems: 'center', flex: 1, gap: 1, minWidth: 0 },
+  emptyStack: { aspectRatio: CARD_ASPECT_RATIO, borderRadius: 6, borderStyle: 'dashed', borderWidth: 2 },
+  suitName: { fontSize: 7, fontWeight: '800', maxWidth: '100%' },
+  discard: { borderRadius: 9, borderWidth: 1, gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   discardLandscape: { gap: 2, paddingHorizontal: 6, paddingVertical: 3 },
   discardHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between' },
-  discardCount: { fontSize: 13, fontWeight: '900' },
+  discardCount: { fontSize: 12, fontWeight: '900' },
   discardSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   discardLandscapeSummary: { alignItems: 'center', flexDirection: 'row', flexWrap: 'nowrap', gap: 3 },
-  discardSuitRow: { alignItems: 'center', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 4, maxWidth: '49%', minHeight: 24, paddingHorizontal: 5, paddingVertical: 3 },
+  discardSuitRow: { alignItems: 'center', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 4, maxWidth: '49%', minHeight: 23, paddingHorizontal: 5, paddingVertical: 2 },
   landscapeSuitToken: { alignItems: 'center', borderRadius: 6, borderWidth: 1, flexDirection: 'row', gap: 2, minHeight: 19, paddingHorizontal: 4, paddingVertical: 2 },
   landscapeSuitCount: { fontSize: 8, fontWeight: '900' },
   suitIdentity: { alignItems: 'center', justifyContent: 'center', minWidth: 18 },
@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   rankChip: { alignItems: 'baseline', borderRadius: 5, borderWidth: 1, flexDirection: 'row', gap: 1, minWidth: 20, paddingHorizontal: 3, paddingVertical: 1 },
   rankChipRank: { fontSize: 9, fontWeight: '900' },
   rankChipCount: { fontSize: 7, fontWeight: '800' },
-  emptyText: { fontSize: 10 },
+  emptyText: { fontSize: 9 },
   pressed: { opacity: 0.82 },
 });
