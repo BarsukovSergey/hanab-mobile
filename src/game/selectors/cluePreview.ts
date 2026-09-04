@@ -46,6 +46,9 @@ export function getCluePreview(
   };
 }
 
-export function isCluePreviewConfirmable(preview: CluePreview | null): boolean {
-  return preview !== null && preview.touchedOrders.length > 0;
+export function isCluePreviewConfirmable(
+  preview: CluePreview | null,
+  allowEmptyClues: boolean,
+): boolean {
+  return preview !== null && (allowEmptyClues || preview.touchedOrders.length > 0);
 }
