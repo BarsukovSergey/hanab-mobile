@@ -9,7 +9,9 @@ type GameplayLayoutInput = {
 
 export type GameplayLayout = {
   orientation: 'portrait' | 'landscape';
-  handContentWidth: number;
+  contentWidth: number;
+  ownLaneWidth: number;
+  opponentLaneWidth: number;
   cardGap: number;
   ownCardHeight: number;
   opponentCardHeight: number;
@@ -19,12 +21,13 @@ export type GameplayLayout = {
   needsSharedVerticalScroll: boolean;
 };
 
-const PHONE_HORIZONTAL_CHROME = 60;
-const TABLET_MAX_HAND_WIDTH = 720;
+const PHONE_HORIZONTAL_CHROME = 32;
+const TABLET_MAX_CONTENT_WIDTH = 1120;
 const OWN_MAX_HEIGHT = 112;
 const OPPONENT_MAX_HEIGHT = 76;
-const OWN_MIN_HEIGHT = 70;
-const OPPONENT_MIN_HEIGHT = 48;
+const OWN_MIN_HEIGHT = 68;
+const OPPONENT_MIN_HEIGHT = 46;
+const LANDSCAPE_GUTTER = 12;
 
 export function getGameplayLayout({
   viewportWidth,
@@ -37,18 +40,25 @@ export function getGameplayLayout({
   const orientation = width > height ? 'landscape' : 'portrait';
   const cardGap = width < 360 ? 4 : width < 700 ? 6 : 7;
   const opponentRowGap = width < 360 ? 5 : 7;
-  const handContentWidth = Math.min(TABLET_MAX_HAND_WIDTH, Math.max(220, width - PHONE_HORIZONTAL_CHROME));
+  const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - PHONE_HORIZONTAL_CHROME));
+  const ownLaneWidth = orientation === 'landscape'
+    ? Math.max(220, (contentWidth - LANDSCAPE_GUTTER) * 0.43)
+    : contentWidth;
+  const opponentLaneWidth = orientation === 'landscape'
+    ? Math.max(260, contentWidth - LANDSCAPE_GUTTER - ownLaneWidth)
+    : contentWidth;
+
   const ownHandSize = ourPlayerIndex === null ? 0 : handSizes[ourPlayerIndex] ?? 0;
   const opponentHandSizes = handSizes.filter((_, index) => index !== ourPlayerIndex);
   const maxOpponentHandSize = Math.max(1, ...opponentHandSizes);
   const opponentColumns: 1 | 2 = orientation === 'landscape' && width >= 620 && opponentHandSizes.length >= 2 ? 2 : 1;
   const opponentColumnWidth = opponentColumns === 2
-    ? (handContentWidth - 10) / 2
-    : handContentWidth;
+    ? (opponentLaneWidth - LANDSCAPE_GUTTER) / 2
+    : opponentLaneWidth;
 
   const ownCardHeight = ownHandSize === 0
     ? 0
-    : fitCardHeight(handContentWidth, ownHandSize, cardGap, OWN_MIN_HEIGHT, OWN_MAX_HEIGHT);
+    : fitCardHeight(ownLaneWidth, ownHandSize, cardGap, OWN_MIN_HEIGHT, OWN_MAX_HEIGHT);
   const opponentCardHeight = fitCardHeight(
     opponentColumnWidth,
     maxOpponentHandSize,
@@ -58,16 +68,22 @@ export function getGameplayLayout({
   );
 
   const opponentRows = Math.ceil(opponentHandSizes.length / opponentColumns);
-  const ownSectionHeight = ownCardHeight === 0 ? 0 : ownCardHeight + 40;
+  const ownSectionHeight = ownCardHeight === 0 ? 0 : ownCardHeight + 32;
   const opponentSectionHeight = opponentRows === 0
     ? 0
-    : opponentRows * (opponentCardHeight + 32) + Math.max(0, opponentRows - 1) * opponentRowGap;
-  const estimatedHandsHeight = Math.round(ownSectionHeight + opponentSectionHeight);
-  const handsBudget = height * (orientation === 'portrait' ? 0.62 : 0.76);
+    : opponentRows * (opponentCardHeight + 30) + Math.max(0, opponentRows - 1) * opponentRowGap;
+  const estimatedHandsHeight = Math.round(
+    orientation === 'landscape'
+      ? Math.max(ownSectionHeight, opponentSectionHeight)
+      : ownSectionHeight + opponentSectionHeight,
+  );
+  const handsBudget = height * (orientation === 'portrait' ? 0.58 : 0.72);
 
   return {
     orientation,
-    handContentWidth,
+    contentWidth: round1(contentWidth),
+    ownLaneWidth: round1(ownLaneWidth),
+    opponentLaneWidth: round1(opponentLaneWidth),
     cardGap,
     ownCardHeight: round1(ownCardHeight),
     opponentCardHeight: round1(opponentCardHeight),
