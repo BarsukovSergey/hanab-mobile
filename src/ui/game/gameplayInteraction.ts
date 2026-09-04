@@ -70,20 +70,17 @@ export function gameplayInteractionReducer(
     case 'sync-hands': {
       const selectedCard = state.selectedCard !== null && action.ownOrders.includes(state.selectedCard)
         ? state.selectedCard
-        : action.ownOrders[action.ownOrders.length - 1] ?? null;
+        : null;
       const clueTarget = state.clueTarget !== null && action.clueTargets.includes(state.clueTarget)
         ? state.clueTarget
-        : action.clueTargets[0] ?? null;
-      let noteCard = state.noteCard;
-      if (noteCard === null || !action.visibleOrders.includes(noteCard)) {
-        noteCard = selectedCard !== null && action.visibleOrders.includes(selectedCard)
-          ? selectedCard
-          : action.visibleOrders[0] ?? null;
-      }
+        : null;
+      const noteCard = state.noteCard !== null && action.visibleOrders.includes(state.noteCard)
+        ? state.noteCard
+        : null;
       const empathyPlayer = state.empathyPlayer !== null && action.clueTargets.includes(state.empathyPlayer)
         ? state.empathyPlayer
         : null;
-      const cluePreview = clueTarget === state.clueTarget ? state.cluePreview : null;
+      const cluePreview = clueTarget !== null && clueTarget === state.clueTarget ? state.cluePreview : null;
       return { selectedCard, clueTarget, cluePreview, empathyPlayer, noteCard };
     }
     default:
