@@ -4,8 +4,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { GameState } from '../../game/bootstrap/types';
 import { getDiscardSummary } from '../../game/selectors/discardSummary';
 import { getGameTableSuits } from '../../game/selectors/gameplay';
+import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { VisibleHanabiCard } from './GameCard';
+import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
 
 const CARD_ASPECT_RATIO = 286 / 406;
 
@@ -22,6 +24,7 @@ export function CompactTable({
   const { width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
   const suits = getGameTableSuits(variantName, game);
+  const suitVisuals = getCardSuitVisuals(variantName);
   const discard = getDiscardSummary(variantName, game);
   const [fireworksWidth, setFireworksWidth] = useState(310);
   const gap = landscapePhone ? 3 : 5;
@@ -81,17 +84,22 @@ export function CompactTable({
       </View>
       {discard.total === 0
         ? <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>None</Text>
-        : <View style={styles.discardSummary}>{discard.suits.map((suit) => (
-          <View key={suit.suitIndex} style={[styles.discardSuitRow, { borderColor: theme.colors.borderStrong }]}>
-            <Text numberOfLines={1} style={[styles.discardSuitName, { color: theme.colors.textMuted }]}>{compactSuitName(suit.suitName)}</Text>
+        : <View style={styles.discardSummary}>{discard.suits.map((suit) => {
+          const visual = suitVisuals[suit.suitIndex];
+          return <View key={suit.suitIndex} style={[styles.discardSuitRow, { borderColor: theme.colors.borderStrong }]}>
+            <View style={styles.suitIdentity}>
+              {visual !== undefined && hasUpstreamSvgPip(visual.pip)
+                ? <UpstreamPip duplicatePip={visual.duplicatePip} fillColors={visual.fillColors} pip={visual.pip} size={14} suitName={visual.name} />
+                : <Text style={[styles.discardSuitName, { color: theme.colors.textMuted }]}>{compactSuitName(suit.suitName)}</Text>}
+            </View>
             <View style={styles.rankChips}>{suit.ranks.map(({ rank, count }) => (
               <View key={rank} style={[styles.rankChip, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
                 <Text style={[styles.rankChipRank, { color: theme.colors.text }]}>{rank}</Text>
                 {count > 1 && <Text style={[styles.rankChipCount, { color: theme.colors.textMuted }]}>×{count}</Text>}
               </View>
             ))}</View>
-          </View>
-        ))}</View>}
+          </View>;
+        })}</View>}
     </Pressable>
   </View>;
 }
@@ -118,7 +126,8 @@ const styles = StyleSheet.create({
   discardCount: { fontSize: 13, fontWeight: '900' },
   discardSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   discardSuitRow: { alignItems: 'center', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 4, maxWidth: '49%', minHeight: 24, paddingHorizontal: 5, paddingVertical: 3 },
-  discardSuitName: { fontSize: 8, fontWeight: '900', minWidth: 22 },
+  suitIdentity: { alignItems: 'center', justifyContent: 'center', minWidth: 18 },
+  discardSuitName: { fontSize: 8, fontWeight: '900' },
   rankChips: { alignItems: 'center', flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 2 },
   rankChip: { alignItems: 'baseline', borderRadius: 5, borderWidth: 1, flexDirection: 'row', gap: 1, minWidth: 20, paddingHorizontal: 3, paddingVertical: 1 },
   rankChipRank: { fontSize: 9, fontWeight: '900' },
