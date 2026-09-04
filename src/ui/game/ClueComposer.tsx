@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { CluePreview } from '../../game/selectors/cluePreview';
+import { isCluePreviewConfirmable, type CluePreview } from '../../game/selectors/cluePreview';
 import type { GameplayClueChoices } from '../../game/selectors/gameplay';
 import { ActionButton, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import type { GameplayCluePreviewState } from './gameplayInteraction';
@@ -9,6 +9,7 @@ export function ClueComposer({
   targetName,
   choices,
   enabled,
+  allowEmptyClues,
   previewState,
   preview,
   onPreview,
@@ -18,6 +19,7 @@ export function ClueComposer({
   targetName: string | null;
   choices: GameplayClueChoices | null;
   enabled: boolean;
+  allowEmptyClues: boolean;
   previewState: GameplayCluePreviewState;
   preview: CluePreview | null;
   onPreview: (type: 'color' | 'rank', value: number) => void;
@@ -32,7 +34,7 @@ export function ClueComposer({
     : previewState.type === 'color'
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
-  const validPreview = preview !== null && preview.touchedOrders.length > 0;
+  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues);
 
   if (targetName === null) {
     return <View style={[
@@ -79,7 +81,9 @@ export function ClueComposer({
           {preview === null
             ? 'Invalid clue preview'
             : preview.touchedOrders.length === 0
-              ? 'No cards touched — this clue cannot be given'
+              ? allowEmptyClues
+                ? 'Empty clue · 0 cards touched'
+                : 'No cards touched — this clue cannot be given'
               : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
         </Text>
       </View>
