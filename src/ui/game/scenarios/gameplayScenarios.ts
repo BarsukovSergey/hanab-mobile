@@ -1,7 +1,9 @@
 import { GameBootstrapCoordinator } from '../../../game/bootstrap/GameBootstrapCoordinator';
 import { getGameplayCardsPerHand } from '../../../game/selectors/gameplay';
 import {
+  cardIdentitiesSchema,
   gameActionListSchema,
+  gameHistorySchema,
   gameInitSchema,
   incrementalGameActionSchema,
   noteCommandSchema,
@@ -28,7 +30,7 @@ export type GameplayScenario = {
   readonly store: AppStore;
   readonly expectedInteraction: GameplayInteractionState;
   readonly expectedCurrentPlayerIndex: number;
-  readonly family: 'base' | 'clue-flow' | 'note-flow' | 'responsive' | 'table-surface';
+  readonly family: 'base' | 'clue-flow' | 'note-flow' | 'responsive' | 'table-surface' | 'finished-replay';
 };
 
 type ScenarioSpec = {
@@ -45,6 +47,7 @@ type ScenarioSpec = {
   acceptedNote?: { order: number; text: string };
   incrementalActions?: readonly unknown[];
   optionOverrides?: Readonly<Record<string, unknown>>;
+  finishSharedReplay?: boolean;
 };
 
 const PLAYER_NAMES = ['Alice', 'Bob', 'Cathy', 'Donald', 'Emily', 'Frank'] as const;
@@ -53,7 +56,9 @@ const NARROW_PORTRAIT_PHONE = { width: 320, height: 568 } as const;
 const LANDSCAPE_PHONE = { width: 720, height: 360 } as const;
 const BOB_RED_ORDER = 5;
 const NOTE_TEXT = 'Finesse | r1';
+const FINISHED_DATABASE_ID = 456;
 let cachedScenarios: readonly GameplayScenario[] | null = null;
+let cachedFinishedReplayScenario: GameplayScenario | null = null;
 
 export function getGameplayScenarios(): readonly GameplayScenario[] {
   cachedScenarios ??= [
@@ -202,6 +207,23 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
   return cachedScenarios;
 }
 
+export function getFinishedReplayScenario(): GameplayScenario {
+  cachedFinishedReplayScenario ??= buildScenario({
+    id: 'finished-shared-replay',
+    title: 'Finished · shared replay',
+    description: 'Authoritative postgame reconciliation has completed. Inspect the production finished summary, shared replay controls, exposed identities, wrapped replay hands, and read-only note viewer.',
+    numPlayers: 2,
+    viewport: NARROW_PORTRAIT_PHONE,
+    family: 'finished-replay',
+    finishSharedReplay: true,
+  });
+  return cachedFinishedReplayScenario;
+}
+
+export function getGameplayGalleryScenarios(): readonly GameplayScenario[] {
+  return [...getGameplayScenarios(), getFinishedReplayScenario()];
+}
+
 export function getClueFlowScenarios(): readonly GameplayScenario[] {
   return getGameplayScenarios().filter((scenario) => scenario.family === 'clue-flow');
 }
@@ -282,6 +304,18 @@ function buildScenario(spec: ScenarioSpec): GameplayScenario {
     }
   }
 
+  if (spec.finishSharedReplay === true) {
+    finishScenarioAsSharedReplay({
+      coordinator,
+      connectionEpoch,
+      tableID,
+      init,
+      playerNames,
+      cardCount: spec.numPlayers * handSize,
+      scenarioID: spec.id,
+    });
+  }
+
   const room = store.getState().room.room;
   if (room.kind !== 'live_game') throw new Error(`Scenario ${spec.id} did not reach live_game.`);
 
@@ -295,6 +329,70 @@ function buildScenario(spec: ScenarioSpec): GameplayScenario {
     expectedCurrentPlayerIndex: spec.expectedCurrentPlayerIndex ?? 0,
     family: spec.family,
   };
+}
+
+function finishScenarioAsSharedReplay({
+  coordinator,
+  connectionEpoch,
+  tableID,
+  init,
+  playerNames,
+  cardCount,
+  scenarioID,
+}: {
+  coordinator: GameBootstrapCoordinator;
+  connectionEpoch: number;
+  tableID: number;
+  init: ReturnType<typeof gameInitSchema.parse>;
+  playerNames: readonly string[];
+  cardCount: number;
+  scenarioID: string;
+}) {
+  const postgameActions = [
+    { type: 'gameOver', endCondition: 1, playerIndex: 0, votes: null },
+    { type: 'playerTimes', playerTimes: playerNames.map(() => 60_000), duration: 300_000 },
+  ] as const;
+  for (const action of postgameActions) {
+    const accepted = coordinator.receiveIncrementalDetailed(
+      connectionEpoch,
+      incrementalGameActionSchema.parse({ tableID, action }),
+    );
+    if (!accepted.accepted) {
+      throw new Error(`Scenario ${scenarioID} postgame action was rejected: ${accepted.rejectionReason}.`);
+    }
+  }
+
+  const historyAccepted = coordinator.receiveGameHistory(connectionEpoch, gameHistorySchema.parse([{
+    id: FINISHED_DATABASE_ID,
+    options: init.options,
+    seed: init.seed,
+    score: 0,
+    numTurns: 0,
+    endCondition: 1,
+    datetimeStarted: '2026-08-31T00:00:00Z',
+    datetimeFinished: '2026-08-31T00:05:00Z',
+    numGamesOnThisSeed: 1,
+    playerNames,
+    incrementNumGames: true,
+    tags: '',
+  }]));
+  if (!historyAccepted) throw new Error(`Scenario ${scenarioID} game history was rejected.`);
+
+  const identitiesAccepted = coordinator.receiveCardIdentities(connectionEpoch, cardIdentitiesSchema.parse({
+    tableID,
+    cardIdentities: Array.from({ length: cardCount }, (_, order) => ({
+      suitIndex: order % 5,
+      rank: (order % 5) + 1,
+    })),
+  }));
+  if (!identitiesAccepted) throw new Error(`Scenario ${scenarioID} card identities were rejected.`);
+
+  const finishedAccepted = coordinator.receiveFinishOngoingGame(connectionEpoch, {
+    tableID,
+    databaseID: FINISHED_DATABASE_ID,
+    sharedReplayLeader: playerNames[0] ?? 'Alice',
+  });
+  if (!finishedAccepted) throw new Error(`Scenario ${scenarioID} finishOngoingGame was rejected.`);
 }
 
 function makeCommittedClueHistory(): readonly unknown[] {
