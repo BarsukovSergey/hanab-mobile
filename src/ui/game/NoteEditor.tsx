@@ -1,0 +1,83 @@
+import { Modal, StyleSheet, Text, View } from 'react-native';
+
+import { ActionButton, Field, useHanabTheme } from '../designSystem';
+import { appendNoteToken, normalizeSubmittedNote } from './noteEditing';
+
+const QUICK_TOKENS = [
+  ['Finesse', 'f'],
+  ['CM', 'cm'],
+  ['PTD', 'ptd'],
+] as const;
+
+export function NoteEditor({
+  title,
+  value,
+  editable,
+  visible,
+  onChange,
+  onSave,
+  onClear,
+  onClose,
+}: {
+  title: string;
+  value: string;
+  editable: boolean;
+  visible: boolean;
+  onChange: (value: string) => void;
+  onSave: (value: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const { theme } = useHanabTheme();
+  const submit = () => onSave(normalizeSubmittedNote(value));
+
+  return <Modal animationType="slide" onRequestClose={onClose} statusBarTranslucent transparent visible={visible}>
+    <View style={styles.backdrop}>
+      <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CARD NOTE</Text>
+            <Text numberOfLines={2} style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
+          </View>
+          <ActionButton compact title="Close" tone="ghost" onPress={onClose} />
+        </View>
+        <Field
+          blurOnSubmit={false}
+          editable={editable}
+          maxLength={300}
+          multiline
+          onChangeText={onChange}
+          onSubmitEditing={submit}
+          placeholder={editable ? 'Add a private note' : 'Read-only note'}
+          returnKeyType="done"
+          style={styles.input}
+          submitBehavior="submit"
+          value={value}
+        />
+        <View style={styles.quickRow}>{QUICK_TOKENS.map(([label, token]) => <ActionButton
+          compact
+          disabled={!editable}
+          key={token}
+          title={label}
+          onPress={() => onChange(appendNoteToken(value, token))}
+        />)}</View>
+        <View style={styles.actions}>
+          <ActionButton disabled={!editable} title="Save" tone="primary" onPress={submit} />
+          <ActionButton disabled={!editable || value.length === 0} title="Clear" onPress={onClear} />
+        </View>
+      </View>
+    </View>
+  </Modal>;
+}
+
+const styles = StyleSheet.create({
+  backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.58)', flex: 1, justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, gap: 12, padding: 14, paddingBottom: 20 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
+  headerCopy: { flex: 1, minWidth: 0 },
+  eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
+  title: { fontSize: 17, fontWeight: '900' },
+  input: { minHeight: 92, textAlignVertical: 'top' },
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  actions: { flexDirection: 'row', gap: 8 },
+});
