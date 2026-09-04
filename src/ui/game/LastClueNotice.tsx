@@ -30,17 +30,32 @@ export function LastClueNotice() {
     ? choices.ranks.find((candidate) => candidate.value === clue.value)
     : choices.colors.find((candidate) => candidate.value === clue.value);
   const clueLabel = choice?.label ?? (clue.clueType === 'rank' ? `rank ${clue.value}` : `color ${clue.value + 1}`);
-  const touchedLabel = touchedPositions.length === 0 ? 'no cards' : `cards ${touchedPositions.join(', ')}`;
 
   return <View style={[styles.slot, styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
-    <Text numberOfLines={1} style={[styles.label, { color: theme.colors.text }]}>{giver} → {target}: {clueLabel}</Text>
-    <Text numberOfLines={1} style={[styles.detail, { color: theme.colors.textMuted }]}>Touched {touchedLabel}</Text>
+    <View style={styles.copy}>
+      <Text numberOfLines={1} style={[styles.label, { color: theme.colors.text }]}>{giver} → {target}</Text>
+      <Text numberOfLines={1} style={[styles.detail, { color: theme.colors.textMuted }]}>{clueLabel}</Text>
+    </View>
+    <View style={styles.markers}>
+      {touchedPositions.length === 0
+        ? <Text style={[styles.none, { color: theme.colors.textMuted }]}>No cards touched</Text>
+        : touchedPositions.map((position) => <View key={position} style={[styles.marker, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+          <Text style={[styles.arrow, { color: theme.colors.text }]}>↓</Text>
+          <Text style={[styles.cardNumber, { color: theme.colors.text }]}>#{position}</Text>
+        </View>)}
+    </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  slot: { minHeight: 39 },
-  notice: { borderLeftWidth: 3, borderRadius: 8, gap: 1, justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 5 },
+  slot: { minHeight: 42 },
+  notice: { alignItems: 'center', borderLeftWidth: 3, borderRadius: 8, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingHorizontal: 9, paddingVertical: 5 },
+  copy: { flex: 1, minWidth: 0 },
   label: { fontSize: 12, fontWeight: '800' },
   detail: { fontSize: 10, lineHeight: 13 },
+  markers: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-end' },
+  marker: { alignItems: 'center', borderRadius: 6, borderWidth: 1, minWidth: 25, paddingHorizontal: 3, paddingVertical: 1 },
+  arrow: { fontSize: 12, fontWeight: '900', lineHeight: 11 },
+  cardNumber: { fontSize: 8, fontWeight: '900', lineHeight: 9 },
+  none: { fontSize: 9 },
 });
