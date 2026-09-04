@@ -47,6 +47,9 @@ type ThemeContextValue = {
   setPreference: (preference: ThemePreference) => void;
 };
 
+const COMPACT_HIT_SLOP = { top: 6, bottom: 6, left: 2, right: 2 } as const;
+const SWITCHER_HIT_SLOP = { top: 6, bottom: 6, left: 0, right: 0 } as const;
+
 const LIGHT: HanabTheme = {
   scheme: 'light',
   dark: false,
@@ -111,7 +114,7 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
     <View style={[styles.switcherTrack, { backgroundColor: theme.colors.surfaceMuted }]}>
       {labels.map(([value, label]) => {
         const selected = preference === value;
-        return <Pressable accessibilityRole="button" accessibilityState={{ selected }} key={value}
+        return <Pressable accessibilityRole="button" accessibilityState={{ selected }} hitSlop={SWITCHER_HIT_SLOP} key={value}
           onPress={() => setPreference(value)} style={({ pressed }) => [styles.switcherOption,
             selected && { backgroundColor: theme.colors.surfaceRaised }, pressed && { opacity: 0.72 }]}>
           <Text style={{ color: selected ? theme.colors.text : theme.colors.textMuted, fontSize: 12, fontWeight: selected ? '700' : '500' }}>{label}</Text>
@@ -147,7 +150,7 @@ export function ActionButton({ title, onPress, disabled = false, tone = 'seconda
       : tone === 'ghost'
         ? { bg: 'transparent', pressed: theme.colors.overlay, text: theme.colors.textMuted, border: 'transparent' }
         : { bg: theme.colors.surfaceRaised, pressed: theme.colors.surfaceMuted, text: theme.colors.text, border: theme.colors.borderStrong };
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [
+  return <Pressable accessibilityRole="button" disabled={disabled} hitSlop={compact ? COMPACT_HIT_SLOP : undefined} onPress={onPress} style={({ pressed }) => [
     styles.button, compact && styles.buttonCompact,
     { backgroundColor: pressed ? palette.pressed : palette.bg, borderColor: palette.border }, disabled && styles.disabled, style,
   ]}><Text numberOfLines={1} style={[styles.buttonText, compact && styles.buttonTextCompact, { color: palette.text }]}>{title}</Text></Pressable>;
