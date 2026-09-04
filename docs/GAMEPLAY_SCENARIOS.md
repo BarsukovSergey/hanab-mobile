@@ -39,7 +39,7 @@ Table-surface acceptance family:
 
 Empathy reuses authoritative clue snapshots rather than duplicating the deal. `clue-committed` gives a deterministic opponent card whose open identity differs from the owner-perspective knowledge shown during empathy.
 
-Reconnect and rotation are lifecycle acceptance tests over canonical authoritative scenarios rather than duplicate game fixtures.
+Reconnect, rotation, and finished/replay are lifecycle acceptance tests over canonical authoritative game construction rather than parallel gameplay engines.
 
 ## Clue-flow acceptance contract
 
@@ -114,14 +114,26 @@ Viewport/app lifecycle changes may recompute presentation but never mutate autho
 1. portrait -> landscape -> portrait uses the production `getGameplayLayout` calculation and the same authoritative game object;
 2. returning to the same viewport produces the same layout result deterministically;
 3. own-hand cards remain at least as large as opponent cards in both orientations;
-4. orientation/background lifecycle boundaries drop every UI-only interaction reference: selected card, clue target/preview, empathy, and note target;
-5. durable server-derived knowledge, notes, replay actions, hands, stacks, turn state, and score are not rewritten by the lifecycle reset;
-6. no lifecycle rule may introduce per-hand horizontal scrolling.
+4. `GameScreen` drops every UI-only interaction reference on orientation change or when the app leaves `active`: selected card, clue target/preview, empathy, and note target;
+5. NoteEditor and DiscardViewer are also closed at those lifecycle boundaries;
+6. durable server-derived knowledge, notes, replay actions, hands, stacks, turn state, and score are not rewritten by the lifecycle reset;
+7. no lifecycle rule may introduce per-hand horizontal scrolling.
 
-These invariants are executable in `gameplayScenarios.test.ts`, `scenarioHandSize.test.ts`, `tableSurface.test.ts`, `discardSummary.test.ts`, `reconnectLifecycle.test.ts`, `rotationLifecycle.test.ts`, `gameplayInteraction.test.ts`, and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
+## Finished and replay acceptance contract
+
+Finished state is entered only after the full authoritative postgame sequence is reconciled:
+
+1. `gameOver` and `playerTimes` remain part of the replay action stream but do not by themselves mark the client finished;
+2. game-history metadata and full card identities are accepted before finalization;
+3. `finishOngoingGame` flips `finished`, records database/timing metadata, and recalculates the former player state as spectator-visible truth;
+4. the finished client starts in shared replay at the authoritative penultimate segment and records leader/follower semantics;
+5. previously hidden card identities are available to finished/replay presentation after reconciliation;
+6. finished layout remains valid in both portrait and landscape without creating a second game-state implementation.
+
+These invariants are executable in `gameplayScenarios.test.ts`, `scenarioHandSize.test.ts`, `tableSurface.test.ts`, `discardSummary.test.ts`, `reconnectLifecycle.test.ts`, `rotationLifecycle.test.ts`, `finishedReplayLifecycle.test.ts`, `gameplayInteraction.test.ts`, and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
 
 ## Expansion order
 
-Add scenarios when they close a real gameplay risk, not just to increase fixture count. The next high-value case is finished/replay state coverage, followed by final physical Android lifecycle smoke.
+The deterministic gameplay lifecycle matrix is now broad enough that the next step is physical Android smoke over the canonical cases: portrait/landscape rotation, background/foreground, clue preview/marker persistence, notes, empathy, extra-card density, six-suit table surface, discard viewer, reconnect, and finished/replay presentation.
 
-For each scenario, prefer executable assertions over prose whenever the invariant can be expressed deterministically.
+For each future scenario, prefer executable assertions over prose whenever the invariant can be expressed deterministically.
