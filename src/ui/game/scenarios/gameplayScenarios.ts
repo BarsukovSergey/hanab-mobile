@@ -130,27 +130,27 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
     buildScenario({
       id: 'note-survives-turn',
       title: 'Note · next turn',
-      description: 'The saved opponent note survives an authoritative turn advance while the card remains in Bob’s hand.',
+      description: 'The saved opponent note survives a real authoritative clue that advances Alice’s turn to Bob while the noted card remains in Bob’s hand.',
       numPlayers: 3,
       viewport: PORTRAIT_PHONE,
       family: 'note-flow',
       expectedCurrentPlayerIndex: 1,
       acceptedNote: { order: BOB_RED_ORDER, text: NOTE_TEXT },
       incrementalActions: [
-        { type: 'turn', num: 1, currentPlayerIndex: 1 },
+        colorClueToCathy(0),
       ],
     }),
     buildScenario({
       id: 'note-card-left-hand',
       title: 'Note · card left hand',
-      description: 'Bob discards the noted card and draws a replacement. Saved note knowledge may remain by card order, but live editing must no longer target that card.',
+      description: 'Alice clues Cathy to advance to Bob; Bob discards the noted card and draws a replacement. Saved note knowledge may remain by card order, but live editing must no longer target that card.',
       numPlayers: 3,
       viewport: LANDSCAPE_PHONE,
       family: 'note-flow',
       expectedCurrentPlayerIndex: 2,
       acceptedNote: { order: BOB_RED_ORDER, text: NOTE_TEXT },
       incrementalActions: [
-        { type: 'turn', num: 1, currentPlayerIndex: 1 },
+        colorClueToCathy(0),
         {
           type: 'discard',
           playerIndex: 1,
@@ -166,7 +166,6 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
           suitIndex: 0,
           rank: 2,
         },
-        { type: 'turn', num: 2, currentPlayerIndex: 2 },
       ],
     }),
     buildScenario({
@@ -338,6 +337,17 @@ function redClueToBob(giver: number, turn: number) {
     giver,
     list: [BOB_RED_ORDER],
     target: 1,
+    turn,
+  };
+}
+
+function colorClueToCathy(turn: number) {
+  return {
+    type: 'clue' as const,
+    clue: { type: 0 as const, value: 1 },
+    giver: 0,
+    list: [10],
+    target: 2,
     turn,
   };
 }
