@@ -2,6 +2,10 @@ import { describe, expect, test } from '@jest/globals';
 
 import { getGameplayLayout, getHandRowWidth } from './gameplayLayout';
 
+const OWN_PADDING = 18;
+const OPPONENT_PADDING = 14;
+const COLUMN_GAP = 7;
+
 describe('getGameplayLayout', () => {
   test('fits a normal five-card hand across a portrait phone without horizontal scrolling', () => {
     const layout = getGameplayLayout({
@@ -15,12 +19,12 @@ describe('getGameplayLayout', () => {
     expect(layout.opponentColumns).toBe(1);
     expect(layout.ownLaneWidth).toBe(layout.contentWidth);
     expect(layout.opponentLaneWidth).toBe(layout.contentWidth);
-    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
-    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
+    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap) + OWN_PADDING).toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
+    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap) + OPPONENT_PADDING).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
     expect(layout.ownCardHeight).toBeGreaterThan(layout.opponentCardHeight);
   });
 
-  test('uses a wider own lane and readable two-column opponent area on landscape phones', () => {
+  test('stacks opponent rows on a normal landscape phone rather than creating unreadable columns', () => {
     const layout = getGameplayLayout({
       viewportWidth: 844,
       viewportHeight: 390,
@@ -29,13 +33,27 @@ describe('getGameplayLayout', () => {
     });
 
     expect(layout.orientation).toBe('landscape');
-    expect(layout.opponentColumns).toBe(2);
+    expect(layout.opponentColumns).toBe(1);
     expect(layout.ownLaneWidth).toBeGreaterThan(layout.opponentLaneWidth);
     expect(layout.ownLaneWidth + layout.opponentLaneWidth).toBeLessThan(layout.contentWidth);
     expect(layout.ownCardHeight).toBeGreaterThanOrEqual(58);
-    expect(layout.ownCardHeight).toBeLessThanOrEqual(88);
     expect(layout.opponentCardHeight).toBeGreaterThanOrEqual(42);
-    expect(layout.opponentCardHeight).toBeLessThanOrEqual(60);
+    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap) + OPPONENT_PADDING).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
+  });
+
+  test('uses two opponent columns only when both columns can keep readable cards', () => {
+    const layout = getGameplayLayout({
+      viewportWidth: 1180,
+      viewportHeight: 640,
+      handSizes: [5, 5, 5, 5],
+      ourPlayerIndex: 0,
+    });
+
+    expect(layout.orientation).toBe('landscape');
+    expect(layout.opponentColumns).toBe(2);
+    const columnWidth = (layout.opponentLaneWidth - COLUMN_GAP) / 2;
+    expect(layout.opponentCardHeight).toBeGreaterThanOrEqual(42);
+    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap) + OPPONENT_PADDING).toBeLessThanOrEqual(columnWidth + 0.5);
   });
 
   test('never over-allocates the two landscape lanes on a narrow phone', () => {
@@ -47,21 +65,9 @@ describe('getGameplayLayout', () => {
     });
 
     expect(layout.orientation).toBe('landscape');
-    expect(layout.ownLaneWidth + layout.opponentLaneWidth + 10).toBeLessThanOrEqual(layout.contentWidth + 0.5);
-    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
-    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
-  });
-
-  test('keeps two opponent hands stacked instead of squeezing them side-by-side', () => {
-    const layout = getGameplayLayout({
-      viewportWidth: 780,
-      viewportHeight: 390,
-      handSizes: [5, 5, 5],
-      ourPlayerIndex: 0,
-    });
-
-    expect(layout.orientation).toBe('landscape');
-    expect(layout.opponentColumns).toBe(1);
+    expect(layout.ownLaneWidth + layout.opponentLaneWidth + 8).toBeLessThanOrEqual(layout.contentWidth + 0.5);
+    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap) + OWN_PADDING).toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
+    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap) + OPPONENT_PADDING).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
   });
 
   test('shrinks rather than overflowing when an extra card modifier produces six cards', () => {
@@ -79,7 +85,34 @@ describe('getGameplayLayout', () => {
     });
 
     expect(extraCard.ownCardHeight).toBeLessThan(normal.ownCardHeight);
-    expect(getHandRowWidth(extraCard.ownCardHeight, 6, extraCard.cardGap)).toBeLessThanOrEqual(extraCard.ownLaneWidth + 0.5);
+    expect(getHandRowWidth(extraCard.ownCardHeight, 6, extraCard.cardGap) + OWN_PADDING).toBeLessThanOrEqual(extraCard.ownLaneWidth + 0.5);
+  });
+
+  test('never lets hand rows overflow their rendered lane across a phone matrix', () => {
+    const viewports = [
+      [320, 568], [360, 780], [390, 844], [412, 915],
+      [480, 320], [740, 360], [844, 390], [915, 412],
+    ] as const;
+
+    for (const [viewportWidth, viewportHeight] of viewports) {
+      for (let players = 2; players <= 6; players += 1) {
+        for (const cards of [4, 5, 6]) {
+          const layout = getGameplayLayout({
+            viewportWidth,
+            viewportHeight,
+            handSizes: Array.from({ length: players }, () => cards),
+            ourPlayerIndex: 0,
+          });
+          const opponentColumnWidth = layout.opponentColumns === 2
+            ? (layout.opponentLaneWidth - COLUMN_GAP) / 2
+            : layout.opponentLaneWidth;
+          expect(getHandRowWidth(layout.ownCardHeight, cards, layout.cardGap) + OWN_PADDING)
+            .toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
+          expect(getHandRowWidth(layout.opponentCardHeight, cards, layout.cardGap) + OPPONENT_PADDING)
+            .toBeLessThanOrEqual(opponentColumnWidth + 0.5);
+        }
+      }
+    }
   });
 
   test('flags a shared vertical-scroll fallback for very dense small-screen tables', () => {
