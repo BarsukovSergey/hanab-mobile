@@ -10,6 +10,7 @@ import {
   getGameTableSuits,
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
+  type LiveClock,
 } from '../../game/selectors/gameplay';
 import { getLastCluePresentation } from '../../game/selectors/lastClue';
 import { noteCommandSchema } from '../../protocol/gameProtocol';
@@ -61,7 +62,6 @@ export function GameScreen() {
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [discardViewerOpen, setDiscardViewerOpen] = useState(false);
   const [note, setNote] = useState('');
-  const [clockNow, setClockNow] = useState(Date.now());
   const selectedCard = interaction.selectedCard;
   const selectedTarget = interaction.clueTarget;
   const noteCard = interaction.noteCard;
@@ -93,18 +93,10 @@ export function GameScreen() {
     setNote(noteEditorOpen ? beginNoteEdit(authoritativeNote) : authoritativeNote);
   }, [authoritativeNote, noteCard, noteEditorOpen]);
 
-  const timed = clientState?.metadata.options.timed === true && !clientState.finished
-    && !clientState.replay.active && clientState.ongoingGame.turn.currentPlayerIndex !== null
-    && !liveRoom?.sharedReplay;
-  useEffect(() => {
-    if (!timed || clientState?.pause.active || liveRoom?.clock === null) return undefined;
-    setClockNow(Date.now());
-    const timer = setInterval(() => setClockNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [timed, clientState?.pause.active, liveRoom?.clock?.receivedAtMs]);
-
   if (liveRoom === null || clientState === null || game === null) return null;
   const { metadata, replay, ongoingGame } = clientState;
+  const timed = metadata.options.timed === true && !clientState.finished
+    && !replay.active && ongoingGame.turn.currentPlayerIndex !== null && !liveRoom.sharedReplay;
   const latest = ongoingGame.turn.segment ?? 0;
   const segment = replay.active ? replay.segment : latest;
   const segments = replay.states.flatMap((state, i) => state === undefined ? [] : [i]);
@@ -219,7 +211,6 @@ export function GameScreen() {
   const clueEnabled = enabled && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName) && selectedTarget !== null;
   const notesEditable = sessionPhase === 'ready' && !replay.active && !liveRoom.sharedReplay && noteCard !== null;
   const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
-  const clock = (i: number) => liveRoom.clock === null ? null : getDisplayedClockString(liveRoom.clock, i, clientState.pause.active, clockNow);
   const pauseLabel = clientState.pause.active ? 'Unpause' : isOurTurn ? 'Pause' : clientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
   const openNote = (order: number) => {
     interactionDispatch({ type: 'open-note', order });
@@ -297,7 +288,7 @@ export function GameScreen() {
           <View style={styles.handHeader}>
             <Text style={[styles.handTitle, { color: theme.colors.text }]}>Your hand</Text>
             <View style={styles.buttons}>
-              {timed && clock(metadata.ourPlayerIndex) !== null && <Text style={[styles.clock, { color: theme.colors.text }]}>{clock(metadata.ourPlayerIndex)}</Text>}
+              {timed && liveRoom.clock !== null && <LiveClockText clock={liveRoom.clock} paused={clientState.pause.active} playerIndex={metadata.ourPlayerIndex} />}
               <Pill>{presence(liveRoom.connected?.[metadata.ourPlayerIndex], Object.values(lobbyUsers).find((user) => user?.name === metadata.playerNames[metadata.ourPlayerIndex])?.inactive ?? false)}</Pill>
             </View>
           </View>
@@ -344,13 +335,20 @@ export function GameScreen() {
               { backgroundColor: theme.colors.surface, borderColor: target ? theme.colors.accent : theme.colors.border },
               target && styles.target,
             ]}>
-              <Pressable disabled={playerRoom === null} onPress={() => interactionDispatch({ type: 'select-clue-target', playerIndex: i })} style={styles.playerHeader}>
+              <Pressable
+                accessibilityLabel={playerRoom === null ? undefined : `Clue ${metadata.playerNames[i] ?? `Player ${i + 1}`}`}
+                accessibilityRole={playerRoom === null ? undefined : 'button'}
+                accessibilityState={playerRoom === null ? undefined : { selected: target }}
+                disabled={playerRoom === null}
+                onPress={() => interactionDispatch({ type: 'select-clue-target', playerIndex: i })}
+                style={styles.playerHeader}
+              >
                 <View style={styles.grow}>
                   <Text numberOfLines={1} style={[styles.playerName, { color: theme.colors.text }]}>{metadata.playerNames[i]}</Text>
                   <Text style={[styles.presence, { color: theme.colors.textMuted }]}>{presence(liveRoom.connected?.[i], Object.values(lobbyUsers).find((user) => user?.name === metadata.playerNames[i])?.inactive ?? false)}</Text>
                 </View>
                 <View style={styles.buttons}>
-                  {timed && clock(i) !== null && <Text style={[styles.clock, { color: theme.colors.text }]}>{clock(i)}</Text>}
+                  {timed && liveRoom.clock !== null && <LiveClockText clock={liveRoom.clock} paused={clientState.pause.active} playerIndex={i} />}
                   {empathizing && <Pill active>Empathy</Pill>}
                   {target && !empathizing && <Pill active>Clue</Pill>}
                 </View>
@@ -464,6 +462,20 @@ function GameLog({ entries, title }: { entries: readonly { turn: number; text: s
 function HudStat({ label, value }: { label: string; value: number }) {
   const { theme } = useHanabTheme();
   return <View style={styles.hudStat}><Text style={[styles.hudValue, { color: theme.colors.text }]}>{value}</Text><Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text></View>;
+}
+
+function LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; playerIndex: number; paused: boolean }) {
+  const { theme } = useHanabTheme();
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    if (paused) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [clock.receivedAtMs, paused, playerIndex]);
+  const display = getDisplayedClockString(clock, playerIndex, paused, now);
+  if (display === null) return null;
+  return <Text style={[styles.clock, { color: theme.colors.text }]}>{display}</Text>;
 }
 
 function presence(connected: boolean | undefined, inactive: boolean) { return connected === false ? 'disconnected' : inactive ? 'away' : 'online'; }
