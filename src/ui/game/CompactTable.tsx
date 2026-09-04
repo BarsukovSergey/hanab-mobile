@@ -118,7 +118,12 @@ export function CompactTable({
                   <Text style={[styles.rankChipRank, { color: theme.colors.text }]}>{rank}</Text>
                   {count > 1 && <Text style={[styles.rankChipCount, { color: theme.colors.textMuted }]}>×{count}</Text>}
                 </View>
-              ))}</View>
+              ))}
+              {suit.unknownCount > 0 && <View style={[styles.rankChip, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+                <Text style={[styles.rankChipRank, { color: theme.colors.text }]}>?</Text>
+                {suit.unknownCount > 1 && <Text style={[styles.rankChipCount, { color: theme.colors.textMuted }]}>×{suit.unknownCount}</Text>}
+              </View>}
+              </View>
             </View>;
           })}</View>}
     </Pressable>
