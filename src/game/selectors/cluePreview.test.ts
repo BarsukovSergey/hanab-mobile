@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { getCluePreview } from './cluePreview';
+import { getCluePreview, isCluePreviewConfirmable } from './cluePreview';
 
 describe('getCluePreview', () => {
   test('uses upstream color clue touch semantics for the target hand', () => {
@@ -42,5 +42,27 @@ describe('getCluePreview', () => {
     const game = { hands: [[]], deck: [] } as unknown as Parameters<typeof getCluePreview>[0];
     expect(getCluePreview(game, 'No Variant', 2, 'rank', 1)).toBeNull();
     expect(getCluePreview(game, 'No Variant', 0, 'color', 999)).toBeNull();
+  });
+});
+
+describe('isCluePreviewConfirmable', () => {
+  const emptyPreview = {
+    type: 'color' as const,
+    value: 0,
+    targetPlayerIndex: 1,
+    touchedOrders: [],
+  };
+
+  test('requires at least one touched card for ordinary games', () => {
+    expect(isCluePreviewConfirmable(emptyPreview, false)).toBe(false);
+    expect(isCluePreviewConfirmable({ ...emptyPreview, touchedOrders: [7] }, false)).toBe(true);
+  });
+
+  test('allows zero touched cards when the Empty Clues modifier is enabled', () => {
+    expect(isCluePreviewConfirmable(emptyPreview, true)).toBe(true);
+  });
+
+  test('never confirms an invalid preview', () => {
+    expect(isCluePreviewConfirmable(null, true)).toBe(false);
   });
 });
