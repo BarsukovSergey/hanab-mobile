@@ -10,16 +10,29 @@ type GameCardProps = {
   position: number;
   knowledge: CardKnowledgeViewModel;
   selected: boolean;
+  highlighted?: boolean;
   hasNote?: boolean;
   height?: number;
   onSelect: () => void;
   onLongPress?: () => void;
+  onPressOut?: () => void;
   variantName: string;
 };
 
 type VisibleCardSize = 'hand' | 'table' | 'mini';
 
-export function GameCard({ position, knowledge, selected, hasNote = false, height, onSelect, onLongPress, variantName }: GameCardProps) {
+export function GameCard({
+  position,
+  knowledge,
+  selected,
+  highlighted = false,
+  hasNote = false,
+  height,
+  onSelect,
+  onLongPress,
+  onPressOut,
+  variantName,
+}: GameCardProps) {
   const { theme } = useHanabTheme();
 
   return <Pressable
@@ -29,6 +42,7 @@ export function GameCard({ position, knowledge, selected, hasNote = false, heigh
     delayLongPress={350}
     onLongPress={onLongPress}
     onPress={onSelect}
+    onPressOut={onPressOut}
     style={({ pressed }) => [styles.cardTouch, pressed && styles.pressed]}
   >
     <View style={[
@@ -40,6 +54,7 @@ export function GameCard({ position, knowledge, selected, hasNote = false, heigh
       <View style={styles.hiddenCard}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
         {knowledge.borderColor !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: knowledge.borderColor }]} />}
+        {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
         {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
         <HiddenKnowledgeOverlay knowledge={knowledge} variantName={variantName} />
         <Text style={styles.cardPosition}>{position + 1}</Text>
@@ -48,16 +63,31 @@ export function GameCard({ position, knowledge, selected, hasNote = false, heigh
   </Pressable>;
 }
 
-export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = false, hasNote = false, semanticBorder = null, onPress, onLongPress, size = 'hand', height }: {
+export function VisibleHanabiCard({
+  suitIndex,
+  rank,
+  variantName,
+  selected = false,
+  highlighted = false,
+  hasNote = false,
+  semanticBorder = null,
+  onPress,
+  onLongPress,
+  onPressOut,
+  size = 'hand',
+  height,
+}: {
   suitIndex: number | null;
   rank: number | null;
   variantName: string;
   position?: number;
   selected?: boolean;
+  highlighted?: boolean;
   hasNote?: boolean;
   semanticBorder?: string | null;
   onPress?: () => void;
   onLongPress?: () => void;
+  onPressOut?: () => void;
   size?: VisibleCardSize;
   height?: number;
 }) {
@@ -78,10 +108,11 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
   ]}>
     <UpstreamCardFace rank={rank} suitIndex={suitIndex} variantName={variantName} />
     {semanticBorder !== null && size === 'hand' && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: semanticBorder }]} />}
+    {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
     {hasNote && <NoteIndicator compact={compactIndicator} />}
   </View>;
 
-  if (onPress === undefined && onLongPress === undefined) return content;
+  if (onPress === undefined && onLongPress === undefined && onPressOut === undefined) return content;
   return <Pressable
     accessibilityLabel={`${suit?.name ?? 'Unknown'} ${rank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
@@ -89,6 +120,7 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
     delayLongPress={350}
     onLongPress={onLongPress}
     onPress={onPress}
+    onPressOut={onPressOut}
     style={({ pressed }) => pressed && styles.pressed}
   >{content}</Pressable>;
 }
@@ -222,7 +254,8 @@ const styles = StyleSheet.create({
   visibleTable: { height: 86 },
   visibleMini: { borderRadius: 5, height: 56 },
   semanticInset: { ...StyleSheet.absoluteFill, borderRadius: 5, borderWidth: 4, zIndex: 3 },
-  noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 18, justifyContent: 'center', position: 'absolute', right: 5, top: 5, transform: [{ rotate: '-8deg' }], width: 18, zIndex: 6 },
+  previewInset: { ...StyleSheet.absoluteFill, borderRadius: 5, borderWidth: 4, zIndex: 7 },
+  noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 18, justifyContent: 'center', position: 'absolute', right: 5, top: 5, transform: [{ rotate: '-8deg' }], width: 18, zIndex: 8 },
   noteIndicatorCompact: { height: 12, right: 3, top: 3, width: 12 },
   noteIndicatorText: { color: '#0d0d0d', fontSize: 13, fontWeight: '900', lineHeight: 14 },
   noteIndicatorTextCompact: { fontSize: 8, lineHeight: 9 },
