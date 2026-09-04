@@ -5,6 +5,7 @@ import { getCommittedClueMarker } from './clueIndication';
 const choices = {
   colors: [{ value: 0, label: 'Red' }, { value: 1, label: 'Yellow' }],
   ranks: [{ value: 1, label: '1' }, { value: 2, label: '2' }],
+  allowEmptyClues: false,
 };
 
 test('marks only cards touched by the latest color clue', () => {
