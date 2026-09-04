@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar as NativeStatusBar,
   StyleSheet,
   Text,
   View,
@@ -49,6 +50,7 @@ function AppContent() {
   const { theme } = useHanabTheme();
   const { contentMaxWidth, width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
+  const androidStatusInset = Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0;
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
   const [loginPending, setLoginPending] = useState(false);
@@ -216,6 +218,7 @@ function AppContent() {
         <View style={[
           styles.gameBar,
           landscapePhone && styles.gameBarLandscape,
+          landscapePhone && androidStatusInset > 0 && { paddingTop: androidStatusInset + 2 },
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
           {!landscapePhone && <View style={styles.brandCopy}>
@@ -353,7 +356,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
-  gameContainerLandscape: { gap: 4, paddingBottom: 6, paddingHorizontal: 6, paddingTop: 4 },
+  gameContainerLandscape: { gap: 4, paddingBottom: 28, paddingHorizontal: 6, paddingTop: 4 },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
