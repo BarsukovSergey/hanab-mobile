@@ -11,6 +11,7 @@ type GameCardProps = {
   knowledge: CardKnowledgeViewModel;
   selected: boolean;
   hasNote?: boolean;
+  height?: number;
   onSelect: () => void;
   onLongPress?: () => void;
   variantName: string;
@@ -18,7 +19,7 @@ type GameCardProps = {
 
 type VisibleCardSize = 'hand' | 'table' | 'mini';
 
-export function GameCard({ position, knowledge, selected, hasNote = false, onSelect, onLongPress, variantName }: GameCardProps) {
+export function GameCard({ position, knowledge, selected, hasNote = false, height, onSelect, onLongPress, variantName }: GameCardProps) {
   const { theme } = useHanabTheme();
 
   return <Pressable
@@ -32,13 +33,14 @@ export function GameCard({ position, knowledge, selected, hasNote = false, onSel
   >
     <View style={[
       styles.hiddenFrame,
+      height === undefined ? null : { height, width: undefined },
       { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
       selected && styles.selectedFrame,
     ]}>
       <View style={styles.hiddenCard}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
         {knowledge.borderColor !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: knowledge.borderColor }]} />}
-        {hasNote && <NoteIndicator />}
+        {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
         <HiddenKnowledgeOverlay knowledge={knowledge} variantName={variantName} />
         <Text style={styles.cardPosition}>{position + 1}</Text>
       </View>
@@ -46,7 +48,7 @@ export function GameCard({ position, knowledge, selected, hasNote = false, onSel
   </Pressable>;
 }
 
-export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = false, hasNote = false, semanticBorder = null, onPress, onLongPress, size = 'hand' }: {
+export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = false, hasNote = false, semanticBorder = null, onPress, onLongPress, size = 'hand', height }: {
   suitIndex: number | null;
   rank: number | null;
   variantName: string;
@@ -57,15 +59,18 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
   onPress?: () => void;
   onLongPress?: () => void;
   size?: VisibleCardSize;
+  height?: number;
 }) {
   const { theme } = useHanabTheme();
   const suits = getCardSuitVisuals(variantName);
   const suit = suitIndex === null ? undefined : suits[suitIndex];
   const sizeStyles = size === 'mini' ? styles.visibleMini : size === 'table' ? styles.visibleTable : styles.visibleHand;
+  const compactIndicator = size === 'mini' || (height !== undefined && height < 80);
 
   const content = <View style={[
     styles.visibleCard,
     sizeStyles,
+    height === undefined ? null : { height },
     {
       borderColor: selected ? theme.colors.accent : 'transparent',
       borderWidth: selected ? 5 : 0,
@@ -73,7 +78,7 @@ export function VisibleHanabiCard({ suitIndex, rank, variantName, selected = fal
   ]}>
     <UpstreamCardFace rank={rank} suitIndex={suitIndex} variantName={variantName} />
     {semanticBorder !== null && size === 'hand' && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: semanticBorder }]} />}
-    {hasNote && <NoteIndicator compact={size === 'mini'} />}
+    {hasNote && <NoteIndicator compact={compactIndicator} />}
   </View>;
 
   if (onPress === undefined && onLongPress === undefined) return content;
