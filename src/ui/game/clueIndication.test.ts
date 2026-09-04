@@ -18,8 +18,8 @@ test('marks only cards touched by the latest color clue', () => {
 
   expect(getCommittedClueMarker(clue, 7, 1, choices)).toEqual({
     kind: 'color',
+    value: 0,
     label: 'Red',
-    fill: '#ff7777',
     retouched: false,
   });
   expect(getCommittedClueMarker(clue, 8, 1, choices)).toBeNull();
@@ -36,8 +36,8 @@ test('shows rank labels and distinguishes retouched cards', () => {
 
   expect(getCommittedClueMarker(clue, 4, 2, choices)).toEqual({
     kind: 'rank',
+    value: 2,
     label: '2',
-    fill: null,
     retouched: true,
   });
 });
