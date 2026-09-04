@@ -9,9 +9,14 @@ export type CardSuitVisual = {
   duplicatePip: boolean;
 };
 
+const suitVisualCache = new Map<string, readonly CardSuitVisual[]>();
+
 export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual[] {
+  const cached = suitVisualCache.get(variantName);
+  if (cached !== undefined) return cached;
+
   const variant = getVariant(variantName);
-  return variant.suits.map((suit, suitIndex) => {
+  const visuals = variant.suits.map((suit, suitIndex) => {
     const fillColors = suit.fill === 'multi' && suit.fillColors.length > 0
       ? suit.fillColors
       : [suit.fill.length === 0 ? '#5d6570' : suit.fill];
@@ -25,4 +30,6 @@ export function getCardSuitVisuals(variantName: string): readonly CardSuitVisual
       duplicatePip: variant.pips.slice(0, suitIndex).some((previousPip) => previousPip === pip),
     };
   });
+  suitVisualCache.set(variantName, visuals);
+  return visuals;
 }
