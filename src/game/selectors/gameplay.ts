@@ -8,6 +8,7 @@ import {
   getAdjustedClueTokens,
   getUnadjustedClueTokens,
 } from '../upstream/rules/clueTokens';
+import { getCardsPerHand } from '../upstream/rules/hand';
 import { millisecondsToClockString } from '../upstream/rules/text';
 
 export type LiveClock = {
@@ -59,8 +60,13 @@ export type GameTableSuit = {
 
 type AuthoritativeTableState = Pick<GameState, 'playStacks' | 'discardStacks' | 'deck'>;
 type ClueMetadata = Pick<GameMetadata, 'options' | 'ourPlayerIndex' | 'characterAssignments'>;
+type OptionsMetadata = Pick<GameMetadata, 'options'>;
 
 const clueChoiceCache = new Map<string, GameplayClueChoices>();
+
+export function getGameplayCardsPerHand(metadata: OptionsMetadata): number {
+  return getCardsPerHand(metadata.options);
+}
 
 export function getGameplayClueChoices(
   variantName: string,
