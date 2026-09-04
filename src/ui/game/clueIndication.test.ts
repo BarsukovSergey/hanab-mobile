@@ -42,3 +42,19 @@ test('shows rank labels and distinguishes retouched cards', () => {
     retouched: true,
   });
 });
+
+test('uses the same compact O/E rank marker text as upstream Odds and Evens arrows', () => {
+  const clue = {
+    giverPlayerIndex: 0,
+    targetPlayerIndex: 1,
+    clueType: 'rank' as const,
+    value: 2,
+    touchedOrders: [4],
+  };
+  const oddsAndEvensChoices = {
+    ...choices,
+    ranks: [{ value: 1, label: 'Odd' }, { value: 2, label: 'Even' }],
+  };
+
+  expect(getCommittedClueMarker(clue, 4, 1, oddsAndEvensChoices)?.label).toBe('E');
+});
