@@ -39,6 +39,8 @@ Table-surface acceptance family:
 
 Empathy reuses authoritative clue snapshots rather than duplicating the deal. `clue-committed` gives a deterministic opponent card whose open identity differs from the owner-perspective knowledge shown during empathy.
 
+Reconnect and rotation are lifecycle acceptance tests over canonical authoritative scenarios rather than duplicate game fixtures.
+
 ## Clue-flow acceptance contract
 
 The clue family intentionally separates transient interaction from authoritative lifecycle:
@@ -94,10 +96,32 @@ Fireworks and discards are projections of authoritative stacks, not independent 
 5. known discard ranks remain grouped by suit/rank, while hidden identities are represented explicitly by `unknownCount` rather than silently disappearing;
 6. the compact summary and discard viewer therefore share the same authoritative card count even when their presentations differ.
 
-These invariants are executable in `gameplayScenarios.test.ts`, `scenarioHandSize.test.ts`, `tableSurface.test.ts`, `discardSummary.test.ts`, `gameplayInteraction.test.ts`, and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
+## Reconnect acceptance contract
+
+Reconnect replaces the live room from authoritative bootstrap rather than trying to keep stale client gameplay state alive:
+
+1. a new connection epoch clears the old live room before recovery bootstrap;
+2. recovery of the same table receives a new monotonic `gameLoadEpoch`;
+3. restored game truth comes from fresh init/history through `GameBootstrapCoordinator`;
+4. local note/transient state from the old connection is not silently copied into the restored client state;
+5. actions carrying an old connection epoch or old game-load epoch are rejected after restore;
+6. current-epoch/current-load mutations remain accepted.
+
+## Rotation and app-state acceptance contract
+
+Viewport/app lifecycle changes may recompute presentation but never mutate authoritative game truth:
+
+1. portrait -> landscape -> portrait uses the production `getGameplayLayout` calculation and the same authoritative game object;
+2. returning to the same viewport produces the same layout result deterministically;
+3. own-hand cards remain at least as large as opponent cards in both orientations;
+4. orientation/background lifecycle boundaries drop every UI-only interaction reference: selected card, clue target/preview, empathy, and note target;
+5. durable server-derived knowledge, notes, replay actions, hands, stacks, turn state, and score are not rewritten by the lifecycle reset;
+6. no lifecycle rule may introduce per-hand horizontal scrolling.
+
+These invariants are executable in `gameplayScenarios.test.ts`, `scenarioHandSize.test.ts`, `tableSurface.test.ts`, `discardSummary.test.ts`, `reconnectLifecycle.test.ts`, `rotationLifecycle.test.ts`, `gameplayInteraction.test.ts`, and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
 
 ## Expansion order
 
-Add scenarios when they close a real gameplay risk, not just to increase fixture count. High-value next cases are reconnect/restored state, rotation lifecycle, and finished/replay states.
+Add scenarios when they close a real gameplay risk, not just to increase fixture count. The next high-value case is finished/replay state coverage, followed by final physical Android lifecycle smoke.
 
 For each scenario, prefer executable assertions over prose whenever the invariant can be expressed deterministically.
