@@ -1,8 +1,11 @@
+import { getVariant } from '../../game/upstream/gameData';
 import type { GameplayClueChoices } from '../../game/selectors/gameplay';
 import type { LastCluePresentation } from '../../game/selectors/lastClue';
 
 export type ClueCardMarker = {
+  kind: 'color' | 'rank';
   label: string;
+  fill: string | null;
   retouched: boolean;
 };
 
@@ -11,6 +14,7 @@ export function getCommittedClueMarker(
   order: number,
   numPositiveClues: number,
   choices: GameplayClueChoices | null,
+  variantName: string,
 ): ClueCardMarker | null {
   if (clue === null || !clue.touchedOrders.includes(order)) return null;
 
@@ -18,17 +22,14 @@ export function getCommittedClueMarker(
     ? choices?.ranks.find((candidate) => candidate.value === clue.value)
     : choices?.colors.find((candidate) => candidate.value === clue.value);
   const fallback = clue.clueType === 'rank' ? String(clue.value) : `C${clue.value + 1}`;
-  const label = choice?.label ?? fallback;
+  const color = clue.clueType === 'color' ? getVariant(variantName).clueColors[clue.value] : undefined;
 
   return {
-    label: clue.clueType === 'rank' ? label : compactColorLabel(label),
-    // The authoritative state is already post-clue. A touched card at 2+ positive clues
-    // therefore had a positive clue before the clue we are currently indicating.
+    kind: clue.clueType,
+    label: choice?.label ?? fallback,
+    fill: color?.fill ?? null,
+    // Upstream draws the arrow after the clue is applied. Two positive clues means this clue
+    // retouched a card that had already been positively clued once.
     retouched: numPositiveClues >= 2,
   };
-}
-
-function compactColorLabel(label: string): string {
-  const word = label.trim().split(/\s+/)[0] ?? label;
-  return word.length <= 2 ? word : word.slice(0, 1).toUpperCase();
 }
