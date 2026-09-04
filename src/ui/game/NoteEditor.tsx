@@ -42,16 +42,16 @@ export function NoteEditor({
           <ActionButton compact title="Close" tone="ghost" onPress={onClose} />
         </View>
         <Field
-          blurOnSubmit={false}
+          blurOnSubmit
           editable={editable}
+          enterKeyHint="done"
           maxLength={300}
-          multiline
           onChangeText={onChange}
           onSubmitEditing={submit}
           placeholder={editable ? 'Add a private note' : 'Read-only note'}
           returnKeyType="done"
           style={styles.input}
-          submitBehavior="submit"
+          submitBehavior="blurAndSubmit"
           value={value}
         />
         <View style={styles.quickRow}>{QUICK_TOKENS.map(([label, token]) => <ActionButton
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
   title: { fontSize: 17, fontWeight: '900' },
-  input: { minHeight: 92, textAlignVertical: 'top' },
+  input: { minHeight: 52 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   actions: { flexDirection: 'row', gap: 8 },
 });
