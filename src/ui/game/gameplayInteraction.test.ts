@@ -17,6 +17,14 @@ describe('gameplayInteractionReducer', () => {
     expect(targeted).toMatchObject({ selectedCard: 12, noteCard: 12, clueTarget: 2 });
   });
 
+  test('clears clue preview when the clue target changes', () => {
+    const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 1 });
+    const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'color', value: 0 });
+    expect(previewed.cluePreview).toEqual({ type: 'color', value: 0 });
+    const retargeted = gameplayInteractionReducer(previewed, { type: 'select-clue-target', playerIndex: 2 });
+    expect(retargeted.cluePreview).toBeNull();
+  });
+
   test('models empathy as momentary player state', () => {
     const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
     expect(held.empathyPlayer).toBe(1);
@@ -28,6 +36,7 @@ describe('gameplayInteractionReducer', () => {
     const stale = {
       selectedCard: 99,
       clueTarget: 4,
+      cluePreview: { type: 'rank' as const, value: 3 },
       empathyPlayer: 4,
       noteCard: 88,
     };
@@ -41,6 +50,7 @@ describe('gameplayInteractionReducer', () => {
     expect(synced).toEqual({
       selectedCard: 12,
       clueTarget: 1,
+      cluePreview: null,
       empathyPlayer: null,
       noteCard: 12,
     });
