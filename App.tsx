@@ -250,7 +250,7 @@ function AppContent() {
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
           { maxWidth: contentMaxWidth },
-        ]} keyboardShouldPersistTaps="handled">
+        ]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
           <LastClueNotice />
           <GameScreen />
         </ScrollView>
@@ -329,7 +329,7 @@ function AppContent() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <View style={styles.appHeader}>
           <View style={styles.brandCopy}>
             <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
@@ -356,13 +356,13 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
-  gameContainerLandscape: { gap: 4, paddingBottom: 28, paddingHorizontal: 6, paddingTop: 4 },
+  gameContainerLandscape: { gap: 4, paddingBottom: 28, paddingHorizontal: Platform.OS === 'android' ? 28 : 8, paddingTop: 4 },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: Platform.OS === 'android' ? 34 : 44 },
-  gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: 6, paddingTop: Platform.OS === 'android' ? 3 : 5 },
+  gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: Platform.OS === 'android' ? 24 : 8, paddingTop: Platform.OS === 'android' ? 3 : 5 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
   gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
