@@ -60,13 +60,19 @@ export type GameTableSuit = {
 type AuthoritativeTableState = Pick<GameState, 'playStacks' | 'discardStacks' | 'deck'>;
 type ClueMetadata = Pick<GameMetadata, 'options' | 'ourPlayerIndex' | 'characterAssignments'>;
 
+const clueChoiceCache = new Map<string, GameplayClueChoices>();
+
 export function getGameplayClueChoices(
   variantName: string,
   characterName = '',
   allowEmptyClues = false,
 ): GameplayClueChoices {
+  const cacheKey = `${variantName}\u0000${characterName}\u0000${allowEmptyClues ? '1' : '0'}`;
+  const cached = clueChoiceCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const variant = getVariant(variantName);
-  return {
+  const choices = {
     colors: variant.clueColors.map((_color, value) => ({
       value,
       label: getClueName(ClueType.Color, value, variant, characterName),
@@ -76,7 +82,9 @@ export function getGameplayClueChoices(
       label: getClueName(ClueType.Rank, value, variant, characterName),
     })),
     allowEmptyClues,
-  };
+  } satisfies GameplayClueChoices;
+  clueChoiceCache.set(cacheKey, choices);
+  return choices;
 }
 
 export function getGameplayClueChoicesForPlayer(metadata: ClueMetadata): GameplayClueChoices {
