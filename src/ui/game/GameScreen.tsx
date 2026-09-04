@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -424,7 +424,7 @@ function ReplayHands({ game, playerNames, variantName, notes, onOpenNote }: {
   const { theme } = useHanabTheme();
   return <Panel><SectionHeading title="Replay hands" detail="Desktop left-to-right order; tap a noted card to read it." /><View style={styles.players}>{playerNames.map((name, i) => <View key={name}
     style={[styles.player, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><Text style={[styles.playerName, { color: theme.colors.text }]}>{name}</Text>
-    <ScrollView horizontal contentContainerStyle={styles.hand} showsHorizontalScrollIndicator={false}>{getDisplayedHandOrders(game.hands[i]).map((order, position) => {
+    <View style={styles.replayHand}>{getDisplayedHandOrders(game.hands[i]).map((order, position) => {
       const card = game.deck[order];
       const knowledge = card === undefined ? null : getCardKnowledgeViewModel(variantName, card, undefined, true);
       const hasNote = notes[order]?.some((entry) => entry.text.trim().length > 0) ?? false;
@@ -433,7 +433,7 @@ function ReplayHands({ game, playerNames, variantName, notes, onOpenNote }: {
         position={position} rank={card?.rank ?? null} semanticBorder={knowledge?.borderColor ?? null}
         suitIndex={card?.suitIndex ?? null} variantName={variantName} />
         {knowledge !== null && <CardKnowledgeDetails knowledge={knowledge} variantName={variantName} />}</View>;
-    })}</ScrollView>
+    })}</View>
   </View>)}</View></Panel>;
 }
 
@@ -530,5 +530,6 @@ const styles = StyleSheet.create({
   gameOverText: { fontSize: 24, fontWeight: '900', letterSpacing: 1.2 },
   finalScore: { fontSize: 48, fontWeight: '900', lineHeight: 52 },
   log: { gap: 6 },
+  replayHand: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'center', width: '100%' },
   replayCard: { gap: 5, width: 92 },
 });
