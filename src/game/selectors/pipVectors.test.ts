@@ -50,4 +50,11 @@ describe('supported variant pip rendering', () => {
 
     expect(failures).toEqual([]);
   });
+
+  it('reuses immutable recorded vectors instead of replaying canvas recording on every render', () => {
+    const first = getRecordedPipVector('rainbow', ['#ff0000', '#00ff00'], 'Rainbow');
+    const second = getRecordedPipVector('rainbow', ['#ff0000', '#00ff00'], 'Rainbow');
+    expect(first).not.toBeNull();
+    expect(second).toBe(first);
+  });
 });
