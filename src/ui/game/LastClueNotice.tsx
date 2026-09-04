@@ -11,13 +11,16 @@ export function LastClueNotice() {
   const room = useAppSelector((state) => state.room.room);
   if (room.kind !== 'live_game' || room.clientState.finished || room.clientState.replay.active) return null;
 
+  const visibleState = room.clientState.visibleState;
+  if (visibleState === null) return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.slot} />;
+
   const clue = getLastCluePresentation(room.clientState.replay.actions);
   if (clue === null) return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.slot} />;
 
   const names = room.clientState.metadata.playerNames;
   const variantName = room.clientState.metadata.options.variantName;
   const choices = getGameplayClueChoices(variantName);
-  const targetHand = getDisplayedHandOrders(room.clientState.visibleState.hands[clue.targetPlayerIndex] ?? []);
+  const targetHand = getDisplayedHandOrders(visibleState.hands[clue.targetPlayerIndex] ?? []);
   const touchedPositions = clue.touchedOrders
     .map((order) => targetHand.findIndex((candidate) => candidate === order) + 1)
     .filter((position) => position > 0);
