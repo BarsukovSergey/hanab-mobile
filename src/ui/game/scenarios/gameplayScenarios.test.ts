@@ -2,13 +2,15 @@ import { describe, expect, test } from '@jest/globals';
 
 import { getCluePreview } from '../../../game/selectors/cluePreview';
 import { getGameplayLayout } from '../gameplayLayout';
-import { gameplayScenarios } from './gameplayScenarios';
+import { getGameplayScenarios } from './gameplayScenarios';
 
 describe('gameplay scenario harness', () => {
-  test('keeps canonical ids unique and bootstraps every scenario through the real headless client', () => {
-    expect(new Set(gameplayScenarios.map((scenario) => scenario.id)).size).toBe(gameplayScenarios.length);
+  const scenarios = getGameplayScenarios();
 
-    for (const scenario of gameplayScenarios) {
+  test('keeps canonical ids unique and bootstraps every scenario through the real headless client', () => {
+    expect(new Set(scenarios.map((scenario) => scenario.id)).size).toBe(scenarios.length);
+
+    for (const scenario of scenarios) {
       const room = scenario.store.getState().room.room;
       expect(room.kind).toBe('live_game');
       if (room.kind !== 'live_game') continue;
@@ -19,12 +21,12 @@ describe('gameplay scenario harness', () => {
   });
 
   test('keeps scenario stores isolated from one another', () => {
-    const stores = gameplayScenarios.map((scenario) => scenario.store);
+    const stores = scenarios.map((scenario) => scenario.store);
     expect(new Set(stores).size).toBe(stores.length);
   });
 
   test('contains a deterministic one-card clue preview source', () => {
-    const scenario = gameplayScenarios.find((candidate) => candidate.id === 'clue-preview-source');
+    const scenario = scenarios.find((candidate) => candidate.id === 'clue-preview-source');
     expect(scenario).toBeDefined();
     if (scenario === undefined) return;
     const room = scenario.store.getState().room.room;
@@ -55,7 +57,7 @@ describe('gameplay scenario harness', () => {
       ['six-player-landscape', 'landscape'],
     ]);
 
-    for (const scenario of gameplayScenarios) {
+    for (const scenario of scenarios) {
       const room = scenario.store.getState().room.room;
       if (room.kind !== 'live_game') throw new Error(`Missing live room for ${scenario.id}.`);
       const game = room.clientState.visibleState;
@@ -76,7 +78,7 @@ describe('gameplay scenario harness', () => {
   });
 
   test('keeps the dense six-player fixture honest', () => {
-    const scenario = gameplayScenarios.find((candidate) => candidate.id === 'six-player-landscape');
+    const scenario = scenarios.find((candidate) => candidate.id === 'six-player-landscape');
     expect(scenario).toBeDefined();
     if (scenario === undefined) return;
     const room = scenario.store.getState().room.room;

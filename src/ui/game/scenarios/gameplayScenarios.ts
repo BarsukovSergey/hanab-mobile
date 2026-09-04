@@ -33,35 +33,39 @@ type ScenarioSpec = {
 };
 
 const PLAYER_NAMES = ['Alice', 'Bob', 'Cathy', 'Donald', 'Emily', 'Frank'] as const;
+let cachedScenarios: readonly GameplayScenario[] | null = null;
 
-export const gameplayScenarios: readonly GameplayScenario[] = [
-  buildScenario({
-    id: 'three-player-base',
-    title: '3P base · portrait',
-    description: 'Ordinary three-player live turn with five-card hands and no transient interaction.',
-    numPlayers: 3,
-    viewport: { width: 390, height: 844 },
-  }),
-  buildScenario({
-    id: 'clue-preview-source',
-    title: '3P clue source · portrait',
-    description: 'Deterministic three-player deal containing a known one-card red clue target for interaction checks.',
-    numPlayers: 3,
-    viewport: { width: 390, height: 844 },
-    expectedInteraction: {
-      ...initialGameplayInteractionState,
-      clueTarget: 1,
-      cluePreview: { type: 'color', value: 0 },
-    },
-  }),
-  buildScenario({
-    id: 'six-player-landscape',
-    title: '6P dense · landscape',
-    description: 'Six-player narrow Android-like landscape geometry with four-card hands.',
-    numPlayers: 6,
-    viewport: { width: 720, height: 360 },
-  }),
-];
+export function getGameplayScenarios(): readonly GameplayScenario[] {
+  cachedScenarios ??= [
+    buildScenario({
+      id: 'three-player-base',
+      title: '3P base · portrait',
+      description: 'Ordinary three-player live turn with five-card hands and no transient interaction.',
+      numPlayers: 3,
+      viewport: { width: 390, height: 844 },
+    }),
+    buildScenario({
+      id: 'clue-preview-source',
+      title: '3P clue source · portrait',
+      description: 'Deterministic deal with a one-card red clue target. In the gallery, tap Bob then Red to inspect the production preview flow.',
+      numPlayers: 3,
+      viewport: { width: 390, height: 844 },
+      expectedInteraction: {
+        ...initialGameplayInteractionState,
+        clueTarget: 1,
+        cluePreview: { type: 'color', value: 0 },
+      },
+    }),
+    buildScenario({
+      id: 'six-player-landscape',
+      title: '6P dense · landscape',
+      description: 'Six-player narrow Android-like landscape geometry with four-card hands.',
+      numPlayers: 6,
+      viewport: { width: 720, height: 360 },
+    }),
+  ];
+  return cachedScenarios;
+}
 
 function buildScenario(spec: ScenarioSpec): GameplayScenario {
   const store = createAppStore();

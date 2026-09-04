@@ -4,14 +4,15 @@ import { Provider } from 'react-redux';
 
 import { ActionButton, Panel, SectionHeading, useHanabTheme } from '../../designSystem';
 import { GameScreen } from '../GameScreen';
-import { gameplayScenarios } from './gameplayScenarios';
+import { getGameplayScenarios } from './gameplayScenarios';
 
 export function GameplayScenarioGallery({ onBack }: { onBack: () => void }) {
   const { theme } = useHanabTheme();
-  const [selectedID, setSelectedID] = useState(gameplayScenarios[0]?.id ?? '');
+  const scenarios = useMemo(() => getGameplayScenarios(), []);
+  const [selectedID, setSelectedID] = useState(scenarios[0]?.id ?? '');
   const scenario = useMemo(
-    () => gameplayScenarios.find((candidate) => candidate.id === selectedID) ?? gameplayScenarios[0],
-    [selectedID],
+    () => scenarios.find((candidate) => candidate.id === selectedID) ?? scenarios[0],
+    [scenarios, selectedID],
   );
 
   if (scenario === undefined) return null;
@@ -24,7 +25,7 @@ export function GameplayScenarioGallery({ onBack }: { onBack: () => void }) {
 
     <Panel>
       <View style={styles.scenarioButtons}>
-        {gameplayScenarios.map((candidate) => <ActionButton
+        {scenarios.map((candidate) => <ActionButton
           compact
           key={candidate.id}
           title={candidate.title}
