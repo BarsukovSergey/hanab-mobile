@@ -18,6 +18,7 @@ export type GameplayInteractionAction =
   | { type: 'clear-clue-preview' }
   | { type: 'open-note'; order: number | null }
   | { type: 'hold-empathy'; playerIndex: number | null }
+  | { type: 'cancel-transient' }
   | { type: 'sync-hands'; ownOrders: readonly number[]; clueTargets: readonly number[]; visibleOrders: readonly number[] };
 
 export const initialGameplayInteractionState: GameplayInteractionState = {
@@ -38,12 +39,14 @@ export function gameplayInteractionReducer(
         ...state,
         selectedCard: action.order,
         noteCard: action.order ?? state.noteCard,
+        empathyPlayer: null,
       };
     case 'select-clue-target':
       return {
         ...state,
         clueTarget: action.playerIndex,
         cluePreview: action.playerIndex === state.clueTarget ? state.cluePreview : null,
+        empathyPlayer: null,
       };
     case 'preview-clue':
       return state.clueTarget === null
@@ -51,21 +54,29 @@ export function gameplayInteractionReducer(
         : {
           ...state,
           cluePreview: { type: action.clueType, value: action.value },
+          empathyPlayer: null,
         };
     case 'clear-clue-preview':
       return {
         ...state,
         cluePreview: null,
+        empathyPlayer: null,
       };
     case 'open-note':
       return {
         ...state,
         noteCard: action.order,
+        empathyPlayer: null,
       };
     case 'hold-empathy':
       return {
         ...state,
         empathyPlayer: action.playerIndex,
+      };
+    case 'cancel-transient':
+      return {
+        ...state,
+        empathyPlayer: null,
       };
     case 'sync-hands': {
       const selectedCard = state.selectedCard !== null && action.ownOrders.includes(state.selectedCard)
