@@ -13,12 +13,14 @@ describe('getGameplayLayout', () => {
 
     expect(layout.orientation).toBe('portrait');
     expect(layout.opponentColumns).toBe(1);
-    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.handContentWidth + 0.5);
-    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.handContentWidth + 0.5);
+    expect(layout.ownLaneWidth).toBe(layout.contentWidth);
+    expect(layout.opponentLaneWidth).toBe(layout.contentWidth);
+    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
+    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
     expect(layout.ownCardHeight).toBeGreaterThan(layout.opponentCardHeight);
   });
 
-  test('uses two opponent columns in landscape phone geometry', () => {
+  test('uses separate lanes and two opponent columns in landscape phone geometry', () => {
     const layout = getGameplayLayout({
       viewportWidth: 844,
       viewportHeight: 390,
@@ -28,6 +30,8 @@ describe('getGameplayLayout', () => {
 
     expect(layout.orientation).toBe('landscape');
     expect(layout.opponentColumns).toBe(2);
+    expect(layout.ownLaneWidth).toBeLessThan(layout.opponentLaneWidth);
+    expect(layout.ownLaneWidth + layout.opponentLaneWidth).toBeLessThan(layout.contentWidth);
   });
 
   test('shrinks rather than overflowing when an extra card modifier produces six cards', () => {
@@ -45,7 +49,7 @@ describe('getGameplayLayout', () => {
     });
 
     expect(extraCard.ownCardHeight).toBeLessThan(normal.ownCardHeight);
-    expect(getHandRowWidth(extraCard.ownCardHeight, 6, extraCard.cardGap)).toBeLessThanOrEqual(extraCard.handContentWidth + 0.5);
+    expect(getHandRowWidth(extraCard.ownCardHeight, 6, extraCard.cardGap)).toBeLessThanOrEqual(extraCard.ownLaneWidth + 0.5);
   });
 
   test('flags a shared vertical-scroll fallback for very dense small-screen tables', () => {
