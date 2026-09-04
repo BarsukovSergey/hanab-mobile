@@ -31,6 +31,8 @@ Opponent-note acceptance family:
 - `note-survives-turn`: the note survives an authoritative turn advance while the card remains in hand.
 - `note-card-left-hand`: the noted card is discarded and replaced; stored note knowledge may remain by card order, but the live editor must stop targeting the card immediately.
 
+Empathy reuses authoritative clue snapshots rather than duplicating the deal. `clue-committed` gives a deterministic opponent card whose open identity differs from the owner-perspective knowledge shown during empathy.
+
 ## Clue-flow acceptance contract
 
 The clue family intentionally separates transient interaction from authoritative lifecycle:
@@ -54,10 +56,21 @@ Live note editing follows hand membership, not generic card visibility:
 5. discard/play/hole visibility does not make a card live-note-editable again;
 6. `LobbyRuntime.editNote()` remains the command boundary and rejects cards that are no longer in a live hand.
 
-These invariants are executable in `gameplayScenarios.test.ts` and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
+## Empathy acceptance contract
+
+Empathy is a momentary gesture overlay, never durable gameplay state:
+
+1. holding an opponent card sets only `empathyPlayer` and does not alter authoritative game state;
+2. the held hand renders upstream owner-perspective knowledge rather than the opponent's normally open identities;
+3. entering or leaving empathy does not change hand/layout geometry;
+4. release clears empathy immediately;
+5. card selection, clue targeting, note editing, and explicit transient cancellation clear empathy;
+6. every authoritative hand sync also clears empathy, even if the same player remains a valid clue target, so an unmounted or moved Pressable cannot leave a sticky hold behind.
+
+These invariants are executable in `gameplayScenarios.test.ts`, `gameplayInteraction.test.ts`, and `liveNoteOrders.test.ts`; prose here documents why the snapshots exist.
 
 ## Expansion order
 
-Add scenarios when they close a real gameplay risk, not just to increase fixture count. High-value next cases are empathy hold/release, extra-card hands, many-suit fireworks, discard viewer, reconnect/restored state, rotation lifecycle, and finished/replay states.
+Add scenarios when they close a real gameplay risk, not just to increase fixture count. High-value next cases are extra-card hands, many-suit fireworks, discard viewer, reconnect/restored state, rotation lifecycle, and finished/replay states.
 
 For each scenario, prefer executable assertions over prose whenever the invariant can be expressed deterministically.
