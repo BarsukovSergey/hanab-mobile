@@ -66,6 +66,18 @@ describe('gameplayInteractionReducer', () => {
     expect(synced.empathyPlayer).toBeNull();
   });
 
+  test('drops every UI-only interaction across orientation/background lifecycle boundaries', () => {
+    const active = {
+      selectedCard: 11,
+      clueTarget: 2,
+      cluePreview: { type: 'color' as const, value: 0 },
+      empathyPlayer: 1,
+      noteCard: 20,
+    };
+    expect(gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' }))
+      .toEqual(initialGameplayInteractionState);
+  });
+
   test('drops stale interaction references without silently selecting replacements', () => {
     const stale = {
       selectedCard: 99,
