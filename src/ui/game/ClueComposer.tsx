@@ -32,7 +32,8 @@ export function ClueComposer({
     : previewState.type === 'color'
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
-  const validPreview = isCluePreviewConfirmable(preview);
+  const allowEmptyClues = choices?.allowEmptyClues ?? false;
+  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues);
 
   if (targetName === null) {
     return <View style={[
@@ -79,7 +80,9 @@ export function ClueComposer({
           {preview === null
             ? 'Invalid clue preview'
             : preview.touchedOrders.length === 0
-              ? 'No cards touched — this clue cannot be given'
+              ? allowEmptyClues
+                ? 'No cards touched — Empty Clues allows this clue'
+                : 'No cards touched — enable Empty Clues to give this clue'
               : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
         </Text>
       </View>
