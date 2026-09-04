@@ -32,7 +32,7 @@ describe('gameplayInteractionReducer', () => {
     expect(released.empathyPlayer).toBeNull();
   });
 
-  test('syncs stale references to authoritative visible hands', () => {
+  test('drops stale interaction references without silently selecting replacements', () => {
     const stale = {
       selectedCard: 99,
       clueTarget: 4,
@@ -48,11 +48,27 @@ describe('gameplayInteractionReducer', () => {
     });
 
     expect(synced).toEqual({
-      selectedCard: 12,
-      clueTarget: 1,
+      selectedCard: null,
+      clueTarget: null,
       cluePreview: null,
       empathyPlayer: null,
-      noteCard: 12,
+      noteCard: null,
     });
+  });
+
+  test('preserves still-valid explicit selections through authoritative updates', () => {
+    const selected = {
+      selectedCard: 11,
+      clueTarget: 2,
+      cluePreview: { type: 'color' as const, value: 0 },
+      empathyPlayer: null,
+      noteCard: 20,
+    };
+    expect(gameplayInteractionReducer(selected, {
+      type: 'sync-hands',
+      ownOrders: [10, 11, 12],
+      clueTargets: [1, 2],
+      visibleOrders: [10, 11, 12, 20, 21],
+    })).toEqual(selected);
   });
 });
