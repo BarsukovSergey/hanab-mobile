@@ -1,13 +1,16 @@
+import { memo } from 'react';
 import { Svg, Path, SvgXml } from 'react-native-svg';
 
 import { getUpstreamCardKey, getUpstreamCardSvg, UPSTREAM_CARD_HEIGHT, UPSTREAM_CARD_WIDTH } from '../../game/selectors/upstreamCardAssets';
 import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
 
-export function UpstreamCardFace({ rank, suitIndex, variantName }: {
+type UpstreamCardFaceProps = {
   rank: number | null;
   suitIndex: number | null;
   variantName: string;
-}) {
+};
+
+export const UpstreamCardFace = memo(function UpstreamCardFace({ rank, suitIndex, variantName }: UpstreamCardFaceProps) {
   const suits = getCardSuitVisuals(variantName);
   const suitName = suitIndex === null ? null : suits[suitIndex]?.name ?? null;
   const cardKey = getUpstreamCardKey(suitName, rank);
@@ -15,7 +18,7 @@ export function UpstreamCardFace({ rank, suitIndex, variantName }: {
 
   if (svg === null) return <MissingUpstreamCard />;
   return <SvgXml height="100%" width="100%" xml={svg} />;
-}
+});
 
 function MissingUpstreamCard() {
   const padding = 4;
