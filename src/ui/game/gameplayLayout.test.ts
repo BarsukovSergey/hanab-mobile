@@ -38,6 +38,20 @@ describe('getGameplayLayout', () => {
     expect(layout.opponentCardHeight).toBeLessThanOrEqual(60);
   });
 
+  test('never over-allocates the two landscape lanes on a narrow phone', () => {
+    const layout = getGameplayLayout({
+      viewportWidth: 480,
+      viewportHeight: 320,
+      handSizes: [5, 5, 5],
+      ourPlayerIndex: 0,
+    });
+
+    expect(layout.orientation).toBe('landscape');
+    expect(layout.ownLaneWidth + layout.opponentLaneWidth + 10).toBeLessThanOrEqual(layout.contentWidth + 0.5);
+    expect(getHandRowWidth(layout.ownCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.ownLaneWidth + 0.5);
+    expect(getHandRowWidth(layout.opponentCardHeight, 5, layout.cardGap)).toBeLessThanOrEqual(layout.opponentLaneWidth + 0.5);
+  });
+
   test('keeps two opponent hands stacked instead of squeezing them side-by-side', () => {
     const layout = getGameplayLayout({
       viewportWidth: 780,
