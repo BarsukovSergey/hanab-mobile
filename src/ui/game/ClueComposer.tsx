@@ -9,6 +9,7 @@ export function ClueComposer({
   targetName,
   choices,
   enabled,
+  confirmEnabled,
   previewState,
   preview,
   onPreview,
@@ -18,6 +19,7 @@ export function ClueComposer({
   targetName: string | null;
   choices: GameplayClueChoices | null;
   enabled: boolean;
+  confirmEnabled?: boolean;
   previewState: GameplayCluePreviewState;
   preview: CluePreview | null;
   onPreview: (type: 'color' | 'rank', value: number) => void;
@@ -34,6 +36,7 @@ export function ClueComposer({
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
   const allowEmptyClues = choices?.allowEmptyClues ?? false;
   const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues);
+  const confirmAllowed = confirmEnabled ?? enabled;
 
   if (targetName === null) {
     return <View style={[
@@ -86,7 +89,7 @@ export function ClueComposer({
               : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
         </Text>
       </View>
-      <ActionButton disabled={!enabled || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
+      <ActionButton disabled={!confirmAllowed || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
     </View>}
   </View>;
 }
