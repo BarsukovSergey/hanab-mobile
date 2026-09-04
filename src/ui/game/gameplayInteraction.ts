@@ -19,6 +19,7 @@ export type GameplayInteractionAction =
   | { type: 'open-note'; order: number | null }
   | { type: 'hold-empathy'; playerIndex: number | null }
   | { type: 'cancel-transient' }
+  | { type: 'reset-lifecycle-transients' }
   | { type: 'sync-hands'; ownOrders: readonly number[]; clueTargets: readonly number[]; visibleOrders: readonly number[] };
 
 export const initialGameplayInteractionState: GameplayInteractionState = {
@@ -82,6 +83,8 @@ export function gameplayInteractionReducer(
         ...state,
         empathyPlayer: null,
       };
+    case 'reset-lifecycle-transients':
+      return initialGameplayInteractionState;
     case 'sync-hands': {
       const selectedCard = state.selectedCard !== null && action.ownOrders.includes(state.selectedCard)
         ? state.selectedCard
