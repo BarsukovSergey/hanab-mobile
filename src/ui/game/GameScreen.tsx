@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
@@ -16,6 +16,11 @@ import {
   useHanabTheme, useResponsiveLayout,
 } from '../designSystem';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
+import {
+  gameplayInteractionReducer,
+  initialGameplayInteractionState,
+} from './gameplayInteraction';
+import { getGameplayLayout } from './gameplayLayout';
 import { getDisplayedHandOrders } from './gamePresentation';
 
 const END: Record<number, string> = {
@@ -29,7 +34,7 @@ type NoteEntry = { name: string; text: string; isSpectator: boolean };
 
 export function GameScreen() {
   const { theme } = useHanabTheme();
-  const { wide } = useResponsiveLayout();
+  const { wide, width, height } = useResponsiveLayout();
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
   const roomState = useAppSelector((state) => state.room);
@@ -43,28 +48,13 @@ export function GameScreen() {
   const displayedOurHand = useMemo(() => getDisplayedHandOrders(ourHand), [ourHand]);
   const clueTargets = useMemo(() => playerRoom?.clientState.metadata.playerNames
     .map((_, i) => i).filter((i) => i !== ourIndex) ?? [], [ourIndex, playerRoom]);
-  const [selectedCard, setSelectedCard] = useState<number | null>(null);
-  const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
-  const [noteCard, setNoteCard] = useState<number | null>(null);
+  const [interaction, interactionDispatch] = useReducer(gameplayInteractionReducer, initialGameplayInteractionState);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [note, setNote] = useState('');
   const [clockNow, setClockNow] = useState(Date.now());
-
-  useEffect(() => {
-    if (ourHand.length === 0) {
-      setSelectedCard(null);
-      return;
-    }
-    if (selectedCard === null || !ourHand.some((order) => order === selectedCard)) {
-      setSelectedCard(ourHand[ourHand.length - 1] ?? null);
-    }
-  }, [ourHand, selectedCard]);
-
-  useEffect(() => {
-    if (selectedTarget === null || !clueTargets.includes(selectedTarget)) {
-      setSelectedTarget(clueTargets[0] ?? null);
-    }
-  }, [clueTargets, selectedTarget]);
+  const selectedCard = interaction.selectedCard;
+  const selectedTarget = interaction.clueTarget;
+  const noteCard = interaction.noteCard;
 
   const visibleOrders = useMemo(() => game === null ? [] : [
     ...game.hands.flatMap((hand) => hand),
@@ -73,17 +63,20 @@ export function GameScreen() {
     ...game.hole,
   ], [game]);
   useEffect(() => {
-    if (visibleOrders.length === 0) {
-      setNoteCard(null);
-      return;
-    }
-    if (noteCard !== null && visibleOrders.some((order) => order === noteCard)) return;
-    if (selectedCard !== null && visibleOrders.some((order) => order === selectedCard)) {
-      setNoteCard(selectedCard);
-      return;
-    }
-    setNoteCard(visibleOrders[0] ?? null);
-  }, [noteCard, selectedCard, visibleOrders]);
+    interactionDispatch({
+      type: 'sync-hands',
+      ownOrders: ourHand,
+      clueTargets,
+      visibleOrders,
+    });
+  }, [clueTargets, ourHand, visibleOrders]);
+
+  const gameplayLayout = useMemo(() => getGameplayLayout({
+    viewportWidth: width,
+    viewportHeight: height,
+    handSizes: game?.hands.map((hand) => hand.length) ?? [],
+    ourPlayerIndex: ourIndex,
+  }), [game, height, ourIndex, width]);
 
   const authoritativeNote = noteCard === null ? '' : clientState?.notes.ourNotes[noteCard]?.text ?? '';
   useEffect(() => setNote(authoritativeNote), [authoritativeNote, noteCard]);
@@ -147,7 +140,10 @@ export function GameScreen() {
     const canQuick = sessionPhase === 'ready' && isQuickRematchEligible(clientState, roomState.pendingRestartTableID);
     const canRemake = sessionPhase === 'ready' && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID);
     const selectedReplayNotes = noteCard === null ? [] : clientState.notes.allNotes[noteCard]?.filter((entry) => entry.text.trim().length > 0) ?? [];
-    const openReplayNote = (order: number) => { setNoteCard(order); setNoteEditorOpen(true); };
+    const openReplayNote = (order: number) => {
+      interactionDispatch({ type: 'open-note', order });
+      setNoteEditorOpen(true);
+    };
     const selectedReplayLabel = noteCard === null
       ? 'Card notes'
       : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
@@ -187,7 +183,7 @@ export function GameScreen() {
     return <>
       <View style={[styles.screen, wide && styles.wide]}>{summary}{replayView}</View>
       <Modal animationType="fade" onRequestClose={() => setNoteEditorOpen(false)} statusBarTranslucent transparent visible={noteEditorOpen}>
-        <View style={styles.modalBackdrop}><View style={[styles.noteModal, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+        <View style={styles.modalBackdrop}><View style={[styles.noteModal, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}> 
           <Panel><SectionHeading title="Card notes" detail={selectedReplayLabel} />
             {selectedReplayNotes.length === 0 ? <Text style={[styles.muted, { color: theme.colors.textMuted }]}>No notes on this card.</Text>
               : selectedReplayNotes.map((entry, i) => <NoteReadout entry={entry} key={`${entry.name}-${i}`} />)}
@@ -213,7 +209,10 @@ export function GameScreen() {
   const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
   const clock = (i: number) => liveRoom.clock === null ? null : getDisplayedClockString(liveRoom.clock, i, clientState.pause.active, clockNow);
   const pauseLabel = clientState.pause.active ? 'Unpause' : isOurTurn ? 'Pause' : clientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
-  const openNote = (order: number) => { setNoteCard(order); if (!wide) setNoteEditorOpen(true); };
+  const openNote = (order: number) => {
+    interactionDispatch({ type: 'open-note', order });
+    if (!wide) setNoteEditorOpen(true);
+  };
   const saveNote = () => { if (noteCard !== null && lobbyRuntime.editNote(noteCard, note) && !wide) setNoteEditorOpen(false); };
   const clearNote = () => { if (noteCard !== null && lobbyRuntime.editNote(noteCard, '')) setNote(''); };
 
@@ -246,10 +245,10 @@ export function GameScreen() {
     </Panel>
     <TablePanel game={game} hasNote={hasCardNote} onOpenNote={openNote} variantName={metadata.options.variantName} title="Table" />
     {pendingText !== null && <Notice>{pendingText}… awaiting server</Notice>}
-    {playerRoom !== null && <Panel><View style={styles.between}><SectionHeading title="Your hand" detail="Desktop order. Tap to select; long-press for notes." />
+    {playerRoom !== null && <Panel><View style={styles.between}><SectionHeading title="Your hand" detail="Fits the viewport. Tap to select; long-press for notes." />
       <View style={styles.buttons}>{timed && clock(metadata.ourPlayerIndex) !== null && <Text style={[styles.clock, { color: theme.colors.text }]}>{clock(metadata.ourPlayerIndex)}</Text>}
         <Pill>{presence(liveRoom.connected?.[metadata.ourPlayerIndex], Object.values(lobbyUsers).find((user) => user?.name === metadata.playerNames[metadata.ourPlayerIndex])?.inactive ?? false)}</Pill></View></View>
-      <ScrollView horizontal contentContainerStyle={styles.hand} showsHorizontalScrollIndicator={false}>
+      <View style={[styles.hand, { gap: gameplayLayout.cardGap }]}>
         {displayedOurHand.map((order, position) => {
           const card = game.deck[order];
           if (card === undefined) return <Text key={order}>Card unavailable</Text>;
@@ -259,11 +258,11 @@ export function GameScreen() {
             clientState.notes.ourNotes[order],
             clientState.finished,
           )} position={position}
-            hasNote={hasCardNote(order)} selected={selectedCard === order} variantName={metadata.options.variantName}
-            onLongPress={() => openNote(order)} onSelect={() => { setSelectedCard(order); setNoteCard(order); }} />;
+            hasNote={hasCardNote(order)} height={gameplayLayout.ownCardHeight} selected={selectedCard === order} variantName={metadata.options.variantName}
+            onLongPress={() => openNote(order)} onSelect={() => interactionDispatch({ type: 'select-card', order })} />;
         })}
-      </ScrollView>
-      <View style={[styles.action, { backgroundColor: theme.colors.surfaceMuted }]}><Text style={[styles.panelTitle, { color: theme.colors.text }]}>
+      </View>
+      <View style={[styles.action, { backgroundColor: theme.colors.surfaceMuted }]}><Text style={[styles.panelTitle, { color: theme.colors.text }]}> 
         {selectedCard === null ? 'Select a card' : `Card ${displayedOurHand.findIndex((order) => order === selectedCard) + 1} selected`}</Text>
         {selectedCard !== null && hasCardNote(selectedCard) && <Text style={[styles.notePreview, { color: theme.colors.text }]} numberOfLines={2}>Note: {clientState.notes.ourNotes[selectedCard]?.text ?? ''}</Text>}
         <Text style={[styles.muted, { color: theme.colors.textMuted }]}>{!isOurTurn ? 'Actions unlock on your turn.' : pendingText ?? 'Choose Play or Discard.'}</Text>
@@ -272,17 +271,18 @@ export function GameScreen() {
           <ActionButton disabled={selectedCard === null} title={selectedCard !== null && hasCardNote(selectedCard) ? 'View note' : 'Add note'} onPress={() => { if (selectedCard !== null) openNote(selectedCard); }} /></View>
       </View>
     </Panel>}
-    <Panel><SectionHeading title={playerRoom === null ? 'Players' : 'Other players'} detail="Desktop card order; long-press a card for notes." />
-      <View style={styles.players}>{visiblePlayers.map((i) => {
+    <Panel><SectionHeading title={playerRoom === null ? 'Players' : 'Other players'} detail={gameplayLayout.needsSharedVerticalScroll ? 'Dense table: the game view may scroll vertically, but individual hands do not.' : 'All hands fit without individual horizontal scrolling.'} />
+      <View style={[styles.players, gameplayLayout.opponentColumns === 2 && styles.playersLandscape]}>{visiblePlayers.map((i) => {
         const target = selectedTarget === i;
         const displayedHand = getDisplayedHandOrders(game.hands[i]);
-        return <Pressable key={i} disabled={playerRoom === null} onPress={() => setSelectedTarget(i)}
+        return <Pressable key={i} disabled={playerRoom === null} onPress={() => interactionDispatch({ type: 'select-clue-target', playerIndex: i })}
           accessibilityRole={playerRoom === null ? undefined : 'button'} accessibilityState={playerRoom === null ? undefined : { selected: target }}
-          style={[styles.player, { backgroundColor: theme.colors.surfaceMuted, borderColor: target ? theme.colors.accent : theme.colors.border }, target && styles.target]}>
+          style={[styles.player, gameplayLayout.opponentColumns === 2 && styles.playerLandscape,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: target ? theme.colors.accent : theme.colors.border }, target && styles.target]}>
           <View style={styles.between}><View style={styles.grow}><Text style={[styles.playerName, { color: theme.colors.text }]}>{metadata.playerNames[i]}</Text>
             <Text style={[styles.muted, { color: theme.colors.textMuted }]}>{presence(liveRoom.connected?.[i], Object.values(lobbyUsers).find((user) => user?.name === metadata.playerNames[i])?.inactive ?? false)}</Text></View>
             <View style={styles.buttons}>{timed && clock(i) !== null && <Text style={[styles.clock, { color: theme.colors.text }]}>{clock(i)}</Text>}{target && <Pill active>Clue target</Pill>}</View></View>
-          <ScrollView horizontal contentContainerStyle={styles.hand} nestedScrollEnabled showsHorizontalScrollIndicator={false}>
+          <View style={[styles.hand, { gap: gameplayLayout.cardGap }]}>
             {displayedHand.map((order, position) => {
               const card = game.deck[order];
               const spectatorCanTap = liveRoom.role === 'spectator';
@@ -292,13 +292,13 @@ export function GameScreen() {
                 clientState.notes.ourNotes[order],
                 clientState.finished,
               );
-              return <VisibleHanabiCard key={order} hasNote={hasCardNote(order)} onLongPress={() => openNote(order)}
-                onPress={spectatorCanTap ? () => openNote(order) : () => setSelectedTarget(i)} position={position}
+              return <VisibleHanabiCard key={order} hasNote={hasCardNote(order)} height={gameplayLayout.opponentCardHeight} onLongPress={() => openNote(order)}
+                onPress={spectatorCanTap ? () => openNote(order) : () => interactionDispatch({ type: 'select-clue-target', playerIndex: i })} position={position}
                 rank={card?.rank ?? null} selected={liveRoom.role === 'spectator' && noteCard === order}
                 semanticBorder={knowledge?.borderColor ?? null} suitIndex={card?.suitIndex ?? null}
                 variantName={metadata.options.variantName} />;
             })}
-          </ScrollView>
+          </View>
         </Pressable>;
       })}</View>
     </Panel>
@@ -317,7 +317,7 @@ export function GameScreen() {
   return <>
     <View style={[styles.screen, wide && styles.wide]}>{board}{side}</View>
     {!wide && <Modal animationType="fade" onRequestClose={() => setNoteEditorOpen(false)} statusBarTranslucent transparent visible={noteEditorOpen}>
-      <View style={styles.modalBackdrop}><View style={[styles.noteModal, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+      <View style={styles.modalBackdrop}><View style={[styles.noteModal, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}> 
         {notePanel}<ActionButton title="Close" onPress={() => setNoteEditorOpen(false)} />
       </View></View>
     </Modal>}
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   stacks: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, stackColumn: { alignItems: 'center', gap: 5, minWidth: 62 }, stackName: { fontSize: 10, fontWeight: '800', maxWidth: 86 },
   emptyStack: { alignItems: 'center', aspectRatio: 286 / 406, borderRadius: 7, borderStyle: 'dashed', borderWidth: 2, height: 86, justifyContent: 'center' }, emptyStackText: { fontSize: 22, fontWeight: '900' },
   discardHeader: { alignItems: 'baseline', flexDirection: 'row', gap: 8, justifyContent: 'space-between' }, discardGroups: { gap: 8 }, discardGroup: { gap: 5 }, discardCards: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  hand: { alignItems: 'flex-start', flexDirection: 'row', gap: 7, paddingBottom: 2, paddingRight: 2 }, action: { borderRadius: 12, gap: 7, padding: 11 }, players: { gap: 9 }, player: { borderRadius: 12, borderWidth: 1, gap: 10, padding: 10 }, target: { borderWidth: 2, padding: 9 }, playerName: { fontSize: 15, fontWeight: '900' },
+  hand: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'center', minWidth: 0, width: '100%' }, action: { borderRadius: 12, gap: 7, padding: 11 }, players: { gap: 9 }, playersLandscape: { flexDirection: 'row', flexWrap: 'wrap' }, player: { borderRadius: 12, borderWidth: 1, gap: 10, minWidth: 0, padding: 10 }, playerLandscape: { flexBasis: '48%', flexGrow: 1 }, target: { borderWidth: 2, padding: 9 }, playerName: { fontSize: 15, fontWeight: '900' },
   clock: { fontVariant: ['tabular-nums'], fontSize: 14, fontWeight: '900' }, note: { minHeight: 92, textAlignVertical: 'top' }, notePreview: { fontSize: 13, fontWeight: '700', lineHeight: 18 }, noteReaders: { gap: 8 }, noteEntry: { gap: 2 }, noteAuthor: { fontSize: 12, fontWeight: '900' },
   modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.58)', flex: 1, justifyContent: 'center', padding: 18 }, noteModal: { borderRadius: 16, borderWidth: 1, gap: 10, maxHeight: '88%', maxWidth: 620, padding: 12, width: '100%' },
   log: { gap: 6 }, replayCard: { gap: 5, width: 92 }, replayNote: { borderBottomWidth: StyleSheet.hairlineWidth, gap: 5, paddingBottom: 8 },
