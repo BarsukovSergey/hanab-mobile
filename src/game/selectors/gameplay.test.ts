@@ -5,6 +5,7 @@ import {
   getDisplayedClueTokens,
   getGameTableSuits,
   getGameplayClueChoices,
+  getGameplayClueChoicesForPlayerIndex,
   hasClueTokenForVariant,
   getDisplayedClockTime,
 } from './gameplay';
@@ -24,6 +25,16 @@ describe('getGameTableSuits', () => {
       { value: 1, label: 'Odd' }, { value: 2, label: 'Even' },
     ]);
     expect(getGameplayClueChoices('No Variant', 'Quacker').colors[0]?.label).toBe('Quack');
+  });
+
+  it('uses the actual clue giver character when presenting an authoritative clue', () => {
+    const metadata = {
+      options: { variantName: 'No Variant' },
+      ourPlayerIndex: 0,
+      characterAssignments: [null, 34],
+    } as unknown as Parameters<typeof getGameplayClueChoicesForPlayerIndex>[0];
+    expect(getGameplayClueChoicesForPlayerIndex(metadata, 1).colors[0]?.label).toBe('Quack');
+    expect(getGameplayClueChoicesForPlayerIndex(metadata, 0).colors[0]?.label).toBe('Red');
   });
 
   it('exposes exact variant clue fills without leaking upstream imports into UI', () => {
