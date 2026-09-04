@@ -282,7 +282,7 @@ function AppContent() {
           <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in to play</Text>
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
         </View>
-        {statusMessage.length > 0 && <Notice tone={lobbyNotice?.kind === 'error' ? 'error' : 'neutral'}>{statusMessage}</Notice>}
+        {statusMessage.length > 0 && <Notice tone="error">{statusMessage}</Notice>}
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
         <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
