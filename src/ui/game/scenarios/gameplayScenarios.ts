@@ -28,7 +28,7 @@ export type GameplayScenario = {
   readonly store: AppStore;
   readonly expectedInteraction: GameplayInteractionState;
   readonly expectedCurrentPlayerIndex: number;
-  readonly family: 'base' | 'clue-flow' | 'note-flow' | 'responsive';
+  readonly family: 'base' | 'clue-flow' | 'note-flow' | 'responsive' | 'table-surface';
 };
 
 type ScenarioSpec = {
@@ -139,9 +139,7 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
       family: 'note-flow',
       expectedCurrentPlayerIndex: 1,
       acceptedNote: { order: BOB_RED_ORDER, text: NOTE_TEXT },
-      incrementalActions: [
-        colorClueToCathy(0),
-      ],
+      incrementalActions: [colorClueToCathy(0)],
     }),
     buildScenario({
       id: 'note-card-left-hand',
@@ -189,6 +187,17 @@ export function getGameplayScenarios(): readonly GameplayScenario[] {
       family: 'responsive',
       optionOverrides: { oneExtraCard: true },
     }),
+    buildScenario({
+      id: 'rainbow-table-surface',
+      title: 'Rainbow 6 suits · table',
+      description: 'Six-suit table surface with an authoritative Rainbow 1 firework and a Red 1 discard, exercising real card faces, empty suit pips, compact discard summary, and discard viewer source.',
+      numPlayers: 3,
+      viewport: NARROW_PORTRAIT_PHONE,
+      family: 'table-surface',
+      expectedCurrentPlayerIndex: 2,
+      optionOverrides: { variantName: 'Rainbow (6 Suits)' },
+      history: makeRainbowTableSurfaceHistory(),
+    }),
   ];
   return cachedScenarios;
 }
@@ -201,14 +210,12 @@ export function getNoteFlowScenarios(): readonly GameplayScenario[] {
   return getGameplayScenarios().filter((scenario) => scenario.family === 'note-flow');
 }
 
-export const clueFlowFixtureOrders = {
-  bobRed: BOB_RED_ORDER,
-} as const;
+export function getTableSurfaceScenarios(): readonly GameplayScenario[] {
+  return getGameplayScenarios().filter((scenario) => scenario.family === 'table-surface');
+}
 
-export const noteFlowFixture = {
-  opponentOrder: BOB_RED_ORDER,
-  text: NOTE_TEXT,
-} as const;
+export const clueFlowFixtureOrders = { bobRed: BOB_RED_ORDER } as const;
+export const noteFlowFixture = { opponentOrder: BOB_RED_ORDER, text: NOTE_TEXT } as const;
 
 function buildScenario(spec: ScenarioSpec): GameplayScenario {
   const store = createAppStore();
@@ -224,10 +231,7 @@ function buildScenario(spec: ScenarioSpec): GameplayScenario {
     welcome: { userID: 1, username: playerNames[0] ?? 'Alice', totalGames: 0, playingAtTables: [] },
   }));
   store.dispatch(roomActions.joinRequested({ epoch: connectionEpoch, tableID }));
-  store.dispatch(roomActions.tableStartReceived({
-    epoch: connectionEpoch,
-    tableStart: { tableID, replay: false },
-  }));
+  store.dispatch(roomActions.tableStartReceived({ epoch: connectionEpoch, tableStart: { tableID, replay: false } }));
 
   const coordinator = new GameBootstrapCoordinator(store, () => true);
   const gameLoadEpoch = coordinator.startFromAuthoritativeRoom(connectionEpoch);
@@ -261,11 +265,7 @@ function buildScenario(spec: ScenarioSpec): GameplayScenario {
   if (!historyAccepted) throw new Error(`Scenario ${spec.id} history was rejected.`);
 
   if (spec.acceptedNote !== undefined) {
-    const parsed = noteCommandSchema.parse({
-      tableID,
-      order: spec.acceptedNote.order,
-      note: spec.acceptedNote.text,
-    });
+    const parsed = noteCommandSchema.parse({ tableID, order: spec.acceptedNote.order, note: spec.acceptedNote.text });
     store.dispatch(roomActions.noteActionAccepted({
       connectionEpoch,
       tableID,
@@ -309,14 +309,7 @@ function makeCommittedClueHistory(): readonly unknown[] {
 function makeRetouchedQuackerHistory(): readonly unknown[] {
   return [
     ...makeCommittedClueHistory(),
-    {
-      type: 'clue',
-      clue: { type: 1, value: 1 },
-      giver: 1,
-      list: [10],
-      target: 2,
-      turn: 1,
-    },
+    { type: 'clue', clue: { type: 1, value: 1 }, giver: 1, list: [10], target: 2, turn: 1 },
     { type: 'turn', num: 2, currentPlayerIndex: 2 },
     redClueToBob(2, 2),
     { type: 'turn', num: 3, currentPlayerIndex: 0 },
@@ -326,45 +319,29 @@ function makeRetouchedQuackerHistory(): readonly unknown[] {
 function makeClueCleanupHistory(): readonly unknown[] {
   return [
     ...makeRetouchedQuackerHistory(),
-    {
-      type: 'discard',
-      playerIndex: 0,
-      order: 0,
-      suitIndex: 0,
-      rank: 1,
-      failed: false,
-    },
-    {
-      type: 'draw',
-      playerIndex: 0,
-      order: 15,
-      suitIndex: -1,
-      rank: -1,
-    },
+    { type: 'discard', playerIndex: 0, order: 0, suitIndex: 0, rank: 1, failed: false },
+    { type: 'draw', playerIndex: 0, order: 15, suitIndex: -1, rank: -1 },
     { type: 'turn', num: 4, currentPlayerIndex: 1 },
   ];
 }
 
+function makeRainbowTableSurfaceHistory(): readonly unknown[] {
+  return [
+    ...makeDeal(3, 5),
+    { type: 'turn', num: 0, currentPlayerIndex: 0 },
+    { type: 'play', playerIndex: 0, order: 0, suitIndex: 5, rank: 1 },
+    { type: 'draw', playerIndex: 0, order: 15, suitIndex: -1, rank: -1 },
+    { type: 'discard', playerIndex: 1, order: 5, suitIndex: 0, rank: 1, failed: false },
+    { type: 'draw', playerIndex: 1, order: 16, suitIndex: 1, rank: 2 },
+  ];
+}
+
 function redClueToBob(giver: number, turn: number) {
-  return {
-    type: 'clue' as const,
-    clue: { type: 0 as const, value: 0 },
-    giver,
-    list: [BOB_RED_ORDER],
-    target: 1,
-    turn,
-  };
+  return { type: 'clue' as const, clue: { type: 0 as const, value: 0 }, giver, list: [BOB_RED_ORDER], target: 1, turn };
 }
 
 function colorClueToCathy(turn: number) {
-  return {
-    type: 'clue' as const,
-    clue: { type: 0 as const, value: 1 },
-    giver: 0,
-    list: [10],
-    target: 2,
-    turn,
-  };
+  return { type: 'clue' as const, clue: { type: 0 as const, value: 1 }, giver: 0, list: [10], target: 2, turn };
 }
 
 function makeDeal(numPlayers: number, handSize: number) {
@@ -374,13 +351,7 @@ function makeDeal(numPlayers: number, handSize: number) {
       const cardOrder = order;
       order += 1;
       if (playerIndex === 0) {
-        return {
-          type: 'draw' as const,
-          playerIndex,
-          order: cardOrder,
-          suitIndex: -1,
-          rank: -1,
-        };
+        return { type: 'draw' as const, playerIndex, order: cardOrder, suitIndex: -1, rank: -1 };
       }
       return {
         type: 'draw' as const,
