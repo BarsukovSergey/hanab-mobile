@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Svg, Path, SvgXml } from 'react-native-svg';
+import { Path, Svg, SvgAst, parse, type JsxAST } from 'react-native-svg';
 
 import { getUpstreamCardKey, getUpstreamCardSvg, UPSTREAM_CARD_HEIGHT, UPSTREAM_CARD_WIDTH } from '../../game/selectors/upstreamCardAssets';
 import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
@@ -10,14 +10,35 @@ type UpstreamCardFaceProps = {
   variantName: string;
 };
 
+const parsedCardCache = new Map<string, JsxAST | null>();
+const CARD_AST_OVERRIDE = { height: '100%', width: '100%' } as const;
+
 export const UpstreamCardFace = memo(function UpstreamCardFace({ rank, suitIndex, variantName }: UpstreamCardFaceProps) {
   const suits = getCardSuitVisuals(variantName);
   const suitName = suitIndex === null ? null : suits[suitIndex]?.name ?? null;
   const cardKey = getUpstreamCardKey(suitName, rank);
-  const svg = getUpstreamCardSvg(variantName, cardKey);
+  const cacheKey = `${variantName}\u0000${cardKey}`;
+  const cached = parsedCardCache.get(cacheKey);
+  if (cached !== undefined) {
+    return cached === null ? <MissingUpstreamCard /> : <SvgAst ast={cached} override={CARD_AST_OVERRIDE} />;
+  }
 
-  if (svg === null) return <MissingUpstreamCard />;
-  return <SvgXml height="100%" width="100%" xml={svg} />;
+  const svg = getUpstreamCardSvg(variantName, cardKey);
+  if (svg === null) {
+    parsedCardCache.set(cacheKey, null);
+    return <MissingUpstreamCard />;
+  }
+
+  try {
+    const ast = parse(svg);
+    parsedCardCache.set(cacheKey, ast);
+    return ast === null ? <MissingUpstreamCard /> : <SvgAst ast={ast} override={CARD_AST_OVERRIDE} />;
+  } catch {
+    // Generated assets are validated in CI, but fail closed to the existing placeholder if a
+    // malformed asset ever reaches a device rather than crashing the gameplay tree.
+    parsedCardCache.set(cacheKey, null);
+    return <MissingUpstreamCard />;
+  }
 });
 
 function MissingUpstreamCard() {
