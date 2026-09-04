@@ -13,7 +13,6 @@ import {
   type LiveClock,
 } from '../../game/selectors/gameplay';
 import { getLastCluePresentation } from '../../game/selectors/lastClue';
-import { noteCommandSchema } from '../../protocol/gameProtocol';
 import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -24,7 +23,7 @@ import { CompactTable } from './CompactTable';
 import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
-import { getCommittedClueMarker } from './clueIndication';
+import { getCommittedClueMarkerForMetadata } from './clueIndication';
 import { beginNoteEdit } from './noteEditing';
 import {
   gameplayInteractionReducer,
@@ -216,24 +215,7 @@ export function GameScreen() {
     interactionDispatch({ type: 'open-note', order });
     setNoteEditorOpen(true);
   };
-  const persistNote = (value: string) => {
-    if (noteCard === null) return false;
-    const parsed = noteCommandSchema.safeParse({
-      tableID: liveRoom.tableID,
-      order: noteCard,
-      note: value,
-    });
-    if (!parsed.success || !visibleOrders.some((order) => order === parsed.data.order)) return false;
-    const sent = lobbyRuntime.send('note', parsed.data);
-    if (!sent) return false;
-    dispatch(roomActions.noteActionAccepted({
-      connectionEpoch: roomState.connectionEpoch,
-      tableID: liveRoom.tableID,
-      gameLoadEpoch: liveRoom.gameLoadEpoch,
-      noteAction: { type: 'editNote', order: parsed.data.order, text: parsed.data.note },
-    }));
-    return true;
-  };
+  const persistNote = (value: string) => noteCard !== null && lobbyRuntime.editNote(noteCard, value);
   const saveNote = (value: string) => {
     if (persistNote(value)) {
       setNote(value);
@@ -297,7 +279,7 @@ export function GameScreen() {
               const card = game.deck[order];
               if (card === undefined) return null;
               return <GameCard
-                clueMarker={getCommittedClueMarker(lastClue, order, card.numPositiveClues, clueChoices)}
+                clueMarker={getCommittedClueMarkerForMetadata(lastClue, order, card.numPositiveClues, metadata)}
                 hasNote={hasCardNote(order)}
                 height={gameplayLayout.ownCardHeight}
                 key={order}
@@ -363,7 +345,7 @@ export function GameScreen() {
                     ? getCardKnowledgeViewModel(metadata.options.variantName, card, cardNote, false, true)
                     : null;
                   return <VisibleHanabiCard
-                    clueMarker={getCommittedClueMarker(lastClue, order, card.numPositiveClues, clueChoices)}
+                    clueMarker={getCommittedClueMarkerForMetadata(lastClue, order, card.numPositiveClues, metadata)}
                     empathyKnowledge={empathyKnowledge}
                     hasNote={hasCardNote(order)}
                     height={gameplayLayout.opponentCardHeight}

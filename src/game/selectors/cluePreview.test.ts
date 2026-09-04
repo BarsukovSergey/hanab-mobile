@@ -53,16 +53,12 @@ describe('isCluePreviewConfirmable', () => {
     touchedOrders: [],
   };
 
-  test('requires at least one touched card for ordinary games', () => {
-    expect(isCluePreviewConfirmable(emptyPreview, false)).toBe(false);
-    expect(isCluePreviewConfirmable({ ...emptyPreview, touchedOrders: [7] }, false)).toBe(true);
-  });
-
-  test('allows zero touched cards when the Empty Clues modifier is enabled', () => {
-    expect(isCluePreviewConfirmable(emptyPreview, true)).toBe(true);
+  test('requires at least one touched card before confirmation', () => {
+    expect(isCluePreviewConfirmable(emptyPreview)).toBe(false);
+    expect(isCluePreviewConfirmable({ ...emptyPreview, touchedOrders: [7] })).toBe(true);
   });
 
   test('never confirms an invalid preview', () => {
-    expect(isCluePreviewConfirmable(null, true)).toBe(false);
+    expect(isCluePreviewConfirmable(null)).toBe(false);
   });
 });

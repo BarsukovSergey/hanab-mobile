@@ -27,13 +27,12 @@ export function ClueComposer({
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
-  const allowEmptyClues = choices?.allowEmptyClues ?? false;
   const previewLabel = previewState === null
     ? null
     : previewState.type === 'color'
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
-  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues);
+  const validPreview = isCluePreviewConfirmable(preview);
 
   if (targetName === null) {
     return <View style={[
@@ -80,9 +79,7 @@ export function ClueComposer({
           {preview === null
             ? 'Invalid clue preview'
             : preview.touchedOrders.length === 0
-              ? allowEmptyClues
-                ? 'Empty clue · 0 cards touched'
-                : 'No cards touched — this clue cannot be given'
+              ? 'No cards touched — this clue cannot be given'
               : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
         </Text>
       </View>

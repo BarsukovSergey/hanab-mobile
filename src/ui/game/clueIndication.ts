@@ -1,4 +1,7 @@
-import type { GameplayClueChoices } from '../../game/selectors/gameplay';
+import {
+  getGameplayClueChoicesForPlayerIndex,
+  type GameplayClueChoices,
+} from '../../game/selectors/gameplay';
 import type { LastCluePresentation } from '../../game/selectors/lastClue';
 
 export type ClueCardMarker = {
@@ -7,6 +10,20 @@ export type ClueCardMarker = {
   label: string;
   retouched: boolean;
 };
+
+type ClueMetadata = Parameters<typeof getGameplayClueChoicesForPlayerIndex>[0];
+
+export function getCommittedClueMarkerForMetadata(
+  clue: LastCluePresentation | null,
+  order: number,
+  numPositiveClues: number,
+  metadata: ClueMetadata,
+): ClueCardMarker | null {
+  const choices = clue === null
+    ? null
+    : getGameplayClueChoicesForPlayerIndex(metadata, clue.giverPlayerIndex);
+  return getCommittedClueMarker(clue, order, numPositiveClues, choices);
+}
 
 export function getCommittedClueMarker(
   clue: LastCluePresentation | null,

@@ -53,6 +53,7 @@ import { sessionActions } from '../store/sessionSlice';
 import { terminationActions } from '../store/terminationSlice';
 import { historyActions } from '../store/historySlice';
 import type { AppStore } from '../store/store';
+import { isEditableLiveNoteOrder } from './notePolicy';
 
 const SOCKET_OPEN = 1;
 const SOCKET_CLOSING = 2;
@@ -732,10 +733,7 @@ export class LobbyRuntime {
     if (!parsed.success) return false;
     const order = parsed.data.order;
     const hands = room.clientState.ongoingGame.hands;
-    const editable = room.role === 'player'
-      ? hands[room.clientState.metadata.ourPlayerIndex]?.includes(order) ?? false
-      : hands.some((hand) => hand.includes(order));
-    if (!editable) return false;
+    if (!isEditableLiveNoteOrder(hands, order)) return false;
 
     let sent = false;
     try {
