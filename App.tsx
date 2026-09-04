@@ -27,6 +27,7 @@ import {
   useResponsiveLayout,
 } from './src/ui/designSystem';
 import { GameScreen } from './src/ui/game/GameScreen';
+import { LastClueNotice } from './src/ui/game/LastClueNotice';
 import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
@@ -239,6 +240,7 @@ function AppContent() {
           </View>
         )}
         <ScrollView contentContainerStyle={[styles.gameContainer, { maxWidth: contentMaxWidth }]} keyboardShouldPersistTaps="handled">
+          <LastClueNotice />
           <GameScreen />
         </ScrollView>
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
