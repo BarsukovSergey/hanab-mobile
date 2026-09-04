@@ -28,8 +28,13 @@ const OWN_MAX_HEIGHT = 112;
 const OPPONENT_MAX_HEIGHT = 76;
 const OWN_MIN_HEIGHT = 68;
 const OPPONENT_MIN_HEIGHT = 46;
-const LANDSCAPE_GUTTER = 10;
-const LANDSCAPE_OWN_FRACTION = 1.35 / 2.35;
+const LANDSCAPE_GUTTER = 8;
+const LANDSCAPE_OPPONENT_COLUMN_GAP = 7;
+const OWN_HAND_HORIZONTAL_PADDING = 18;
+const OPPONENT_HAND_HORIZONTAL_PADDING = 14;
+// Keep enough room for opponent cards on phones. The own hand remains slightly wider and its
+// larger max-height still makes it visually dominant without starving the second lane.
+const LANDSCAPE_OWN_FRACTION = 1.05 / 2.05;
 
 export function getGameplayLayout({
   viewportWidth,
@@ -46,8 +51,6 @@ export function getGameplayLayout({
   const horizontalChrome = landscapePhone ? LANDSCAPE_HORIZONTAL_CHROME : PHONE_HORIZONTAL_CHROME;
   const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - horizontalChrome));
   const landscapeUsableWidth = Math.max(1, contentWidth - LANDSCAPE_GUTTER);
-  // Keep the geometry model in lockstep with GameScreen's 1.35:1 flex split. If these drift,
-  // opponent cards can be sized for a lane that is wider than the lane actually rendered.
   const ownLaneWidth = orientation === 'landscape'
     ? landscapeUsableWidth * LANDSCAPE_OWN_FRACTION
     : contentWidth;
@@ -60,20 +63,21 @@ export function getGameplayLayout({
   const maxOpponentHandSize = Math.max(1, ...opponentHandSizes);
   const opponentColumns: 1 | 2 = orientation === 'landscape' && width >= 760 && opponentHandSizes.length >= 3 ? 2 : 1;
   const opponentColumnWidth = opponentColumns === 2
-    ? (opponentLaneWidth - LANDSCAPE_GUTTER) / 2
+    ? (opponentLaneWidth - LANDSCAPE_OPPONENT_COLUMN_GAP) / 2
     : opponentLaneWidth;
 
-  // Landscape still has enough vertical room for readable cards; avoid turning hands into thumbnails.
   const ownMaxHeight = landscapePhone ? 88 : OWN_MAX_HEIGHT;
   const opponentMaxHeight = landscapePhone ? 60 : OPPONENT_MAX_HEIGHT;
   const ownMinHeight = landscapePhone ? 58 : OWN_MIN_HEIGHT;
   const opponentMinHeight = landscapePhone ? 42 : OPPONENT_MIN_HEIGHT;
+  const ownHandWidth = Math.max(1, ownLaneWidth - OWN_HAND_HORIZONTAL_PADDING);
+  const opponentHandWidth = Math.max(1, opponentColumnWidth - OPPONENT_HAND_HORIZONTAL_PADDING);
 
   const ownCardHeight = ownHandSize === 0
     ? 0
-    : fitCardHeight(ownLaneWidth, ownHandSize, cardGap, ownMinHeight, ownMaxHeight);
+    : fitCardHeight(ownHandWidth, ownHandSize, cardGap, ownMinHeight, ownMaxHeight);
   const opponentCardHeight = fitCardHeight(
-    opponentColumnWidth,
+    opponentHandWidth,
     maxOpponentHandSize,
     cardGap,
     opponentMinHeight,
@@ -123,7 +127,7 @@ function fitCardHeight(
   const gapWidth = Math.max(0, cardCount - 1) * gap;
   const widthPerCard = Math.max(1, (availableWidth - gapWidth) / cardCount);
   const heightFromWidth = widthPerCard / HANABI_CARD_ASPECT_RATIO;
-  return Math.max(Math.min(minHeight, heightFromWidth), Math.min(maxHeight, heightFromWidth));
+  return Math.min(maxHeight, heightFromWidth < minHeight ? heightFromWidth : Math.max(minHeight, heightFromWidth));
 }
 
 function round1(value: number): number {
