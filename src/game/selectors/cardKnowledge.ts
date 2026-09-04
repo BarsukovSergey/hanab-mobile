@@ -1,4 +1,11 @@
+import {
+  PipState,
+  getCardBorderPresentation,
+  getCardIdentityToShow,
+  getCardPipPresentation,
+} from '../client/cardPresentation';
 import { getVariant } from '../upstream/gameData';
+import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { CardState } from '../upstream/interfaces/CardState';
 
 export type KnowledgePipState = 'hidden' | 'visible' | 'eliminated';
@@ -19,6 +26,9 @@ export type RankKnowledgePip = {
 export type CardKnowledgeViewModel = {
   order: number;
   hasClueApplied: boolean;
+  displaySuitIndex: number | null;
+  displayRank: number | null;
+  borderColor: string | null;
   positiveColorLabels: readonly string[];
   positiveRanks: readonly number[];
   possibleSuitLabels: readonly string[];
@@ -29,22 +39,45 @@ export type CardKnowledgeViewModel = {
   rankDetermined: boolean;
 };
 
+const EMPTY_NOTE: CardNote = {
+  possibilities: [],
+  knownTrash: false,
+  needsFix: false,
+  questionMark: false,
+  exclamationMark: false,
+  chopMoved: false,
+  finessed: false,
+  discardPermission: false,
+  blank: false,
+  unclued: false,
+  clued: false,
+  text: '',
+};
+
 export function getCardKnowledgeViewModel(
   variantName: string,
   card: CardState,
+  note: CardNote | undefined = undefined,
+  finished = false,
+  empathy = false,
 ): CardKnowledgeViewModel {
   const variant = getVariant(variantName);
+  const cardNote = note ?? EMPTY_NOTE;
+  const identity = getCardIdentityToShow({
+    cardIdentity: { suitIndex: card.suitIndex, rank: card.rank },
+    state: card,
+    note: cardNote,
+    empathy,
+    isStackBase: false,
+    finished,
+  });
+  const border = getCardBorderPresentation(card, cardNote, finished);
+  const pips = getCardPipPresentation(variant, card, cardNote, empathy);
   const clueSuitIndexes = new Set<number>(
     card.possibleCardsFromClues.map(([suitIndex]) => suitIndex),
   );
   const clueRanks = new Set<number>(
     card.possibleCardsFromClues.map(([, rank]) => rank),
-  );
-  const possibleSuitIndexes = new Set<number>(
-    card.possibleCards.map(([suitIndex]) => suitIndex),
-  );
-  const possibleRanks = new Set<number>(
-    card.possibleCards.map(([, rank]) => rank),
   );
   const positiveColorLabels = card.positiveColorClues.map((color) => (
     variant.clueColors.find((candidate) => candidate.name === color.name)?.name
@@ -55,28 +88,47 @@ export function getCardKnowledgeViewModel(
   return {
     order: card.order,
     hasClueApplied: card.hasClueApplied,
+    displaySuitIndex: identity.suitIndex,
+    displayRank: identity.rank,
+    borderColor: getBorderColor(border),
     positiveColorLabels,
     positiveRanks,
     possibleSuitLabels: variant.suits
       .filter((_, suitIndex) => clueSuitIndexes.has(suitIndex))
       .map((suit) => suit.name),
     possibleRanks: variant.ranks.filter((rank) => clueRanks.has(rank)),
-    suitPips: variant.suits.map((suit, suitIndex) => ({
-      suitIndex,
-      label: suit.name,
-      state: !clueSuitIndexes.has(suitIndex)
-        ? 'hidden'
-        : possibleSuitIndexes.has(suitIndex) ? 'visible' : 'eliminated',
-      positive: card.positiveColorClues.some((color) => color.name === suit.name),
+    suitPips: pips.suitPips.map((pip) => ({
+      suitIndex: pip.suitIndex,
+      label: variant.suits[pip.suitIndex]?.name ?? `Suit ${pip.suitIndex}`,
+      state: pipStateName(pip.state),
+      positive: pip.positive,
     })),
-    rankPips: variant.ranks.map((rank) => ({
-      rank,
-      state: !clueRanks.has(rank)
-        ? 'hidden'
-        : possibleRanks.has(rank) ? 'visible' : 'eliminated',
-      positive: positiveRanks.some((positiveRank) => positiveRank === rank),
+    rankPips: pips.rankPips.map((pip) => ({
+      rank: pip.rank,
+      state: pipStateName(pip.state),
+      positive: pip.positive,
     })),
     suitDetermined: card.suitDetermined,
     rankDetermined: card.rankDetermined,
   };
+}
+
+function pipStateName(state: PipState): KnowledgePipState {
+  switch (state) {
+    case PipState.Eliminated:
+      return 'eliminated';
+    case PipState.Visible:
+      return 'visible';
+    case PipState.Hidden:
+    default:
+      return 'hidden';
+  }
+}
+
+function getBorderColor(border: ReturnType<typeof getCardBorderPresentation>): string | null {
+  if (border.clued) return 'orange';
+  if (border.finessed) return 'aqua';
+  if (border.discardPermission) return '#812020';
+  if (border.chopMoved) return '#fffce6';
+  return null;
 }
