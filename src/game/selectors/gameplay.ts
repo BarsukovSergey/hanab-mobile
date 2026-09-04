@@ -57,6 +57,7 @@ export type GameTableSuit = {
 };
 
 type AuthoritativeTableState = Pick<GameState, 'playStacks' | 'discardStacks' | 'deck'>;
+type ClueMetadata = Pick<GameMetadata, 'options' | 'ourPlayerIndex' | 'characterAssignments'>;
 
 export function getGameplayClueChoices(
   variantName: string,
@@ -75,12 +76,17 @@ export function getGameplayClueChoices(
   };
 }
 
-export function getGameplayClueChoicesForPlayer(
-  metadata: Pick<GameMetadata, 'options' | 'ourPlayerIndex' | 'characterAssignments'>,
+export function getGameplayClueChoicesForPlayer(metadata: ClueMetadata): GameplayClueChoices {
+  return getGameplayClueChoicesForPlayerIndex(metadata, metadata.ourPlayerIndex);
+}
+
+export function getGameplayClueChoicesForPlayerIndex(
+  metadata: ClueMetadata,
+  playerIndex: number,
 ): GameplayClueChoices {
   return getGameplayClueChoices(
     metadata.options.variantName,
-    getCharacterNameForPlayer(metadata.ourPlayerIndex, metadata.characterAssignments),
+    getCharacterNameForPlayer(playerIndex, metadata.characterAssignments),
   );
 }
 
