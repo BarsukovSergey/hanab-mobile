@@ -1,3 +1,5 @@
+import { expect, test } from '@jest/globals';
+
 import { getCommittedClueMarker } from './clueIndication';
 
 const choices = {
