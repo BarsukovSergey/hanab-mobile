@@ -81,14 +81,25 @@ export function CompactTable({
       </View>
       {discard.total === 0
         ? <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>None</Text>
-        : <View style={styles.discardSummary}>{discard.suits.map((suit) => {
-          const ranks = suit.ranks.map(({ rank, count }) => `${rank}${count > 1 ? `×${count}` : ''}`).join(' ');
-          return <View key={suit.suitIndex} style={[styles.suitChip, landscapePhone && styles.suitChipLandscape, { borderColor: theme.colors.borderStrong }]}>
-            <Text numberOfLines={1} style={[styles.suitChipText, { color: theme.colors.text }]}>{suit.suitName} {ranks}</Text>
-          </View>;
-        })}</View>}
+        : <View style={styles.discardSummary}>{discard.suits.map((suit) => (
+          <View key={suit.suitIndex} style={[styles.discardSuitRow, { borderColor: theme.colors.borderStrong }]}>
+            <Text numberOfLines={1} style={[styles.discardSuitName, { color: theme.colors.textMuted }]}>{compactSuitName(suit.suitName)}</Text>
+            <View style={styles.rankChips}>{suit.ranks.map(({ rank, count }) => (
+              <View key={rank} style={[styles.rankChip, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+                <Text style={[styles.rankChipRank, { color: theme.colors.text }]}>{rank}</Text>
+                {count > 1 && <Text style={[styles.rankChipCount, { color: theme.colors.textMuted }]}>×{count}</Text>}
+              </View>
+            ))}</View>
+          </View>
+        ))}</View>}
     </Pressable>
   </View>;
+}
+
+function compactSuitName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length <= 5) return trimmed;
+  return trimmed.slice(0, 3).toUpperCase();
 }
 
 const styles = StyleSheet.create({
@@ -101,14 +112,17 @@ const styles = StyleSheet.create({
   firework: { alignItems: 'center', flex: 1, gap: 2, minWidth: 0 },
   emptyStack: { aspectRatio: CARD_ASPECT_RATIO, borderRadius: 7, borderStyle: 'dashed', borderWidth: 2 },
   suitName: { fontSize: 8, fontWeight: '800', maxWidth: '100%' },
-  discard: { borderRadius: 10, borderWidth: 1, gap: 4, paddingHorizontal: 8, paddingVertical: 6 },
-  discardLandscape: { gap: 2, paddingHorizontal: 6, paddingVertical: 4 },
+  discard: { borderRadius: 10, borderWidth: 1, gap: 5, paddingHorizontal: 8, paddingVertical: 6 },
+  discardLandscape: { gap: 3, paddingHorizontal: 6, paddingVertical: 4 },
   discardHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between' },
   discardCount: { fontSize: 13, fontWeight: '900' },
   discardSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  suitChip: { borderRadius: 6, borderWidth: 1, maxWidth: '48%', paddingHorizontal: 5, paddingVertical: 2 },
-  suitChipLandscape: { maxWidth: '32%' },
-  suitChipText: { fontSize: 9, fontWeight: '800' },
+  discardSuitRow: { alignItems: 'center', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 4, maxWidth: '49%', minHeight: 24, paddingHorizontal: 5, paddingVertical: 3 },
+  discardSuitName: { fontSize: 8, fontWeight: '900', minWidth: 22 },
+  rankChips: { alignItems: 'center', flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 2 },
+  rankChip: { alignItems: 'baseline', borderRadius: 5, borderWidth: 1, flexDirection: 'row', gap: 1, minWidth: 20, paddingHorizontal: 3, paddingVertical: 1 },
+  rankChipRank: { fontSize: 9, fontWeight: '900' },
+  rankChipCount: { fontSize: 7, fontWeight: '800' },
   emptyText: { fontSize: 10 },
   pressed: { opacity: 0.82 },
 });
