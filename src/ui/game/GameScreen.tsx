@@ -31,6 +31,7 @@ import {
 } from './gameplayInteraction';
 import { getGameplayLayout } from './gameplayLayout';
 import { getDisplayedHandOrders } from './gamePresentation';
+import { getLiveNoteOrders } from './liveNoteOrders';
 
 const END: Record<number, string> = {
   0: 'In progress', 1: 'Normal completion', 2: 'Strikeout', 3: 'Timeout',
@@ -65,20 +66,18 @@ export function GameScreen() {
   const selectedTarget = interaction.clueTarget;
   const noteCard = interaction.noteCard;
 
-  const visibleOrders = useMemo(() => game === null ? [] : [
-    ...game.hands.flatMap((hand) => hand),
-    ...game.playStacks.flatMap((stack) => stack),
-    ...game.discardStacks.flatMap((stack) => stack),
-    ...game.hole,
-  ], [game]);
+  const liveNoteOrders = useMemo(() => getLiveNoteOrders(game), [game]);
   useEffect(() => {
     interactionDispatch({
       type: 'sync-hands',
       ownOrders: ourHand,
       clueTargets,
-      visibleOrders,
+      visibleOrders: liveNoteOrders,
     });
-  }, [clueTargets, ourHand, visibleOrders]);
+  }, [clueTargets, liveNoteOrders, ourHand]);
+  useEffect(() => {
+    if (noteCard === null) setNoteEditorOpen(false);
+  }, [noteCard]);
 
   const gameplayLayout = useMemo(() => getGameplayLayout({
     viewportWidth: width,
@@ -208,7 +207,8 @@ export function GameScreen() {
   const visiblePlayers = metadata.playerNames.map((_, i) => i).filter((i) => playerRoom === null || i !== ourIndex);
   const cardEnabled = enabled && selectedCard !== null && ourHand.some((order) => order === selectedCard);
   const clueEnabled = enabled && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName) && selectedTarget !== null;
-  const notesEditable = sessionPhase === 'ready' && !replay.active && !liveRoom.sharedReplay && noteCard !== null;
+  const notesEditable = sessionPhase === 'ready' && !replay.active && !liveRoom.sharedReplay
+    && noteCard !== null && liveNoteOrders.includes(noteCard);
   const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
   const pauseLabel = clientState.pause.active ? 'Unpause' : isOurTurn ? 'Pause' : clientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
   const openNote = (order: number) => {
@@ -294,7 +294,7 @@ export function GameScreen() {
           </View>
           {selectedCard === null
             ? <Text style={[styles.selectHint, { color: theme.colors.textMuted }]}>Tap a card to play, discard, or note it.</Text>
-            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}>
+            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}> 
               <Text numberOfLines={1} style={[styles.actionLabel, { color: theme.colors.text }]}>Card {displayedOurHand.findIndex((order) => order === selectedCard) + 1}</Text>
               <View style={styles.actionButtons}>
                 <ActionButton compact disabled={!cardEnabled} title="Play" tone="primary" onPress={() => lobbyRuntime.play(selectedCard)} />
