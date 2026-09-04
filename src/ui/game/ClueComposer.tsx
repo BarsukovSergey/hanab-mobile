@@ -9,7 +9,6 @@ export function ClueComposer({
   targetName,
   choices,
   enabled,
-  allowEmptyClues,
   previewState,
   preview,
   onPreview,
@@ -19,7 +18,6 @@ export function ClueComposer({
   targetName: string | null;
   choices: GameplayClueChoices | null;
   enabled: boolean;
-  allowEmptyClues: boolean;
   previewState: GameplayCluePreviewState;
   preview: CluePreview | null;
   onPreview: (type: 'color' | 'rank', value: number) => void;
@@ -29,6 +27,7 @@ export function ClueComposer({
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
+  const allowEmptyClues = choices?.allowEmptyClues ?? false;
   const previewLabel = previewState === null
     ? null
     : previewState.type === 'color'
