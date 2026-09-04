@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getVariant } from '../../game/upstream/gameData';
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { useHanabTheme } from '../designSystem';
@@ -71,7 +72,7 @@ export function GameCard({
         {knowledge.borderColor !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: knowledge.borderColor }]} />}
         {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
-        {clueMarker !== null && <CommittedClueMarker marker={clueMarker} />}
+        {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
         {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
       </View>
     </View>
@@ -136,7 +137,7 @@ export function VisibleHanabiCard({
     {activeSemanticBorder !== null && size === 'hand' && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: activeSemanticBorder }]} />}
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
     {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
-    {clueMarker !== null && <CommittedClueMarker marker={clueMarker} />}
+    {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
     {hasNote && <NoteIndicator compact={compactIndicator} />}
   </View>;
 
@@ -209,13 +210,16 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
   </View>;
 }
 
-function CommittedClueMarker({ marker }: { marker: ClueCardMarker }) {
+function CommittedClueMarker({ marker, variantName }: { marker: ClueCardMarker; variantName: string }) {
   const arrowColor = marker.retouched ? '#737373' : '#ffffff';
+  const clueColor = marker.kind === 'color'
+    ? getVariant(variantName).clueColors[marker.value]?.fill ?? '#ffffff'
+    : null;
   return <View pointerEvents="none" style={styles.clueMarker}>
     <Text style={[styles.clueArrow, { color: arrowColor }]}>↓</Text>
     <View style={[
       styles.clueCircle,
-      marker.kind === 'rank' ? styles.rankClueCircle : { backgroundColor: marker.fill ?? '#ffffff' },
+      marker.kind === 'rank' ? styles.rankClueCircle : { backgroundColor: clueColor },
     ]}>
       {marker.kind === 'rank' && <Text numberOfLines={1} style={styles.rankClueText}>{marker.label}</Text>}
     </View>
