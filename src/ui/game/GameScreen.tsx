@@ -252,9 +252,11 @@ export function GameScreen() {
     if (sent) interactionDispatch({ type: 'clear-clue-preview' });
   };
 
+  const landscape = gameplayLayout.orientation === 'landscape';
+
   return <>
-    <View style={[styles.liveScreen, gameplayLayout.orientation === 'landscape' && styles.liveLandscape]}>
-      <View style={styles.mainLane}>
+    <View style={[styles.liveScreen, landscape && styles.liveLandscape]}>
+      <View style={[styles.mainLane, landscape && styles.mainLaneLandscape]}>
         <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.hudTurn}>
             <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {game.turn.turnNum}</Text>
@@ -307,7 +309,7 @@ export function GameScreen() {
         </View>}
       </View>
 
-      <View style={styles.opponentLane}>
+      <View style={[styles.opponentLane, landscape && styles.opponentLaneLandscape]}>
         <View style={[styles.players, gameplayLayout.opponentColumns === 2 && styles.playersLandscape]}>
           {visiblePlayers.map((i) => {
             const target = selectedTarget === i;
@@ -334,30 +336,22 @@ export function GameScreen() {
                 {displayedHand.map((order, position) => {
                   const card = game.deck[order];
                   if (card === undefined) return null;
-                  const common = {
-                    hasNote: hasCardNote(order),
-                    height: gameplayLayout.opponentCardHeight,
-                    highlighted: previewTouched.has(order),
-                    key: order,
-                    onLongPress: () => interactionDispatch({ type: 'hold-empathy', playerIndex: i }),
-                    onPressOut: () => interactionDispatch({ type: 'hold-empathy', playerIndex: null }),
-                    variantName: metadata.options.variantName,
-                  };
-                  if (empathizing) {
-                    return <GameCard
-                      {...common}
-                      knowledge={getCardKnowledgeViewModel(metadata.options.variantName, card, clientState.notes.ourNotes[order], false, true)}
-                      onSelect={() => openNote(order)}
-                      position={position}
-                      selected={false}
-                    />;
-                  }
+                  const empathyKnowledge = empathizing
+                    ? getCardKnowledgeViewModel(metadata.options.variantName, card, clientState.notes.ourNotes[order], false, true)
+                    : null;
                   return <VisibleHanabiCard
-                    {...common}
+                    empathyKnowledge={empathyKnowledge}
+                    hasNote={hasCardNote(order)}
+                    height={gameplayLayout.opponentCardHeight}
+                    highlighted={previewTouched.has(order)}
+                    key={order}
+                    onLongPress={() => interactionDispatch({ type: 'hold-empathy', playerIndex: i })}
                     onPress={() => openNote(order)}
+                    onPressOut={() => interactionDispatch({ type: 'hold-empathy', playerIndex: null })}
                     position={position}
                     rank={card.rank}
                     suitIndex={card.suitIndex}
+                    variantName={metadata.options.variantName}
                   />;
                 })}
               </View>
@@ -452,9 +446,11 @@ function Stat({ label, value }: { label: string; value: number }) { const { them
 
 const styles = StyleSheet.create({
   liveScreen: { gap: 10, paddingBottom: 8 },
-  liveLandscape: { alignItems: 'flex-start', flexDirection: 'row' },
+  liveLandscape: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },
   mainLane: { flex: 1, gap: 9, minWidth: 0 },
-  opponentLane: { flex: 1.15, gap: 9, minWidth: 0 },
+  mainLaneLandscape: { flex: 1.35 },
+  opponentLane: { flex: 1, gap: 9, minWidth: 0 },
+  opponentLaneLandscape: { flex: 1 },
   finishedScreen: { gap: 14, paddingBottom: 10 },
   wide: { alignItems: 'flex-start', flexDirection: 'row' },
   column: { flex: 1, gap: 14, minWidth: 0 },
