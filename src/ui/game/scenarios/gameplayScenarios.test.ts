@@ -208,6 +208,7 @@ describe('gameplay scenario harness', () => {
       ['note-saved', 'portrait'],
       ['note-survives-turn', 'portrait'],
       ['note-card-left-hand', 'landscape'],
+      ['three-player-extra-card', 'portrait'],
       ['six-player-landscape', 'landscape'],
     ]);
 
