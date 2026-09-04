@@ -212,14 +212,15 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
 
 function CommittedClueMarker({ marker, variantName }: { marker: ClueCardMarker; variantName: string }) {
   const arrowColor = marker.retouched ? '#737373' : '#ffffff';
-  const clueColor = marker.kind === 'color'
+  const clueFill = marker.kind === 'color'
     ? getVariant(variantName).clueColors[marker.value]?.fill ?? '#ffffff'
-    : null;
+    : '#111111';
   return <View pointerEvents="none" style={styles.clueMarker}>
     <Text style={[styles.clueArrow, { color: arrowColor }]}>↓</Text>
     <View style={[
       styles.clueCircle,
-      marker.kind === 'rank' ? styles.rankClueCircle : { backgroundColor: clueColor },
+      { backgroundColor: clueFill },
+      marker.kind === 'rank' && styles.rankClueCircle,
     ]}>
       {marker.kind === 'rank' && <Text numberOfLines={1} style={styles.rankClueText}>{marker.label}</Text>}
     </View>
