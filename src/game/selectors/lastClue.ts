@@ -1,8 +1,10 @@
-type RelevantAction =
-  | { type: 'clue'; clue: { type: 0 | 1; value: number }; giver: number; list: readonly number[]; target: number }
-  | { type: 'play' }
-  | { type: 'discard' }
-  | { type: string };
+type RelevantAction = {
+  type: string;
+  clue?: { type: number; value: number };
+  giver?: number;
+  list?: readonly number[];
+  target?: number;
+};
 
 export type LastCluePresentation = {
   giverPlayerIndex: number;
@@ -17,7 +19,13 @@ export function getLastCluePresentation(actions: readonly RelevantAction[]): Las
     const action = actions[index];
     if (action === undefined) continue;
     if (action.type === 'play' || action.type === 'discard') return null;
-    if (action.type !== 'clue') continue;
+    if (
+      action.type !== 'clue'
+      || action.clue === undefined
+      || action.giver === undefined
+      || action.list === undefined
+      || action.target === undefined
+    ) continue;
     return {
       giverPlayerIndex: action.giver,
       targetPlayerIndex: action.target,
