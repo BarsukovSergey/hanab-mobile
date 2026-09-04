@@ -33,6 +33,17 @@ export function ClueComposer({
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
 
+  if (targetName === null) {
+    return <View style={[
+      styles.idleSurface,
+      landscapePhone && styles.idleSurfaceLandscape,
+      { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+    ]}>
+      <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CLUE</Text>
+      <Text numberOfLines={1} style={[styles.idleText, { color: theme.colors.textMuted }]}>Tap a player name to choose a clue target</Text>
+    </View>;
+  }
+
   return <View style={[
     styles.surface,
     landscapePhone && styles.surfaceLandscape,
@@ -40,8 +51,8 @@ export function ClueComposer({
   ]}>
     <View style={styles.header}>
       <View style={styles.headerCopy}>
-        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CLUE</Text>
-        <Text numberOfLines={1} style={[styles.target, landscapePhone && styles.targetLandscape, { color: theme.colors.text }]}>{targetName ?? 'Choose a player'}</Text>
+        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CLUE TO</Text>
+        <Text numberOfLines={1} style={[styles.target, landscapePhone && styles.targetLandscape, { color: theme.colors.text }]}>{targetName}</Text>
       </View>
       {previewState !== null && <ActionButton compact title="Cancel" tone="ghost" onPress={onClear} />}
     </View>
@@ -73,6 +84,9 @@ export function ClueComposer({
 }
 
 const styles = StyleSheet.create({
+  idleSurface: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, paddingHorizontal: 9, paddingVertical: 7 },
+  idleSurfaceLandscape: { paddingHorizontal: 7, paddingVertical: 4 },
+  idleText: { flex: 1, fontSize: 10, fontWeight: '700' },
   surface: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 10 },
   surfaceLandscape: { gap: 5, padding: 7 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
