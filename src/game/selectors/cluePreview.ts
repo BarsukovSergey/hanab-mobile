@@ -26,9 +26,10 @@ export function getCluePreview(
       const color = variant.clueColors[value];
       return color === undefined ? null : newColorClue(color);
     })()
-    : variant.clueRanks.includes(value)
-      ? newRankClue(value)
-      : null;
+    : (() => {
+      const rank = variant.clueRanks.find((candidate) => candidate === value);
+      return rank === undefined ? null : newRankClue(rank);
+    })();
   if (clue === null) return null;
 
   const touchedOrders = hand.filter((order) => {
