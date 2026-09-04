@@ -177,10 +177,10 @@ export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: Ca
 function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge: CardKnowledgeViewModel; variantName: string; height?: number }) {
   const suits = getCardSuitVisuals(variantName);
   const scale = Math.max(0.58, Math.min(1, (height ?? 112) / 112));
-  const pipSize = Math.max(12, Math.round(18 * scale));
-  const pipBox = Math.max(14, pipSize + 2);
-  const rankFontSize = Math.max(9, Math.round(13 * scale));
-  const rankBox = Math.max(13, Math.round(17 * scale));
+  const pipSize = Math.max(11, Math.round(16 * scale));
+  const pipBox = Math.max(13, pipSize + 1);
+  const rankFontSize = Math.max(8, Math.round(10 * scale));
+  const rankBox = Math.max(10, Math.round(12 * scale));
   const visibleSuits = knowledge.suitPips.filter((pipState) => pipState.state !== 'hidden');
   const visibleRanks = knowledge.rankPips.filter((pipState) => pipState.state !== 'hidden');
 
@@ -205,7 +205,7 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
     {visibleRanks.length > 0 && <View style={[styles.knowledgeStrip, styles.rankStrip]}>
       {visibleRanks.map((pipState) => <View key={`rank-${pipState.rank}`} style={[styles.rankToken, { height: rankBox, width: rankBox }]}>
         <Text style={[styles.hiddenRankText, { fontSize: rankFontSize, lineHeight: rankFontSize + 1 }, pipState.positive && styles.positiveRankText]}>{pipState.rank}</Text>
-        {pipState.state === 'eliminated' && <EliminationX size={Math.max(11, Math.round(rankBox * 0.9))} />}
+        {pipState.state === 'eliminated' && <EliminationX size={Math.max(9, Math.round(rankBox * 0.85))} />}
       </View>)}
     </View>}
   </View>;
@@ -213,8 +213,7 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
 
 function CommittedClueMarker({ marker }: { marker: ClueCardMarker }) {
   return <View pointerEvents="none" style={[styles.clueMarker, marker.retouched && styles.clueMarkerRetouched]}>
-    <Text style={[styles.clueArrow, marker.retouched && styles.clueArrowRetouched]}>↓</Text>
-    <Text numberOfLines={1} style={[styles.clueMarkerText, marker.retouched && styles.clueMarkerTextRetouched]}>{marker.label}</Text>
+    <Text style={styles.clueMarkerText}>↓ {marker.label}</Text>
   </View>;
 }
 
@@ -271,19 +270,19 @@ const styles = StyleSheet.create({
   selectedFrame: { borderWidth: 4 },
   hiddenCard: { backgroundColor: '#747a76', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   empathyCard: { backgroundColor: '#747a76' },
-  knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '5%', paddingHorizontal: '7%', paddingTop: '38%', position: 'absolute', right: 0, top: 0 },
+  knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '7%', paddingHorizontal: '8%', paddingTop: '42%', position: 'absolute', right: 0, top: 0 },
   knowledgeStrip: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  suitStrip: { gap: 2 },
-  rankStrip: { gap: 1 },
+  suitStrip: { gap: 1 },
+  rankStrip: { gap: 0 },
   knowledgeToken: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   rankToken: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   hiddenRankText: { color: '#f7f7f3', fontFamily: 'Arial', fontWeight: '900', textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
   positiveRankText: { color: 'orange' },
-  positiveSuitHalo: { backgroundColor: 'rgba(238, 188, 29, 0.18)', borderColor: 'rgba(13, 13, 13, 0.6)', borderWidth: 1, left: 0, position: 'absolute', top: 0 },
+  positiveSuitHalo: { backgroundColor: 'rgba(238, 188, 29, 0.16)', borderColor: 'rgba(13, 13, 13, 0.55)', borderWidth: 1, left: 0, position: 'absolute', top: 0 },
   eliminationStroke: { backgroundColor: '#111111', left: 0, position: 'absolute' },
   eliminationSlash: { transform: [{ rotate: '45deg' }] },
   eliminationBackslash: { transform: [{ rotate: '-45deg' }] },
-  cardPosition: { bottom: 2, color: 'rgba(255,255,255,0.62)', fontSize: 7, fontWeight: '800', position: 'absolute', right: 3 },
+  cardPosition: { bottom: 2, color: 'rgba(255,255,255,0.55)', fontSize: 7, fontWeight: '800', position: 'absolute', right: 3 },
   knowledgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
   legendPip: { alignItems: 'center', height: 24, justifyContent: 'center', position: 'relative', width: 24 },
   legendRank: { alignItems: 'center', height: 20, justifyContent: 'center', position: 'relative', width: 20 },
@@ -294,12 +293,9 @@ const styles = StyleSheet.create({
   visibleMini: { borderRadius: 5, height: 56 },
   semanticInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 3 },
   previewInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 7 },
-  clueMarker: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.94)', borderColor: '#111111', borderRadius: 7, borderWidth: 1, left: 3, minWidth: 20, paddingHorizontal: 3, paddingVertical: 1, position: 'absolute', top: 2, zIndex: 9 },
-  clueMarkerRetouched: { backgroundColor: 'rgba(120,120,120,0.92)' },
-  clueArrow: { color: '#111111', fontSize: 13, fontWeight: '900', lineHeight: 12 },
-  clueArrowRetouched: { color: '#eeeeee' },
-  clueMarkerText: { color: '#111111', fontSize: 8, fontWeight: '900', lineHeight: 9, maxWidth: 34 },
-  clueMarkerTextRetouched: { color: '#f1f1f1' },
+  clueMarker: { alignItems: 'center', backgroundColor: 'rgba(15,15,15,0.72)', borderRadius: 4, left: 3, minWidth: 20, paddingHorizontal: 3, paddingVertical: 2, position: 'absolute', top: 3, zIndex: 9 },
+  clueMarkerRetouched: { backgroundColor: 'rgba(95,95,95,0.78)' },
+  clueMarkerText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 10, maxWidth: 38, textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
   noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 16, justifyContent: 'center', position: 'absolute', right: 4, top: 4, transform: [{ rotate: '-8deg' }], width: 16, zIndex: 10 },
   noteIndicatorCompact: { height: 11, right: 2, top: 2, width: 11 },
   noteIndicatorText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900', lineHeight: 12 },
