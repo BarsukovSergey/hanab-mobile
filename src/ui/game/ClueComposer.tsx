@@ -56,15 +56,15 @@ export function ClueComposer({
       </View>
       {previewState !== null && <ActionButton compact title="Cancel" tone="ghost" onPress={onClear} />}
     </View>
-    {previewState === null ? <View style={landscapePhone ? styles.landscapeChoices : undefined}>
-      <View style={styles.choiceRow}>{choices?.colors.map((choice) => <ActionButton
+    {previewState === null ? <View style={styles.choiceGroups}>
+      <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.colors.map((choice) => <ActionButton
         compact
         disabled={!enabled}
         key={`color-${choice.value}`}
         title={choice.label}
         onPress={() => onPreview('color', choice.value)}
       />)}</View>
-      <View style={styles.choiceRow}>{choices?.ranks.map((choice) => <ActionButton
+      <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.ranks.map((choice) => <ActionButton
         compact
         disabled={!enabled}
         key={`rank-${choice.value}`}
@@ -88,14 +88,15 @@ const styles = StyleSheet.create({
   idleSurfaceLandscape: { paddingHorizontal: 7, paddingVertical: 4 },
   idleText: { flex: 1, fontSize: 10, fontWeight: '700' },
   surface: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 10 },
-  surfaceLandscape: { gap: 5, padding: 7 },
+  surfaceLandscape: { gap: 4, padding: 6 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
   target: { fontSize: 14, fontWeight: '900' },
   targetLandscape: { fontSize: 12 },
-  landscapeChoices: { flexDirection: 'row', gap: 6 },
+  choiceGroups: { gap: 5 },
   choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  choiceRowLandscape: { gap: 4 },
   confirmRow: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   previewCopy: { flex: 1, minWidth: 0 },
   previewTitle: { fontSize: 15, fontWeight: '900' },
