@@ -42,11 +42,12 @@ export function getGameplayLayout({
   const cardGap = width < 360 ? 4 : landscapePhone ? 4 : width < 700 ? 6 : 7;
   const opponentRowGap = landscapePhone ? 5 : width < 360 ? 5 : 7;
   const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - PHONE_HORIZONTAL_CHROME));
+  const landscapeUsableWidth = Math.max(1, contentWidth - LANDSCAPE_GUTTER);
   const ownLaneWidth = orientation === 'landscape'
-    ? Math.max(260, (contentWidth - LANDSCAPE_GUTTER) * 0.54)
+    ? landscapeUsableWidth * 0.54
     : contentWidth;
   const opponentLaneWidth = orientation === 'landscape'
-    ? Math.max(260, contentWidth - LANDSCAPE_GUTTER - ownLaneWidth)
+    ? landscapeUsableWidth - ownLaneWidth
     : contentWidth;
 
   const ownHandSize = ourPlayerIndex === null ? 0 : handSizes[ourPlayerIndex] ?? 0;
