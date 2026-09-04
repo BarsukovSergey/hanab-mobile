@@ -7,6 +7,7 @@ The scenario harness exists to make gameplay work scenario-driven instead of dis
 - A scenario must bootstrap through the same `GameBootstrapCoordinator` and pinned upstream reducers as production. Do not hand-write a parallel `GameState` engine for fixtures.
 - The developer gallery renders the production `GameScreen` against an isolated scenario Redux store.
 - Scenario stores never replace the application singleton store. While the gallery is mounted, authoritative UI commands are suppressed at the application runtime boundary so fixture interactions cannot leak into a real session. Local selection, clue preview, empathy, notes/discard inspection, and authoritative snapshots remain available for deterministic inspection.
+- The Gallery entry is exposed only from the `SettingsScreen` that `App.tsx` actually renders, and only under `__DEV__`.
 - Canonical viewport dimensions belong to the scenario registry and are exercised through the same pure layout calculations as production. The gallery itself renders on the current device viewport.
 - Initial deal sizes are derived through the gameplay selector boundary from pinned upstream `getCardsPerHand`; fixture code must not maintain a parallel player-count hand-size table.
 - A gameplay feature is not considered closed merely because one happy-path component test passes. Its scenario should capture the important authoritative state, transient interaction state, responsive geometry, and lifecycle expectations.
@@ -25,6 +26,8 @@ Clue-flow acceptance family:
 - `clue-committed`: authoritative clue has landed and the server has advanced the turn; the last-clue marker and upstream orange positive-clue border must still be visible.
 - `clue-retouched-quacker`: the same card is positively clued again by Cathy with Quacker assigned; the marker must use the actual giver semantics (`Quack`) and render as a retouch.
 - `clue-cleanup-after-discard`: the next authoritative discard clears the last-clue marker while the card's accumulated upstream clue knowledge and orange semantic border remain.
+- `empty-clue-off`: Gallery-ready zero-touch color clue with Empty Clues disabled; `Give clue` must stay disabled.
+- `empty-clue-on`: the same zero-touch fixture with Empty Clues enabled; `Give clue` must be confirmable.
 
 Opponent-note acceptance family:
 
@@ -37,9 +40,13 @@ Table-surface acceptance family:
 
 - `rainbow-table-surface`: `Rainbow (6 Suits)` on a narrow portrait target with an authoritative Rainbow 1 in the sixth firework stack and Red 1 in the discard stack.
 
+Finished/replay Gallery coverage:
+
+- `finished-shared-replay`: runs the authoritative postgame sequence (`gameOver`, `playerTimes`, game history, full card identities, `finishOngoingGame`) and renders the production finished/shared-replay screen without manually completing a live game.
+
 Empathy reuses authoritative clue snapshots rather than duplicating the deal. `clue-committed` gives a deterministic opponent card whose open identity differs from the owner-perspective knowledge shown during empathy.
 
-Reconnect, rotation, Empty Clues, and finished/replay are lifecycle/option acceptance tests over canonical authoritative game construction rather than parallel gameplay engines.
+Reconnect and rotation remain lifecycle acceptance tests over canonical authoritative game construction; they intentionally do not fake a reconnecting socket inside the rendering gallery.
 
 ## Clue-flow acceptance contract
 
@@ -62,7 +69,8 @@ Zero-touch confirmation follows authoritative table options rather than a UI-onl
 3. Empty Clues ON + zero touched cards is confirmable;
 4. Empty Clues ON + one or more touched cards is confirmable;
 5. the option reaches clue presentation through `GameplayClueChoices.allowEmptyClues` from authoritative metadata;
-6. clue preview still uses pinned upstream touch semantics; enabling Empty Clues changes confirmation eligibility, not which cards are considered touched.
+6. clue preview still uses pinned upstream touch semantics; enabling Empty Clues changes confirmation eligibility, not which cards are considered touched;
+7. OFF and ON zero-touch states are both directly inspectable in the developer Gallery using the same canonical stores as `emptyClues.test.ts`.
 
 ## Opponent-note acceptance contract
 
@@ -140,7 +148,8 @@ Finished state is entered only after the full authoritative postgame sequence is
 4. the finished client starts in shared replay at the authoritative penultimate segment and records leader/follower semantics;
 5. previously hidden card identities are available to finished/replay presentation after reconciliation;
 6. finished layout remains valid in both portrait and landscape without creating a second game-state implementation;
-7. replay hands wrap inside the shared vertical surface and never introduce per-hand horizontal `ScrollView` controls.
+7. replay hands wrap inside the shared vertical surface and never introduce per-hand horizontal `ScrollView` controls;
+8. `finished-shared-replay` exposes that exact reconciled state in the Gallery for physical rendering checks.
 
 ## Scenario-gallery runtime safety contract
 
@@ -150,12 +159,14 @@ The developer gallery must never become a second live controller:
 2. the production `GameScreen` is still used, so local interaction and rendering paths are representative;
 3. while the gallery is mounted, the application runtime command gate suppresses gameplay/postgame UI sends such as play, discard, clue, note mutation, pause, replay navigation, and rematch controls;
 4. non-command runtime lifecycle/network behavior continues through the raw runtime;
-5. suppression is lease-based and nested/idempotent so React development remount behavior cannot leave the application permanently suppressed or release suppression too early.
+5. suppression is lease-based and nested/idempotent so React development remount behavior cannot leave the application permanently suppressed or release suppression too early;
+6. a source guard compares every `lobbyRuntime.*` call made by `GameScreen` with the command-gate suppression list, so adding a new GameScreen runtime command without isolating it fails CI;
+7. the active Settings screen owns the Gallery entry under `__DEV__`; duplicate or unreachable Settings implementations are rejected by the source guard.
 
-These invariants are executable in `gameplayScenarios.test.ts`, `scenarioHandSize.test.ts`, `tableSurface.test.ts`, `discardSummary.test.ts`, `reconnectLifecycle.test.ts`, `rotationLifecycle.test.ts`, `finishedReplayLifecycle.test.ts`, `emptyClues.test.ts`, `gameplayInteraction.test.ts`, `liveNoteOrders.test.ts`, `runtimeCommandGate.test.ts`, and `replayHandPolicy.test.ts`; prose here documents why the snapshots exist.
+These invariants are executable in `gameplayScenarios.test.ts`, `scenarioHandSize.test.ts`, `tableSurface.test.ts`, `discardSummary.test.ts`, `reconnectLifecycle.test.ts`, `rotationLifecycle.test.ts`, `finishedReplayLifecycle.test.ts`, `finishedReplayGallery.test.ts`, `emptyClues.test.ts`, `gameplayInteraction.test.ts`, `liveNoteOrders.test.ts`, `runtimeCommandGate.test.ts`, `scenarioRuntimeIsolation.test.ts`, `replayHandPolicy.test.ts`, and `settingsScenarioEntry.test.ts`; prose here documents why the snapshots exist.
 
 ## Expansion order
 
-The deterministic gameplay lifecycle matrix is broad enough that the remaining release-confidence step is physical Android smoke over the canonical cases: portrait/landscape rotation, background/foreground, clue preview/marker persistence, notes, empathy, extra-card density, six-suit table surface, discard viewer, reconnect, Empty Clues confirmation, and finished/replay presentation.
+The deterministic gameplay lifecycle matrix is broad enough that the remaining release-confidence step is physical Android smoke. Most rendering checks can now be reached directly from Settings -> Developer -> Gameplay scenarios: clue preview/marker persistence, notes, empathy, extra-card density, six-suit table surface, discard viewer, Empty Clues OFF/ON, and finished/shared replay. Rotation/background lifecycle and reconnect still need real platform/session behavior rather than a fake gallery transport.
 
 For each future scenario, prefer executable assertions over prose whenever the invariant can be expressed deterministically.
