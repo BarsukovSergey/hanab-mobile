@@ -84,6 +84,10 @@ export function getGameplayClueChoicesForPlayer(
   );
 }
 
+export function getClueColorFill(variantName: string, value: number): string | null {
+  return getVariant(variantName).clueColors[value]?.fill ?? null;
+}
+
 export function hasClueTokenForVariant(clueTokens: number, variantName: string): boolean {
   return clueTokens >= getAdjustedClueTokens(1, getVariant(variantName));
 }
