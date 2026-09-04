@@ -1,15 +1,18 @@
 import { describe, expect, test } from '@jest/globals';
 
 import { GameBootstrapCoordinator } from '../../../game/bootstrap/GameBootstrapCoordinator';
-import { cardOrder } from '../../../game/upstream/types/CardOrder';
-import { gameActionListSchema, gameInitSchema } from '../../../protocol/gameProtocol';
+import { gameActionListSchema, gameInitSchema, noteCommandSchema } from '../../../protocol/gameProtocol';
 import { makeInit } from '../../../protocol/gameProtocol.fixtures';
 import { roomActions } from '../../../store/roomSlice';
 import { sessionActions } from '../../../store/sessionSlice';
 import { createAppStore } from '../../../store/store';
 
 const TABLE_ID = 123;
-const OPPONENT_ORDER = cardOrder.parse(5);
+const OPPONENT_ORDER = noteCommandSchema.parse({
+  tableID: TABLE_ID,
+  order: 5,
+  note: '',
+}).order;
 
 function deal() {
   return [
