@@ -165,18 +165,15 @@ The existing mobile test helper in `cardKnowledge.test.ts` does this deliberatel
 - suit/rank pips;
 - determined flags.
 
+The selector now accepts an explicit `empathy` flag and passes it through to both upstream identity and pip presentation selectors. The regression test covers the key distinction that an opponent's open identity can become hidden/partial in empathy while empathy-specific eliminated possibilities remain visible as pips.
+
 The UI should continue to receive presentation results from this boundary instead of reimplementing clue/note/knowledge rules in components.
 
-## Known parity gap: empathy wiring
+## Remaining UX work: empathy gesture
 
-At the time this document was written, `getCardKnowledgeViewModel` still passes `empathy: false` to both:
+The presentation/selector boundary is empathy-capable, but the current game screen does not yet expose the intended press-and-hold opponent-hand gesture. That interaction belongs to the gameplay redesign described in `docs/MOBILE_GAMEPLAY_REDESIGN.md`, where empathy must switch the whole hand in-place without a layout shift.
 
-- `getCardIdentityToShow`;
-- `getCardPipPresentation`.
-
-That is a known integration gap, not an intentional product rule. The selectors already support empathy; mobile still needs to pass the actual empathy state and expose the interaction described in `docs/MOBILE_GAMEPLAY_REDESIGN.md`.
-
-Do not consider card-presentation parity complete while empathy remains hard-coded off.
+Do not reintroduce a hard-coded `empathy: false` inside the selector. Future UI work should supply the transient empathy state to this existing boundary.
 
 ## Rules for future changes
 
