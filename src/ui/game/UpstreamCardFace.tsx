@@ -10,6 +10,8 @@ type UpstreamCardFaceProps = {
   variantName: string;
 };
 
+// The generated manifest deduplicates card SVGs across variants. Keying by the immutable XML asset
+// keeps this cache bounded by unique artwork rather than variant/card combinations.
 const parsedCardCache = new Map<string, JsxAST | null>();
 const CARD_AST_OVERRIDE = { height: '100%', width: '100%' } as const;
 
@@ -17,26 +19,22 @@ export const UpstreamCardFace = memo(function UpstreamCardFace({ rank, suitIndex
   const suits = getCardSuitVisuals(variantName);
   const suitName = suitIndex === null ? null : suits[suitIndex]?.name ?? null;
   const cardKey = getUpstreamCardKey(suitName, rank);
-  const cacheKey = `${variantName}\u0000${cardKey}`;
-  const cached = parsedCardCache.get(cacheKey);
-  if (cached !== undefined) {
-    return cached === null ? <MissingUpstreamCard /> : <SvgAst ast={cached} override={CARD_AST_OVERRIDE} />;
-  }
-
   const svg = getUpstreamCardSvg(variantName, cardKey);
-  if (svg === null) {
-    parsedCardCache.set(cacheKey, null);
-    return <MissingUpstreamCard />;
+  if (svg === null) return <MissingUpstreamCard />;
+
+  if (parsedCardCache.has(svg)) {
+    const cached = parsedCardCache.get(svg) ?? null;
+    return cached === null ? <MissingUpstreamCard /> : <SvgAst ast={cached} override={CARD_AST_OVERRIDE} />;
   }
 
   try {
     const ast = parse(svg);
-    parsedCardCache.set(cacheKey, ast);
+    parsedCardCache.set(svg, ast);
     return ast === null ? <MissingUpstreamCard /> : <SvgAst ast={ast} override={CARD_AST_OVERRIDE} />;
   } catch {
     // Generated assets are validated in CI, but fail closed to the existing placeholder if a
     // malformed asset ever reaches a device rather than crashing the gameplay tree.
-    parsedCardCache.set(cacheKey, null);
+    parsedCardCache.set(svg, null);
     return <MissingUpstreamCard />;
   }
 });
