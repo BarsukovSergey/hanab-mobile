@@ -12,7 +12,8 @@ export function LastClueNotice() {
   if (room.kind !== 'live_game' || room.clientState.finished || room.clientState.replay.active) return null;
 
   const clue = getLastCluePresentation(room.clientState.replay.actions);
-  if (clue === null) return null;
+  if (clue === null) return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.slot} />;
+
   const names = room.clientState.metadata.playerNames;
   const variantName = room.clientState.metadata.options.variantName;
   const choices = getGameplayClueChoices(variantName);
@@ -28,14 +29,15 @@ export function LastClueNotice() {
   const clueLabel = choice?.label ?? (clue.clueType === 'rank' ? `rank ${clue.value}` : `color ${clue.value + 1}`);
   const touchedLabel = touchedPositions.length === 0 ? 'no cards' : `cards ${touchedPositions.join(', ')}`;
 
-  return <View style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
+  return <View style={[styles.slot, styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
     <Text numberOfLines={1} style={[styles.label, { color: theme.colors.text }]}>{giver} → {target}: {clueLabel}</Text>
     <Text numberOfLines={1} style={[styles.detail, { color: theme.colors.textMuted }]}>Touched {touchedLabel}</Text>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  notice: { borderLeftWidth: 3, borderRadius: 8, gap: 1, paddingHorizontal: 9, paddingVertical: 6 },
+  slot: { minHeight: 39 },
+  notice: { borderLeftWidth: 3, borderRadius: 8, gap: 1, justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 5 },
   label: { fontSize: 12, fontWeight: '800' },
   detail: { fontSize: 10, lineHeight: 13 },
 });
