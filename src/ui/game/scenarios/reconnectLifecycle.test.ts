@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 
 import { GameBootstrapCoordinator } from '../../../game/bootstrap/GameBootstrapCoordinator';
+import { cardOrder } from '../../../game/upstream/types/CardOrder';
 import { gameActionListSchema, gameInitSchema } from '../../../protocol/gameProtocol';
 import { makeInit } from '../../../protocol/gameProtocol.fixtures';
 import { roomActions } from '../../../store/roomSlice';
@@ -8,7 +9,7 @@ import { sessionActions } from '../../../store/sessionSlice';
 import { createAppStore } from '../../../store/store';
 
 const TABLE_ID = 123;
-const OPPONENT_ORDER = 5;
+const OPPONENT_ORDER = cardOrder.parse(5);
 
 function deal() {
   return [
