@@ -32,9 +32,8 @@ const LANDSCAPE_GUTTER = 8;
 const LANDSCAPE_OPPONENT_COLUMN_GAP = 7;
 const OWN_HAND_HORIZONTAL_PADDING = 18;
 const OPPONENT_HAND_HORIZONTAL_PADDING = 14;
-// Keep enough room for opponent cards on phones. The own hand remains slightly wider and its
-// larger max-height still makes it visually dominant without starving the second lane.
-const LANDSCAPE_OWN_FRACTION = 1.05 / 2.05;
+const LANDSCAPE_OWN_FRACTION = 1.35 / 2.35;
+const LANDSCAPE_READABLE_OPPONENT_HEIGHT = 42;
 
 export function getGameplayLayout({
   viewportWidth,
@@ -51,6 +50,7 @@ export function getGameplayLayout({
   const horizontalChrome = landscapePhone ? LANDSCAPE_HORIZONTAL_CHROME : PHONE_HORIZONTAL_CHROME;
   const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - horizontalChrome));
   const landscapeUsableWidth = Math.max(1, contentWidth - LANDSCAPE_GUTTER);
+  // Keep this ratio in lockstep with GameScreen's 1.35:1 landscape flex split.
   const ownLaneWidth = orientation === 'landscape'
     ? landscapeUsableWidth * LANDSCAPE_OWN_FRACTION
     : contentWidth;
@@ -61,7 +61,10 @@ export function getGameplayLayout({
   const ownHandSize = ourPlayerIndex === null ? 0 : handSizes[ourPlayerIndex] ?? 0;
   const opponentHandSizes = handSizes.filter((_, index) => index !== ourPlayerIndex);
   const maxOpponentHandSize = Math.max(1, ...opponentHandSizes);
-  const opponentColumns: 1 | 2 = orientation === 'landscape' && width >= 760 && opponentHandSizes.length >= 3 ? 2 : 1;
+  const canUseTwoColumns = orientation === 'landscape'
+    && opponentHandSizes.length >= 3
+    && fitsReadableTwoColumnOpponentHand(opponentLaneWidth, maxOpponentHandSize, cardGap);
+  const opponentColumns: 1 | 2 = canUseTwoColumns ? 2 : 1;
   const opponentColumnWidth = opponentColumns === 2
     ? (opponentLaneWidth - LANDSCAPE_OPPONENT_COLUMN_GAP) / 2
     : opponentLaneWidth;
@@ -69,7 +72,7 @@ export function getGameplayLayout({
   const ownMaxHeight = landscapePhone ? 88 : OWN_MAX_HEIGHT;
   const opponentMaxHeight = landscapePhone ? 60 : OPPONENT_MAX_HEIGHT;
   const ownMinHeight = landscapePhone ? 58 : OWN_MIN_HEIGHT;
-  const opponentMinHeight = landscapePhone ? 42 : OPPONENT_MIN_HEIGHT;
+  const opponentMinHeight = landscapePhone ? LANDSCAPE_READABLE_OPPONENT_HEIGHT : OPPONENT_MIN_HEIGHT;
   const ownHandWidth = Math.max(1, ownLaneWidth - OWN_HAND_HORIZONTAL_PADDING);
   const opponentHandWidth = Math.max(1, opponentColumnWidth - OPPONENT_HAND_HORIZONTAL_PADDING);
 
@@ -116,6 +119,16 @@ export function getHandRowWidth(cardHeight: number, cardCount: number, gap: numb
   return cardCount * cardHeight * HANABI_CARD_ASPECT_RATIO + Math.max(0, cardCount - 1) * gap;
 }
 
+function fitsReadableTwoColumnOpponentHand(
+  opponentLaneWidth: number,
+  cardCount: number,
+  gap: number,
+): boolean {
+  const columnWidth = (opponentLaneWidth - LANDSCAPE_OPPONENT_COLUMN_GAP) / 2;
+  const innerWidth = Math.max(1, columnWidth - OPPONENT_HAND_HORIZONTAL_PADDING);
+  return getHandRowWidth(LANDSCAPE_READABLE_OPPONENT_HEIGHT, cardCount, gap) <= innerWidth;
+}
+
 function fitCardHeight(
   availableWidth: number,
   cardCount: number,
@@ -127,7 +140,9 @@ function fitCardHeight(
   const gapWidth = Math.max(0, cardCount - 1) * gap;
   const widthPerCard = Math.max(1, (availableWidth - gapWidth) / cardCount);
   const heightFromWidth = widthPerCard / HANABI_CARD_ASPECT_RATIO;
-  return Math.min(maxHeight, heightFromWidth < minHeight ? heightFromWidth : Math.max(minHeight, heightFromWidth));
+  // Never overflow in order to honor a visual minimum. The caller can use the density signal to
+  // fall back to shared vertical scrolling when the viewport genuinely cannot fit readable cards.
+  return Math.min(maxHeight, heightFromWidth);
 }
 
 function round1(value: number): number {
