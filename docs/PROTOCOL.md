@@ -5,7 +5,7 @@ This document records the protocol facts currently relied on by Hanab Mobile.
 Source baseline:
 
 - `Hanabi-Live/hanabi-live`
-- pinned commit: `054e859b97ebacc514ca37470e6bdfae5a93d467`
+- pinned commit: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`
 
 Do not invent fields or command behavior that is not documented here or re-verified against upstream.
 
@@ -380,7 +380,7 @@ server → gameAction {...}
 
 `init` contains game metadata such as table/player identity, role, options, seed, and related settings.
 
-At pinned commit `054e859b97ebacc514ca37470e6bdfae5a93d467`, `getGameInfo1` and
+At pinned commit `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`, `getGameInfo1` and
 `getGameInfo2` both consume exactly `{ "tableID": number }`. The `init` payload is emitted by
 `server/src/command_get_game_info_1.go` with these fields:
 

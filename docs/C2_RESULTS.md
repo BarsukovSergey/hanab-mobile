@@ -15,7 +15,7 @@ This conclusion is based on the exercised representative paths: a deterministic,
 ## Upstream closure
 
 - Repository: `Hanabi-Live/hanabi-live`
-- Pinned SHA: `054e859b97ebacc514ca37470e6bdfae5a93d467`
+- Pinned SHA: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`
 - Original upstream path: `packages/game/src`
 - Vendored path: `src/game/upstream/**`
 - Closure: 78 TypeScript/JSON files reachable from the C2 roots recorded in `src/game/upstream/UPSTREAM.md`, plus the copied upstream license and local provenance document.

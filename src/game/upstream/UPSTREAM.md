@@ -1,7 +1,7 @@
 # Pinned upstream game-core closure
 
 - Repository: `https://github.com/Hanabi-Live/hanabi-live.git`
-- Exact commit: `054e859b97ebacc514ca37470e6bdfae5a93d467`
+- Exact commit: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`
 - Original path: `packages/game/src`
 - License: repository-root `LICENSE`, copied here as `LICENSE`
 - Copy method: checked out the exact commit in a temporary clone, then followed every relative TypeScript/JSON import reachable from the C2 roots listed below and preserved each reachable file's path and contents.
