@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -85,6 +85,22 @@ export function GameScreen() {
     handSizes: game?.hands.map((hand) => hand.length) ?? [],
     ourPlayerIndex: ourIndex,
   }), [game, height, ourIndex, width]);
+
+  useEffect(() => {
+    interactionDispatch({ type: 'reset-lifecycle-transients' });
+    setNoteEditorOpen(false);
+    setDiscardViewerOpen(false);
+  }, [gameplayLayout.orientation]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') return;
+      interactionDispatch({ type: 'reset-lifecycle-transients' });
+      setNoteEditorOpen(false);
+      setDiscardViewerOpen(false);
+    });
+    return () => subscription.remove();
+  }, []);
 
   const authoritativeNote = noteCard === null ? '' : clientState?.notes.ourNotes[noteCard]?.text ?? '';
   useEffect(() => {
