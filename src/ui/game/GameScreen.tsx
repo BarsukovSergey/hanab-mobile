@@ -335,7 +335,7 @@ export function GameScreen() {
                   {target && !empathizing && <Pill active>Clue</Pill>}
                 </View>
               </Pressable>
-              <View style={[styles.hand, { gap: gameplayLayout.cardGap }]}> 
+              <View style={[styles.hand, { gap: gameplayLayout.cardGap }]}>
                 {displayedHand.map((order, position) => {
                   const card = game.deck[order];
                   if (card === undefined) return null;
