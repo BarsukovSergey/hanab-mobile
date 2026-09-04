@@ -39,8 +39,8 @@ export function getGameplayLayout({
   const height = Math.max(320, viewportHeight);
   const orientation = width > height ? 'landscape' : 'portrait';
   const landscapePhone = orientation === 'landscape' && height < 700;
-  const cardGap = width < 360 ? 4 : landscapePhone ? 4 : width < 700 ? 6 : 7;
-  const opponentRowGap = landscapePhone ? 5 : width < 360 ? 5 : 7;
+  const cardGap = width < 360 ? 4 : landscapePhone ? 3 : width < 700 ? 6 : 7;
+  const opponentRowGap = landscapePhone ? 4 : width < 360 ? 5 : 7;
   const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - PHONE_HORIZONTAL_CHROME));
   const ownLaneWidth = orientation === 'landscape'
     ? Math.max(260, (contentWidth - LANDSCAPE_GUTTER) * 0.55)
@@ -59,10 +59,10 @@ export function getGameplayLayout({
     ? (opponentLaneWidth - LANDSCAPE_GUTTER) / 2
     : opponentLaneWidth;
 
-  const ownMaxHeight = landscapePhone ? 84 : OWN_MAX_HEIGHT;
-  const opponentMaxHeight = landscapePhone ? 58 : OPPONENT_MAX_HEIGHT;
-  const ownMinHeight = landscapePhone ? 54 : OWN_MIN_HEIGHT;
-  const opponentMinHeight = landscapePhone ? 40 : OPPONENT_MIN_HEIGHT;
+  const ownMaxHeight = landscapePhone ? 72 : OWN_MAX_HEIGHT;
+  const opponentMaxHeight = landscapePhone ? 48 : OPPONENT_MAX_HEIGHT;
+  const ownMinHeight = landscapePhone ? 50 : OWN_MIN_HEIGHT;
+  const opponentMinHeight = landscapePhone ? 36 : OPPONENT_MIN_HEIGHT;
 
   const ownCardHeight = ownHandSize === 0
     ? 0
@@ -72,20 +72,20 @@ export function getGameplayLayout({
     maxOpponentHandSize,
     cardGap,
     opponentMinHeight,
-    Math.min(opponentMaxHeight, ownCardHeight > 0 ? ownCardHeight * 0.72 : opponentMaxHeight),
+    Math.min(opponentMaxHeight, ownCardHeight > 0 ? ownCardHeight * 0.68 : opponentMaxHeight),
   );
 
   const opponentRows = Math.ceil(opponentHandSizes.length / opponentColumns);
-  const ownSectionHeight = ownCardHeight === 0 ? 0 : ownCardHeight + (landscapePhone ? 26 : 32);
+  const ownSectionHeight = ownCardHeight === 0 ? 0 : ownCardHeight + (landscapePhone ? 22 : 32);
   const opponentSectionHeight = opponentRows === 0
     ? 0
-    : opponentRows * (opponentCardHeight + (landscapePhone ? 24 : 30)) + Math.max(0, opponentRows - 1) * opponentRowGap;
+    : opponentRows * (opponentCardHeight + (landscapePhone ? 20 : 30)) + Math.max(0, opponentRows - 1) * opponentRowGap;
   const estimatedHandsHeight = Math.round(
     orientation === 'landscape'
       ? Math.max(ownSectionHeight, opponentSectionHeight)
       : ownSectionHeight + opponentSectionHeight,
   );
-  const handsBudget = height * (orientation === 'portrait' ? 0.58 : 0.70);
+  const handsBudget = height * (orientation === 'portrait' ? 0.58 : 0.66);
 
   return {
     orientation,
