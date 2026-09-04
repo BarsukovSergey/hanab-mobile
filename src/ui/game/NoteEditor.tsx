@@ -29,7 +29,17 @@ export function NoteEditor({
   onClose: () => void;
 }) {
   const { theme } = useHanabTheme();
-  const submit = () => onSave(normalizeSubmittedNote(value));
+  const submitValue = (nextValue: string) => onSave(normalizeSubmittedNote(nextValue));
+  const submit = () => submitValue(value);
+  const change = (nextValue: string) => {
+    // Some Android keyboards still surface Enter as a newline before onSubmitEditing.
+    // Treat that as the same single-line submit action instead of leaving the sheet open.
+    if (nextValue.includes('\n') || nextValue.includes('\r')) {
+      submitValue(nextValue.replace(/[\r\n]+/g, ''));
+      return;
+    }
+    onChange(nextValue);
+  };
 
   return <Modal animationType="slide" onRequestClose={onClose} statusBarTranslucent transparent visible={visible}>
     <View style={styles.backdrop}>
@@ -46,7 +56,8 @@ export function NoteEditor({
           editable={editable}
           enterKeyHint="done"
           maxLength={300}
-          onChangeText={onChange}
+          multiline={false}
+          onChangeText={change}
           onSubmitEditing={submit}
           placeholder={editable ? 'Add a private note' : 'Read-only note'}
           returnKeyType="done"
@@ -77,7 +88,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
   title: { fontSize: 17, fontWeight: '900' },
-  input: { minHeight: 52 },
+  input: { minHeight: 44 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   actions: { flexDirection: 'row', gap: 8 },
 });
