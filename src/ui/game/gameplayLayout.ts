@@ -28,6 +28,7 @@ const OPPONENT_MAX_HEIGHT = 76;
 const OWN_MIN_HEIGHT = 68;
 const OPPONENT_MIN_HEIGHT = 46;
 const LANDSCAPE_GUTTER = 10;
+const LANDSCAPE_OWN_FRACTION = 1.35 / 2.35;
 
 export function getGameplayLayout({
   viewportWidth,
@@ -43,8 +44,10 @@ export function getGameplayLayout({
   const opponentRowGap = landscapePhone ? 5 : width < 360 ? 5 : 7;
   const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - PHONE_HORIZONTAL_CHROME));
   const landscapeUsableWidth = Math.max(1, contentWidth - LANDSCAPE_GUTTER);
+  // Keep the geometry model in lockstep with GameScreen's 1.35:1 flex split. If these drift,
+  // opponent cards can be sized for a lane that is wider than the lane actually rendered.
   const ownLaneWidth = orientation === 'landscape'
-    ? landscapeUsableWidth * 0.54
+    ? landscapeUsableWidth * LANDSCAPE_OWN_FRACTION
     : contentWidth;
   const opponentLaneWidth = orientation === 'landscape'
     ? landscapeUsableWidth - ownLaneWidth
