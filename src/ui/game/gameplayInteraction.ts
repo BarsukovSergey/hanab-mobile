@@ -92,9 +92,9 @@ export function gameplayInteractionReducer(
       const noteCard = state.noteCard !== null && action.visibleOrders.includes(state.noteCard)
         ? state.noteCard
         : null;
-      const empathyPlayer = state.empathyPlayer !== null && action.clueTargets.includes(state.empathyPlayer)
-        ? state.empathyPlayer
-        : null;
+      // Empathy is a momentary gesture, not durable gameplay state. Any authoritative hand sync
+      // invalidates the active press so an unmounted/moved Pressable cannot leave empathy sticky.
+      const empathyPlayer = null;
       const cluePreview = clueTarget !== null && clueTarget === state.clueTarget ? state.cluePreview : null;
       return { selectedCard, clueTarget, cluePreview, empathyPlayer, noteCard };
     }
