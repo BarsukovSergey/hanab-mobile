@@ -10,6 +10,7 @@ export type DiscardSuitSummary = {
   suitIndex: number;
   suitName: string;
   total: number;
+  unknownCount: number;
   ranks: readonly DiscardRankCount[];
 };
 
@@ -25,19 +26,27 @@ export function getDiscardSummary(
   const variant = getVariant(variantName);
   let total = 0;
   const suits = variant.suits.flatMap((suit, suitIndex) => {
+    const orders = game.discardStacks[suitIndex] ?? [];
+    if (orders.length === 0) return [];
+
     const counts = new Map<number, number>();
-    for (const order of game.discardStacks[suitIndex] ?? []) {
+    let unknownCount = 0;
+    for (const order of orders) {
       const card = game.deck[order];
-      if (card === undefined || card.rank === null) continue;
+      if (card === undefined || card.rank === null) {
+        unknownCount += 1;
+        continue;
+      }
       counts.set(card.rank, (counts.get(card.rank) ?? 0) + 1);
     }
-    const suitTotal = [...counts.values()].reduce((sum, count) => sum + count, 0);
-    if (suitTotal === 0) return [];
+
+    const suitTotal = orders.length;
     total += suitTotal;
     return [{
       suitIndex,
       suitName: suit.name,
       total: suitTotal,
+      unknownCount,
       ranks: [...counts.entries()]
         .sort(([a], [b]) => a - b)
         .map(([rank, count]) => ({ rank, count })),
