@@ -4,11 +4,18 @@ import { getCardKnowledgeViewModel } from '../../../game/selectors/cardKnowledge
 import { getCluePreview } from '../../../game/selectors/cluePreview';
 import { getLastCluePresentation } from '../../../game/selectors/lastClue';
 import { getCommittedClueMarkerForMetadata } from '../clueIndication';
+import {
+  gameplayInteractionReducer,
+  initialGameplayInteractionState,
+} from '../gameplayInteraction';
 import { getGameplayLayout } from '../gameplayLayout';
+import { getLiveNoteOrders } from '../liveNoteOrders';
 import {
   clueFlowFixtureOrders,
   getClueFlowScenarios,
   getGameplayScenarios,
+  getNoteFlowScenarios,
+  noteFlowFixture,
 } from './gameplayScenarios';
 
 describe('gameplay scenario harness', () => {
@@ -111,6 +118,44 @@ describe('gameplay scenario harness', () => {
     ).borderColor).toBe('orange');
   });
 
+  test('captures opponent note save, turn persistence, and live-editor cleanup after the card leaves hand', () => {
+    const noteFlow = new Map(getNoteFlowScenarios().map((scenario) => [scenario.id, scenario]));
+    const source = liveScenario(noteFlow, 'note-edit-source');
+    const saved = liveScenario(noteFlow, 'note-saved');
+    const advanced = liveScenario(noteFlow, 'note-survives-turn');
+    const leftHand = liveScenario(noteFlow, 'note-card-left-hand');
+    const order = noteFlowFixture.opponentOrder;
+
+    expect(source.clientState.ongoingGame.hands[1]).toContain(order);
+    expect(source.clientState.notes.ourNotes[order]?.text ?? '').toBe('');
+
+    const replayLength = saved.clientState.replay.actions.length;
+    expect(saved.clientState.notes.ourNotes[order]?.text).toBe(noteFlowFixture.text);
+    expect(replayLength).toBe(source.clientState.replay.actions.length);
+    expect(saved.clientState.ongoingGame.hands[1]).toContain(order);
+
+    expect(advanced.clientState.notes.ourNotes[order]?.text).toBe(noteFlowFixture.text);
+    expect(advanced.clientState.ongoingGame.hands[1]).toContain(order);
+    expect(advanced.clientState.replay.actions).toHaveLength(replayLength + 1);
+
+    expect(leftHand.clientState.notes.ourNotes[order]?.text).toBe(noteFlowFixture.text);
+    expect(leftHand.clientState.ongoingGame.hands[1]).not.toContain(order);
+    expect(leftHand.clientState.ongoingGame.discardStacks[0]).toContain(order);
+    expect(leftHand.clientState.ongoingGame.hands[1]).toContain(15);
+
+    const opened = {
+      ...initialGameplayInteractionState,
+      noteCard: order,
+    };
+    const synchronized = gameplayInteractionReducer(opened, {
+      type: 'sync-hands',
+      ownOrders: leftHand.clientState.ongoingGame.hands[0] ?? [],
+      clueTargets: [1, 2],
+      visibleOrders: getLiveNoteOrders(leftHand.clientState.ongoingGame),
+    });
+    expect(synchronized.noteCard).toBeNull();
+  });
+
   test('runs canonical viewport targets through the production layout calculation', () => {
     const expectedOrientations = new Map<string, 'portrait' | 'landscape'>([
       ['three-player-base', 'portrait'],
@@ -118,6 +163,10 @@ describe('gameplay scenario harness', () => {
       ['clue-committed', 'portrait'],
       ['clue-retouched-quacker', 'portrait'],
       ['clue-cleanup-after-discard', 'landscape'],
+      ['note-edit-source', 'portrait'],
+      ['note-saved', 'portrait'],
+      ['note-survives-turn', 'portrait'],
+      ['note-card-left-hand', 'landscape'],
       ['six-player-landscape', 'landscape'],
     ]);
 
