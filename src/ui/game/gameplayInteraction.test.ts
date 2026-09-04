@@ -32,6 +32,13 @@ describe('gameplayInteractionReducer', () => {
     expect(released.empathyPlayer).toBeNull();
   });
 
+  test('clears empathy when another interaction takes over', () => {
+    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
+    expect(gameplayInteractionReducer(held, { type: 'open-note', order: 20 }).empathyPlayer).toBeNull();
+    expect(gameplayInteractionReducer(held, { type: 'select-clue-target', playerIndex: 2 }).empathyPlayer).toBeNull();
+    expect(gameplayInteractionReducer(held, { type: 'cancel-transient' }).empathyPlayer).toBeNull();
+  });
+
   test('drops stale interaction references without silently selecting replacements', () => {
     const stale = {
       selectedCard: 99,
