@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getClueColorFill,
   getDisplayedClueTokens,
+  getDisplayedLiveFutureEfficiency,
   getGameTableSuits,
   getGameplayClueChoices,
   getGameplayClueChoicesForPlayerIndex,
@@ -82,5 +83,40 @@ describe('getGameTableSuits', () => {
     expect(hasClueTokenForVariant(2, variantName)).toBe(true);
     expect(getDisplayedClueTokens(1, variantName)).toBe(0.5);
     expect(getDisplayedClueTokens(2, variantName)).toBe(1);
+  });
+
+  it('matches pinned web live FRE semantics, including note and manual adjustments', () => {
+    const game = {
+      stats: {
+        maxScore: 25,
+        cardsGotten: 3,
+        cardsGottenByNotes: 2,
+        cluesStillUsableNotRounded: 20.9,
+      },
+    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+
+    expect(getDisplayedLiveFutureEfficiency(game, 1)).toBeCloseTo(19 / 20);
+  });
+
+  it('hides live FRE when no finite future efficiency exists', () => {
+    const unavailable = {
+      stats: {
+        maxScore: 25,
+        cardsGotten: 3,
+        cardsGottenByNotes: 0,
+        cluesStillUsableNotRounded: null,
+      },
+    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+    const noClues = {
+      stats: {
+        maxScore: 25,
+        cardsGotten: 3,
+        cardsGottenByNotes: 0,
+        cluesStillUsableNotRounded: 0,
+      },
+    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+
+    expect(getDisplayedLiveFutureEfficiency(unavailable, 0)).toBeNull();
+    expect(getDisplayedLiveFutureEfficiency(noClues, 0)).toBeNull();
   });
 });

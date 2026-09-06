@@ -9,6 +9,7 @@ import {
   getUnadjustedClueTokens,
 } from '../upstream/rules/clueTokens';
 import { getCardsPerHand } from '../upstream/rules/hand';
+import { getEfficiency } from '../upstream/rules/stats';
 import { millisecondsToClockString } from '../upstream/rules/text';
 
 export type LiveClock = {
@@ -126,15 +127,33 @@ export function getDisplayedClueTokens(clueTokens: number, variantName: string):
   return getUnadjustedClueTokens(clueTokens, getVariant(variantName));
 }
 
+/** Matches the pinned web client's live FRE display, including note and manual efficiency adjustments. */
+export function getDisplayedLiveFutureEfficiency(
+  game: Pick<GameState, 'stats'>,
+  efficiencyModifier: number,
+): number | null {
+  const cluesStillUsable = game.stats.cluesStillUsableNotRounded === null
+    ? null
+    : Math.floor(game.stats.cluesStillUsableNotRounded);
+  if (cluesStillUsable === null) return null;
+
+  const cardsGotten = game.stats.cardsGotten
+    + efficiencyModifier
+    + (game.stats.cardsGottenByNotes ?? 0);
+  const cardsNotGotten = Math.max(game.stats.maxScore - cardsGotten, 0);
+  const futureEfficiency = getEfficiency(cardsNotGotten, cluesStillUsable);
+  return Number.isFinite(futureEfficiency) ? futureEfficiency : null;
+}
+
 export function getGameTableSuits(
   variantName: string,
   game: AuthoritativeTableState,
 ): readonly GameTableSuit[] {
   return getVariant(variantName).suits.map((suit, suitIndex) => {
-    const playStack = game.playStacks[suitIndex] ?? [];
+    const playStack = game.playStacks[suit.suitIndex] ?? [];
     const topCardOrder = playStack[playStack.length - 1];
     const topCard = topCardOrder === undefined ? undefined : game.deck[topCardOrder];
-    const discardStack = game.discardStacks[suitIndex] ?? [];
+    const discardStack = game.discardStacks[suit.suitIndex] ?? [];
 
     return {
       suitIndex,

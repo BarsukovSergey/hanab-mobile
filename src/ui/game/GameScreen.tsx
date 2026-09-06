@@ -7,6 +7,7 @@ import { getCluePreview } from '../../game/selectors/cluePreview';
 import {
   getDisplayedClueTokens,
   getDisplayedClockString,
+  getDisplayedLiveFutureEfficiency,
   getGameTableSuits,
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
@@ -185,7 +186,7 @@ export function GameScreen() {
             {times?.type === 'playerTimes' ? <View style={styles.details}>
               <Text style={[styles.body, { color: theme.colors.text }]}>Duration: {formatMs(times.duration)}</Text>
               {times.playerTimes.map((time, i) => <Text key={metadata.playerNames[i] ?? i} style={[styles.muted, { color: theme.colors.textMuted }]}>{metadata.playerNames[i] ?? `Player ${i + 1}`}: {formatMs(time)}</Text>)}
-            </View> : duration !== null && <Text style={[styles.body, { color: theme.colors.text }]}>Duration: {formatMs(duration)}</Text>}
+            </View> : duration !== null && <Text style={[styles.body, { color: theme.colors.textMuted }]}>Duration: {formatMs(duration)}</Text>}
           </Panel>
           {shared !== null && <Panel><SectionHeading title="Shared replay" detail={`${clientState.spectators.length} active spectators`} />
             {shared.amLeader && <View style={styles.buttons}>
@@ -272,8 +273,10 @@ export function GameScreen() {
     && !replay.active;
 
   if (c17DensePortrait && ourIndex !== null) {
+    const futureEfficiency = getDisplayedLiveFutureEfficiency(game, clientState.notes.efficiencyModifier);
     return <>
       <C17DenseWorkspace
+        futureEfficiency={futureEfficiency}
         game={game}
         lastAction={game.log.at(-1)?.text ?? 'No completed action yet.'}
         metadata={metadata}
@@ -432,12 +435,13 @@ export function GameScreen() {
   </>;
 }
 
-function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction, onOpenDiscards, onSelectCard, variantName }: {
+function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction, futureEfficiency, onOpenDiscards, onSelectCard, variantName }: {
   game: GameState;
   metadata: { playerNames: readonly string[] };
   ourIndex: number;
   selectedCard: number | null;
   lastAction: string;
+  futureEfficiency: number | null;
   onOpenDiscards: () => void;
   onSelectCard: (order: number) => void;
   variantName: string;
@@ -467,6 +471,7 @@ function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction,
       <HudStat label="Strikes" value={game.strikes.length} />
       <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
       {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
+      {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
     </View>
     <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
     <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
@@ -551,7 +556,7 @@ function GameLog({ entries, title }: { entries: readonly { turn: number; text: s
   return <Panel><SectionHeading title={title} /><View style={styles.log}>{entries.map((entry, i) => <Text key={`${entry.turn}-${i}`} style={[styles.muted, { color: theme.colors.textMuted }]}>{entry.text}</Text>)}</View></Panel>;
 }
 
-function HudStat({ label, value }: { label: string; value: number }) {
+function HudStat({ label, value }: { label: string; value: number | string }) {
   const { theme } = useHanabTheme();
   return <View style={styles.hudStat}><Text style={[styles.hudValue, { color: theme.colors.text }]}>{value}</Text><Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text></View>;
 }
