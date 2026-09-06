@@ -53,7 +53,19 @@ If this fails, switch that window/text-scale class to Compact Overview + focused
 
 The first ordinary Android portrait Full Ledger attempt failed the physical gate: the opponent rows/HUD were individually readable, but the local hand was clipped/covered by three-button navigation and the reserved Workbench fell below the usable viewport. The same failure was visible in 6P + One Extra Card with four-card hands.
 
-Therefore the ordinary-phone portrait class is now routed to Compact Overview instead of further shrinking Full Ledger. The current ~390 x 844 and ~320 x 568 Compact Overview thresholds and the ~390 x 932 Full Ledger candidate remain implementation hypotheses pending physical follow-up; they are not frozen product breakpoints.
+The immediate fixed-size Compact attempt then fit above system navigation but wasted substantial vertical space because it hard-capped opponent cards around 34 dp and still reserved a fixed Workbench band. That allocation policy also failed.
+
+The current candidate is adaptive allocation:
+
+1. subtract fixed app/table/system chrome;
+2. reserve only the minimum actionable Workbench band;
+3. reserve the stable local-hand band;
+4. divide the remaining height across all opponent rows;
+5. cap by width and reasonable maximum card size;
+6. classify as Full Ledger when the resulting card size remains readable;
+7. use true Compact Overview only when the computed card size falls below the readability floor.
+
+This candidate must now be rechecked physically on the same ordinary Android portrait device, preferably 6P + One Extra Card. Pass requires no bottom clipping/system-navigation overlap, materially larger hands than the fixed Compact attempt, no large unexplained empty region, and a usable minimum Workbench/action band.
 
 ## 2. Trash/useless visual validation
 
@@ -265,9 +277,9 @@ Record physical results here as C17 progresses.
 
 | Date | Build/commit | Device / safe window | Scenario | Result | Notes / decision |
 |---|---|---|---|---|---|
-| 2026-09-06 | `2519c2f5` | Android portrait, three-button nav, ordinary ~390 x 844 class | Dense 6P Full Ledger | **FAIL** | Opponent rows/HUD readable, but local hand is covered/clipped at bottom and reserved Workbench is below usable viewport. Route this class to Compact Overview. |
-| 2026-09-06 | `2519c2f5` | Same phone class | Dense 6P + One Extra Card | **FAIL Full Ledger** | Four-card hands remain readable in width; failure is primarily vertical composition/safe-area budget, not hand width. |
-| — | `1b12cdcb` or later | Same phone class | Dense 6P Compact Overview follow-up | PENDING | Confirm all players remain useful, own hand and Workbench stay above system navigation, and compact cards/summaries remain readable. |
+| 2026-09-06 | pre-adaptive C17-0 | ordinary Android portrait / three-button nav | Dense 6P Full Ledger | FAIL | Bottom/local hand and Workbench clipped by system navigation. |
+| 2026-09-06 | fixed compact C17-0 | same device class | Dense 6P compact | FAIL | Fit succeeded but opponent hands were over-shrunk and large vertical space was wasted. |
+| — | — | — | Adaptive dense allocation | PENDING | Recheck same 6P + One Extra Card scenario. |
 | — | — | — | Trash visual candidate | PENDING | Start with semi-transparent/subdued treatment. |
 | — | — | — | Functional action animations | PENDING | Verify no blocking/backlog. |
 | — | — | — | Serious 5P session | PENDING | Release gate. |
