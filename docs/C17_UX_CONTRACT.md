@@ -1,7 +1,7 @@
 # C17 Product & Gameplay UX Contract
 
-Version: **1.1 — frozen product baseline**  
-Date: 2026-09-06  
+Version: **1.1 — frozen product baseline**
+Date: 2026-09-06
 Scope: Android-first Hanab Mobile C17 product/gameplay UX
 
 This is the authoritative C17 product/UI contract for the mobile client. It supersedes presentation and gesture decisions in `docs/MOBILE_GAMEPLAY_REDESIGN.md` and C16 where they conflict. C16 networking, protocol, upstream-semantic, reconnect, and authoritative-state boundaries remain in force.
@@ -36,7 +36,7 @@ C17 does not rewrite Hanabi.
 - Notes/actions are keyed by authoritative card identity/order, never by a slot that can be occupied by a later draw.
 - Latest clue, permanent knowledge, personal notes, candidate preview, and last action are separate concepts and must remain visually/semantically separate.
 
-Upstream semantic baseline: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`.  
+Upstream semantic baseline: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`.
 Card-presentation pin: `7a9c601b66f5966f7e33564855e25f82e68a94ed`.
 
 ## 3. Protected reasoning context
