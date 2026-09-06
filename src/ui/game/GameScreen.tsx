@@ -380,7 +380,7 @@ export function GameScreen() {
           </View>
           {selectedCard === null
             ? <Text style={[styles.selectHint, { color: theme.colors.textMuted }]}>Tap a card to play, discard, or note it.</Text>
-            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}> 
+            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}>
               <Text numberOfLines={1} style={[styles.actionLabel, { color: theme.colors.text }]}>Card {displayedOurHand.findIndex((order) => order === selectedCard) + 1}</Text>
               <View style={styles.actionButtons}>
                 <ActionButton compact disabled={!cardEnabled} title="Play" tone="primary" onPress={() => lobbyRuntime.play(selectedCard)} />
@@ -562,7 +562,7 @@ function C17DenseWorkspace({
   const recentText = recent.at(-1)?.summary ?? 'Start of game';
 
   return <View style={styles.c17Workspace}>
-    <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+    <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <View style={styles.grow}>
         <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {getHumanTurnNumber(game.turn.turnNum)}</Text>
         <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
@@ -576,12 +576,13 @@ function C17DenseWorkspace({
       {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
     </View>
     <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
-    <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}> 
+    <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
       <View style={styles.c17LastActionHeader}>
         <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? 'REVIEW ACTION' : 'LAST ACTION'}</Text>
         {!reviewActive && <Pressable
           accessibilityLabel="Review previous action"
           disabled={previousSegment === null}
+          hitSlop={12}
           onPress={onReviewBefore}
         >
           <Text style={[styles.c17HistoryLink, { color: previousSegment === null ? theme.colors.textMuted : theme.colors.accent }]}>HISTORY</Text>
@@ -594,7 +595,7 @@ function C17DenseWorkspace({
       {opponents.map((index) => {
         const currentActor = current === index;
         const compact = layout.mode === 'compact-overview';
-        return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}> 
+        return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
           <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
           <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
             const card = game.deck[order];
@@ -604,7 +605,7 @@ function C17DenseWorkspace({
         </View>;
       })}
     </View>
-    <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+    <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <Text style={[styles.c17OwnTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
       <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
         const card = game.deck[order];
@@ -615,7 +616,7 @@ function C17DenseWorkspace({
       })}</View>
     </View>
     </View>
-    <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}> 
+    <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
       {reviewActive
         ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>REVIEW · {selectedSegment}/{latestSegment}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
