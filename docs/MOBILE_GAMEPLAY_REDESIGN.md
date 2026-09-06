@@ -2,8 +2,8 @@
 
 Status: **HISTORICAL / SUPERSEDED FOR C17 PRESENTATION**
 
-> C17 product/UI authority is now `docs/C17_UX_CONTRACT.md`.  
-> Product decisions ratified after the Astra review are recorded in `docs/C17_UX_DECISIONS.md`, and unresolved/on-device gates live in `docs/C17_VALIDATION.md`.  
+> C17 product/UI authority is now `docs/C17_UX_CONTRACT.md`.
+> Product decisions ratified after the Astra review are recorded in `docs/C17_UX_DECISIONS.md`, and unresolved/on-device gates live in `docs/C17_VALIDATION.md`.
 > This file remains useful historical context, but its presentation and gesture choices are not authoritative where they conflict with the C17 contract. In particular, hold-only empathy, global-empathy deferral, blanket transient reset, and a shared root-scroll fallback are superseded. Frozen server/upstream semantics remain governed by the architecture/upstream docs.
 
 This document records the earlier product and architecture direction for redesigning the live-game UI on phones/tablets. The main goal was to avoid losing important gameplay context behind nested scrolling while keeping hanab.live semantics familiar.
