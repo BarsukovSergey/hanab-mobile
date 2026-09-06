@@ -34,7 +34,6 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
     : selectedSegment;
   const selectedIndex = available.indexOf(resolvedSegment);
   const selectedState = states[resolvedSegment];
-  const latestState = states[available.at(-1) ?? resolvedSegment] ?? selectedState;
   const entries = available.map((segment, index) => {
     const after = states[segment];
     if (after === undefined) return null;
@@ -55,9 +54,7 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
     nextSegment: selectedIndex >= 0 && selectedIndex < available.length - 1
       ? available[selectedIndex + 1] ?? null
       : null,
-    newerActionCount: selectedState === undefined || latestState === undefined
-      ? 0
-      : Math.max(0, latestState.log.length - selectedState.log.length),
+    newerActionCount: selectedIndex < 0 ? 0 : Math.max(0, available.length - selectedIndex - 1),
     last,
     recent,
   };
