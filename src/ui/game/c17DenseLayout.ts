@@ -19,7 +19,7 @@ type Input = {
 };
 
 const OPPONENT_CARD_GAP = 3;
-const OWN_CARD_GAP = 4;
+const OWN_CARD_GAP = 3;
 const OPPONENT_ROW_GAP = 2;
 const HAND_ROW_GAP = 5;
 // Matches c17OpponentRow's 1 dp top and bottom border.
