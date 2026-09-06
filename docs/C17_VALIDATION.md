@@ -3,7 +3,7 @@
 Status: **active**
 Date: 2026-09-06
 
-This document tracks what C17 still has to prove on real devices. It does not restate game semantics. The current product contract is `docs/C17_UX_CONTRACT.md`.
+This document tracks what C17 still has to prove on real devices. It does not restate game semantics. The current product contract is `docs/C17_UX_CONTRACT.md`. Detailed physical observations and defect history are preserved in `docs/C17_EVIDENCE.md`.
 
 ## 1. Immediate gate: dense 6P workspace prototype
 
@@ -48,6 +48,12 @@ Full Ledger passes for a window/text-scale class only if:
 - a serious player would accept the density for a full game.
 
 If this fails, switch that window/text-scale class to Compact Overview + focused/pinned comparison. Do not shrink below readability just to preserve the Full Ledger label.
+
+### Current C17-0 physical result
+
+The first ordinary Android portrait Full Ledger attempt failed the physical gate: the opponent rows/HUD were individually readable, but the local hand was clipped/covered by three-button navigation and the reserved Workbench fell below the usable viewport. The same failure was visible in 6P + One Extra Card with four-card hands.
+
+Therefore the ordinary-phone portrait class is now routed to Compact Overview instead of further shrinking Full Ledger. The current ~390 x 844 and ~320 x 568 Compact Overview thresholds and the ~390 x 932 Full Ledger candidate remain implementation hypotheses pending physical follow-up; they are not frozen product breakpoints.
 
 ## 2. Trash/useless visual validation
 
@@ -259,7 +265,9 @@ Record physical results here as C17 progresses.
 
 | Date | Build/commit | Device / safe window | Scenario | Result | Notes / decision |
 |---|---|---|---|---|---|
-| — | — | — | Dense 6P Full Ledger prototype | PENDING | First gate before broad C17 implementation. |
+| 2026-09-06 | `2519c2f5` | Android portrait, three-button nav, ordinary ~390 x 844 class | Dense 6P Full Ledger | **FAIL** | Opponent rows/HUD readable, but local hand is covered/clipped at bottom and reserved Workbench is below usable viewport. Route this class to Compact Overview. |
+| 2026-09-06 | `2519c2f5` | Same phone class | Dense 6P + One Extra Card | **FAIL Full Ledger** | Four-card hands remain readable in width; failure is primarily vertical composition/safe-area budget, not hand width. |
+| — | `1b12cdcb` or later | Same phone class | Dense 6P Compact Overview follow-up | PENDING | Confirm all players remain useful, own hand and Workbench stay above system navigation, and compact cards/summaries remain readable. |
 | — | — | — | Trash visual candidate | PENDING | Start with semi-transparent/subdued treatment. |
 | — | — | — | Functional action animations | PENDING | Verify no blocking/backlog. |
 | — | — | — | Serious 5P session | PENDING | Release gate. |
