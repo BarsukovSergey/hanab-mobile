@@ -13,10 +13,17 @@ describe('C17 workspace route', () => {
     expect(isC17WorkspaceEligible({ ...livePlayerPortrait, playerCount })).toBe(true);
   });
 
+  test('keeps the C17 ledger while locally reviewing a live game', () => {
+    expect(isC17WorkspaceEligible({
+      ...livePlayerPortrait,
+      playerCount: 6,
+      replayActive: true,
+    })).toBe(true);
+  });
+
   test.each([
     { ...livePlayerPortrait, playerCount: 6, portrait: false },
     { ...livePlayerPortrait, playerCount: 6, finished: true },
-    { ...livePlayerPortrait, playerCount: 6, replayActive: true },
     { ...livePlayerPortrait, playerCount: 6, isPlayer: false },
     { ...livePlayerPortrait, playerCount: 1 },
     { ...livePlayerPortrait, playerCount: 7 },
