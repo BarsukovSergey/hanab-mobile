@@ -6,18 +6,16 @@ export type C17WorkspaceEligibility = {
   replayActive: boolean;
 };
 
-/** The non-scrolling C17 workspace is only for an active player at a live table. */
+/** The non-scrolling C17 workspace stays active for a player while reviewing live history. */
 export function isC17WorkspaceEligible({
   isPlayer,
   playerCount,
   portrait,
   finished,
-  replayActive,
 }: C17WorkspaceEligibility): boolean {
   return isPlayer
     && playerCount >= 2
     && playerCount <= 6
     && portrait
-    && !finished
-    && !replayActive;
+    && !finished;
 }
