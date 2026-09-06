@@ -49,23 +49,33 @@ Full Ledger passes for a window/text-scale class only if:
 
 If this fails, switch that window/text-scale class to Compact Overview + focused/pinned comparison. Do not shrink below readability just to preserve the Full Ledger label.
 
-### Current C17-0 physical result
+### Current C17-0 physical result — PASS for the tested ordinary Android portrait class
 
 The first ordinary Android portrait Full Ledger attempt failed the physical gate: the opponent rows/HUD were individually readable, but the local hand was clipped/covered by three-button navigation and the reserved Workbench fell below the usable viewport. The same failure was visible in 6P + One Extra Card with four-card hands.
 
 The immediate fixed-size Compact attempt then fit above system navigation but wasted substantial vertical space because it hard-capped opponent cards around 34 dp and still reserved a fixed Workbench band. That allocation policy also failed.
 
-The current candidate is adaptive allocation:
+The corrected adaptive allocation now:
 
-1. subtract fixed app/table/system chrome;
-2. reserve only the minimum actionable Workbench band;
-3. reserve the stable local-hand band;
-4. divide the remaining height across all opponent rows;
-5. cap by width and reasonable maximum card size;
-6. classify as Full Ledger when the resulting card size remains readable;
-7. use true Compact Overview only when the computed card size falls below the readability floor.
+1. subtracts fixed app/table/system chrome;
+2. reserves only the minimum actionable Workbench band;
+3. reserves the stable local-hand band;
+4. divides the remaining height across all opponent rows;
+5. caps by width and reasonable maximum card size;
+6. classifies as Full Ledger when the resulting card size remains above the readability floor;
+7. uses true Compact Overview only when the computed card size falls below that floor.
 
-This candidate must now be rechecked physically on the same ordinary Android portrait device, preferably 6P + One Extra Card. Pass requires no bottom clipping/system-navigation overlap, materially larger hands than the fixed Compact attempt, no large unexplained empty region, and a usable minimum Workbench/action band.
+Physical Android portrait follow-up on the same three-button-navigation device class passed in both ordinary 6P and 6P + One Extra Card. In the four-card-hand case:
+
+- all five opponent hands were simultaneously visible and readable;
+- all four cards in each opponent hand remained comfortably distinguishable;
+- the local four-card hand was fully visible above Android navigation;
+- HUD, fireworks/discard, Last Action, local hand, and minimum Workbench all fit without root scrolling;
+- no required region was clipped by system navigation;
+- the fixed-Compact empty-space failure disappeared;
+- the adaptive result remained a useful Full Ledger rather than forcing an unnecessarily tiny Compact Overview.
+
+Therefore C17-0 density validation is **closed for this tested ordinary portrait/window/text-scale class**. Do not reopen it for subjective dp tuning unless a later acceptance case or another window/text-scale class fails. Compact Overview remains required as the fallback for genuinely constrained classes where the adaptive result falls below the readability floor.
 
 ## 2. Trash/useless visual validation
 
@@ -279,7 +289,8 @@ Record physical results here as C17 progresses.
 |---|---|---|---|---|---|
 | 2026-09-06 | pre-adaptive C17-0 | ordinary Android portrait / three-button nav | Dense 6P Full Ledger | FAIL | Bottom/local hand and Workbench clipped by system navigation. |
 | 2026-09-06 | fixed compact C17-0 | same device class | Dense 6P compact | FAIL | Fit succeeded but opponent hands were over-shrunk and large vertical space was wasted. |
-| — | — | — | Adaptive dense allocation | PENDING | Recheck same 6P + One Extra Card scenario. |
+| 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P | PASS | All hands, own hand, HUD/table, Last Action, and minimum Workbench fit cleanly. |
+| 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P + One Extra Card | PASS | Four-card opponent and local hands remain readable; no Android-nav clipping or wasted compact-space band. C17-0 density gate closed for this class. |
 | — | — | — | Trash visual candidate | PENDING | Start with semi-transparent/subdued treatment. |
 | — | — | — | Functional action animations | PENDING | Verify no blocking/backlog. |
 | — | — | — | Serious 5P session | PENDING | Release gate. |
