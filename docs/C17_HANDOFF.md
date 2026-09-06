@@ -72,41 +72,43 @@ FRE follow-up was added and fixed through:
 
 `2519c2f5cdf9ddff9014a5117b721761be738b68`
 
-Physical Full Ledger evidence then forced Compact Overview fallback work. The branch contains later commits after that; always inspect the current PR head before editing.
+Adaptive dense allocation that passed the physical 6P portrait gate is at:
+
+`b07bfff7569fa0cae1178ce4950cb2d3857aae1f`
 
 Implemented C17-0 characteristics:
 
 - six-player live portrait uses a non-scrolling C17 host;
 - stable local-relative seating;
 - current actor / `YOUR TURN` without row reorder;
-- Full Ledger vs Compact Overview fit mode;
+- adaptive Full Ledger vs Compact Overview fit mode;
 - all opponent hands represented;
-- local-hand anchor plus reserved Workbench;
+- local-hand anchor plus minimum Workbench band;
 - fireworks/discard summary and persistent last-action region;
 - score, achievable max, clues, strikes, deck, pace, FRE;
 - existing C16 route remains for other compositions until later slices migrate them.
 
 C17-0 is deliberately a density/layout prototype, not full C17 gameplay parity.
 
-## C17-0 physical result
+## C17-0 physical result — PASSED for tested ordinary Android portrait class
 
-The first Full Ledger attempt on the ordinary Android portrait class **failed**.
+Three successive physical checks established the final rule:
 
-Observed:
+1. Initial Full Ledger failed because the local hand and Workbench were clipped by Android three-button navigation.
+2. Fixed-size Compact Overview fit, but over-shrank opponent hands and left a large useless empty region.
+3. Adaptive allocation passed in both ordinary 6P and 6P + One Extra Card (four-card hands).
 
-- opponent cards/HUD were individually readable;
-- local hand was clipped/covered by Android three-button navigation;
-- reserved Workbench fell below the usable viewport;
-- 6P + One Extra Card (four-card hands) confirmed the main failure was vertical composition/safe-area budget rather than width.
+The passing adaptive result showed:
 
-Result:
+- all five opponent hands simultaneously visible and readable;
+- four-card One Extra Card hands still readable;
+- local hand fully visible above Android navigation;
+- HUD, fireworks/discard, Last Action, local hand, and minimum Workbench all fit without root scrolling;
+- no required region clipped by system navigation;
+- no large unexplained empty region;
+- the tested ordinary portrait class can remain Full Ledger after adaptive fitting.
 
-- ordinary ~390 x 844 class -> Compact Overview candidate;
-- ~320 x 568 -> smaller Compact Overview candidate;
-- genuinely taller ~390 x 932 class may still be a Full Ledger candidate;
-- exact thresholds are hypotheses, not frozen product breakpoints.
-
-The immediate next physical gate is **the same 6P + One Extra Card portrait state after Compact Overview changes**. Check only whether all players remain useful/readable and own hand + Workbench stay clear of Android navigation. Do not run a broad smoke before that gate passes.
+Therefore **do not reopen C17-0 density for this tested window/text-scale class unless a later acceptance case or new device/text-scale evidence fails**. Compact Overview remains the fallback for genuinely constrained classes where adaptive fitting drops below the readability floor.
 
 ## Known current presentation defects visible in C17-0 evidence
 
@@ -116,9 +118,9 @@ Do not ask the user to rediscover these:
 - empty discard copy still uses `None`; target wording is `Empty`;
 - C17-0 Workbench is still a placeholder and the new 6P portrait route does not yet expose full Play/Discard/Clue/Note parity;
 - current dense C17 route has not yet migrated all C16 note/semantic/latest-clue overlays;
-- exact Compact Overview final interaction is not frozen until physical readability passes; do not endlessly shave a few dp if mini cards are not useful.
+- Last Action wording is still mechanically derived and needs the C17-2 human-readable temporal treatment.
 
-## Next implementation slices after density gate
+## Next implementation slices
 
 1. **C17-1 Workspace/direct actions** — stable production workspace for supported player counts, safe-area ownership, tap card -> explicit Play/Discard, spectator-safe action surface.
 2. **C17-2 Temporal awareness/table inspection** — actor/resources, useful stats, last action, exact before/after, recent events, A29 live history.
