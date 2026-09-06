@@ -274,16 +274,25 @@ export function GameScreen() {
 
   if (c17DensePortrait && ourIndex !== null) {
     const futureEfficiency = getDisplayedLiveFutureEfficiency(game, clientState.notes.efficiencyModifier);
+    const commitSelectedCard = (action: 'play' | 'discard') => {
+      if (!cardEnabled || selectedCard === null) return;
+      if (action === 'play') lobbyRuntime.play(selectedCard);
+      else lobbyRuntime.discard(selectedCard);
+    };
     return <>
       <C17DenseWorkspace
+        canCommitCard={cardEnabled}
         futureEfficiency={futureEfficiency}
         game={game}
         lastAction={game.log.at(-1)?.text ?? 'No completed action yet.'}
         metadata={metadata}
+        onDiscard={() => commitSelectedCard('discard')}
         ourIndex={ourIndex}
         selectedCard={selectedCard}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
+        onPlay={() => commitSelectedCard('play')}
         onSelectCard={(order) => interactionDispatch({ type: 'select-card', order })}
+        pendingText={pendingText ?? null}
         variantName={metadata.options.variantName}
       />
       <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
@@ -435,15 +444,19 @@ export function GameScreen() {
   </>;
 }
 
-function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction, futureEfficiency, onOpenDiscards, onSelectCard, variantName }: {
+function C17DenseWorkspace({ canCommitCard, game, metadata, ourIndex, selectedCard, lastAction, futureEfficiency, onDiscard, onOpenDiscards, onPlay, onSelectCard, pendingText, variantName }: {
+  canCommitCard: boolean;
   game: GameState;
   metadata: { playerNames: readonly string[] };
   ourIndex: number;
   selectedCard: number | null;
   lastAction: string;
   futureEfficiency: number | null;
+  onDiscard: () => void;
   onOpenDiscards: () => void;
+  onPlay: () => void;
   onSelectCard: (order: number) => void;
+  pendingText: string | null;
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
@@ -458,6 +471,7 @@ function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction,
   const current = game.turn.currentPlayerIndex;
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
+  const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
 
   return <View style={styles.c17Workspace}>
     <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -499,12 +513,21 @@ function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction,
         if (card === undefined) return null;
         return <GameCard height={layout.ownCardHeight} key={order}
           knowledge={getCardKnowledgeViewModel(variantName, card, undefined, false)} onSelect={() => onSelectCard(order)}
-          position={position} selected={selectedCard === order} variantName={variantName} />;
+          position={position} selected={selectedOwnCard === order} variantName={variantName} />;
       })}</View>
     </View>
     <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
       <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
-      <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Reserved C17 workspace for card actions, clues, notes, and inspection.</Text>
+      {selectedOwnCard === null
+        ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
+        : <View style={styles.c17ActionRow}>
+          <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+          <View style={styles.actionButtons}>
+            <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
+            <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+          </View>
+        </View>}
+      {pendingText !== null && <Text style={[styles.c17PendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
     </View>
   </View>;
 }
@@ -635,7 +658,9 @@ const styles = StyleSheet.create({
   c17OwnTitle: { fontSize: 10, fontWeight: '900', width: 64 },
   c17OwnCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 4, minWidth: 0 },
   c17Workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 4, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
+  c17ActionRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   c17WorkbenchText: { fontSize: 12, lineHeight: 16 },
+  c17PendingText: { fontSize: 10, lineHeight: 14 },
   stats: { flexDirection: 'row', gap: 8, width: '100%' },
   stat: { alignItems: 'center', borderRadius: 10, flex: 1, padding: 9 },
   statValue: { fontSize: 20, fontWeight: '900' },
