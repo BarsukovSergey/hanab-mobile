@@ -9,9 +9,9 @@ This file exists so the physical observations that motivated C17 do not live onl
 
 ## 1. C17-0 dense portrait evidence
 
-### Full Ledger on ordinary Android portrait — FAIL
+### First Full Ledger attempt on ordinary Android portrait — FAIL
 
-Physical screenshots of the C17-0 production-path 6-player portrait prototype showed:
+Physical screenshots of the first C17-0 production-path 6-player portrait prototype showed:
 
 - HUD, fireworks/discard summary, last action, and opponent card identities were individually readable;
 - all five opponent rows could be represented;
@@ -19,17 +19,34 @@ Physical screenshots of the C17-0 production-path 6-player portrait prototype sh
 - the local hand was clipped/covered at the bottom by Android three-button navigation;
 - the reserved Workbench was pushed below the usable viewport;
 - the failure remained in the 6P + One Extra Card case (four-card hands), so it was not merely a width problem;
-- therefore mathematical card-row fit was a false positive for this window class.
+- therefore the original mathematical full-ledger fit calculation was a false positive for this window class.
 
-Decision produced by this evidence: ordinary phone portrait around the current 390 x 844 layout class must use Compact Overview rather than shrinking Full Ledger or clipping the bottom. Full Ledger may still be used for genuinely taller usable windows after physical validation.
+### First fixed Compact Overview attempt — FAIL AS ALLOCATION POLICY
 
-Current implementation hypothesis after the failure:
+The immediate fallback hard-capped ordinary portrait opponent cards around 34 dp and reserved a fixed Workbench band. The next physical screenshot showed:
 
-- ~390 x 844 class -> Compact Overview;
-- ~390 x 932 class -> Full Ledger candidate;
-- ~320 x 568 class -> smaller Compact Overview candidate.
+- all required regions now fit above Android navigation;
+- opponent hands became much smaller than necessary;
+- a large amount of useful vertical space remained empty below the Workbench;
+- therefore a binary breakpoint with fixed compact card heights wastes space and is not the correct final policy.
 
-These thresholds are implementation hypotheses, not frozen product breakpoints. Compact Overview still requires a physical follow-up screenshot/readability check.
+### Current density rule produced by both failures
+
+C17 should allocate dense portrait space adaptively rather than choose between two arbitrary fixed card sizes:
+
+1. subtract fixed app/table/system chrome;
+2. reserve only a minimum actionable Workbench band;
+3. reserve the stable local-hand band;
+4. divide the remaining height across all opponent rows;
+5. cap by width and reasonable maximum card size;
+6. classify the result as Full Ledger when the resulting opponent card faces remain above the readability floor;
+7. use true Compact Overview only when the computed card faces would fall below that floor.
+
+The Workbench is a protected interaction region, not a permanently oversized empty rectangle. In idle state it may be only the minimum action band; note/clue/inspection tools can use a larger surface when active while preserving return context.
+
+Geometry remains stable for the current window/text-scale/player-count/hand-capacity class and must not reflow merely because hands shrink later in the game.
+
+A new physical screenshot is required to validate this adaptive allocation on the same 6P + One Extra Card device state.
 
 ### Other defects visible in the same prototype evidence
 
