@@ -23,6 +23,7 @@ type Input = {
   variantName: string;
 };
 
+// Upstream stores reducer turns from zero; player-facing logs and UI count from one.
 export function getHumanTurnNumber(turnNum: number): number {
   return Math.max(1, turnNum + 1);
 }
