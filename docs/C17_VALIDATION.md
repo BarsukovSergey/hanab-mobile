@@ -1,6 +1,6 @@
 # C17 Validation Plan
 
-Status: **active**  
+Status: **active**
 Date: 2026-09-06
 
 This document tracks what C17 still has to prove on real devices. It does not restate game semantics. The current product contract is `docs/C17_UX_CONTRACT.md`.
