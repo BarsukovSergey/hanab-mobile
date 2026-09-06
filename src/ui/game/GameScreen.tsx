@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -8,6 +8,7 @@ import {
   getDisplayedClueTokens,
   getDisplayedClockString,
   getDisplayedLiveFutureEfficiency,
+  getGameplayCardsPerHand,
   getGameTableSuits,
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
@@ -32,6 +33,7 @@ import {
 } from './gameplayInteraction';
 import { getGameplayLayout } from './gameplayLayout';
 import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout';
+import { isC17WorkspaceEligible } from './c17Workspace';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
 
@@ -266,11 +268,13 @@ export function GameScreen() {
   };
 
   const landscape = gameplayLayout.orientation === 'landscape';
-  const c17DensePortrait = playerRoom !== null
-    && metadata.playerNames.length === 6
-    && gameplayLayout.orientation === 'portrait'
-    && !clientState.finished
-    && !replay.active;
+  const c17DensePortrait = isC17WorkspaceEligible({
+    isPlayer: playerRoom !== null,
+    playerCount: metadata.playerNames.length,
+    portrait: gameplayLayout.orientation === 'portrait',
+    finished: clientState.finished,
+    replayActive: replay.active,
+  });
 
   if (c17DensePortrait && ourIndex !== null) {
     const futureEfficiency = getDisplayedLiveFutureEfficiency(game, clientState.notes.efficiencyModifier);
@@ -281,6 +285,7 @@ export function GameScreen() {
     };
     return <>
       <C17DenseWorkspace
+        cardsPerHand={getGameplayCardsPerHand(metadata)}
         canCommitCard={cardEnabled}
         futureEfficiency={futureEfficiency}
         game={game}
@@ -444,7 +449,8 @@ export function GameScreen() {
   </>;
 }
 
-function C17DenseWorkspace({ canCommitCard, game, metadata, ourIndex, selectedCard, lastAction, futureEfficiency, onDiscard, onOpenDiscards, onPlay, onSelectCard, pendingText, variantName }: {
+function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourIndex, selectedCard, lastAction, futureEfficiency, onDiscard, onOpenDiscards, onPlay, onSelectCard, pendingText, variantName }: {
+  cardsPerHand: number;
   canCommitCard: boolean;
   game: GameState;
   metadata: { playerNames: readonly string[] };
@@ -461,19 +467,25 @@ function C17DenseWorkspace({ canCommitCard, game, metadata, ourIndex, selectedCa
 }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
+  const [workspaceSize, setWorkspaceSize] = useState({ width: 0, height: 0 });
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
   const layout = getC17DenseLayout({
-    viewportWidth: width,
-    viewportHeight: height,
-    opponentHandSizes: opponents.map((index) => game.hands[index]?.length ?? 0),
-    ownHandSize: game.hands[ourIndex]?.length ?? 0,
+    workspaceWidth: workspaceSize.width || width,
+    workspaceHeight: workspaceSize.height || height,
+    opponentCount: opponents.length,
+    cardsPerHand,
   });
+  const onWorkspaceLayout = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
+    if (next.width !== workspaceSize.width || next.height !== workspaceSize.height) {
+      setWorkspaceSize({ width: next.width, height: next.height });
+    }
+  };
   const current = game.turn.currentPlayerIndex;
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
 
-  return <View style={styles.c17Workspace}>
+  return <View onLayout={onWorkspaceLayout} style={styles.c17Workspace}>
     <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <View style={styles.grow}>
         <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {game.turn.turnNum}</Text>

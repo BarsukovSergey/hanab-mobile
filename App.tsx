@@ -7,11 +7,11 @@ import {
   Modal,
   Platform,
   ScrollView,
-  StatusBar as NativeStatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { lobbyRuntime, networkSession } from './src/runtime/application';
 import { useAppSelector } from './src/store/hooks';
@@ -29,6 +29,7 @@ import {
 } from './src/ui/designSystem';
 import { GameScreen } from './src/ui/game/GameScreen';
 import { LastClueNotice } from './src/ui/game/LastClueNotice';
+import { isC17WorkspaceEligible } from './src/ui/game/c17Workspace';
 import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
@@ -40,9 +41,11 @@ type LiveSheet = 'menu' | 'chat' | 'settings' | null;
 
 export default function App() {
   return (
-    <HanabThemeProvider>
-      <AppContent />
-    </HanabThemeProvider>
+    <SafeAreaProvider>
+      <HanabThemeProvider>
+        <AppContent />
+      </HanabThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -50,7 +53,6 @@ function AppContent() {
   const { theme } = useHanabTheme();
   const { contentMaxWidth, width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
-  const androidStatusInset = Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0;
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
   const [loginPending, setLoginPending] = useState(false);
@@ -210,20 +212,22 @@ function AppContent() {
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
     const liveConnectionProblem = session.phase === 'failed' || session.phase === 'closed';
-    const c17DensePortrait = roomState.room.role === 'player'
-      && roomState.room.clientState.metadata.playerNames.length === 6
-      && width <= height
-      && !roomState.room.clientState.finished
-      && !roomState.room.clientState.replay.active;
+    const c17DensePortrait = isC17WorkspaceEligible({
+      isPlayer: roomState.room.role === 'player' && roomState.room.clientState.playing,
+      playerCount: roomState.room.clientState.metadata.playerNames.length,
+      portrait: width <= height,
+      finished: roomState.room.clientState.finished,
+      replayActive: roomState.room.clientState.replay.active,
+    });
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.flex, { backgroundColor: theme.colors.background }]}
       >
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
         <View style={[
           styles.gameBar,
           landscapePhone && styles.gameBarLandscape,
-          landscapePhone && androidStatusInset > 0 && { paddingTop: androidStatusInset + 2 },
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
           {!landscapePhone && <View style={styles.brandCopy}>
@@ -251,6 +255,7 @@ function AppContent() {
             <ActionButton compact title="Reconnect" tone="primary" onPress={() => void lobbyRuntime.connect()} />
           </View>
         )}
+        <SafeAreaView edges={['bottom']} style={styles.flex}>
         {c17DensePortrait
           ? <View style={[styles.gameWorkspace, { maxWidth: contentMaxWidth }]}>
             <GameScreen />
@@ -263,6 +268,7 @@ function AppContent() {
           <LastClueNotice />
           <GameScreen />
           </ScrollView>}
+        </SafeAreaView>
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
           <View style={styles.sheetBackdrop}>
             <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
@@ -288,6 +294,7 @@ function AppContent() {
           </View>
         </Modal>
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
+        </SafeAreaView>
       </KeyboardAvoidingView>
     );
   }
@@ -365,14 +372,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
-  gameContainerLandscape: { gap: 4, paddingBottom: 28, paddingHorizontal: Platform.OS === 'android' ? 28 : 8, paddingTop: 4 },
-  gameWorkspace: { alignSelf: 'center', flex: 1, paddingBottom: Platform.OS === 'android' ? 16 : 10, paddingHorizontal: 10, paddingTop: 7, width: '100%' },
+  gameContainerLandscape: { gap: 4, paddingBottom: 10, paddingHorizontal: 8, paddingTop: 4 },
+  gameWorkspace: { alignSelf: 'center', flex: 1, paddingBottom: 10, paddingHorizontal: 10, paddingTop: 7, width: '100%' },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: Platform.OS === 'android' ? 34 : 44 },
-  gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: Platform.OS === 'android' ? 24 : 8, paddingTop: Platform.OS === 'android' ? 3 : 5 },
+  gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: 9 },
+  gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: 8, paddingTop: 5 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
   gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
