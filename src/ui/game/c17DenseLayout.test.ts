@@ -4,7 +4,7 @@ import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout'
 function layout(overrides: Partial<Parameters<typeof getC17DenseLayout>[0]> = {}) {
   return getC17DenseLayout({
     opponentCardLaneWidth: 300,
-    opponentRegionHeight: 360,
+    handsRegionHeight: 500,
     ownCardLaneWidth: 300,
     opponentCount: 5,
     cardsPerHand: 4,
@@ -18,30 +18,38 @@ describe('C17 dense portrait layout', () => {
     expect(getRelativeOpponentIndices(6, 3)).toEqual([4, 5, 0, 1, 2]);
   });
 
-  test('gives fewer opponent rows larger cards when height limits the region', () => {
-    const sixPlayer = layout({ opponentCount: 5, opponentRegionHeight: 300, opponentCardLaneWidth: 600 });
-    const threePlayer = layout({ opponentCount: 2, opponentRegionHeight: 300, opponentCardLaneWidth: 600 });
+  test('uses one shared card height for opponents and YOUR HAND', () => {
+    const result = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 400 });
+
+    expect(result.ownCardHeight).toBe(result.opponentCardHeight);
+  });
+
+  test('gives fewer opponent rows larger cards when height limits the hands region', () => {
+    const sixPlayer = layout({ opponentCount: 5, handsRegionHeight: 400, opponentCardLaneWidth: 600, ownCardLaneWidth: 600 });
+    const threePlayer = layout({ opponentCount: 2, handsRegionHeight: 400, opponentCardLaneWidth: 600, ownCardLaneWidth: 600 });
 
     expect(threePlayer.opponentCardHeight).toBeGreaterThan(sixPlayer.opponentCardHeight);
   });
 
-  test('constrains opponent cards by the measured card lane width', () => {
-    const narrow = layout({ opponentCardLaneWidth: 140, opponentRegionHeight: 800 });
-    const wide = layout({ opponentCardLaneWidth: 360, opponentRegionHeight: 800 });
+  test('constrains the shared size by the opponent card lane', () => {
+    const narrowOpponent = layout({ opponentCardLaneWidth: 140, ownCardLaneWidth: 600, handsRegionHeight: 900 });
+    const wideOpponent = layout({ opponentCardLaneWidth: 360, ownCardLaneWidth: 600, handsRegionHeight: 900 });
 
-    expect(narrow.opponentCardHeight).toBeLessThan(wide.opponentCardHeight);
+    expect(narrowOpponent.opponentCardHeight).toBeLessThan(wideOpponent.opponentCardHeight);
+    expect(narrowOpponent.ownCardHeight).toBe(narrowOpponent.opponentCardHeight);
   });
 
-  test('constrains opponent cards by a short measured region', () => {
-    const short = layout({ opponentCardLaneWidth: 600, opponentRegionHeight: 180 });
-    const tall = layout({ opponentCardLaneWidth: 600, opponentRegionHeight: 500 });
+  test('constrains the shared size by the own card lane', () => {
+    const narrowOwn = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 140, handsRegionHeight: 900 });
+    const wideOwn = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 360, handsRegionHeight: 900 });
 
-    expect(short.opponentCardHeight).toBeLessThan(tall.opponentCardHeight);
+    expect(narrowOwn.ownCardHeight).toBeLessThan(wideOwn.ownCardHeight);
+    expect(narrowOwn.ownCardHeight).toBe(narrowOwn.opponentCardHeight);
   });
 
   test('does not enlarge cards when width remains the limiting dimension', () => {
-    const ordinary = layout({ opponentCardLaneWidth: 180, opponentRegionHeight: 500 });
-    const tall = layout({ opponentCardLaneWidth: 180, opponentRegionHeight: 900 });
+    const ordinary = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 500 });
+    const tall = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 900 });
 
     expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
   });
@@ -53,23 +61,30 @@ describe('C17 dense portrait layout', () => {
     expect(afterAction).toEqual(beforeAction);
   });
 
-  test('keeps One Extra Card capacity in the width calculation', () => {
-    const standard = layout({ cardsPerHand: 3, opponentRegionHeight: 800 });
-    const oneExtraCard = layout({ cardsPerHand: 4, opponentRegionHeight: 800 });
+  test('keeps One Extra Card capacity in the shared width calculation', () => {
+    const standard = layout({ cardsPerHand: 3, handsRegionHeight: 900 });
+    const oneExtraCard = layout({ cardsPerHand: 4, handsRegionHeight: 900 });
 
-    expect(oneExtraCard.ownCardHeight).toBeLessThan(standard.ownCardHeight);
     expect(oneExtraCard.opponentCardHeight).toBeLessThan(standard.opponentCardHeight);
+    expect(oneExtraCard.ownCardHeight).toBeLessThan(standard.ownCardHeight);
   });
 
   test('keeps constrained six-player layouts on the existing readability threshold when they fit', () => {
     const constrained = layout({
       opponentCardLaneWidth: 300,
-      opponentRegionHeight: 265,
+      ownCardLaneWidth: 300,
+      handsRegionHeight: 315,
       opponentCount: 5,
       cardsPerHand: 4,
     });
 
     expect(constrained.mode).toBe('full-ledger');
     expect(constrained.opponentCardHeight).toBeGreaterThanOrEqual(46);
+  });
+
+  test('keeps shared cards and real row chrome inside the measured hands region', () => {
+    const result = layout({ handsRegionHeight: 360 });
+
+    expect(result.handsHeight).toBeLessThanOrEqual(360);
   });
 });

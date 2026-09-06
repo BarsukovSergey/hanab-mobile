@@ -468,7 +468,7 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
   const { theme } = useHanabTheme();
   const [layoutMetrics, setLayoutMetrics] = useState({
     opponentCardLaneWidth: 0,
-    opponentRegionHeight: 0,
+    handsRegionHeight: 0,
     ownCardLaneWidth: 0,
   });
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
@@ -477,9 +477,9 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
     opponentCount: opponents.length,
     cardsPerHand,
   });
-  const onOpponentRegionLayout = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
-    setLayoutMetrics((current) => current.opponentRegionHeight === next.height
-      ? current : { ...current, opponentRegionHeight: next.height });
+  const onHandsRegionLayout = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
+    setLayoutMetrics((current) => current.handsRegionHeight === next.height
+      ? current : { ...current, handsRegionHeight: next.height });
   };
   const onOpponentCardLaneLayout = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((current) => current.opponentCardLaneWidth === next.width
@@ -513,7 +513,8 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
       <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>LAST ACTION</Text>
       <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
     </View>
-    <View onLayout={onOpponentRegionLayout} style={styles.c17Opponents}>
+    <View onLayout={onHandsRegionLayout} style={styles.c17Hands}>
+    <View style={styles.c17Opponents}>
       {opponents.map((index) => {
         const currentActor = current === index;
         const compact = layout.mode === 'compact-overview';
@@ -527,7 +528,7 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
         </View>;
       })}
     </View>
-    <View style={[styles.c17OwnHand, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+    <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <Text style={[styles.c17OwnTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
       <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
         const card = game.deck[order];
@@ -536,6 +537,7 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
           knowledge={getCardKnowledgeViewModel(variantName, card, undefined, false)} onSelect={() => onSelectCard(order)}
           position={position} selected={selectedOwnCard === order} variantName={variantName} />;
       })}</View>
+    </View>
     </View>
     <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
       <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
@@ -671,7 +673,8 @@ const styles = StyleSheet.create({
   c17Turn: { fontSize: 13, fontWeight: '900' },
   c17LastAction: { borderRadius: 8, borderWidth: 1, gap: 1, minHeight: 29, paddingHorizontal: 7, paddingVertical: 3 },
   c17LastActionText: { fontSize: 10, fontWeight: '700' },
-  c17Opponents: { flex: 1, gap: 2, minHeight: 0 },
+  c17Hands: { flex: 1, gap: 5, minHeight: 0 },
+  c17Opponents: { gap: 2 },
   c17OpponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 4 },
   c17OpponentName: { fontSize: 10, fontWeight: '900', width: 64 },
   c17OpponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 3, minWidth: 0 },
