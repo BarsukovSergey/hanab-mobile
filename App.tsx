@@ -210,6 +210,11 @@ function AppContent() {
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
     const liveConnectionProblem = session.phase === 'failed' || session.phase === 'closed';
+    const c17DensePortrait = roomState.room.role === 'player'
+      && roomState.room.clientState.metadata.playerNames.length === 6
+      && width <= height
+      && !roomState.room.clientState.finished
+      && !roomState.room.clientState.replay.active;
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -246,14 +251,18 @@ function AppContent() {
             <ActionButton compact title="Reconnect" tone="primary" onPress={() => void lobbyRuntime.connect()} />
           </View>
         )}
-        <ScrollView contentContainerStyle={[
+        {c17DensePortrait
+          ? <View style={[styles.gameWorkspace, { maxWidth: contentMaxWidth }]}>
+            <GameScreen />
+          </View>
+          : <ScrollView contentContainerStyle={[
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
           { maxWidth: contentMaxWidth },
         ]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
           <LastClueNotice />
           <GameScreen />
-        </ScrollView>
+          </ScrollView>}
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
           <View style={styles.sheetBackdrop}>
             <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
@@ -357,6 +366,7 @@ const styles = StyleSheet.create({
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
   gameContainerLandscape: { gap: 4, paddingBottom: 28, paddingHorizontal: Platform.OS === 'android' ? 28 : 8, paddingTop: 4 },
+  gameWorkspace: { alignSelf: 'center', flex: 1, paddingBottom: Platform.OS === 'android' ? 16 : 10, paddingHorizontal: 10, paddingTop: 7, width: '100%' },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },

@@ -17,14 +17,16 @@ export function CompactTable({
   game,
   variantName,
   onOpenDiscards,
+  dense = false,
 }: {
   game: GameState;
   variantName: string;
   onOpenDiscards?: () => void;
+  dense?: boolean;
 }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
-  const landscapePhone = width > height && height < 700;
+  const landscapePhone = dense || (width > height && height < 700);
   const suits = getGameTableSuits(variantName, game);
   const suitVisuals = getCardSuitVisuals(variantName);
   const discard = getDiscardSummary(variantName, game);

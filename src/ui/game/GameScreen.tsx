@@ -30,6 +30,7 @@ import {
   initialGameplayInteractionState,
 } from './gameplayInteraction';
 import { getGameplayLayout } from './gameplayLayout';
+import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
 
@@ -264,6 +265,27 @@ export function GameScreen() {
   };
 
   const landscape = gameplayLayout.orientation === 'landscape';
+  const c17DensePortrait = playerRoom !== null
+    && metadata.playerNames.length === 6
+    && gameplayLayout.orientation === 'portrait'
+    && !clientState.finished
+    && !replay.active;
+
+  if (c17DensePortrait && ourIndex !== null) {
+    return <>
+      <C17DenseWorkspace
+        game={game}
+        lastAction={game.log.at(-1)?.text ?? 'No completed action yet.'}
+        metadata={metadata}
+        ourIndex={ourIndex}
+        selectedCard={selectedCard}
+        onOpenDiscards={() => setDiscardViewerOpen(true)}
+        onSelectCard={(order) => interactionDispatch({ type: 'select-card', order })}
+        variantName={metadata.options.variantName}
+      />
+      <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
+    </>;
+  }
 
   return <>
     <View style={[styles.liveScreen, landscape && styles.liveLandscape]}>
@@ -410,6 +432,78 @@ export function GameScreen() {
   </>;
 }
 
+function C17DenseWorkspace({ game, metadata, ourIndex, selectedCard, lastAction, onOpenDiscards, onSelectCard, variantName }: {
+  game: GameState;
+  metadata: { playerNames: readonly string[] };
+  ourIndex: number;
+  selectedCard: number | null;
+  lastAction: string;
+  onOpenDiscards: () => void;
+  onSelectCard: (order: number) => void;
+  variantName: string;
+}) {
+  const { theme } = useHanabTheme();
+  const { width, height } = useResponsiveLayout();
+  const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
+  const layout = getC17DenseLayout({
+    viewportWidth: width,
+    viewportHeight: height,
+    opponentHandSizes: opponents.map((index) => game.hands[index]?.length ?? 0),
+    ownHandSize: game.hands[ourIndex]?.length ?? 0,
+  });
+  const current = game.turn.currentPlayerIndex;
+  const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
+  const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
+
+  return <View style={styles.c17Workspace}>
+    <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View style={styles.grow}>
+        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {game.turn.turnNum}</Text>
+        <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+      </View>
+      <HudStat label="Score" value={game.score} />
+      <HudStat label="Max" value={game.stats.maxScore} />
+      <HudStat label="Clues" value={getDisplayedClueTokens(game.clueTokens, variantName)} />
+      <HudStat label="Strikes" value={game.strikes.length} />
+      <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
+      {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
+    </View>
+    <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
+    <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+      <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>LAST ACTION</Text>
+      <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+    </View>
+    <View style={styles.c17Opponents}>
+      {opponents.map((index) => {
+        const currentActor = current === index;
+        const compact = layout.mode === 'compact-overview';
+        return <View key={index} style={[styles.c17OpponentRow, { minHeight: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
+          <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
+          <View style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
+            const card = game.deck[order];
+            if (card === undefined) return null;
+            return <VisibleHanabiCard height={layout.opponentCardHeight} key={order} position={position} rank={card.rank} size={compact ? 'mini' : 'hand'} suitIndex={card.suitIndex} variantName={variantName} />;
+          })}</View>
+        </View>;
+      })}
+    </View>
+    <View style={[styles.c17OwnHand, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <Text style={[styles.c17OwnTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
+      <View style={styles.c17OwnCards}>{ownHand.map((order, position) => {
+        const card = game.deck[order];
+        if (card === undefined) return null;
+        return <GameCard height={layout.ownCardHeight} key={order}
+          knowledge={getCardKnowledgeViewModel(variantName, card, undefined, false)} onSelect={() => onSelectCard(order)}
+          position={position} selected={selectedCard === order} variantName={variantName} />;
+      })}</View>
+    </View>
+    <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
+      <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
+      <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Reserved C17 workspace for card actions, clues, notes, and inspection.</Text>
+    </View>
+  </View>;
+}
+
 function ReplayTable({ game, variantName }: { game: GameState; variantName: string }) {
   return <CompactTable game={game} variantName={variantName} />;
 }
@@ -523,6 +617,20 @@ const styles = StyleSheet.create({
   presence: { fontSize: 9, lineHeight: 12 },
   clock: { fontVariant: ['tabular-nums'], fontSize: 12, fontWeight: '900' },
   denseHint: { fontSize: 10, lineHeight: 14, textAlign: 'center' },
+  c17Workspace: { flex: 1, gap: 5, minHeight: 0, paddingBottom: 4 },
+  c17Hud: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
+  c17Turn: { fontSize: 13, fontWeight: '900' },
+  c17LastAction: { borderRadius: 8, borderWidth: 1, gap: 1, minHeight: 29, paddingHorizontal: 7, paddingVertical: 3 },
+  c17LastActionText: { fontSize: 10, fontWeight: '700' },
+  c17Opponents: { gap: 2 },
+  c17OpponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 4 },
+  c17OpponentName: { fontSize: 10, fontWeight: '900', width: 64 },
+  c17OpponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 3, minWidth: 0 },
+  c17OwnHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 6, padding: 5 },
+  c17OwnTitle: { fontSize: 10, fontWeight: '900', width: 64 },
+  c17OwnCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 4, minWidth: 0 },
+  c17Workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 4, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
+  c17WorkbenchText: { fontSize: 12, lineHeight: 16 },
   stats: { flexDirection: 'row', gap: 8, width: '100%' },
   stat: { alignItems: 'center', borderRadius: 10, flex: 1, padding: 9 },
   statValue: { fontSize: 20, fontWeight: '900' },
