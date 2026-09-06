@@ -59,7 +59,11 @@ export function GameCard({
     }}
     onPressIn={() => { longPressed.current = false; }}
     onPressOut={onPressOut}
-    style={({ pressed }) => [styles.cardTouch, pressed && styles.pressed]}
+    style={({ pressed }) => [
+      styles.cardTouch,
+      height === undefined ? null : styles.sizedCardTouch,
+      pressed && styles.pressed,
+    ]}
   >
     <View style={[
       styles.hiddenFrame,
@@ -280,6 +284,7 @@ function NoteIndicator({ compact = false }: { compact?: boolean }) {
 
 const styles = StyleSheet.create({
   cardTouch: { alignItems: 'center' },
+  sizedCardTouch: { marginRight: -1, transform: [{ translateX: -2 }] },
   pressed: { opacity: 0.82 },
   hiddenFrame: { aspectRatio: 286 / 406, backgroundColor: '#0d0d0d', borderRadius: 8, borderWidth: 2, elevation: 2, shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.28, shadowRadius: 2, width: 88 },
   selectedFrame: { borderWidth: 4 },
