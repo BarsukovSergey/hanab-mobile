@@ -33,6 +33,7 @@ import {
 } from './gameplayInteraction';
 import { getGameplayLayout } from './gameplayLayout';
 import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout';
+import { getC17TemporalContext, getHumanTurnNumber, type C17TemporalEntry } from './c17Temporal';
 import { isC17WorkspaceEligible } from './c17Workspace';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
@@ -127,7 +128,7 @@ export function GameScreen() {
   };
   const review = <Panel>
     <View style={styles.between}>
-      <SectionHeading title={`${replay.active ? 'Review' : 'Live'} · ${segment}/${latest}`} detail={`Turn ${game.turn.turnNum}`} />
+      <SectionHeading title={`${replay.active ? 'Review' : 'Live'} · ${segment}/${latest}`} detail={`Turn ${getHumanTurnNumber(game.turn.turnNum)}`} />
       {replay.active && <Pill active>Review</Pill>}
     </View>
     <View style={styles.buttons}>
@@ -278,10 +279,30 @@ export function GameScreen() {
 
   if (c17DensePortrait && ourIndex !== null) {
     const futureEfficiency = getDisplayedLiveFutureEfficiency(game, clientState.notes.efficiencyModifier);
+    const temporal = getC17TemporalContext({
+      states: replay.states,
+      selectedSegment: segment,
+      variantName: metadata.options.variantName,
+    });
     const commitSelectedCard = (action: 'play' | 'discard') => {
       if (!cardEnabled || selectedCard === null) return;
       if (action === 'play') lobbyRuntime.play(selectedCard);
       else lobbyRuntime.discard(selectedCard);
+    };
+    const navigateBefore = () => {
+      if (temporal.previousSegment !== null) lobbyRuntime.navigateReplaySegment(temporal.previousSegment);
+    };
+    const navigateAfter = () => {
+      if (temporal.nextSegment !== null) lobbyRuntime.navigateReplaySegment(temporal.nextSegment);
+    };
+    const returnLive = () => {
+      if (!replay.active) return;
+      if (shared !== null) lobbyRuntime.navigateReplaySegment(latest);
+      else dispatch(roomActions.reviewSegmentSelected({
+        tableID: liveRoom.tableID,
+        gameLoadEpoch: liveRoom.gameLoadEpoch,
+        segment: null,
+      }));
     };
     return <>
       <C17DenseWorkspace
@@ -289,15 +310,25 @@ export function GameScreen() {
         canCommitCard={cardEnabled}
         futureEfficiency={futureEfficiency}
         game={game}
-        lastAction={game.log.at(-1)?.text ?? 'No completed action yet.'}
+        lastAction={temporal.last.summary}
+        latestSegment={latest}
         metadata={metadata}
+        newerActionCount={temporal.newerActionCount}
+        nextSegment={temporal.nextSegment}
         onDiscard={() => commitSelectedCard('discard')}
-        ourIndex={ourIndex}
-        selectedCard={selectedCard}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
         onPlay={() => commitSelectedCard('play')}
+        onReviewAfter={navigateAfter}
+        onReviewBefore={navigateBefore}
+        onReturnLive={returnLive}
         onSelectCard={(order) => interactionDispatch({ type: 'select-card', order })}
+        ourIndex={ourIndex}
         pendingText={pendingText ?? null}
+        previousSegment={temporal.previousSegment}
+        recent={temporal.recent}
+        reviewActive={replay.active}
+        selectedCard={selectedCard}
+        selectedSegment={temporal.selectedSegment}
         variantName={metadata.options.variantName}
       />
       <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
@@ -309,7 +340,7 @@ export function GameScreen() {
       <View style={[styles.mainLane, landscape && styles.mainLaneLandscape]}>
         <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.hudTurn}>
-            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {game.turn.turnNum}</Text>
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {getHumanTurnNumber(game.turn.turnNum)}</Text>
             <Text numberOfLines={1} style={[styles.hudCurrent, { color: theme.colors.text }]}>{currentName}</Text>
           </View>
           <HudStat label="Score" value={game.score} />
@@ -349,7 +380,7 @@ export function GameScreen() {
           </View>
           {selectedCard === null
             ? <Text style={[styles.selectHint, { color: theme.colors.textMuted }]}>Tap a card to play, discard, or note it.</Text>
-            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}>
+            : <View style={[styles.actionBar, { backgroundColor: theme.colors.surfaceMuted }]}> 
               <Text numberOfLines={1} style={[styles.actionLabel, { color: theme.colors.text }]}>Card {displayedOurHand.findIndex((order) => order === selectedCard) + 1}</Text>
               <View style={styles.actionButtons}>
                 <ActionButton compact disabled={!cardEnabled} title="Play" tone="primary" onPress={() => lobbyRuntime.play(selectedCard)} />
@@ -449,7 +480,32 @@ export function GameScreen() {
   </>;
 }
 
-function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourIndex, selectedCard, lastAction, futureEfficiency, onDiscard, onOpenDiscards, onPlay, onSelectCard, pendingText, variantName }: {
+function C17DenseWorkspace({
+  cardsPerHand,
+  canCommitCard,
+  game,
+  metadata,
+  ourIndex,
+  selectedCard,
+  lastAction,
+  futureEfficiency,
+  latestSegment,
+  newerActionCount,
+  nextSegment,
+  onDiscard,
+  onOpenDiscards,
+  onPlay,
+  onReviewAfter,
+  onReviewBefore,
+  onReturnLive,
+  onSelectCard,
+  pendingText,
+  previousSegment,
+  recent,
+  reviewActive,
+  selectedSegment,
+  variantName,
+}: {
   cardsPerHand: number;
   canCommitCard: boolean;
   game: GameState;
@@ -458,11 +514,21 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
   selectedCard: number | null;
   lastAction: string;
   futureEfficiency: number | null;
+  latestSegment: number;
+  newerActionCount: number;
+  nextSegment: number | null;
   onDiscard: () => void;
   onOpenDiscards: () => void;
   onPlay: () => void;
+  onReviewAfter: () => void;
+  onReviewBefore: () => void;
+  onReturnLive: () => void;
   onSelectCard: (order: number) => void;
   pendingText: string | null;
+  previousSegment: number | null;
+  recent: readonly C17TemporalEntry[];
+  reviewActive: boolean;
+  selectedSegment: number;
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
@@ -493,11 +559,12 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
+  const recentText = recent.at(-1)?.summary ?? 'Start of game';
 
   return <View style={styles.c17Workspace}>
-    <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+    <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
       <View style={styles.grow}>
-        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {game.turn.turnNum}</Text>
+        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {getHumanTurnNumber(game.turn.turnNum)}</Text>
         <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
       </View>
       <HudStat label="Score" value={game.score} />
@@ -509,8 +576,17 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
       {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
     </View>
     <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
-    <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-      <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>LAST ACTION</Text>
+    <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}> 
+      <View style={styles.c17LastActionHeader}>
+        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? 'REVIEW ACTION' : 'LAST ACTION'}</Text>
+        {!reviewActive && <Pressable
+          accessibilityLabel="Review previous action"
+          disabled={previousSegment === null}
+          onPress={onReviewBefore}
+        >
+          <Text style={[styles.c17HistoryLink, { color: previousSegment === null ? theme.colors.textMuted : theme.colors.accent }]}>HISTORY</Text>
+        </Pressable>}
+      </View>
       <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
     </View>
     <View onLayout={onHandsRegionLayout} style={styles.c17Hands}>
@@ -518,7 +594,7 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
       {opponents.map((index) => {
         const currentActor = current === index;
         const compact = layout.mode === 'compact-overview';
-        return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
+        return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}> 
           <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
           <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
             const card = game.deck[order];
@@ -528,7 +604,7 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
         </View>;
       })}
     </View>
-    <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+    <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
       <Text style={[styles.c17OwnTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
       <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
         const card = game.deck[order];
@@ -539,18 +615,32 @@ function C17DenseWorkspace({ cardsPerHand, canCommitCard, game, metadata, ourInd
       })}</View>
     </View>
     </View>
-    <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
-      <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
-      {selectedOwnCard === null
-        ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
-        : <View style={styles.c17ActionRow}>
-          <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
-          <View style={styles.actionButtons}>
-            <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
-            <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+    <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}> 
+      {reviewActive
+        ? <>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>REVIEW · {selectedSegment}/{latestSegment}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+          <View style={styles.c17ActionRow}>
+            <Text numberOfLines={1} style={[styles.c17ReviewRecent, { color: theme.colors.textMuted }]}>Prev · {recentText}</Text>
+            <View style={styles.actionButtons}>
+              <ActionButton compact disabled={previousSegment === null} title="Before" onPress={onReviewBefore} />
+              <ActionButton compact disabled={nextSegment === null} title="After" onPress={onReviewAfter} />
+              <ActionButton compact title="Live" tone="primary" onPress={onReturnLive} />
+            </View>
           </View>
-        </View>}
-      {pendingText !== null && <Text style={[styles.c17PendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
+        </>
+        : <>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
+          {selectedOwnCard === null
+            ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
+            : <View style={styles.c17ActionRow}>
+              <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+              <View style={styles.actionButtons}>
+                <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
+                <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+              </View>
+            </View>}
+          {pendingText !== null && <Text style={[styles.c17PendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
+        </>}
     </View>
   </View>;
 }
@@ -672,6 +762,8 @@ const styles = StyleSheet.create({
   c17Hud: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   c17Turn: { fontSize: 13, fontWeight: '900' },
   c17LastAction: { borderRadius: 8, borderWidth: 1, gap: 1, minHeight: 29, paddingHorizontal: 7, paddingVertical: 3 },
+  c17LastActionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  c17HistoryLink: { fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
   c17LastActionText: { fontSize: 10, fontWeight: '700' },
   c17Hands: { flex: 1, gap: 5, minHeight: 0 },
   c17Opponents: { gap: 2 },
@@ -684,6 +776,7 @@ const styles = StyleSheet.create({
   c17Workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 4, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
   c17ActionRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   c17WorkbenchText: { fontSize: 12, lineHeight: 16 },
+  c17ReviewRecent: { flex: 1, fontSize: 10, lineHeight: 14, minWidth: 0 },
   c17PendingText: { fontSize: 10, lineHeight: 14 },
   stats: { flexDirection: 'row', gap: 8, width: '100%' },
   stat: { alignItems: 'center', borderRadius: 10, flex: 1, padding: 9 },
