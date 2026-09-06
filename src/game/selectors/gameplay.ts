@@ -150,10 +150,10 @@ export function getGameTableSuits(
   game: AuthoritativeTableState,
 ): readonly GameTableSuit[] {
   return getVariant(variantName).suits.map((suit, suitIndex) => {
-    const playStack = game.playStacks[suit.suitIndex] ?? [];
+    const playStack = game.playStacks[suitIndex] ?? [];
     const topCardOrder = playStack[playStack.length - 1];
     const topCard = topCardOrder === undefined ? undefined : game.deck[topCardOrder];
-    const discardStack = game.discardStacks[suit.suitIndex] ?? [];
+    const discardStack = game.discardStacks[suitIndex] ?? [];
 
     return {
       suitIndex,
