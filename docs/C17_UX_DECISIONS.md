@@ -1,6 +1,6 @@
 # C17 UX Decisions
 
-Date: 2026-09-06  
+Date: 2026-09-06
 Status: **ratified**
 
 This file records the product decisions made after reviewing the Astra Pro C17 UX contract. The authoritative current contract is `docs/C17_UX_CONTRACT.md`.
