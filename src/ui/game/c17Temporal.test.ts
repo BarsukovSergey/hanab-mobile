@@ -94,6 +94,20 @@ describe('C17 temporal presentation', () => {
     expect(countC17TemporalStatesAfter(states, 5)).toBe(0);
   });
 
+  test('exposes the initial state as explicit T0 rewind position', () => {
+    const context = getC17TemporalContext({
+      states: [state(), state({ turnNum: 1 })],
+      selectedSegment: 0,
+      variantName: 'No Variant',
+    });
+
+    expect(context.selectedSegment).toBe(0);
+    expect(context.selectedTurn).toBe(0);
+    expect(context.last.summary).toBe('Game start');
+    expect(context.previousActionSegment).toBeNull();
+    expect(context.nextActionSegment).toBe(1);
+  });
+
   test('reconstructs the exact played card and old displayed slot from authoritative states', () => {
     const before = state({
       log: [{ turn: 1, text: 'Ada goes first' }],
@@ -130,9 +144,10 @@ describe('C17 temporal presentation', () => {
     expect(context.last.preActionSlot).toBe(3);
     expect(context.last.cardIdentity).toBe('Red 3');
     expect(context.last.summary).toContain('Ada plays a card');
-    expect(context.last.summary).toContain('Before slot 3: Red 3');
+    expect(context.last.summary).toContain('Red 3 · from slot 3');
     expect(context.last.summary).toContain('Score +1');
     expect(context.last.summary).toContain('Deck -1');
+    expect(context.last.summary).not.toContain('Before');
   });
 
   test('reconstructs discard identity independently of a log slot sentence', () => {
@@ -164,7 +179,7 @@ describe('C17 temporal presentation', () => {
     expect(context.last.cardOrder).toBe(12);
     expect(context.last.preActionSlot).toBe(3);
     expect(context.last.cardIdentity).toBe('Red 4');
-    expect(context.last.summary).toContain('Before slot 3: Red 4');
+    expect(context.last.summary).toContain('Red 4 · from slot 3');
     expect(context.last.summary).toContain('Clues +1');
   });
 
@@ -185,7 +200,7 @@ describe('C17 temporal presentation', () => {
     expect(context.last.actorIndex).toBe(0);
     expect(context.last.targetIndex).toBe(0);
     expect(context.last.touchedSlots).toEqual([1, 4]);
-    expect(context.last.summary).toContain('Touched 1/4');
+    expect(context.last.summary).toContain('Cards 1, 4');
     expect(context.last.summary).toContain('Clues -1');
   });
 
@@ -200,14 +215,14 @@ describe('C17 temporal presentation', () => {
     expect(context.afterSegment).toBe(1);
     expect(context.previousSegment).toBe(0);
     expect(context.nextSegment).toBe(2);
-    expect(context.previousActionSegment).toBeNull();
+    expect(context.previousActionSegment).toBe(0);
     expect(context.nextActionSegment).toBe(2);
     expect(context.selectedTurn).toBe(2);
     expect(context.liveTurn).toBe(4);
     expect(context.newerActionCount).toBe(2);
   });
 
-  test('navigates between actions independently from before/after state navigation', () => {
+  test('navigates between timeline positions across sparse stored states', () => {
     const states: Array<GameState | undefined> = [
       state(),
       state({ turnNum: 1 }),
@@ -227,7 +242,7 @@ describe('C17 temporal presentation', () => {
     expect(context.nextActionSegment).toBe(4);
   });
 
-  test('keeps the focused action and its before/after pair while the live tail grows', () => {
+  test('keeps the focused action while the live tail grows', () => {
     const states = [
       state(),
       state({ turnNum: 1 }),
