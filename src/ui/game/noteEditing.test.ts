@@ -1,27 +1,21 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { appendNoteToken, beginNoteEdit, normalizeSubmittedNote } from './noteEditing';
+import { beginNoteEdit, normalizeSubmittedNote } from './noteEditing';
 
 describe('noteEditing', () => {
-  test('appends a web-style separator when editing an existing note', () => {
-    expect(beginNoteEdit('f')).toBe('f | ');
-    expect(beginNoteEdit('f   ')).toBe('f | ');
+  test('starts editing from the exact saved note instead of creating a new pipe segment', () => {
+    expect(beginNoteEdit('f')).toBe('f');
+    expect(beginNoteEdit('f | cm')).toBe('f | cm');
     expect(beginNoteEdit('')).toBe('');
   });
 
-  test('does not duplicate an existing separator', () => {
-    expect(beginNoteEdit('f |')).toBe('f |');
-    expect(beginNoteEdit('f |   ')).toBe('f |');
+  test('does not silently rewrite existing upstream note syntax', () => {
+    expect(beginNoteEdit('[r2] [f]')).toBe('[r2] [f]');
+    expect(beginNoteEdit('reasoning | cm')).toBe('reasoning | cm');
   });
 
-  test('trims a trailing separator on submit', () => {
-    expect(normalizeSubmittedNote('f | ')).toBe('f');
-    expect(normalizeSubmittedNote('f | cm |')).toBe('f | cm');
-  });
-
-  test('appends quick tokens without inventing parser semantics', () => {
-    expect(appendNoteToken('', 'f')).toBe('f');
-    expect(appendNoteToken('f', 'cm')).toBe('f | cm');
-    expect(appendNoteToken('f |', 'ptd')).toBe('f | ptd');
+  test('normalizes only outer whitespace on explicit submit', () => {
+    expect(normalizeSubmittedNote('  [r2] [f]  ')).toBe('[r2] [f]');
+    expect(normalizeSubmittedNote('reasoning | cm')).toBe('reasoning | cm');
   });
 });
