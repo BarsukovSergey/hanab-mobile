@@ -137,11 +137,11 @@ export function SectionHeading({ title, detail }: { title: string; detail?: stri
 }
 
 type ActionButtonProps = {
-  title: string; onPress: () => void; disabled?: boolean;
+  title: string; onPress: () => void; onLongPress?: () => void; disabled?: boolean;
   tone?: 'primary' | 'secondary' | 'danger' | 'ghost'; compact?: boolean; style?: StyleProp<ViewStyle>;
 };
 
-export function ActionButton({ title, onPress, disabled = false, tone = 'secondary', compact = false, style }: ActionButtonProps) {
+export function ActionButton({ title, onPress, onLongPress, disabled = false, tone = 'secondary', compact = false, style }: ActionButtonProps) {
   const { theme } = useHanabTheme();
   const palette = tone === 'primary'
     ? { bg: theme.colors.accent, pressed: theme.colors.accentPressed, text: theme.colors.accentText, border: theme.colors.accent }
@@ -150,7 +150,8 @@ export function ActionButton({ title, onPress, disabled = false, tone = 'seconda
       : tone === 'ghost'
         ? { bg: 'transparent', pressed: theme.colors.overlay, text: theme.colors.textMuted, border: 'transparent' }
         : { bg: theme.colors.surfaceRaised, pressed: theme.colors.surfaceMuted, text: theme.colors.text, border: theme.colors.borderStrong };
-  return <Pressable accessibilityRole="button" disabled={disabled} hitSlop={compact ? COMPACT_HIT_SLOP : undefined} onPress={onPress} style={({ pressed }) => [
+  return <Pressable accessibilityRole="button" disabled={disabled} hitSlop={compact ? COMPACT_HIT_SLOP : undefined}
+    onLongPress={onLongPress} onPress={onPress} style={({ pressed }) => [
     styles.button, compact && styles.buttonCompact,
     { backgroundColor: pressed ? palette.pressed : palette.bg, borderColor: palette.border }, disabled && styles.disabled, style,
   ]}><Text numberOfLines={1} style={[styles.buttonText, compact && styles.buttonTextCompact, { color: palette.text }]}>{title}</Text></Pressable>;
