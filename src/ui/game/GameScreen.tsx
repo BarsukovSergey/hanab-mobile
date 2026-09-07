@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { AppState, Modal, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
-import type { GameState } from '../../game/bootstrap/types';
+import type { CardIdentity, CardNote, GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCluePreview } from '../../game/selectors/cluePreview';
 import {
@@ -15,8 +15,6 @@ import {
   type LiveClock,
 } from '../../game/selectors/gameplay';
 import { getLastCluePresentation } from '../../game/selectors/lastClue';
-import type { CardIdentity } from '../../game/upstream/interfaces/CardIdentity';
-import type { CardNote } from '../../game/upstream/interfaces/CardNote';
 import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
