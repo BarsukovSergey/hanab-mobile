@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Keyboard, Modal, StyleSheet, Text, View } from 'react-native';
 
 import { composeQuickNote, type QuickNoteToken } from '../../game/selectors/noteComposition';
@@ -21,7 +21,6 @@ export function NoteEditor({
   value,
   editable,
   visible,
-  onChange,
   onSave,
   onClear,
   onClose,
@@ -37,28 +36,44 @@ export function NoteEditor({
 }) {
   const { theme } = useHanabTheme();
   const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [dirty, setDirty] = useState(false);
   const variantName = useAppSelector((state) => (
     state.room.room.kind === 'live_game'
       ? state.room.room.clientState.metadata.options.variantName
       : null
   ));
-  const quickCandidates = useMemo(() => new Map(QUICK_TOKENS.map(({ token }) => [
-    token,
-    variantName === null ? null : composeQuickNote(variantName, value, token),
-  ])), [value, variantName]);
 
   useEffect(() => {
-    if (!visible) setEditing(false);
+    if (visible) {
+      setDraft(value);
+      setDirty(false);
+      setEditing(false);
+      return;
+    }
+    setEditing(false);
   }, [visible]);
 
+  useEffect(() => {
+    if (visible && !dirty) setDraft(value);
+  }, [dirty, value, visible]);
+
   const submitValue = (nextValue: string) => onSave(normalizeSubmittedNote(nextValue));
-  const submit = () => submitValue(value);
+  const submit = () => submitValue(draft);
   const change = (nextValue: string) => {
     if (nextValue.includes('\n') || nextValue.includes('\r')) {
       submitValue(nextValue.replace(/[\r\n]+/g, ''));
       return;
     }
-    onChange(nextValue);
+    setDraft(nextValue);
+    setDirty(true);
+  };
+  const applyQuickToken = (token: QuickNoteToken) => {
+    if (variantName === null) return;
+    const candidate = composeQuickNote(variantName, draft, token);
+    if (candidate === null || candidate === draft) return;
+    setDraft(candidate);
+    setDirty(true);
   };
   const requestClose = () => {
     if (editing) {
@@ -92,31 +107,26 @@ export function NoteEditor({
           returnKeyType={editing ? 'done' : undefined}
           style={[styles.input, !editing && styles.readOnlyInput]}
           submitBehavior={editing ? 'blurAndSubmit' : 'newline'}
-          value={value}
+          value={draft}
         />
         {editable && !editing && <View style={styles.actions}>
           <ActionButton title="Edit" tone="primary" onPress={() => setEditing(true)} />
         </View>}
         {editable && editing && <>
           <View style={styles.quickActions}>
-            {QUICK_TOKENS.map(({ label, token }) => {
-              const candidate = quickCandidates.get(token) ?? null;
-              return <ActionButton
-                compact
-                disabled={candidate === null || candidate === value}
-                key={token}
-                title={label}
-                tone="ghost"
-                onPress={() => {
-                  if (candidate !== null) onChange(candidate);
-                }}
-              />;
-            })}
+            {QUICK_TOKENS.map(({ label, token }) => <ActionButton
+              compact
+              disabled={variantName === null}
+              key={token}
+              title={label}
+              tone="ghost"
+              onPress={() => applyQuickToken(token)}
+            />)}
           </View>
           <Text style={[styles.quickHint, { color: theme.colors.textMuted }]}>Quick tags update the draft only. Unsupported syntax stays manual.</Text>
           <View style={styles.actions}>
             <ActionButton title="Save" tone="primary" onPress={submit} />
-            <ActionButton disabled={value.length === 0} title="Clear" onPress={onClear} />
+            <ActionButton disabled={draft.length === 0} title="Clear" onPress={onClear} />
             <ActionButton title="Done editing" tone="ghost" onPress={() => {
               Keyboard.dismiss();
               setEditing(false);
