@@ -46,6 +46,15 @@ export function getHumanTurnNumber(turnNum: number): number {
   return Math.max(1, turnNum + 1);
 }
 
+export function countC17TemporalStatesAfter(
+  states: readonly (GameState | undefined)[],
+  segment: number,
+): number {
+  return states.reduce((count, state, stateSegment) => (
+    state !== undefined && stateSegment > segment ? count + 1 : count
+  ), 0);
+}
+
 export function getC17TemporalContext({ states, selectedSegment, variantName }: Input): C17TemporalContext {
   const available = states.flatMap((state, segment) => state === undefined ? [] : [segment]);
   const resolvedSegment = states[selectedSegment] === undefined
