@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { AppState, Modal, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -33,7 +33,12 @@ import {
 } from './gameplayInteraction';
 import { getGameplayLayout } from './gameplayLayout';
 import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout';
-import { getC17TemporalContext, getHumanTurnNumber, type C17TemporalEntry } from './c17Temporal';
+import {
+  countC17TemporalStatesAfter,
+  getC17TemporalContext,
+  getHumanTurnNumber,
+  type C17TemporalEntry,
+} from './c17Temporal';
 import { isC17WorkspaceEligible } from './c17Workspace';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
@@ -295,7 +300,7 @@ export function GameScreen() {
     const futureEfficiency = getDisplayedLiveFutureEfficiency(game, clientState.notes.efficiencyModifier);
     const liveTemporal = getC17TemporalContext({
       states: replay.states,
-      selectedSegment: segment,
+      selectedSegment: latest,
       variantName: metadata.options.variantName,
     });
     const reviewTemporal = replay.active && c17Review !== null
@@ -307,33 +312,43 @@ export function GameScreen() {
       : liveTemporal;
     const reviewSide: C17ReviewSide | null = replay.active ? c17Review?.side ?? 'after' : null;
     const newerActionCount = replay.active && c17Review !== null
-      ? Math.max(0, latest - c17Review.liveSegmentAtEntry)
+      ? countC17TemporalStatesAfter(replay.states, c17Review.liveSegmentAtEntry)
       : 0;
+    const recentActions = [...liveTemporal.recent, liveTemporal.last]
+      .filter((entry, index, entries) => entry.segment > 0
+        && entries.findIndex((candidate) => candidate.segment === entry.segment) === index)
+      .slice(-Math.max(5, metadata.playerNames.length));
     const commitSelectedCard = (action: 'play' | 'discard') => {
       if (!cardEnabled || selectedCard === null) return;
       if (action === 'play') lobbyRuntime.play(selectedCard);
       else lobbyRuntime.discard(selectedCard);
     };
-    const enterHistory = () => {
-      if (liveTemporal.beforeSegment === null) return;
-      disarmGameplay();
-      setC17Review({
-        actionSegment: liveTemporal.selectedSegment,
-        side: 'before',
-        liveSegmentAtEntry: latest,
+    const jumpToAction = (actionSegment: number, side: C17ReviewSide = 'after') => {
+      const temporal = getC17TemporalContext({
+        states: replay.states,
+        selectedSegment: actionSegment,
+        variantName: metadata.options.variantName,
       });
-      lobbyRuntime.navigateReplaySegment(liveTemporal.beforeSegment);
-    };
-    const navigateReviewSide = (side: C17ReviewSide) => {
-      const target = side === 'before' ? reviewTemporal.beforeSegment : reviewTemporal.afterSegment;
+      const target = side === 'before' ? temporal.beforeSegment : temporal.afterSegment;
       if (target === null) return;
       disarmGameplay();
       setC17Review({
-        actionSegment: reviewTemporal.selectedSegment,
+        actionSegment: temporal.selectedSegment,
         side,
         liveSegmentAtEntry: c17Review?.liveSegmentAtEntry ?? latest,
       });
       lobbyRuntime.navigateReplaySegment(target);
+    };
+    const enterRewind = () => {
+      if (recentActions.length === 0) return;
+      jumpToAction(liveTemporal.selectedSegment, 'after');
+    };
+    const navigateReviewSide = (side: C17ReviewSide) => jumpToAction(reviewTemporal.selectedSegment, side);
+    const navigateReviewAction = (direction: 'older' | 'newer') => {
+      const target = direction === 'older'
+        ? reviewTemporal.previousActionSegment
+        : reviewTemporal.nextActionSegment;
+      if (target !== null) jumpToAction(target, 'after');
     };
     const returnLive = () => {
       if (!replay.active) return;
@@ -349,28 +364,33 @@ export function GameScreen() {
     return <>
       <C17DenseWorkspace
         canReviewBefore={reviewTemporal.beforeSegment !== null}
+        canReviewNewer={reviewTemporal.nextActionSegment !== null}
+        canReviewOlder={reviewTemporal.previousActionSegment !== null}
         cardsPerHand={getGameplayCardsPerHand(metadata)}
         canCommitCard={cardEnabled}
         futureEfficiency={futureEfficiency}
         game={game}
-        historyAvailable={liveTemporal.beforeSegment !== null}
+        historyAvailable={recentActions.length > 0}
         lastAction={reviewTemporal.last.summary}
-        liveTurn={reviewTemporal.liveTurn}
+        liveTurn={liveTemporal.liveTurn}
         metadata={metadata}
         newerActionCount={newerActionCount}
         onDiscard={() => commitSelectedCard('discard')}
-        onEnterHistory={enterHistory}
+        onEnterRewind={enterRewind}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
         onPlay={() => commitSelectedCard('play')}
         onReviewAfter={() => navigateReviewSide('after')}
         onReviewBefore={() => navigateReviewSide('before')}
+        onReviewNewer={() => navigateReviewAction('newer')}
+        onReviewOlder={() => navigateReviewAction('older')}
         onReturnLive={returnLive}
         onSelectCard={(order) => {
           if (!replay.active) interactionDispatch({ type: 'select-card', order });
         }}
+        onSelectRecentAction={(actionSegment) => jumpToAction(actionSegment, 'after')}
         ourIndex={ourIndex}
         pendingText={pendingText ?? null}
-        recent={reviewTemporal.recent}
+        recentActions={recentActions}
         reviewActive={replay.active}
         reviewSide={reviewSide}
         selectedCard={selectedCard}
@@ -528,6 +548,8 @@ export function GameScreen() {
 
 function C17DenseWorkspace({
   canReviewBefore,
+  canReviewNewer,
+  canReviewOlder,
   cardsPerHand,
   canCommitCard,
   game,
@@ -540,21 +562,26 @@ function C17DenseWorkspace({
   liveTurn,
   newerActionCount,
   onDiscard,
-  onEnterHistory,
+  onEnterRewind,
   onOpenDiscards,
   onPlay,
   onReviewAfter,
   onReviewBefore,
+  onReviewNewer,
+  onReviewOlder,
   onReturnLive,
   onSelectCard,
+  onSelectRecentAction,
   pendingText,
-  recent,
+  recentActions,
   reviewActive,
   reviewSide,
   selectedTurn,
   variantName,
 }: {
   canReviewBefore: boolean;
+  canReviewNewer: boolean;
+  canReviewOlder: boolean;
   cardsPerHand: number;
   canCommitCard: boolean;
   game: GameState;
@@ -567,26 +594,33 @@ function C17DenseWorkspace({
   liveTurn: number;
   newerActionCount: number;
   onDiscard: () => void;
-  onEnterHistory: () => void;
+  onEnterRewind: () => void;
   onOpenDiscards: () => void;
   onPlay: () => void;
   onReviewAfter: () => void;
   onReviewBefore: () => void;
+  onReviewNewer: () => void;
+  onReviewOlder: () => void;
   onReturnLive: () => void;
   onSelectCard: (order: number) => void;
+  onSelectRecentAction: (segment: number) => void;
   pendingText: string | null;
-  recent: readonly C17TemporalEntry[];
+  recentActions: readonly C17TemporalEntry[];
   reviewActive: boolean;
   reviewSide: C17ReviewSide | null;
   selectedTurn: number;
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
+  const [recentOpen, setRecentOpen] = useState(false);
   const [layoutMetrics, setLayoutMetrics] = useState({
     opponentCardLaneWidth: 0,
     handsRegionHeight: 0,
     ownCardLaneWidth: 0,
   });
+  useEffect(() => {
+    if (reviewActive) setRecentOpen(false);
+  }, [reviewActive]);
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
   const layout = getC17DenseLayout({
     ...layoutMetrics,
@@ -609,93 +643,131 @@ function C17DenseWorkspace({
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
-  const recentEntry = recent.at(-1);
-  const recentText = recentEntry === undefined ? 'Start of game' : `T${recentEntry.turn} · ${recentEntry.summary}`;
   const reviewSideLabel = reviewSide === null ? '' : reviewSide.toUpperCase();
 
-  return <View style={styles.c17Workspace}>
-    <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <View style={styles.grow}>
-        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REVIEWING T${selectedTurn} · ${reviewSideLabel}` : `LIVE T${liveTurn}`}</Text>
-        <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+  return <>
+    <View style={styles.c17Workspace}>
+      <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={styles.grow}>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REVIEWING T${selectedTurn} · ${reviewSideLabel}` : `LIVE T${liveTurn}`}</Text>
+          <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+        </View>
+        <HudStat label="Score" value={game.score} />
+        <HudStat label="Max" value={game.stats.maxScore} />
+        <HudStat label="Clues" value={getDisplayedClueTokens(game.clueTokens, variantName)} />
+        <HudStat label="Strikes" value={game.strikes.length} />
+        <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
+        {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
+        {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
       </View>
-      <HudStat label="Score" value={game.score} />
-      <HudStat label="Max" value={game.stats.maxScore} />
-      <HudStat label="Clues" value={getDisplayedClueTokens(game.clueTokens, variantName)} />
-      <HudStat label="Strikes" value={game.strikes.length} />
-      <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
-      {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
-      {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
-    </View>
-    <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
-    <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-      <View style={styles.c17LastActionHeader}>
-        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `T${selectedTurn} ACTION` : 'LAST ACTION'}</Text>
-        {!reviewActive && <Pressable
-          accessibilityLabel="Review previous action"
-          disabled={!historyAvailable}
-          hitSlop={12}
-          onPress={onEnterHistory}
-        >
-          <Text style={[styles.c17HistoryLink, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>HISTORY</Text>
-        </Pressable>}
+      <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
+      <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+        <View style={styles.c17LastActionHeader}>
+          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `T${selectedTurn} ACTION` : 'LAST ACTION'}</Text>
+          {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
+        </View>
+        {reviewActive
+          ? <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+          : <Pressable
+            accessibilityLabel="Open recent actions"
+            accessibilityRole="button"
+            disabled={!historyAvailable}
+            onPress={() => setRecentOpen(true)}
+            style={({ pressed }) => [styles.c17LastActionPressable, pressed && { backgroundColor: theme.colors.overlay }]}
+          >
+            <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+            <Text style={[styles.c17RecentLink, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
+          </Pressable>}
       </View>
-      <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
-    </View>
-    <View onLayout={onHandsRegionLayout} style={styles.c17Hands}>
-    <View style={styles.c17Opponents}>
-      {opponents.map((index) => {
-        const currentActor = current === index;
-        const compact = layout.mode === 'compact-overview';
-        return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
-          <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
-          <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
+      <View onLayout={onHandsRegionLayout} style={styles.c17Hands}>
+        <View style={styles.c17Opponents}>
+          {opponents.map((index) => {
+            const currentActor = current === index;
+            const compact = layout.mode === 'compact-overview';
+            return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
+              <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
+              <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
+                const card = game.deck[order];
+                if (card === undefined) return null;
+                return <VisibleHanabiCard height={layout.opponentCardHeight} key={order} position={position} rank={card.rank} size={compact ? 'mini' : 'hand'} suitIndex={card.suitIndex} variantName={variantName} />;
+              })}</View>
+            </View>;
+          })}
+        </View>
+        <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.c17OwnTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
+          <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
-            return <VisibleHanabiCard height={layout.opponentCardHeight} key={order} position={position} rank={card.rank} size={compact ? 'mini' : 'hand'} suitIndex={card.suitIndex} variantName={variantName} />;
+            return <GameCard height={layout.ownCardHeight} key={order}
+              knowledge={getCardKnowledgeViewModel(variantName, card, undefined, false)} onSelect={() => onSelectCard(order)}
+              position={position} selected={selectedOwnCard === order} variantName={variantName} />;
           })}</View>
-        </View>;
-      })}
-    </View>
-    <View style={[styles.c17OwnHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <Text style={[styles.c17OwnTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
-      <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
-        const card = game.deck[order];
-        if (card === undefined) return null;
-        return <GameCard height={layout.ownCardHeight} key={order}
-          knowledge={getCardKnowledgeViewModel(variantName, card, undefined, false)} onSelect={() => onSelectCard(order)}
-          position={position} selected={selectedOwnCard === order} variantName={variantName} />;
-      })}</View>
-    </View>
-    </View>
-    <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
-      {reviewActive
-        ? <>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Reviewing T{selectedTurn} · {reviewSideLabel} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
-          <View style={styles.c17ActionRow}>
-            <Text numberOfLines={1} style={[styles.c17ReviewRecent, { color: theme.colors.textMuted }]}>Prev · {recentText}</Text>
-            <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canReviewBefore || reviewSide === 'before'} title="Before" onPress={onReviewBefore} />
-              <ActionButton compact disabled={reviewSide === 'after'} title="After" onPress={onReviewAfter} />
-              <ActionButton compact title={`Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
-            </View>
-          </View>
-        </>
-        : <>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
-          {selectedOwnCard === null
-            ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
-            : <View style={styles.c17ActionRow}>
-              <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+        </View>
+      </View>
+      <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
+        {reviewActive
+          ? <>
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Reviewing T{selectedTurn} · {reviewSideLabel} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+            <View style={styles.c17ActionRow}>
               <View style={styles.actionButtons}>
-                <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
-                <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+                <ActionButton compact disabled={!canReviewOlder} title="‹ Older" onPress={onReviewOlder} />
+                <ActionButton compact disabled={!canReviewNewer} title="Newer ›" onPress={onReviewNewer} />
               </View>
-            </View>}
-          {pendingText !== null && <Text style={[styles.c17PendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
-        </>}
+              <View style={styles.actionButtons}>
+                <ActionButton compact disabled={!canReviewBefore} title="Before" tone={reviewSide === 'before' ? 'primary' : 'secondary'} onPress={onReviewBefore} />
+                <ActionButton compact title="After" tone={reviewSide === 'after' ? 'primary' : 'secondary'} onPress={onReviewAfter} />
+                <ActionButton compact title={`Live T${liveTurn}`} onPress={onReturnLive} />
+              </View>
+            </View>
+          </>
+          : <>
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
+            {selectedOwnCard === null
+              ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
+              : <View style={styles.c17ActionRow}>
+                <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+                <View style={styles.actionButtons}>
+                  <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
+                  <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+                </View>
+              </View>}
+            {pendingText !== null && <Text style={[styles.c17PendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
+          </>}
+      </View>
     </View>
-  </View>;
+    <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
+      <View style={[styles.c17RecentBackdrop, { backgroundColor: theme.colors.overlay }]}>
+        <View style={[styles.c17RecentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+          <View style={styles.between}>
+            <View>
+              <Text style={[styles.c17RecentTitle, { color: theme.colors.text }]}>Recent actions</Text>
+              <Text style={[styles.c17RecentHint, { color: theme.colors.textMuted }]}>Tap an action to jump there in rewind.</Text>
+            </View>
+            <ActionButton compact title="Close" onPress={() => setRecentOpen(false)} />
+          </View>
+          <View style={styles.c17RecentList}>
+            {[...recentActions].reverse().map((entry) => <Pressable
+              accessibilityRole="button"
+              key={entry.segment}
+              onPress={() => {
+                setRecentOpen(false);
+                onSelectRecentAction(entry.segment);
+              }}
+              style={({ pressed }) => [
+                styles.c17RecentItem,
+                { borderColor: theme.colors.border, backgroundColor: pressed ? theme.colors.surfaceMuted : theme.colors.surface },
+              ]}
+            >
+              <Text style={[styles.c17RecentTurn, { color: theme.colors.accent }]}>T{entry.turn}</Text>
+              <Text numberOfLines={2} style={[styles.c17RecentSummary, { color: theme.colors.text }]}>{entry.summary}</Text>
+              <Text style={[styles.c17RecentJump, { color: theme.colors.accent }]}>JUMP ›</Text>
+            </Pressable>)}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  </>;
 }
 
 function ReplayTable({ game, variantName }: { game: GameState; variantName: string }) {
@@ -814,10 +886,11 @@ const styles = StyleSheet.create({
   c17Workspace: { flex: 1, gap: 5, minHeight: 0, paddingBottom: 4 },
   c17Hud: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   c17Turn: { fontSize: 13, fontWeight: '900' },
-  c17LastAction: { borderRadius: 8, borderWidth: 1, gap: 1, minHeight: 29, paddingHorizontal: 7, paddingVertical: 3 },
-  c17LastActionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  c17HistoryLink: { fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
-  c17LastActionText: { fontSize: 10, fontWeight: '700' },
+  c17LastAction: { borderRadius: 8, borderWidth: 1, gap: 3, minHeight: 37, paddingHorizontal: 7, paddingVertical: 4 },
+  c17LastActionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  c17LastActionPressable: { alignItems: 'center', borderRadius: 5, flexDirection: 'row', gap: 7, minHeight: 24, paddingHorizontal: 2 },
+  c17LastActionText: { flex: 1, fontSize: 10, fontWeight: '700', minWidth: 0 },
+  c17RecentLink: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   c17Hands: { flex: 1, gap: 5, minHeight: 0 },
   c17Opponents: { gap: 2 },
   c17OpponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 4 },
@@ -827,10 +900,18 @@ const styles = StyleSheet.create({
   c17OwnTitle: { fontSize: 10, fontWeight: '900', width: 64 },
   c17OwnCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 4, minWidth: 0 },
   c17Workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 4, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
-  c17ActionRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  c17ActionRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
   c17WorkbenchText: { fontSize: 12, lineHeight: 16 },
-  c17ReviewRecent: { flex: 1, fontSize: 10, lineHeight: 14, minWidth: 0 },
   c17PendingText: { fontSize: 10, lineHeight: 14 },
+  c17RecentBackdrop: { flex: 1, justifyContent: 'center', padding: 18 },
+  c17RecentPopup: { borderRadius: 14, borderWidth: 1, gap: 10, maxHeight: '78%', padding: 12 },
+  c17RecentTitle: { fontSize: 16, fontWeight: '900' },
+  c17RecentHint: { fontSize: 11, lineHeight: 15 },
+  c17RecentList: { gap: 6 },
+  c17RecentItem: { alignItems: 'center', borderRadius: 9, borderWidth: 1, flexDirection: 'row', gap: 7, minHeight: 48, paddingHorizontal: 9, paddingVertical: 7 },
+  c17RecentTurn: { fontSize: 11, fontWeight: '900', width: 30 },
+  c17RecentSummary: { flex: 1, fontSize: 11, lineHeight: 15, minWidth: 0 },
+  c17RecentJump: { fontSize: 9, fontWeight: '900' },
   stats: { flexDirection: 'row', gap: 8, width: '100%' },
   stat: { alignItems: 'center', borderRadius: 10, flex: 1, padding: 9 },
   statValue: { fontSize: 20, fontWeight: '900' },
