@@ -51,10 +51,8 @@ const END: Record<number, string> = {
 };
 
 type NoteEntry = { name: string; text: string; isSpectator: boolean };
-type C17ReviewSide = 'before' | 'after';
 type C17ReviewSelection = {
   actionSegment: number;
-  side: C17ReviewSide;
   liveSegmentAtEntry: number;
 };
 
@@ -310,45 +308,50 @@ export function GameScreen() {
         variantName: metadata.options.variantName,
       })
       : liveTemporal;
-    const reviewSide: C17ReviewSide | null = replay.active ? c17Review?.side ?? 'after' : null;
     const newerActionCount = replay.active && c17Review !== null
       ? countC17TemporalStatesAfter(replay.states, c17Review.liveSegmentAtEntry)
       : 0;
-    const recentActions = [...liveTemporal.recent, liveTemporal.last]
+    const recentTemporal = replay.active && c17Review !== null ? reviewTemporal : liveTemporal;
+    const recentActions = [...recentTemporal.recent, recentTemporal.last]
       .filter((entry, index, entries) => entry.segment > 0
         && entries.findIndex((candidate) => candidate.segment === entry.segment) === index)
       .slice(-Math.max(5, metadata.playerNames.length));
+    const actionSegments = replay.states
+      .flatMap((state, stateSegment) => state === undefined ? [] : [stateSegment])
+      .slice(1);
+    const firstActionSegment = actionSegments[0] ?? null;
+    const lastActionSegment = actionSegments.at(-1) ?? null;
     const commitSelectedCard = (action: 'play' | 'discard') => {
       if (!cardEnabled || selectedCard === null) return;
       if (action === 'play') lobbyRuntime.play(selectedCard);
       else lobbyRuntime.discard(selectedCard);
     };
-    const jumpToAction = (actionSegment: number, side: C17ReviewSide = 'after') => {
+    const jumpToAction = (actionSegment: number) => {
       const temporal = getC17TemporalContext({
         states: replay.states,
         selectedSegment: actionSegment,
         variantName: metadata.options.variantName,
       });
-      const target = side === 'before' ? temporal.beforeSegment : temporal.afterSegment;
-      if (target === null) return;
       disarmGameplay();
       setC17Review({
         actionSegment: temporal.selectedSegment,
-        side,
         liveSegmentAtEntry: c17Review?.liveSegmentAtEntry ?? latest,
       });
-      lobbyRuntime.navigateReplaySegment(target);
+      lobbyRuntime.navigateReplaySegment(temporal.afterSegment);
     };
     const enterRewind = () => {
-      if (recentActions.length === 0) return;
-      jumpToAction(liveTemporal.selectedSegment, 'after');
+      const target = recentActions.at(-1)?.segment ?? lastActionSegment;
+      if (target !== null) jumpToAction(target);
     };
-    const navigateReviewSide = (side: C17ReviewSide) => jumpToAction(reviewTemporal.selectedSegment, side);
-    const navigateReviewAction = (direction: 'older' | 'newer') => {
-      const target = direction === 'older'
+    const navigateReviewAction = (direction: 'back' | 'forward') => {
+      const target = direction === 'back'
         ? reviewTemporal.previousActionSegment
         : reviewTemporal.nextActionSegment;
-      if (target !== null) jumpToAction(target, 'after');
+      if (target !== null) jumpToAction(target);
+    };
+    const jumpReviewEdge = (edge: 'start' | 'end') => {
+      const target = edge === 'start' ? firstActionSegment : lastActionSegment;
+      if (target !== null) jumpToAction(target);
     };
     const returnLive = () => {
       if (!replay.active) return;
@@ -363,9 +366,8 @@ export function GameScreen() {
     };
     return <>
       <C17DenseWorkspace
-        canReviewBefore={reviewTemporal.beforeSegment !== null}
-        canReviewNewer={reviewTemporal.nextActionSegment !== null}
-        canReviewOlder={reviewTemporal.previousActionSegment !== null}
+        canReviewForward={reviewTemporal.nextActionSegment !== null}
+        canReviewBack={reviewTemporal.previousActionSegment !== null}
         cardsPerHand={getGameplayCardsPerHand(metadata)}
         canCommitCard={cardEnabled}
         futureEfficiency={futureEfficiency}
@@ -379,20 +381,19 @@ export function GameScreen() {
         onEnterRewind={enterRewind}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
         onPlay={() => commitSelectedCard('play')}
-        onReviewAfter={() => navigateReviewSide('after')}
-        onReviewBefore={() => navigateReviewSide('before')}
-        onReviewNewer={() => navigateReviewAction('newer')}
-        onReviewOlder={() => navigateReviewAction('older')}
+        onReviewBack={() => navigateReviewAction('back')}
+        onReviewEnd={() => jumpReviewEdge('end')}
+        onReviewForward={() => navigateReviewAction('forward')}
+        onReviewStart={() => jumpReviewEdge('start')}
         onReturnLive={returnLive}
         onSelectCard={(order) => {
           if (!replay.active) interactionDispatch({ type: 'select-card', order });
         }}
-        onSelectRecentAction={(actionSegment) => jumpToAction(actionSegment, 'after')}
+        onSelectRecentAction={jumpToAction}
         ourIndex={ourIndex}
         pendingText={pendingText ?? null}
         recentActions={recentActions}
         reviewActive={replay.active}
-        reviewSide={reviewSide}
         selectedCard={selectedCard}
         selectedTurn={reviewTemporal.selectedTurn}
         variantName={metadata.options.variantName}
@@ -547,9 +548,8 @@ export function GameScreen() {
 }
 
 function C17DenseWorkspace({
-  canReviewBefore,
-  canReviewNewer,
-  canReviewOlder,
+  canReviewForward,
+  canReviewBack,
   cardsPerHand,
   canCommitCard,
   game,
@@ -565,23 +565,21 @@ function C17DenseWorkspace({
   onEnterRewind,
   onOpenDiscards,
   onPlay,
-  onReviewAfter,
-  onReviewBefore,
-  onReviewNewer,
-  onReviewOlder,
+  onReviewBack,
+  onReviewEnd,
+  onReviewForward,
+  onReviewStart,
   onReturnLive,
   onSelectCard,
   onSelectRecentAction,
   pendingText,
   recentActions,
   reviewActive,
-  reviewSide,
   selectedTurn,
   variantName,
 }: {
-  canReviewBefore: boolean;
-  canReviewNewer: boolean;
-  canReviewOlder: boolean;
+  canReviewForward: boolean;
+  canReviewBack: boolean;
   cardsPerHand: number;
   canCommitCard: boolean;
   game: GameState;
@@ -597,17 +595,16 @@ function C17DenseWorkspace({
   onEnterRewind: () => void;
   onOpenDiscards: () => void;
   onPlay: () => void;
-  onReviewAfter: () => void;
-  onReviewBefore: () => void;
-  onReviewNewer: () => void;
-  onReviewOlder: () => void;
+  onReviewBack: () => void;
+  onReviewEnd: () => void;
+  onReviewForward: () => void;
+  onReviewStart: () => void;
   onReturnLive: () => void;
   onSelectCard: (order: number) => void;
   onSelectRecentAction: (segment: number) => void;
   pendingText: string | null;
   recentActions: readonly C17TemporalEntry[];
   reviewActive: boolean;
-  reviewSide: C17ReviewSide | null;
   selectedTurn: number;
   variantName: string;
 }) {
@@ -643,13 +640,12 @@ function C17DenseWorkspace({
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
-  const reviewSideLabel = reviewSide === null ? '' : reviewSide.toUpperCase();
 
   return <>
     <View style={styles.c17Workspace}>
       <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.grow}>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REVIEWING T${selectedTurn} · ${reviewSideLabel}` : `LIVE T${liveTurn}`}</Text>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
           <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
         </View>
         <HudStat label="Score" value={game.score} />
@@ -663,21 +659,19 @@ function C17DenseWorkspace({
       <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
       <View style={[styles.c17LastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
         <View style={styles.c17LastActionHeader}>
-          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `T${selectedTurn} ACTION` : 'LAST ACTION'}</Text>
+          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
           {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
         </View>
-        {reviewActive
-          ? <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
-          : <Pressable
-            accessibilityLabel="Open recent actions"
-            accessibilityRole="button"
-            disabled={!historyAvailable}
-            onPress={() => setRecentOpen(true)}
-            style={({ pressed }) => [styles.c17LastActionPressable, pressed && { backgroundColor: theme.colors.overlay }]}
-          >
-            <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
-            <Text style={[styles.c17RecentLink, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
-          </Pressable>}
+        <Pressable
+          accessibilityLabel="Open recent actions"
+          accessibilityRole="button"
+          disabled={!historyAvailable}
+          onPress={() => setRecentOpen(true)}
+          style={({ pressed }) => [styles.c17LastActionPressable, pressed && { backgroundColor: theme.colors.overlay }]}
+        >
+          <Text numberOfLines={1} style={[styles.c17LastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+          <Text style={[styles.c17RecentLink, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
+        </Pressable>
       </View>
       <View onLayout={onHandsRegionLayout} style={styles.c17Hands}>
         <View style={styles.c17Opponents}>
@@ -708,18 +702,15 @@ function C17DenseWorkspace({
       <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
         {reviewActive
           ? <>
-            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Reviewing T{selectedTurn} · {reviewSideLabel} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
             <View style={styles.c17ActionRow}>
               <View style={styles.actionButtons}>
-                <ActionButton compact disabled={!canReviewOlder} title="‹ Older" onPress={onReviewOlder} />
-                <ActionButton compact disabled={!canReviewNewer} title="Newer ›" onPress={onReviewNewer} />
+                <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
+                <ActionButton compact disabled={!canReviewForward} title="Forward →" onLongPress={onReviewEnd} onPress={onReviewForward} />
               </View>
-              <View style={styles.actionButtons}>
-                <ActionButton compact disabled={!canReviewBefore} title="Before" tone={reviewSide === 'before' ? 'primary' : 'secondary'} onPress={onReviewBefore} />
-                <ActionButton compact title="After" tone={reviewSide === 'after' ? 'primary' : 'secondary'} onPress={onReviewAfter} />
-                <ActionButton compact title={`Live T${liveTurn}`} onPress={onReturnLive} />
-              </View>
+              <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
             </View>
+            <Text style={[styles.c17RewindHint, { color: theme.colors.textMuted }]}>Hold Back for start · Hold Forward for end</Text>
           </>
           : <>
             <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
@@ -903,6 +894,7 @@ const styles = StyleSheet.create({
   c17ActionRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
   c17WorkbenchText: { fontSize: 12, lineHeight: 16 },
   c17PendingText: { fontSize: 10, lineHeight: 14 },
+  c17RewindHint: { fontSize: 9, lineHeight: 12 },
   c17RecentBackdrop: { flex: 1, justifyContent: 'center', padding: 18 },
   c17RecentPopup: { borderRadius: 14, borderWidth: 1, gap: 10, maxHeight: '78%', padding: 12 },
   c17RecentTitle: { fontSize: 16, fontWeight: '900' },
