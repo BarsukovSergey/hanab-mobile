@@ -46,6 +46,7 @@ export function composeQuickNote(
 ): string | null {
   const variant = getVariant(variantName);
   const before = parseNote(variant, text);
+  const empty = parseNote(variant, '');
   const targetField = TOKEN_FIELD[token];
   if (before[targetField]) return text;
 
@@ -59,7 +60,7 @@ export function composeQuickNote(
     nextActive = `[${token}]`;
   } else if (active.includes('[')) {
     nextActive = `${active} [${token}]`;
-  } else if (noteHasSemantics(before)) {
+  } else if (noteHasSemantics(before, empty)) {
     nextActive = `[${active}] [${token}]`;
   } else {
     nextActive = `${active} [${token}]`;
@@ -71,8 +72,9 @@ export function composeQuickNote(
   return candidate;
 }
 
-function noteHasSemantics(note: CardNote): boolean {
-  return note.possibilities.length > 0 || BOOLEAN_FIELDS.some((field) => note[field]);
+function noteHasSemantics(note: CardNote, empty: CardNote): boolean {
+  return JSON.stringify(note.possibilities) !== JSON.stringify(empty.possibilities)
+    || BOOLEAN_FIELDS.some((field) => note[field]);
 }
 
 function preservesSemantics(
