@@ -9,8 +9,6 @@ type Props = {
   onSelectSegment: (segment: number) => void;
 };
 
-const NAVIGATION_INTERVAL_MS = 80;
-
 export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSegment }: Props) {
   const { theme } = useHanabTheme();
   const [trackWidth, setTrackWidth] = useState(0);
@@ -21,12 +19,17 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
   const [previewIndex, setPreviewIndex] = useState(selectedIndex);
   const dragging = useRef(false);
   const lastEmittedIndex = useRef(selectedIndex);
-  const lastNavigationAt = useRef(0);
+  const pendingIndex = useRef<number | null>(null);
+  const navigationFrame = useRef<number | null>(null);
 
   useEffect(() => {
     lastEmittedIndex.current = selectedIndex;
     if (!dragging.current) setPreviewIndex(selectedIndex);
   }, [selectedIndex]);
+
+  useEffect(() => () => {
+    if (navigationFrame.current !== null) cancelAnimationFrame(navigationFrame.current);
+  }, []);
 
   if (timelineSegments.length === 0) return null;
 
@@ -43,21 +46,37 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
       ),
     );
   };
-  const emitIndex = (index: number, force: boolean) => {
-    const now = Date.now();
-    if (!force && now - lastNavigationAt.current < NAVIGATION_INTERVAL_MS) return;
+  const emitIndex = (index: number) => {
     if (index === lastEmittedIndex.current) return;
     const segment = timelineSegments[index];
     if (segment === undefined) return;
     lastEmittedIndex.current = index;
-    lastNavigationAt.current = now;
     onSelectSegment(segment);
   };
-  const scrubToX = (x: number, force: boolean) => {
+  const scheduleIndex = (index: number) => {
+    pendingIndex.current = index;
+    if (navigationFrame.current !== null) return;
+    navigationFrame.current = requestAnimationFrame(() => {
+      navigationFrame.current = null;
+      const nextIndex = pendingIndex.current;
+      pendingIndex.current = null;
+      if (nextIndex !== null) emitIndex(nextIndex);
+    });
+  };
+  const flushIndex = (index: number) => {
+    pendingIndex.current = null;
+    if (navigationFrame.current !== null) {
+      cancelAnimationFrame(navigationFrame.current);
+      navigationFrame.current = null;
+    }
+    emitIndex(index);
+  };
+  const scrubToX = (x: number, final: boolean) => {
     const index = indexFromX(x);
     if (index === null) return;
     setPreviewIndex((current) => current === index ? current : index);
-    emitIndex(index, force);
+    if (final) flushIndex(index);
+    else scheduleIndex(index);
   };
 
   return <View style={styles.root}>
