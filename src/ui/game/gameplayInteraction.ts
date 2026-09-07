@@ -20,6 +20,7 @@ export type GameplayInteractionAction =
   | { type: 'open-note'; order: number | null }
   | { type: 'toggle-empathy-player'; playerIndex: number }
   | { type: 'toggle-global-empathy' }
+  | { type: 'hold-empathy'; playerIndex: number | null }
   | { type: 'cancel-transient' }
   | { type: 'disarm-gameplay' }
   | { type: 'reset-lifecycle-transients' }
@@ -83,6 +84,12 @@ export function gameplayInteractionReducer(
         ...state,
         empathyPlayer: null,
         globalEmpathy: !state.globalEmpathy,
+      };
+    case 'hold-empathy':
+      return {
+        ...state,
+        empathyPlayer: action.playerIndex,
+        globalEmpathy: false,
       };
     case 'cancel-transient':
       return state;
