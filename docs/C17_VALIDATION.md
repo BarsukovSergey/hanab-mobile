@@ -1,7 +1,7 @@
 # C17 Validation Plan
 
 Status: **active**
-Date: 2026-09-07
+Date: 2026-09-08
 
 This document tracks what C17 still has to prove on real devices. It does not restate game semantics. The current product contract is `docs/C17_UX_CONTRACT.md`. Detailed physical observations and defect history are preserved in `docs/C17_EVIDENCE.md`.
 
@@ -189,35 +189,41 @@ At minimum cover:
 
 ### A29 live history
 
-- enter from active game;
-- select prior turn/action;
-- `Reviewing Tn` is clearly distinct from `Live Tm`;
+- enter rewind from active game;
+- Last Action remains visible and tappable in both Live and Rewind;
+- tapping Last Action opens a compact recent-action list for the current temporal position;
+- tapping a recent action jumps directly to that historical action;
+- Rewind is clearly distinct from Live;
+- the primary rewind controls are only Back, Forward, and Exit to Live;
+- Back/Forward move one historical action at a time;
+- long-press Back jumps to the start of the available action history;
+- long-press Forward jumps to the end of the available action history;
 - prior counters/table state are not mixed with live counters;
-- no Play/Discard/Clue send route is available while reviewing;
+- no Play/Discard/Clue send route is available while rewinding;
 - notes/knowledge/discard can be inspected;
 - new-live-action count/urgency is visible without forced exit;
-- one Live action returns to current state;
+- one Exit action returns to current Live state;
 - old action selection is not armed after return;
 - authoritative live game is unchanged by inspection.
 
-#### Current C17-2 deterministic result — PASS; physical A29 still pending
+#### Current C17-2 result — technical temporal foundation PASS; linear rewind UX pending physical acceptance
 
-As of the C17-2 code line ending at `eaf4a9f2887b937f90c58fcc65255db539e22692`, deterministic coverage establishes the non-visual A29 boundaries:
+Deterministic coverage establishes the non-visual boundaries:
 
 - play/discard reconstruction uses authoritative adjacent states to recover the exact durable card order, revealed identity, and pre-action displayed slot;
 - clue reconstruction derives touched displayed slots from the authoritative pre-state hand mapping;
-- Score / Clues / Strikes / Deck deltas are derived from the same before/after pair;
-- human labels distinguish reviewed turn from current Live turn;
-- Before/After are pinned to one focused action instead of silently changing which action is being reviewed;
-- Recent retains at least one seating rotation;
-- entering/leaving review disarms gameplay action selection while preserving note-inspection identity;
-- gameplay runtime rejects Play/Discard/Clue sends during review;
+- Score / Clues / Strikes / Deck deltas are derived from authoritative adjacent states;
+- Recent retains at least one seating rotation in temporal data;
+- entering/leaving rewind disarms gameplay action selection while preserving note-inspection identity;
+- gameplay runtime rejects Play/Discard/Clue sends during rewind;
 - incoming authoritative live actions update `ongoingGame` while the selected historical `visibleState` stays fixed;
 - one local return-to-Live action restores `visibleState` to the authoritative `ongoingGame`;
-- the C17 Ledger, discard viewer, hands, and resource HUD all read from the same selected `visibleState`, so historical presentation does not mix those surfaces with live state;
-- the review UI records the live segment at entry so `NEW` represents temporal progress after entering history rather than distance from the old action being inspected.
+- the C17 Ledger, discard viewer, hands, and resource HUD all read from the same selected `visibleState`;
+- the review UI records the live segment at entry so `NEW` represents temporal progress after entering rewind rather than distance from the historical action.
 
-The remaining C17-2 gate is deliberately physical/human rather than another broad regression pass: confirm that the labels, Before/After transition, Last Action detail, and Live return are immediately understandable at phone reading distance, including the look-away reconstruction probe and visible incoming-live indication.
+The first C17-2 interaction shell using a tiny `HISTORY` affordance plus `Before` / `After` controls **failed physical discoverability** and is not an accepted design. It was replaced by the current linear rewind model: explicit Rewind entry, Back/Forward navigation, long-press edge jumps, one Exit-to-Live action, and a Last Action / Recent jump surface that remains available while rewinding.
+
+The remaining C17-2 gate is physical/human. The user should be able to complete this without button-by-button instructions: inspect recent actions, jump to an older action, move backward/forward in rewind, use a long-press edge jump, inspect Last Action/Recent while still rewound, and return to Live. If the interaction requires explanation, C17-2 has not passed.
 
 ## 6. Pregame/shell validation
 
@@ -310,8 +316,10 @@ Record physical results here as C17 progresses.
 | 2026-09-06 | fixed compact C17-0 | same device class | Dense 6P compact | FAIL | Fit succeeded but opponent hands were over-shrunk and large vertical space was wasted. |
 | 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P | PASS | All hands, own hand, HUD/table, Last Action, and minimum Workbench fit cleanly. |
 | 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P + One Extra Card | PASS | Four-card opponent and local hands remain readable; no Android-nav clipping or wasted compact-space band. C17-0 density gate closed for this class. |
-| 2026-09-07 | `eaf4a9f2887b937f90c58fcc65255db539e22692` | deterministic tests / CI | C17-2 A29 non-visual boundaries | PASS | Exact old card/slot, Before/After focus, stale-send safety, live-while-reviewing preservation, one-action Live return, seating-rotation history, and temporal update counting covered. Physical readability/interaction pass remains. |
-| — | — | ordinary Android portrait / three-button nav | C17-2 A29 live-history UX | PENDING | Run one focused look-away/history pass; also observe the final own-card column alignment tweak. |
+| 2026-09-07 | `eaf4a9f2887b937f90c58fcc65255db539e22692` | deterministic tests / CI | C17-2 temporal foundation | PASS | Exact old card/slot, stale-send safety, live-while-reviewing preservation, one-action Live return, seating-rotation history, and temporal update counting covered. |
+| 2026-09-08 | pre-linear C17-2 interaction shell | ordinary Android portrait / three-button nav | C17-2 discoverability | FAIL | HISTORY did not read as clickable; selected Before/After state read as disabled; action navigation was unclear/incomplete. |
+| 2026-09-08 | `dfbf9212b3ca8d37df4997cb2649d8d368844ec9` | CI | C17-2 linear rewind implementation | PASS (technical) | Back/Forward, long-press edge jumps, Exit-to-Live, persistent Last Action/Recent, and recent-action jump implemented; physical acceptance still pending. |
+| — | — | ordinary Android portrait / three-button nav | C17-2 linear rewind UX | PENDING | Run unprompted Recent -> jump -> Back/Forward -> long-press edge -> Recent while rewound -> Exit flow. |
 | — | — | — | Trash visual candidate | PENDING | Start with semi-transparent/subdued treatment. |
 | — | — | — | Functional action animations | PENDING | Verify no blocking/backlog. |
 | — | — | — | Serious 5P session | PENDING | Release gate. |
