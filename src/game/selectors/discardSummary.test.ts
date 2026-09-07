@@ -35,6 +35,25 @@ describe('getDiscardSummary', () => {
     });
   });
 
+  test('prefers authoritative revealed identity over stale card-state rank', () => {
+    const game = {
+      discardStacks: [[], [], [], [0], []],
+      deck: [{ suitIndex: 3, rank: 1 }],
+    } as unknown as Parameters<typeof getDiscardSummary>[1];
+    const identities = [{ suitIndex: 3, rank: 4 }] as Parameters<typeof getDiscardSummary>[2];
+
+    expect(getDiscardSummary('No Variant', game, identities)).toEqual({
+      total: 1,
+      suits: [{
+        suitIndex: 3,
+        suitName: 'Blue',
+        total: 1,
+        unknownCount: 0,
+        ranks: [{ rank: 4, count: 1 }],
+      }],
+    });
+  });
+
   test('counts hidden or unavailable discard identities instead of dropping them from the total', () => {
     const game = {
       discardStacks: [[0, 1, 2], [], [], [], []],
