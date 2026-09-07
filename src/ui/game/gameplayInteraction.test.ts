@@ -66,6 +66,23 @@ describe('gameplayInteractionReducer', () => {
     expect(synced.empathyPlayer).toBeNull();
   });
 
+  test('disarms gameplay actions for temporal boundaries without discarding note inspection', () => {
+    const active = {
+      selectedCard: 11,
+      clueTarget: 2,
+      cluePreview: { type: 'color' as const, value: 0 },
+      empathyPlayer: 1,
+      noteCard: 20,
+    };
+    expect(gameplayInteractionReducer(active, { type: 'disarm-gameplay' })).toEqual({
+      selectedCard: null,
+      clueTarget: null,
+      cluePreview: null,
+      empathyPlayer: null,
+      noteCard: 20,
+    });
+  });
+
   test('drops every UI-only interaction across orientation/background lifecycle boundaries', () => {
     const active = {
       selectedCard: 11,

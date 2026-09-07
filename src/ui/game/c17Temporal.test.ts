@@ -170,7 +170,7 @@ describe('C17 temporal presentation', () => {
     expect(context.last.summary).toContain('Clues -1');
   });
 
-  test('exposes before/after navigation and counts newer stored action segments', () => {
+  test('exposes before/after navigation and distinct reviewing/live turns', () => {
     const context = getC17TemporalContext({
       states: [state(), state({ turnNum: 1 }), state({ turnNum: 2 }), state({ turnNum: 3 })],
       selectedSegment: 1,
@@ -179,7 +179,29 @@ describe('C17 temporal presentation', () => {
 
     expect(context.previousSegment).toBe(0);
     expect(context.nextSegment).toBe(2);
+    expect(context.selectedTurn).toBe(2);
+    expect(context.liveTurn).toBe(4);
     expect(context.newerActionCount).toBe(2);
+  });
+
+  test('keeps the selected historical position while the live tail grows', () => {
+    const states = [
+      state(),
+      state({ turnNum: 1 }),
+      state({ turnNum: 2 }),
+      state({ turnNum: 3 }),
+      state({ turnNum: 4 }),
+    ];
+    const context = getC17TemporalContext({
+      states,
+      selectedSegment: 1,
+      variantName: 'No Variant',
+    });
+
+    expect(context.selectedSegment).toBe(1);
+    expect(context.selectedTurn).toBe(2);
+    expect(context.liveTurn).toBe(5);
+    expect(context.newerActionCount).toBe(3);
   });
 
   test('keeps at least one full seating rotation of recent entries', () => {

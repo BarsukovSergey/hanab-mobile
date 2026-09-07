@@ -70,6 +70,7 @@ export function GameScreen() {
   const selectedCard = interaction.selectedCard;
   const selectedTarget = interaction.clueTarget;
   const noteCard = interaction.noteCard;
+  const replayActive = clientState?.replay.active ?? false;
 
   const liveNoteOrders = useMemo(() => getLiveNoteOrders(game), [game]);
   useEffect(() => {
@@ -83,6 +84,9 @@ export function GameScreen() {
   useEffect(() => {
     if (noteCard === null) setNoteEditorOpen(false);
   }, [noteCard]);
+  useEffect(() => {
+    interactionDispatch({ type: 'disarm-gameplay' });
+  }, [replayActive]);
 
   const gameplayLayout = useMemo(() => getGameplayLayout({
     viewportWidth: width,
@@ -120,6 +124,7 @@ export function GameScreen() {
   const segment = replay.active ? replay.segment : latest;
   const segments = replay.states.flatMap((state, i) => state === undefined ? [] : [i]);
   const shared = replay.shared;
+  const disarmGameplay = () => interactionDispatch({ type: 'disarm-gameplay' });
   const hasCardNote = (order: number) => {
     if (clientState.finished || liveRoom.role === 'spectator') {
       return clientState.notes.allNotes[order]?.some((entry) => entry.text.trim().length > 0) ?? false;
@@ -142,6 +147,7 @@ export function GameScreen() {
         if (next !== undefined) lobbyRuntime.navigateReplaySegment(next);
       }} />
       <ActionButton compact disabled={!replay.active || (shared !== null && segment >= latest)} title={shared === null ? 'Latest live' : 'Last'} onPress={() => {
+        disarmGameplay();
         if (shared !== null) lobbyRuntime.navigateReplaySegment(latest);
         else dispatch(roomActions.reviewSegmentSelected({ tableID: liveRoom.tableID, gameLoadEpoch: liveRoom.gameLoadEpoch, segment: null }));
       }} />
@@ -290,13 +296,18 @@ export function GameScreen() {
       else lobbyRuntime.discard(selectedCard);
     };
     const navigateBefore = () => {
-      if (temporal.previousSegment !== null) lobbyRuntime.navigateReplaySegment(temporal.previousSegment);
+      if (temporal.previousSegment === null) return;
+      disarmGameplay();
+      lobbyRuntime.navigateReplaySegment(temporal.previousSegment);
     };
     const navigateAfter = () => {
-      if (temporal.nextSegment !== null) lobbyRuntime.navigateReplaySegment(temporal.nextSegment);
+      if (temporal.nextSegment === null) return;
+      disarmGameplay();
+      lobbyRuntime.navigateReplaySegment(temporal.nextSegment);
     };
     const returnLive = () => {
       if (!replay.active) return;
+      disarmGameplay();
       if (shared !== null) lobbyRuntime.navigateReplaySegment(latest);
       else dispatch(roomActions.reviewSegmentSelected({
         tableID: liveRoom.tableID,
@@ -311,7 +322,7 @@ export function GameScreen() {
         futureEfficiency={futureEfficiency}
         game={game}
         lastAction={temporal.last.summary}
-        latestSegment={latest}
+        liveTurn={temporal.liveTurn}
         metadata={metadata}
         newerActionCount={temporal.newerActionCount}
         nextSegment={temporal.nextSegment}
@@ -328,7 +339,7 @@ export function GameScreen() {
         recent={temporal.recent}
         reviewActive={replay.active}
         selectedCard={selectedCard}
-        selectedSegment={temporal.selectedSegment}
+        selectedTurn={temporal.selectedTurn}
         variantName={metadata.options.variantName}
       />
       <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
@@ -489,7 +500,7 @@ function C17DenseWorkspace({
   selectedCard,
   lastAction,
   futureEfficiency,
-  latestSegment,
+  liveTurn,
   newerActionCount,
   nextSegment,
   onDiscard,
@@ -503,7 +514,7 @@ function C17DenseWorkspace({
   previousSegment,
   recent,
   reviewActive,
-  selectedSegment,
+  selectedTurn,
   variantName,
 }: {
   cardsPerHand: number;
@@ -514,7 +525,7 @@ function C17DenseWorkspace({
   selectedCard: number | null;
   lastAction: string;
   futureEfficiency: number | null;
-  latestSegment: number;
+  liveTurn: number;
   newerActionCount: number;
   nextSegment: number | null;
   onDiscard: () => void;
@@ -528,7 +539,7 @@ function C17DenseWorkspace({
   previousSegment: number | null;
   recent: readonly C17TemporalEntry[];
   reviewActive: boolean;
-  selectedSegment: number;
+  selectedTurn: number;
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
@@ -564,7 +575,7 @@ function C17DenseWorkspace({
   return <View style={styles.c17Workspace}>
     <View style={[styles.c17Hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <View style={styles.grow}>
-        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>TURN {getHumanTurnNumber(game.turn.turnNum)}</Text>
+        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REVIEWING T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
         <Text numberOfLines={1} style={[styles.c17Turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
       </View>
       <HudStat label="Score" value={game.score} />
@@ -619,7 +630,7 @@ function C17DenseWorkspace({
     <View style={[styles.c17Workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
       {reviewActive
         ? <>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>REVIEW · {selectedSegment}/{latestSegment}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Reviewing T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <View style={styles.c17ActionRow}>
             <Text numberOfLines={1} style={[styles.c17ReviewRecent, { color: theme.colors.textMuted }]}>Prev · {recentText}</Text>
             <View style={styles.actionButtons}>
