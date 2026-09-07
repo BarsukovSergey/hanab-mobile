@@ -1,6 +1,6 @@
 # C17 UX Decisions
 
-Date: 2026-09-06
+Date: 2026-09-08
 Status: **ratified**
 
 This file records the product decisions made after reviewing the Astra Pro C17 UX contract. The authoritative current contract is `docs/C17_UX_CONTRACT.md`.
@@ -58,9 +58,24 @@ Do not freeze a plain-chat fallback as the final UX. Inspect the actual web/upst
 
 ## D07 — Live in-game history
 
-**Decision:** MUST.
+**Decision:** MUST; linear rewind interaction ratified after physical UX review.
 
-Add A29 Live in-game history inspection as an explicit release gate. Reviewing an old turn must be clearly distinct from Live, disable gameplay sends, preserve inspection context, and return to current state in one action without stale action arming.
+A29 Live in-game history remains an explicit release gate. Reviewing history must be clearly distinct from Live, disable gameplay sends, preserve inspection context, and return to current state in one action without stale action arming.
+
+The C17 live rewind interaction is intentionally one-dimensional:
+
+- Back moves one authoritative action backward;
+- Forward moves one authoritative action forward;
+- long-press Back jumps to the first action;
+- long-press Forward jumps to the latest action available to rewind;
+- a touch scrubber/timeline provides fast direct movement and snaps to authoritative actions, never raw internal segments;
+- Exit / Live returns to the current authoritative live state.
+
+Do not expose Before/After as a persistent rewind axis and do not reintroduce separate Older/Newer plus Before/After controls. The selected rewind point is the state after the selected authoritative action.
+
+Last Action remains visible and actionable during rewind. Tapping it opens the same compact Recent actions surface, scoped to the current temporal point. Tapping a Recent action jumps directly to that action in rewind. In Live, Recent is scoped to the current live tail.
+
+Incoming live actions may extend the right edge while the player is rewinding but must not force an exit or move the selected historical point. Visible NEW state communicates that Live advanced.
 
 ## D08 — Card action input
 
