@@ -1,6 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 import type { GameState } from '../../game/bootstrap/types';
-import { getC17TemporalContext, getHumanTurnNumber } from './c17Temporal';
+import {
+  countC17TemporalStatesAfter,
+  getC17TemporalContext,
+  getHumanTurnNumber,
+} from './c17Temporal';
 
 type CardState = GameState['deck'][number];
 
@@ -73,6 +77,21 @@ describe('C17 temporal presentation', () => {
   test('presents upstream zero-based turns as human one-based turns', () => {
     expect(getHumanTurnNumber(0)).toBe(1);
     expect(getHumanTurnNumber(1)).toBe(2);
+  });
+
+  test('counts only authoritative temporal states added after history entry', () => {
+    const states: Array<GameState | undefined> = [
+      state(),
+      state({ turnNum: 1 }),
+      undefined,
+      state({ turnNum: 2 }),
+      undefined,
+      state({ turnNum: 3 }),
+    ];
+
+    expect(countC17TemporalStatesAfter(states, 1)).toBe(2);
+    expect(countC17TemporalStatesAfter(states, 3)).toBe(1);
+    expect(countC17TemporalStatesAfter(states, 5)).toBe(0);
   });
 
   test('reconstructs the exact played card and old displayed slot from authoritative states', () => {
