@@ -200,9 +200,31 @@ describe('C17 temporal presentation', () => {
     expect(context.afterSegment).toBe(1);
     expect(context.previousSegment).toBe(0);
     expect(context.nextSegment).toBe(2);
+    expect(context.previousActionSegment).toBeNull();
+    expect(context.nextActionSegment).toBe(2);
     expect(context.selectedTurn).toBe(2);
     expect(context.liveTurn).toBe(4);
     expect(context.newerActionCount).toBe(2);
+  });
+
+  test('navigates between actions independently from before/after state navigation', () => {
+    const states: Array<GameState | undefined> = [
+      state(),
+      state({ turnNum: 1 }),
+      undefined,
+      state({ turnNum: 2 }),
+      state({ turnNum: 3 }),
+    ];
+    const context = getC17TemporalContext({
+      states,
+      selectedSegment: 3,
+      variantName: 'No Variant',
+    });
+
+    expect(context.beforeSegment).toBe(1);
+    expect(context.afterSegment).toBe(3);
+    expect(context.previousActionSegment).toBe(1);
+    expect(context.nextActionSegment).toBe(4);
   });
 
   test('keeps the focused action and its before/after pair while the live tail grows', () => {
@@ -227,7 +249,7 @@ describe('C17 temporal presentation', () => {
     expect(context.newerActionCount).toBe(3);
   });
 
-  test('keeps at least one full seating rotation of recent entries', () => {
+  test('keeps at least five recent actions and at least one full seating rotation', () => {
     const hands = [
       [10, 11, 12, 13],
       [20, 21, 22, 23],
@@ -243,6 +265,17 @@ describe('C17 temporal presentation', () => {
     });
 
     expect(context.recent).toHaveLength(5);
+    expect(context.recent.map((entry) => entry.segment)).toEqual([2, 3, 4, 5, 6]);
+  });
+
+  test('keeps five recent actions even in a two-player game', () => {
+    const states = Array.from({ length: 8 }, (_, turnNum) => state({ turnNum }));
+    const context = getC17TemporalContext({
+      states,
+      selectedSegment: 7,
+      variantName: 'No Variant',
+    });
+
     expect(context.recent.map((entry) => entry.segment)).toEqual([2, 3, 4, 5, 6]);
   });
 });
