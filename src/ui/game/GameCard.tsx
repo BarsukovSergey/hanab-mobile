@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
+import type { CardStatePresentation } from '../../game/selectors/cardStatePresentation';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { getClueColorFill } from '../../game/selectors/gameplay';
 import { useHanabTheme } from '../designSystem';
@@ -18,6 +19,7 @@ type GameCardProps = {
   clueMarker?: ClueCardMarker | null;
   hasNote?: boolean;
   height?: number;
+  statePresentation?: CardStatePresentation | null;
   onSelect: () => void;
   onLongPress?: () => void;
   onPressOut?: () => void;
@@ -34,6 +36,7 @@ export function GameCard({
   clueMarker = null,
   hasNote = false,
   height,
+  statePresentation = null,
   onSelect,
   onLongPress,
   onPressOut,
@@ -41,6 +44,7 @@ export function GameCard({
 }: GameCardProps) {
   const { theme } = useHanabTheme();
   const longPressed = useRef(false);
+  const compactIndicator = height !== undefined && height < 80;
 
   return <Pressable
     accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`}
@@ -74,11 +78,13 @@ export function GameCard({
     ]}>
       <View style={[styles.hiddenCard, height === undefined ? null : styles.sizedHiddenCard]}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
+        {statePresentation?.engineTrash && <View pointerEvents="none" style={styles.engineTrashWash} />}
         {knowledge.borderColor !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: knowledge.borderColor }]} />}
         {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
         {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
-        {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
+        <CardStateIndicators compact={compactIndicator} presentation={statePresentation} />
+        {hasNote && <NoteIndicator compact={compactIndicator} />}
       </View>
       {height !== undefined && <View pointerEvents="none" style={[
         styles.sizedHiddenFrameOverlay,
@@ -100,6 +106,7 @@ export function VisibleHanabiCard({
   hasNote = false,
   semanticBorder = null,
   empathyKnowledge = null,
+  statePresentation = null,
   onPress,
   onLongPress,
   onPressOut,
@@ -116,6 +123,7 @@ export function VisibleHanabiCard({
   hasNote?: boolean;
   semanticBorder?: string | null;
   empathyKnowledge?: CardKnowledgeViewModel | null;
+  statePresentation?: CardStatePresentation | null;
   onPress?: () => void;
   onLongPress?: () => void;
   onPressOut?: () => void;
@@ -144,10 +152,12 @@ export function VisibleHanabiCard({
     },
   ]}>
     <UpstreamCardFace rank={faceRank} suitIndex={faceSuitIndex} variantName={variantName} />
+    {statePresentation?.engineTrash && <View pointerEvents="none" style={styles.engineTrashWash} />}
     {activeSemanticBorder !== null && size === 'hand' && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: activeSemanticBorder }]} />}
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
     {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
     {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
+    <CardStateIndicators compact={compactIndicator} presentation={statePresentation} />
     {hasNote && <NoteIndicator compact={compactIndicator} />}
   </View>;
 
@@ -277,6 +287,21 @@ function KnowledgeRankLegend({ knowledge }: { knowledge: CardKnowledgeViewModel 
   ))}</View>;
 }
 
+function CardStateIndicators({ presentation, compact }: { presentation: CardStatePresentation | null; compact: boolean }) {
+  if (presentation === null) return null;
+  const markers: Array<{ key: string; label: string; style: object }> = [];
+  if (presentation.critical) markers.push({ key: 'critical', label: '◆', style: styles.stateBadgeCritical });
+  if (presentation.knownTrashNote) markers.push({ key: 'kt', label: 'KT', style: styles.stateBadgeNeutral });
+  if (presentation.knownTrashFromEmpathy) markers.push({ key: 'trash', label: 'T', style: styles.stateBadgeNeutral });
+  if (presentation.doubleDiscard) markers.push({ key: 'dda', label: 'DDA', style: styles.stateBadgeWarning });
+  if (markers.length === 0) return null;
+  return <View pointerEvents="none" style={styles.stateIndicators}>
+    {markers.map((marker) => <View key={marker.key} style={[styles.stateBadge, marker.style, compact && styles.stateBadgeCompact]}>
+      <Text style={[styles.stateBadgeText, compact && styles.stateBadgeTextCompact]}>{marker.label}</Text>
+    </View>)}
+  </View>;
+}
+
 function NoteIndicator({ compact = false }: { compact?: boolean }) {
   return <View style={[styles.noteIndicator, compact && styles.noteIndicatorCompact]}>
     <Text style={[styles.noteIndicatorText, compact && styles.noteIndicatorTextCompact]}>✎</Text>
@@ -295,6 +320,7 @@ const styles = StyleSheet.create({
   sizedSelectedFrameOverlay: { borderWidth: 4 },
   hiddenCard: { backgroundColor: '#747a76', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   empathyCard: { backgroundColor: '#747a76' },
+  engineTrashWash: { backgroundColor: 'rgba(18, 20, 18, 0.42)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 2 },
   knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '10%', paddingHorizontal: '8%', paddingTop: '42%', position: 'absolute', right: 0, top: 0 },
   knowledgeStrip: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   suitStrip: { gap: 1 },
@@ -322,6 +348,14 @@ const styles = StyleSheet.create({
   clueCircle: { alignItems: 'center', borderColor: '#111111', borderRadius: 7, borderWidth: 1, height: 14, justifyContent: 'center', width: 14 },
   rankClueCircle: { backgroundColor: '#111111', borderColor: '#ffffff' },
   rankClueText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 9, maxWidth: 11 },
+  stateIndicators: { alignItems: 'flex-start', bottom: 3, gap: 2, left: 3, position: 'absolute', zIndex: 10 },
+  stateBadge: { alignItems: 'center', borderColor: '#f4f4ee', borderRadius: 3, borderWidth: 1, justifyContent: 'center', minHeight: 14, minWidth: 14, paddingHorizontal: 2 },
+  stateBadgeCompact: { minHeight: 10, minWidth: 10, paddingHorizontal: 1 },
+  stateBadgeCritical: { backgroundColor: '#7b1e1e' },
+  stateBadgeNeutral: { backgroundColor: '#171717' },
+  stateBadgeWarning: { backgroundColor: '#8a5a00' },
+  stateBadgeText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 10 },
+  stateBadgeTextCompact: { fontSize: 6, lineHeight: 7 },
   noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 16, justifyContent: 'center', position: 'absolute', right: 4, top: 4, transform: [{ rotate: '-8deg' }], width: 16, zIndex: 10 },
   noteIndicatorCompact: { height: 11, right: 2, top: 2, width: 11 },
   noteIndicatorText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900', lineHeight: 12 },
