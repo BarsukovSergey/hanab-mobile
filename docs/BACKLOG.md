@@ -51,6 +51,26 @@ Committed C17-3 through C17-7 work stays in those documents and the active hando
 - **Constraint:** do not reopen passed 5P/6P geometry to fix this. Prefer a player-count/window-class allocation improvement that preserves stable hand/workbench anchors.
 - **Blocker:** no.
 
+### B004 — Live HUD metric hierarchy and compact notation
+
+- **State:** deferred / validate
+- **Source/evidence:** tester discussion plus physical Android screenshot, 2026-09-08.
+- **Problem:** the top metric strip currently reads like a dense dashboard (`SCORE`, `MAX`, `CLUES`, `STRIKES`, `DECK`, `PACE`, `FRE`). Tester feedback specifically called out `FRE` versus the web-style `Eff`, the width/noise of separate `Score` and `Max`, and the fact that some metrics may scan more naturally when placed nearer their table context.
+- **Candidate directions:** test compact `score/max` notation such as `0/25`; use `Eff` if it remains semantically accurate to the pinned upstream/web metric; evaluate selective color/symbol emphasis; evaluate whether deck/discard or score/fireworks values belong visually closer to those table regions on roomy layouts.
+- **Constraint:** do not treat the tester's exact proposed colors or geometry as product authority. Score, achievable max, clues, strikes, deck, pace, and efficiency must remain glanceable when meaningful, and any relocation must survive small-screen fit tests.
+- **Revisit:** C17-7 information-hierarchy / responsive-polish pass, after shell placement is stable.
+- **Blocker:** no.
+
+### B005 — Live header chrome and Lobby prominence
+
+- **State:** deferred / validate
+- **Source/evidence:** tester discussion, 2026-09-08.
+- **Problem:** a permanently visible `Lobby` control consumes scarce top-level width and attention even though it is infrequently used during serious play. Tester feedback preferred keeping rare actions out of the primary visual field.
+- **Candidate directions:** evaluate moving Lobby under `More`, relocating secondary app chrome, or using a different header treatment for constrained versus roomy window classes.
+- **Constraint:** live-game exit/navigation must remain discoverable and safe; hiding the control must not create ambiguous leave/unattend semantics or make recovery from the game screen difficult.
+- **Revisit:** C17-6 shell/navigation work or C17-7 final responsive polish.
+- **Blocker:** no.
+
 ## Optional / post-MVP
 
 ### B003 — Optional drag-to-play / drag-to-discard input mode
