@@ -156,7 +156,7 @@ describe('gameplay scenario harness', () => {
     expect(synchronized.noteCard).toBeNull();
   });
 
-  test('keeps empathy momentary while rendering the upstream owner-perspective knowledge in stable geometry', () => {
+  test('keeps persistent empathy while rendering upstream owner-perspective knowledge in stable geometry', () => {
     const clueFlow = new Map(getClueFlowScenarios().map((scenario) => [scenario.id, scenario]));
     const committed = liveScenario(clueFlow, 'clue-committed');
     const game = committed.clientState.ongoingGame;
@@ -178,23 +178,27 @@ describe('gameplay scenario harness', () => {
       handSizes: game.hands.map((hand) => hand.length),
       ourPlayerIndex: committed.clientState.metadata.ourPlayerIndex,
     };
-    const beforeHold = getGameplayLayout(layoutInput);
-    const held = gameplayInteractionReducer(initialGameplayInteractionState, {
-      type: 'hold-empathy',
+    const beforeToggle = getGameplayLayout(layoutInput);
+    const enabled = gameplayInteractionReducer(initialGameplayInteractionState, {
+      type: 'toggle-empathy-player',
       playerIndex: 1,
     });
-    expect(held.empathyPlayer).toBe(1);
-    expect(getGameplayLayout(layoutInput)).toEqual(beforeHold);
+    expect(enabled.empathyPlayer).toBe(1);
+    expect(getGameplayLayout(layoutInput)).toEqual(beforeToggle);
 
-    const released = gameplayInteractionReducer(held, { type: 'hold-empathy', playerIndex: null });
-    expect(released.empathyPlayer).toBeNull();
-    const synchronized = gameplayInteractionReducer(held, {
+    const synchronized = gameplayInteractionReducer(enabled, {
       type: 'sync-hands',
       ownOrders: game.hands[0] ?? [],
       clueTargets: [1, 2],
       visibleOrders: getLiveNoteOrders(game),
     });
-    expect(synchronized.empathyPlayer).toBeNull();
+    expect(synchronized.empathyPlayer).toBe(1);
+
+    const disabled = gameplayInteractionReducer(synchronized, {
+      type: 'toggle-empathy-player',
+      playerIndex: 1,
+    });
+    expect(disabled.empathyPlayer).toBeNull();
   });
 
   test('runs canonical viewport targets through the production layout calculation', () => {
