@@ -27,7 +27,6 @@ import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
 import { getCommittedClueMarkerForMetadata } from './clueIndication';
-import { beginNoteEdit } from './noteEditing';
 import {
   gameplayInteractionReducer,
   initialGameplayInteractionState,
@@ -108,16 +107,14 @@ export function GameScreen() {
   }), [game, height, ourIndex, width]);
 
   useEffect(() => {
-    interactionDispatch({ type: 'reset-lifecycle-transients' });
-    setNoteEditorOpen(false);
+    interactionDispatch({ type: 'disarm-gameplay' });
     setDiscardViewerOpen(false);
   }, [gameplayLayout.orientation]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
-      interactionDispatch({ type: 'reset-lifecycle-transients' });
-      setNoteEditorOpen(false);
+      interactionDispatch({ type: 'disarm-gameplay' });
       setDiscardViewerOpen(false);
     });
     return () => subscription.remove();
@@ -125,7 +122,7 @@ export function GameScreen() {
 
   const authoritativeNote = noteCard === null ? '' : clientState?.notes.ourNotes[noteCard]?.text ?? '';
   useEffect(() => {
-    setNote(noteEditorOpen ? beginNoteEdit(authoritativeNote) : authoritativeNote);
+    if (!noteEditorOpen) setNote(authoritativeNote);
   }, [authoritativeNote, noteCard, noteEditorOpen]);
 
   if (liveRoom === null || clientState === null || game === null) return null;
@@ -251,6 +248,7 @@ export function GameScreen() {
   const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
   const pauseLabel = clientState.pause.active ? 'Unpause' : isOurTurn ? 'Pause' : clientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
   const openNote = (order: number) => {
+    setNote(clientState.notes.ourNotes[order]?.text ?? '');
     interactionDispatch({ type: 'open-note', order });
     setNoteEditorOpen(true);
   };
@@ -383,6 +381,7 @@ export function GameScreen() {
         onDiscard={() => commitSelectedCard('discard')}
         onEnterRewind={enterRewind}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
+        onOpenNote={openNote}
         onPlay={() => commitSelectedCard('play')}
         onReviewBack={() => navigateReviewAction('back')}
         onReviewEnd={() => jumpReviewEdge('end')}
@@ -404,6 +403,16 @@ export function GameScreen() {
         variantName={metadata.options.variantName}
       />
       <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
+      <NoteEditor
+        editable={notesEditable}
+        onChange={setNote}
+        onClear={clearNote}
+        onClose={() => setNoteEditorOpen(false)}
+        onSave={saveNote}
+        title={noteCardLabel}
+        value={note}
+        visible={noteEditorOpen}
+      />
     </>;
   }
 
@@ -537,7 +546,6 @@ export function GameScreen() {
         {gameplayLayout.needsSharedVerticalScroll && <Text style={[styles.denseHint, { color: theme.colors.textMuted }]}>Dense table: one shared vertical scroll may be needed; individual hands never scroll sideways.</Text>}
       </View>
     </View>
-
     <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
     <NoteEditor
       editable={notesEditable}
@@ -572,6 +580,7 @@ function C17DenseWorkspace({
   onDiscard,
   onEnterRewind,
   onOpenDiscards,
+  onOpenNote,
   onPlay,
   onReviewBack,
   onReviewEnd,
@@ -607,6 +616,7 @@ function C17DenseWorkspace({
   onDiscard: () => void;
   onEnterRewind: () => void;
   onOpenDiscards: () => void;
+  onOpenNote: (order: number) => void;
   onPlay: () => void;
   onReviewBack: () => void;
   onReviewEnd: () => void;
@@ -655,6 +665,7 @@ function C17DenseWorkspace({
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
+  const selectedNote = selectedOwnCard === null ? '' : notes[selectedOwnCard]?.text ?? '';
 
   return <>
     <View style={styles.c17Workspace}>
@@ -698,7 +709,17 @@ function C17DenseWorkspace({
               <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
-                return <VisibleHanabiCard height={layout.opponentCardHeight} key={order} position={position} rank={card.rank} size={compact ? 'mini' : 'hand'} suitIndex={card.suitIndex} variantName={variantName} />;
+                return <VisibleHanabiCard
+                  hasNote={(notes[order]?.text.trim().length ?? 0) > 0}
+                  height={layout.opponentCardHeight}
+                  key={order}
+                  onPress={() => onOpenNote(order)}
+                  position={position}
+                  rank={card.rank}
+                  size={compact ? 'mini' : 'hand'}
+                  suitIndex={card.suitIndex}
+                  variantName={variantName}
+                />;
               })}</View>
             </View>;
           })}
@@ -708,7 +729,7 @@ function C17DenseWorkspace({
           <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
-            return <GameCard height={layout.ownCardHeight} key={order}
+            return <GameCard height={layout.ownCardHeight} hasNote={(notes[order]?.text.trim().length ?? 0) > 0} key={order}
               knowledge={getCardKnowledgeViewModel(
                 variantName,
                 card,
@@ -739,13 +760,19 @@ function C17DenseWorkspace({
             <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
             {selectedOwnCard === null
               ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
-              : <View style={styles.c17ActionRow}>
-                <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
-                <View style={styles.actionButtons}>
-                  <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
-                  <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+              : <>
+                <View style={styles.c17ActionRow}>
+                  <Text style={[styles.c17WorkbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+                  <View style={styles.actionButtons}>
+                    <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
+                    <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+                    <ActionButton compact title="Note" onPress={() => onOpenNote(selectedOwnCard)} />
+                  </View>
                 </View>
-              </View>}
+                <Text numberOfLines={2} style={[styles.c17NotePreview, { color: selectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
+                  {selectedNote.trim().length > 0 ? selectedNote : 'No saved note'}
+                </Text>
+              </>}
             {pendingText !== null && <Text style={[styles.c17PendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
           </>}
       </View>
@@ -916,6 +943,7 @@ const styles = StyleSheet.create({
   c17Workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 4, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
   c17ActionRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
   c17WorkbenchText: { fontSize: 12, lineHeight: 16 },
+  c17NotePreview: { fontSize: 10, lineHeight: 14 },
   c17PendingText: { fontSize: 10, lineHeight: 14 },
   c17RewindHint: { fontSize: 9, lineHeight: 12 },
   c17RecentBackdrop: { flex: 1, justifyContent: 'center', padding: 18 },
