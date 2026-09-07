@@ -47,7 +47,11 @@ const END: Record<number, string> = {
 
 type NoteEntry = { name: string; text: string; isSpectator: boolean };
 type C17ReviewSide = 'before' | 'after';
-type C17ReviewSelection = { actionSegment: number; side: C17ReviewSide };
+type C17ReviewSelection = {
+  actionSegment: number;
+  side: C17ReviewSide;
+  liveSegmentAtEntry: number;
+};
 
 export function GameScreen() {
   const { theme } = useHanabTheme();
@@ -302,6 +306,9 @@ export function GameScreen() {
       })
       : liveTemporal;
     const reviewSide: C17ReviewSide | null = replay.active ? c17Review?.side ?? 'after' : null;
+    const newerActionCount = replay.active && c17Review !== null
+      ? Math.max(0, latest - c17Review.liveSegmentAtEntry)
+      : 0;
     const commitSelectedCard = (action: 'play' | 'discard') => {
       if (!cardEnabled || selectedCard === null) return;
       if (action === 'play') lobbyRuntime.play(selectedCard);
@@ -310,14 +317,22 @@ export function GameScreen() {
     const enterHistory = () => {
       if (liveTemporal.beforeSegment === null) return;
       disarmGameplay();
-      setC17Review({ actionSegment: liveTemporal.selectedSegment, side: 'before' });
+      setC17Review({
+        actionSegment: liveTemporal.selectedSegment,
+        side: 'before',
+        liveSegmentAtEntry: latest,
+      });
       lobbyRuntime.navigateReplaySegment(liveTemporal.beforeSegment);
     };
     const navigateReviewSide = (side: C17ReviewSide) => {
       const target = side === 'before' ? reviewTemporal.beforeSegment : reviewTemporal.afterSegment;
       if (target === null) return;
       disarmGameplay();
-      setC17Review({ actionSegment: reviewTemporal.selectedSegment, side });
+      setC17Review({
+        actionSegment: reviewTemporal.selectedSegment,
+        side,
+        liveSegmentAtEntry: c17Review?.liveSegmentAtEntry ?? latest,
+      });
       lobbyRuntime.navigateReplaySegment(target);
     };
     const returnLive = () => {
@@ -342,7 +357,7 @@ export function GameScreen() {
         lastAction={reviewTemporal.last.summary}
         liveTurn={reviewTemporal.liveTurn}
         metadata={metadata}
-        newerActionCount={reviewTemporal.newerActionCount}
+        newerActionCount={newerActionCount}
         onDiscard={() => commitSelectedCard('discard')}
         onEnterHistory={enterHistory}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
