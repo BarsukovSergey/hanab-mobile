@@ -5,6 +5,7 @@ import {
   getCardPipPresentation,
 } from '../client/cardPresentation';
 import { getVariant } from '../upstream/gameData';
+import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
 import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { CardState } from '../upstream/interfaces/CardState';
 
@@ -60,20 +61,18 @@ export function getCardKnowledgeViewModel(
   note: CardNote | undefined = undefined,
   finished = false,
   empathy = false,
+  cardIdentity: CardIdentity | undefined = undefined,
 ): CardKnowledgeViewModel {
   const variant = getVariant(variantName);
   const cardNote = note ?? EMPTY_NOTE;
   const identity = getCardIdentityToShow({
-    cardIdentity: { suitIndex: card.suitIndex, rank: card.rank },
+    cardIdentity: cardIdentity ?? { suitIndex: card.suitIndex, rank: card.rank },
     state: card,
     note: cardNote,
     empathy,
     isStackBase: false,
     finished,
   });
-  const inferredIdentity = empathy ? null : getSinglePossibilityIdentity(card.possibleCards);
-  const displaySuitIndex = identity.suitIndex ?? inferredIdentity?.suitIndex ?? null;
-  const displayRank = identity.rank ?? inferredIdentity?.rank ?? null;
   const border = getCardBorderPresentation(card, cardNote, finished);
   const pips = getCardPipPresentation(variant, card, cardNote, empathy);
   const clueSuitIndexes = new Set<number>(
@@ -91,8 +90,8 @@ export function getCardKnowledgeViewModel(
   return {
     order: card.order,
     hasClueApplied: card.hasClueApplied,
-    displaySuitIndex,
-    displayRank,
+    displaySuitIndex: identity.suitIndex,
+    displayRank: identity.rank,
     borderColor: getBorderColor(border),
     positiveColorLabels,
     positiveRanks,
@@ -114,15 +113,6 @@ export function getCardKnowledgeViewModel(
     suitDetermined: card.suitDetermined,
     rankDetermined: card.rankDetermined,
   };
-}
-
-function getSinglePossibilityIdentity(
-  possibilities: readonly (readonly [number, number])[],
-): { suitIndex: number; rank: number } | null {
-  if (possibilities.length !== 1) return null;
-  const [suitIndex, rank] = possibilities[0] ?? [];
-  if (suitIndex === undefined || rank === undefined) return null;
-  return { suitIndex, rank };
 }
 
 function pipStateName(state: PipState): KnowledgePipState {
