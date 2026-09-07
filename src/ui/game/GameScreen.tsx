@@ -20,6 +20,7 @@ import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { ActionButton, Notice, Panel, Pill, SectionHeading, useHanabTheme, useResponsiveLayout } from '../designSystem';
+import { C17RewindScrubber } from './C17RewindScrubber';
 import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
 import { DiscardViewer } from './DiscardViewer';
@@ -366,6 +367,7 @@ export function GameScreen() {
     };
     return <>
       <C17DenseWorkspace
+        actionSegments={actionSegments}
         canReviewForward={reviewTemporal.nextActionSegment !== null}
         canReviewBack={reviewTemporal.previousActionSegment !== null}
         cardsPerHand={getGameplayCardsPerHand(metadata)}
@@ -386,6 +388,7 @@ export function GameScreen() {
         onReviewForward={() => navigateReviewAction('forward')}
         onReviewStart={() => jumpReviewEdge('start')}
         onReturnLive={returnLive}
+        onScrubAction={jumpToAction}
         onSelectCard={(order) => {
           if (!replay.active) interactionDispatch({ type: 'select-card', order });
         }}
@@ -394,6 +397,7 @@ export function GameScreen() {
         pendingText={pendingText ?? null}
         recentActions={recentActions}
         reviewActive={replay.active}
+        selectedActionSegment={reviewTemporal.selectedSegment}
         selectedCard={selectedCard}
         selectedTurn={reviewTemporal.selectedTurn}
         variantName={metadata.options.variantName}
@@ -548,6 +552,7 @@ export function GameScreen() {
 }
 
 function C17DenseWorkspace({
+  actionSegments,
   canReviewForward,
   canReviewBack,
   cardsPerHand,
@@ -570,14 +575,17 @@ function C17DenseWorkspace({
   onReviewForward,
   onReviewStart,
   onReturnLive,
+  onScrubAction,
   onSelectCard,
   onSelectRecentAction,
   pendingText,
   recentActions,
   reviewActive,
+  selectedActionSegment,
   selectedTurn,
   variantName,
 }: {
+  actionSegments: readonly number[];
   canReviewForward: boolean;
   canReviewBack: boolean;
   cardsPerHand: number;
@@ -600,11 +608,13 @@ function C17DenseWorkspace({
   onReviewForward: () => void;
   onReviewStart: () => void;
   onReturnLive: () => void;
+  onScrubAction: (segment: number) => void;
   onSelectCard: (order: number) => void;
   onSelectRecentAction: (segment: number) => void;
   pendingText: string | null;
   recentActions: readonly C17TemporalEntry[];
   reviewActive: boolean;
+  selectedActionSegment: number;
   selectedTurn: number;
   variantName: string;
 }) {
@@ -703,6 +713,7 @@ function C17DenseWorkspace({
         {reviewActive
           ? <>
             <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+            <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
             <View style={styles.c17ActionRow}>
               <View style={styles.actionButtons}>
                 <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
