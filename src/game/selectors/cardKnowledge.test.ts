@@ -133,7 +133,7 @@ describe('card knowledge view model', () => {
     expect(knowledge.borderColor).toBe('aqua');
   });
 
-  test('shows a fully deduced hidden card when only one best-knowledge possibility remains', () => {
+  test('does not promote a single best-knowledge possibility into card identity', () => {
     const card = freshCard(15);
     const deduced: CardState = {
       ...card,
@@ -143,6 +143,22 @@ describe('card knowledge view model', () => {
     };
 
     expect(getCardKnowledgeViewModel(variant.name, deduced)).toMatchObject({
+      displaySuitIndex: null,
+      displayRank: null,
+    });
+  });
+
+  test('shows an identity learned outside the selected historical card state', () => {
+    const historical = freshCard(16);
+
+    expect(getCardKnowledgeViewModel(
+      variant.name,
+      historical,
+      undefined,
+      false,
+      false,
+      { suitIndex: 0, rank: 3 },
+    )).toMatchObject({
       displaySuitIndex: 0,
       displayRank: 3,
     });
