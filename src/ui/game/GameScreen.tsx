@@ -3,6 +3,7 @@ import { AppState, Modal, Pressable, StyleSheet, Text, View, type LayoutChangeEv
 
 import type { CardIdentity, CardNote, GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
+import { getCardStatePresentation } from '../../game/selectors/cardStatePresentation';
 import { getCluePreview } from '../../game/selectors/cluePreview';
 import {
   getDisplayedClueTokens,
@@ -716,7 +717,7 @@ function C17DenseWorkspace({
           {opponents.map((index) => {
             const currentActor = current === index;
             const compact = layout.mode === 'compact-overview';
-            const empathizing = globalEmpathy || empathyPlayer === index;
+            const empathizing = !reviewActive && (globalEmpathy || empathyPlayer === index);
             return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
               <View style={styles.c17OpponentMeta}>
                 <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
@@ -734,9 +735,20 @@ function C17DenseWorkspace({
                 const card = game.deck[order];
                 if (card === undefined) return null;
                 const cardNote = notes[order];
+                const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, cardIdentities[order]);
                 const empathyKnowledge = empathizing
                   ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, cardIdentities[order])
                   : null;
+                const activeKnowledge = empathyKnowledge ?? normalKnowledge;
+                const statePresentation = getCardStatePresentation({
+                  game,
+                  state: card,
+                  note: cardNote,
+                  displaySuitIndex: activeKnowledge.displaySuitIndex,
+                  displayRank: activeKnowledge.displayRank,
+                  empathy: empathizing,
+                  finished: false,
+                });
                 return <VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
                   hasNote={(cardNote?.text.trim().length ?? 0) > 0}
@@ -745,7 +757,9 @@ function C17DenseWorkspace({
                   onPress={() => onOpenNote(order)}
                   position={position}
                   rank={card.rank}
+                  semanticBorder={normalKnowledge.borderColor}
                   size={compact ? 'mini' : 'hand'}
+                  statePresentation={statePresentation}
                   suitIndex={card.suitIndex}
                   variantName={variantName}
                 />;
@@ -758,16 +772,28 @@ function C17DenseWorkspace({
           <View onLayout={onOwnCardLaneLayout} style={styles.c17OwnCards}>{ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
-            return <GameCard height={layout.ownCardHeight} hasNote={(notes[order]?.text.trim().length ?? 0) > 0} key={order}
-              knowledge={getCardKnowledgeViewModel(
-                variantName,
-                card,
-                notes[order],
-                false,
-                globalEmpathy,
-                cardIdentities[order],
-              )} onSelect={() => onSelectCard(order)}
-              position={position} selected={selectedOwnCard === order} variantName={variantName} />;
+            const empathyActive = !reviewActive && globalEmpathy;
+            const cardNote = notes[order];
+            const knowledge = getCardKnowledgeViewModel(
+              variantName,
+              card,
+              cardNote,
+              false,
+              empathyActive,
+              cardIdentities[order],
+            );
+            const statePresentation = getCardStatePresentation({
+              game,
+              state: card,
+              note: cardNote,
+              displaySuitIndex: knowledge.displaySuitIndex,
+              displayRank: knowledge.displayRank,
+              empathy: empathyActive,
+              finished: false,
+            });
+            return <GameCard height={layout.ownCardHeight} hasNote={(cardNote?.text.trim().length ?? 0) > 0} key={order}
+              knowledge={knowledge} onSelect={() => onSelectCard(order)}
+              position={position} selected={selectedOwnCard === order} statePresentation={statePresentation} variantName={variantName} />;
           })}</View>
         </View>
       </View>
