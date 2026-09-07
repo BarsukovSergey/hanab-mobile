@@ -3,6 +3,8 @@ import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { CardState } from '../upstream/interfaces/CardState';
 import type { GameState } from '../upstream/interfaces/GameState';
 import { isCardDiscarded, isCardPlayed } from '../upstream/rules/cardState';
+import type { Rank } from '../upstream/types/Rank';
+import type { SuitIndex } from '../upstream/types/SuitIndex';
 
 export type CardStatePresentation = {
   engineTrash: boolean;
@@ -27,8 +29,8 @@ export function getCardStatePresentation({
   game: GameState;
   state: CardState;
   note: CardNote;
-  displaySuitIndex: number | null;
-  displayRank: number | null;
+  displaySuitIndex: SuitIndex | null;
+  displayRank: Rank | null;
   empathy: boolean;
   finished: boolean;
 }): CardStatePresentation {
