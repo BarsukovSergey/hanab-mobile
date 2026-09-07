@@ -21,6 +21,8 @@ export type C17TemporalContext = {
   selectedSegment: number;
   selectedTurn: number;
   liveTurn: number;
+  beforeSegment: number | null;
+  afterSegment: number;
   previousSegment: number | null;
   nextSegment: number | null;
   newerActionCount: number;
@@ -68,12 +70,15 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
   };
   const recentDepth = Math.max(2, selectedState?.hands.length ?? liveState?.hands.length ?? 2);
   const recent = entries.filter((entry) => entry.segment < resolvedSegment).slice(-recentDepth);
+  const beforeSegment = selectedIndex > 0 ? available[selectedIndex - 1] ?? null : null;
 
   return {
     selectedSegment: resolvedSegment,
     selectedTurn: last.turn,
     liveTurn: getHumanTurnNumber(liveState?.turn.turnNum ?? selectedState?.turn.turnNum ?? 0),
-    previousSegment: selectedIndex > 0 ? available[selectedIndex - 1] ?? null : null,
+    beforeSegment,
+    afterSegment: resolvedSegment,
+    previousSegment: beforeSegment,
     nextSegment: selectedIndex >= 0 && selectedIndex < available.length - 1
       ? available[selectedIndex + 1] ?? null
       : null,

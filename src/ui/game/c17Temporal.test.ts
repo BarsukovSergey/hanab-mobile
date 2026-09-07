@@ -170,13 +170,15 @@ describe('C17 temporal presentation', () => {
     expect(context.last.summary).toContain('Clues -1');
   });
 
-  test('exposes before/after navigation and distinct reviewing/live turns', () => {
+  test('exposes the exact before/after state pair for one focused action', () => {
     const context = getC17TemporalContext({
       states: [state(), state({ turnNum: 1 }), state({ turnNum: 2 }), state({ turnNum: 3 })],
       selectedSegment: 1,
       variantName: 'No Variant',
     });
 
+    expect(context.beforeSegment).toBe(0);
+    expect(context.afterSegment).toBe(1);
     expect(context.previousSegment).toBe(0);
     expect(context.nextSegment).toBe(2);
     expect(context.selectedTurn).toBe(2);
@@ -184,7 +186,7 @@ describe('C17 temporal presentation', () => {
     expect(context.newerActionCount).toBe(2);
   });
 
-  test('keeps the selected historical position while the live tail grows', () => {
+  test('keeps the focused action and its before/after pair while the live tail grows', () => {
     const states = [
       state(),
       state({ turnNum: 1 }),
@@ -199,6 +201,8 @@ describe('C17 temporal presentation', () => {
     });
 
     expect(context.selectedSegment).toBe(1);
+    expect(context.beforeSegment).toBe(0);
+    expect(context.afterSegment).toBe(1);
     expect(context.selectedTurn).toBe(2);
     expect(context.liveTurn).toBe(5);
     expect(context.newerActionCount).toBe(3);
