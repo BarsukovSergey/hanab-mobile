@@ -6,6 +6,7 @@ import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/ca
 import { getClueColorFill } from '../../game/selectors/gameplay';
 import { useHanabTheme } from '../designSystem';
 import type { ClueCardMarker } from './clueIndication';
+import { getKnowledgeOverlayMetrics } from './knowledgeOverlayLayout';
 import { UpstreamCardFace } from './UpstreamCardFace';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
 
@@ -184,13 +185,13 @@ export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: Ca
 
 function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge: CardKnowledgeViewModel; variantName: string; height?: number }) {
   const suits = getCardSuitVisuals(variantName);
-  const scale = Math.max(0.58, Math.min(1, (height ?? 112) / 112));
-  const pipSize = Math.max(11, Math.round(16 * scale));
-  const pipBox = Math.max(13, pipSize + 1);
-  const rankFontSize = Math.max(8, Math.round(10 * scale));
-  const rankBox = Math.max(10, Math.round(12 * scale));
   const visibleSuits = knowledge.suitPips.filter((pipState) => pipState.state !== 'hidden');
   const visibleRanks = knowledge.rankPips.filter((pipState) => pipState.state !== 'hidden');
+  const { pipBox, pipSize, rankBox, rankFontSize } = getKnowledgeOverlayMetrics(
+    height,
+    visibleSuits.length,
+    visibleRanks.length,
+  );
 
   return <View pointerEvents="none" style={styles.knowledgeOverlay}>
     {visibleSuits.length > 0 && <View style={[styles.knowledgeStrip, styles.suitStrip]}>
@@ -213,7 +214,7 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
     {visibleRanks.length > 0 && <View style={[styles.knowledgeStrip, styles.rankStrip]}>
       {visibleRanks.map((pipState) => <View key={`rank-${pipState.rank}`} style={[styles.rankToken, { height: rankBox, width: rankBox }]}>
         <Text style={[styles.hiddenRankText, { fontSize: rankFontSize, lineHeight: rankFontSize + 1 }, pipState.positive && styles.positiveRankText]}>{pipState.rank}</Text>
-        {pipState.state === 'eliminated' && <EliminationX size={Math.max(9, Math.round(rankBox * 0.85))} />}
+        {pipState.state === 'eliminated' && <EliminationX size={Math.max(7, Math.round(rankBox * 0.85))} />}
       </View>)}
     </View>}
   </View>;
