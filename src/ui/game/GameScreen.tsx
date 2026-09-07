@@ -15,6 +15,8 @@ import {
   type LiveClock,
 } from '../../game/selectors/gameplay';
 import { getLastCluePresentation } from '../../game/selectors/lastClue';
+import type { CardIdentity } from '../../game/upstream/interfaces/CardIdentity';
+import type { CardNote } from '../../game/upstream/interfaces/CardNote';
 import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -369,6 +371,7 @@ export function GameScreen() {
         actionSegments={actionSegments}
         canReviewForward={reviewTemporal.nextActionSegment !== null}
         canReviewBack={reviewTemporal.previousActionSegment !== null}
+        cardIdentities={clientState.cardIdentities}
         cardsPerHand={getGameplayCardsPerHand(metadata)}
         canCommitCard={cardEnabled}
         futureEfficiency={futureEfficiency}
@@ -378,6 +381,7 @@ export function GameScreen() {
         liveTurn={liveTemporal.liveTurn}
         metadata={metadata}
         newerActionCount={newerActionCount}
+        notes={clientState.notes.ourNotes}
         onDiscard={() => commitSelectedCard('discard')}
         onEnterRewind={enterRewind}
         onOpenDiscards={() => setDiscardViewerOpen(true)}
@@ -554,11 +558,13 @@ function C17DenseWorkspace({
   actionSegments,
   canReviewForward,
   canReviewBack,
+  cardIdentities,
   cardsPerHand,
   canCommitCard,
   game,
   historyAvailable,
   metadata,
+  notes,
   ourIndex,
   selectedCard,
   lastAction,
@@ -587,11 +593,13 @@ function C17DenseWorkspace({
   actionSegments: readonly number[];
   canReviewForward: boolean;
   canReviewBack: boolean;
+  cardIdentities: readonly CardIdentity[];
   cardsPerHand: number;
   canCommitCard: boolean;
   game: GameState;
   historyAvailable: boolean;
   metadata: { playerNames: readonly string[] };
+  notes: readonly CardNote[];
   ourIndex: number;
   selectedCard: number | null;
   lastAction: string;
@@ -703,7 +711,14 @@ function C17DenseWorkspace({
             const card = game.deck[order];
             if (card === undefined) return null;
             return <GameCard height={layout.ownCardHeight} key={order}
-              knowledge={getCardKnowledgeViewModel(variantName, card, undefined, false)} onSelect={() => onSelectCard(order)}
+              knowledge={getCardKnowledgeViewModel(
+                variantName,
+                card,
+                notes[order],
+                false,
+                false,
+                cardIdentities[order],
+              )} onSelect={() => onSelectCard(order)}
               position={position} selected={selectedOwnCard === order} variantName={variantName} />;
           })}</View>
         </View>
