@@ -133,6 +133,21 @@ describe('card knowledge view model', () => {
     expect(knowledge.borderColor).toBe('aqua');
   });
 
+  test('shows a fully deduced hidden card when only one best-knowledge possibility remains', () => {
+    const card = freshCard(15);
+    const deduced: CardState = {
+      ...card,
+      suitIndex: null,
+      rank: null,
+      possibleCards: [[0, 3]],
+    };
+
+    expect(getCardKnowledgeViewModel(variant.name, deduced)).toMatchObject({
+      displaySuitIndex: 0,
+      displayRank: 3,
+    });
+  });
+
   test('marks eliminated possibilities instead of hiding clue-visible pips', () => {
     const card = freshCard(12);
     const firstSuit = variant.suits[0];
