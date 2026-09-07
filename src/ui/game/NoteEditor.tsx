@@ -1,13 +1,8 @@
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, Modal, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Field, useHanabTheme } from '../designSystem';
-import { appendNoteToken, normalizeSubmittedNote } from './noteEditing';
-
-const QUICK_TOKENS = [
-  ['Finesse', 'f'],
-  ['CM', 'cm'],
-  ['PTD', 'ptd'],
-] as const;
+import { normalizeSubmittedNote } from './noteEditing';
 
 export function NoteEditor({
   title,
@@ -29,19 +24,31 @@ export function NoteEditor({
   onClose: () => void;
 }) {
   const { theme } = useHanabTheme();
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!visible) setEditing(false);
+  }, [visible]);
+
   const submitValue = (nextValue: string) => onSave(normalizeSubmittedNote(nextValue));
   const submit = () => submitValue(value);
   const change = (nextValue: string) => {
-    // Some Android keyboards still surface Enter as a newline before onSubmitEditing.
-    // Treat that as the same single-line submit action instead of leaving the sheet open.
     if (nextValue.includes('\n') || nextValue.includes('\r')) {
       submitValue(nextValue.replace(/[\r\n]+/g, ''));
       return;
     }
     onChange(nextValue);
   };
+  const requestClose = () => {
+    if (editing) {
+      Keyboard.dismiss();
+      setEditing(false);
+      return;
+    }
+    onClose();
+  };
 
-  return <Modal animationType="slide" onRequestClose={onClose} statusBarTranslucent transparent visible={visible}>
+  return <Modal animationType="slide" onRequestClose={requestClose} statusBarTranslucent transparent visible={visible}>
     <View style={styles.backdrop}>
       <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
         <View style={styles.header}>
@@ -49,34 +56,34 @@ export function NoteEditor({
             <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CARD NOTE</Text>
             <Text numberOfLines={2} style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
           </View>
-          <ActionButton compact title="Close" tone="ghost" onPress={onClose} />
+          <ActionButton compact title="Close" tone="ghost" onPress={requestClose} />
         </View>
         <Field
-          blurOnSubmit={editable}
-          editable={editable}
-          enterKeyHint={editable ? 'done' : undefined}
-          maxLength={editable ? 300 : undefined}
-          multiline={!editable}
-          onChangeText={editable ? change : undefined}
-          onSubmitEditing={editable ? submit : undefined}
-          placeholder={editable ? 'Add a private note' : 'No notes on this card'}
-          returnKeyType={editable ? 'done' : undefined}
-          style={[styles.input, !editable && styles.readOnlyInput]}
-          submitBehavior={editable ? 'blurAndSubmit' : 'newline'}
+          autoFocus={editing}
+          blurOnSubmit={editing}
+          editable={editing}
+          enterKeyHint={editing ? 'done' : undefined}
+          maxLength={editing ? 300 : undefined}
+          multiline={!editing}
+          onChangeText={editing ? change : undefined}
+          onSubmitEditing={editing ? submit : undefined}
+          placeholder={editing ? 'Add a private note' : 'No saved note on this card'}
+          returnKeyType={editing ? 'done' : undefined}
+          style={[styles.input, !editing && styles.readOnlyInput]}
+          submitBehavior={editing ? 'blurAndSubmit' : 'newline'}
           value={value}
         />
-        {editable && <>
-          <View style={styles.quickRow}>{QUICK_TOKENS.map(([label, token]) => <ActionButton
-            compact
-            key={token}
-            title={label}
-            onPress={() => onChange(appendNoteToken(value, token))}
-          />)}</View>
-          <View style={styles.actions}>
-            <ActionButton title="Save" tone="primary" onPress={submit} />
-            <ActionButton disabled={value.length === 0} title="Clear" onPress={onClear} />
-          </View>
-        </>}
+        {editable && !editing && <View style={styles.actions}>
+          <ActionButton title="Edit" tone="primary" onPress={() => setEditing(true)} />
+        </View>}
+        {editable && editing && <View style={styles.actions}>
+          <ActionButton title="Save" tone="primary" onPress={submit} />
+          <ActionButton disabled={value.length === 0} title="Clear" onPress={onClear} />
+          <ActionButton title="Done editing" tone="ghost" onPress={() => {
+            Keyboard.dismiss();
+            setEditing(false);
+          }} />
+        </View>}
       </View>
     </View>
   </Modal>;
@@ -91,6 +98,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '900' },
   input: { minHeight: 44 },
   readOnlyInput: { minHeight: 88, textAlignVertical: 'top' },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  actions: { flexDirection: 'row', gap: 8 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
