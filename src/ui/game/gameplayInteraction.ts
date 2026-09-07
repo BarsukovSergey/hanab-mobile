@@ -8,6 +8,7 @@ export type GameplayInteractionState = {
   clueTarget: number | null;
   cluePreview: GameplayCluePreviewState;
   empathyPlayer: number | null;
+  globalEmpathy: boolean;
   noteCard: number | null;
 };
 
@@ -17,7 +18,8 @@ export type GameplayInteractionAction =
   | { type: 'preview-clue'; clueType: 'color' | 'rank'; value: number }
   | { type: 'clear-clue-preview' }
   | { type: 'open-note'; order: number | null }
-  | { type: 'hold-empathy'; playerIndex: number | null }
+  | { type: 'toggle-empathy-player'; playerIndex: number }
+  | { type: 'toggle-global-empathy' }
   | { type: 'cancel-transient' }
   | { type: 'disarm-gameplay' }
   | { type: 'reset-lifecycle-transients' }
@@ -28,6 +30,7 @@ export const initialGameplayInteractionState: GameplayInteractionState = {
   clueTarget: null,
   cluePreview: null,
   empathyPlayer: null,
+  globalEmpathy: false,
   noteCard: null,
 };
 
@@ -43,14 +46,12 @@ export function gameplayInteractionReducer(
         noteCard: action.order ?? state.noteCard,
         clueTarget: null,
         cluePreview: null,
-        empathyPlayer: null,
       };
     case 'select-clue-target':
       return {
         ...state,
         clueTarget: action.playerIndex,
         cluePreview: action.playerIndex === state.clueTarget ? state.cluePreview : null,
-        empathyPlayer: null,
       };
     case 'preview-clue':
       return state.clueTarget === null
@@ -58,13 +59,11 @@ export function gameplayInteractionReducer(
         : {
           ...state,
           cluePreview: { type: action.clueType, value: action.value },
-          empathyPlayer: null,
         };
     case 'clear-clue-preview':
       return {
         ...state,
         cluePreview: null,
-        empathyPlayer: null,
       };
     case 'open-note':
       return {
@@ -72,28 +71,30 @@ export function gameplayInteractionReducer(
         noteCard: action.order,
         clueTarget: null,
         cluePreview: null,
-        empathyPlayer: null,
       };
-    case 'hold-empathy':
+    case 'toggle-empathy-player':
       return {
         ...state,
-        empathyPlayer: action.playerIndex,
+        empathyPlayer: state.empathyPlayer === action.playerIndex ? null : action.playerIndex,
+        globalEmpathy: false,
+      };
+    case 'toggle-global-empathy':
+      return {
+        ...state,
+        empathyPlayer: null,
+        globalEmpathy: !state.globalEmpathy,
       };
     case 'cancel-transient':
-      return {
-        ...state,
-        empathyPlayer: null,
-      };
+      return state;
     case 'disarm-gameplay':
       return {
         ...state,
         selectedCard: null,
         clueTarget: null,
         cluePreview: null,
-        empathyPlayer: null,
       };
     case 'reset-lifecycle-transients':
-      return initialGameplayInteractionState;
+      return state;
     case 'sync-hands': {
       const selectedCard = state.selectedCard !== null && action.ownOrders.includes(state.selectedCard)
         ? state.selectedCard
@@ -104,11 +105,18 @@ export function gameplayInteractionReducer(
       const noteCard = state.noteCard !== null && action.visibleOrders.includes(state.noteCard)
         ? state.noteCard
         : null;
-      // Empathy is a momentary gesture, not durable gameplay state. Any authoritative hand sync
-      // invalidates the active press so an unmounted/moved Pressable cannot leave empathy sticky.
-      const empathyPlayer = null;
+      const empathyPlayer = state.empathyPlayer !== null && action.clueTargets.includes(state.empathyPlayer)
+        ? state.empathyPlayer
+        : null;
       const cluePreview = clueTarget !== null && clueTarget === state.clueTarget ? state.cluePreview : null;
-      return { selectedCard, clueTarget, cluePreview, empathyPlayer, noteCard };
+      return {
+        selectedCard,
+        clueTarget,
+        cluePreview,
+        empathyPlayer,
+        globalEmpathy: state.globalEmpathy,
+        noteCard,
+      };
     }
     default:
       return state;
