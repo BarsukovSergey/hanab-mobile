@@ -318,8 +318,7 @@ export function GameScreen() {
         && entries.findIndex((candidate) => candidate.segment === entry.segment) === index)
       .slice(-Math.max(5, metadata.playerNames.length));
     const actionSegments = replay.states
-      .flatMap((state, stateSegment) => state === undefined ? [] : [stateSegment])
-      .slice(1);
+      .flatMap((state, stateSegment) => state === undefined ? [] : [stateSegment]);
     const firstActionSegment = actionSegments[0] ?? null;
     const lastActionSegment = actionSegments.at(-1) ?? null;
     const commitSelectedCard = (action: 'play' | 'discard') => {
