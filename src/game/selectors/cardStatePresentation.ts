@@ -28,7 +28,7 @@ export function getCardStatePresentation({
 }: {
   game: GameState;
   state: CardState;
-  note: CardNote;
+  note?: CardNote;
   displaySuitIndex: SuitIndex | null;
   displayRank: Rank | null;
   empathy: boolean;
@@ -44,11 +44,11 @@ export function getCardStatePresentation({
   return {
     engineTrash: status === CardStatus.Trash,
     critical: status === CardStatus.Critical && !leftHand,
-    knownTrashNote: noteIndicatorsVisible && note.knownTrash,
+    knownTrashNote: noteIndicatorsVisible && (note?.knownTrash ?? false),
     knownTrashFromEmpathy,
-    needsFix: noteIndicatorsVisible && note.needsFix,
-    questionMark: noteIndicatorsVisible && note.questionMark,
-    exclamationMark: noteIndicatorsVisible && note.exclamationMark,
+    needsFix: noteIndicatorsVisible && (note?.needsFix ?? false),
+    questionMark: noteIndicatorsVisible && (note?.questionMark ?? false),
+    exclamationMark: noteIndicatorsVisible && (note?.exclamationMark ?? false),
     doubleDiscard: state.inDoubleDiscard
       && status !== CardStatus.Critical
       && !knownTrashFromEmpathy,
