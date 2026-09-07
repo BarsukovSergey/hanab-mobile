@@ -248,6 +248,61 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(socket.sent.at(-1)).toBe('action {"tableID":123,"type":0,"target":0}');
   });
 
+  test('live actions keep selected historical state visible until one-action return to Live', async () => {
+    const { socket, store } = await makeLive();
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    const actionCountBeforeReview = room.liveActionCount;
+
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.replay).toMatchObject({ active: true, segment: 0 });
+    expect(room.clientState.visibleState?.turn.segment).toBe(0);
+    expect(room.clientState.visibleState?.clueTokens).toBe(8);
+
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"clue","clue":{"type":0,"value":0},"giver":0,"list":[5],"target":1,"turn":0}}',
+    );
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.liveActionCount).toBe(actionCountBeforeReview + 1);
+    expect(room.clientState.replay).toMatchObject({ active: true, segment: 0 });
+    expect(room.clientState.ongoingGame.turn.segment).toBe(1);
+    expect(room.clientState.ongoingGame.clueTokens).toBe(7);
+    expect(room.clientState.visibleState?.turn.segment).toBe(0);
+    expect(room.clientState.visibleState?.clueTokens).toBe(8);
+
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}',
+    );
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.liveActionCount).toBe(actionCountBeforeReview + 2);
+    expect(room.clientState.replay).toMatchObject({ active: true, segment: 0 });
+    expect(room.clientState.ongoingGame.turn.turnNum).toBe(1);
+    expect(room.clientState.ongoingGame.turn.currentPlayerIndex).toBe(1);
+    expect(room.clientState.visibleState?.turn.turnNum).toBe(0);
+    expect(room.clientState.visibleState?.turn.currentPlayerIndex).toBe(0);
+    expect(room.clientState.visibleState?.clueTokens).toBe(8);
+
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: null,
+    }));
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.replay.active).toBe(false);
+    expect(room.clientState.visibleState).toBe(room.clientState.ongoingGame);
+    expect(room.clientState.visibleState?.turn.turnNum).toBe(1);
+    expect(room.clientState.visibleState?.clueTokens).toBe(7);
+  });
+
   test('player LIVE actions reduce authoritatively and accepted turn settles pending', async () => {
     const { runtime, socket, store } = await makeLive();
     expect(runtime.discard(0)).toBe(true);
