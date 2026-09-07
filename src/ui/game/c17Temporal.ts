@@ -43,7 +43,7 @@ type TransitionFacts = Pick<
   'actionType' | 'actorIndex' | 'cardOrder' | 'preActionSlot' | 'cardIdentity' | 'targetIndex' | 'touchedSlots'
 >;
 
-// Upstream stores reducer turns from zero; player-facing logs and UI count from one.
+// Upstream stores reducer turns from zero; player-facing action turns count from one.
 export function getHumanTurnNumber(turnNum: number): number {
   return Math.max(1, turnNum + 1);
 }
@@ -75,13 +75,13 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
   }).filter((entry): entry is C17TemporalEntry => entry !== null);
   const firstStateSegment = available[0] ?? null;
   const actionEntries = entries.filter((entry) => entry.segment !== firstStateSegment);
-  const actionSegments = actionEntries.map((entry) => entry.segment);
-  const actionIndex = actionSegments.indexOf(resolvedSegment);
+  const timelineSegments = entries.map((entry) => entry.segment);
+  const timelineIndex = timelineSegments.indexOf(resolvedSegment);
   const last = entries.find((entry) => entry.segment === resolvedSegment) ?? {
     ...emptyTransitionFacts(),
     segment: resolvedSegment,
-    turn: getHumanTurnNumber(selectedState?.turn.turnNum ?? 0),
-    summary: selectedState?.log.at(-1)?.text ?? 'Game start',
+    turn: resolvedSegment === firstStateSegment ? 0 : getHumanTurnNumber(selectedState?.turn.turnNum ?? 0),
+    summary: resolvedSegment === firstStateSegment ? 'Game start' : selectedState?.log.at(-1)?.text ?? 'Game state updated',
   };
   const recentDepth = Math.max(5, selectedState?.hands.length ?? liveState?.hands.length ?? 2);
   const recent = actionEntries
@@ -99,11 +99,11 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
     nextSegment: selectedIndex >= 0 && selectedIndex < available.length - 1
       ? available[selectedIndex + 1] ?? null
       : null,
-    previousActionSegment: actionIndex > 0
-      ? actionSegments[actionIndex - 1] ?? null
+    previousActionSegment: timelineIndex > 0
+      ? timelineSegments[timelineIndex - 1] ?? null
       : null,
-    nextActionSegment: actionIndex >= 0 && actionIndex < actionSegments.length - 1
-      ? actionSegments[actionIndex + 1] ?? null
+    nextActionSegment: timelineIndex >= 0 && timelineIndex < timelineSegments.length - 1
+      ? timelineSegments[timelineIndex + 1] ?? null
       : null,
     newerActionCount: selectedIndex < 0 ? 0 : Math.max(0, available.length - selectedIndex - 1),
     last,
@@ -117,15 +117,22 @@ function makeEntry(
   after: GameState,
   variantName: string,
 ): C17TemporalEntry {
-  const beforeLogLength = before?.log.length ?? 0;
+  if (before === undefined) {
+    return {
+      segment,
+      turn: 0,
+      summary: 'Game start',
+      ...emptyTransitionFacts(),
+    };
+  }
+
+  const beforeLogLength = before.log.length;
   const actionLog = after.log.slice(beforeLogLength).at(-1);
   const authoritativeText = actionLog?.text
     ?? after.log.at(-1)?.text
-    ?? (segment === 0 ? 'Game start' : 'Game state updated');
-  const facts = before === undefined
-    ? emptyTransitionFacts()
-    : getTransitionFacts(before, after, variantName);
-  const details = before === undefined ? [] : getTransitionDetails(before, after, variantName, facts);
+    ?? 'Game state updated';
+  const facts = getTransitionFacts(before, after, variantName);
+  const details = getTransitionDetails(before, after, variantName, facts);
 
   return {
     segment,
@@ -195,9 +202,9 @@ function getTransitionDetails(
     && facts.preActionSlot !== null
     && facts.cardIdentity !== null
   ) {
-    details.push(`Before slot ${facts.preActionSlot}: ${facts.cardIdentity}`);
+    details.push(`${facts.cardIdentity} · from slot ${facts.preActionSlot}`);
   }
-  if (facts.touchedSlots.length > 0) details.push(`Touched ${facts.touchedSlots.join('/')}`);
+  if (facts.touchedSlots.length > 0) details.push(`Cards ${facts.touchedSlots.join(', ')}`);
 
   addDelta(details, 'Score', before.score, after.score);
   addDelta(
