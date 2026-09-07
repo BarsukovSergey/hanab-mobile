@@ -25,6 +25,8 @@ export type C17TemporalContext = {
   afterSegment: number;
   previousSegment: number | null;
   nextSegment: number | null;
+  previousActionSegment: number | null;
+  nextActionSegment: number | null;
   newerActionCount: number;
   last: C17TemporalEntry;
   recent: readonly C17TemporalEntry[];
@@ -71,14 +73,20 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
     const before = beforeSegment === undefined ? undefined : states[beforeSegment];
     return makeEntry(segment, before, after, variantName);
   }).filter((entry): entry is C17TemporalEntry => entry !== null);
+  const firstStateSegment = available[0] ?? null;
+  const actionEntries = entries.filter((entry) => entry.segment !== firstStateSegment);
+  const actionSegments = actionEntries.map((entry) => entry.segment);
+  const actionIndex = actionSegments.indexOf(resolvedSegment);
   const last = entries.find((entry) => entry.segment === resolvedSegment) ?? {
     ...emptyTransitionFacts(),
     segment: resolvedSegment,
     turn: getHumanTurnNumber(selectedState?.turn.turnNum ?? 0),
     summary: selectedState?.log.at(-1)?.text ?? 'Game start',
   };
-  const recentDepth = Math.max(2, selectedState?.hands.length ?? liveState?.hands.length ?? 2);
-  const recent = entries.filter((entry) => entry.segment < resolvedSegment).slice(-recentDepth);
+  const recentDepth = Math.max(5, selectedState?.hands.length ?? liveState?.hands.length ?? 2);
+  const recent = actionEntries
+    .filter((entry) => entry.segment < resolvedSegment)
+    .slice(-recentDepth);
   const beforeSegment = selectedIndex > 0 ? available[selectedIndex - 1] ?? null : null;
 
   return {
@@ -90,6 +98,12 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
     previousSegment: beforeSegment,
     nextSegment: selectedIndex >= 0 && selectedIndex < available.length - 1
       ? available[selectedIndex + 1] ?? null
+      : null,
+    previousActionSegment: actionIndex > 0
+      ? actionSegments[actionIndex - 1] ?? null
+      : null,
+    nextActionSegment: actionIndex >= 0 && actionIndex < actionSegments.length - 1
+      ? actionSegments[actionIndex + 1] ?? null
       : null,
     newerActionCount: selectedIndex < 0 ? 0 : Math.max(0, available.length - selectedIndex - 1),
     last,
