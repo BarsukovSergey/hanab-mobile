@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useHanabTheme } from '../designSystem';
@@ -12,34 +12,37 @@ type Props = {
 export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSegment }: Props) {
   const { theme } = useHanabTheme();
   const [trackWidth, setTrackWidth] = useState(0);
-  const selectedIndex = Math.max(0, actionSegments.indexOf(selectedSegment));
+  const timelineSegments = useMemo(() => (
+    actionSegments[0] === 0 ? [...actionSegments] : [0, ...actionSegments]
+  ), [actionSegments]);
+  const selectedIndex = Math.max(0, timelineSegments.indexOf(selectedSegment));
   const lastEmittedIndex = useRef(selectedIndex);
 
   useEffect(() => {
     lastEmittedIndex.current = selectedIndex;
   }, [selectedIndex]);
 
-  if (actionSegments.length === 0) return null;
+  if (timelineSegments.length === 0) return null;
 
-  const maxIndex = Math.max(1, actionSegments.length - 1);
-  const progress = actionSegments.length <= 1 ? 0 : selectedIndex / maxIndex;
+  const maxIndex = Math.max(1, timelineSegments.length - 1);
+  const progress = timelineSegments.length <= 1 ? 0 : selectedIndex / maxIndex;
   const selectFromX = (x: number) => {
     if (trackWidth <= 0) return;
     const clampedX = Math.max(0, Math.min(trackWidth, x));
-    const index = Math.max(0, Math.min(actionSegments.length - 1, Math.round((clampedX / trackWidth) * maxIndex)));
+    const index = Math.max(0, Math.min(timelineSegments.length - 1, Math.round((clampedX / trackWidth) * maxIndex)));
     if (index === lastEmittedIndex.current) return;
-    const segment = actionSegments[index];
+    const segment = timelineSegments[index];
     if (segment === undefined) return;
     lastEmittedIndex.current = index;
     onSelectSegment(segment);
   };
 
   return <View style={styles.root}>
-    <Text style={[styles.edgeLabel, { color: theme.colors.textMuted }]}>Start</Text>
+    <Text style={[styles.edgeLabel, { color: theme.colors.textMuted }]}>T0</Text>
     <View
       accessibilityLabel="Rewind timeline"
       accessibilityRole="adjustable"
-      accessibilityValue={{ min: 1, max: actionSegments.length, now: selectedIndex + 1 }}
+      accessibilityValue={{ min: 0, max: timelineSegments.length - 1, now: selectedIndex }}
       onLayout={({ nativeEvent: { layout } }) => setTrackWidth(layout.width)}
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(event) => selectFromX(event.nativeEvent.locationX)}
