@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, Modal, StyleSheet, Text, View } from 'react-native';
 
 import { composeQuickNote, type QuickNoteToken } from '../../game/selectors/noteComposition';
+import { useAppSelector } from '../../store/hooks';
 import { ActionButton, Field, useHanabTheme } from '../designSystem';
 import { normalizeSubmittedNote } from './noteEditing';
 
@@ -18,7 +19,6 @@ const QUICK_TOKENS: readonly { label: string; token: QuickNoteToken }[] = [
 export function NoteEditor({
   title,
   value,
-  variantName,
   editable,
   visible,
   onChange,
@@ -28,7 +28,6 @@ export function NoteEditor({
 }: {
   title: string;
   value: string;
-  variantName: string;
   editable: boolean;
   visible: boolean;
   onChange: (value: string) => void;
@@ -38,9 +37,14 @@ export function NoteEditor({
 }) {
   const { theme } = useHanabTheme();
   const [editing, setEditing] = useState(false);
+  const variantName = useAppSelector((state) => (
+    state.room.room.kind === 'live_game'
+      ? state.room.room.clientState.metadata.options.variantName
+      : null
+  ));
   const quickCandidates = useMemo(() => new Map(QUICK_TOKENS.map(({ token }) => [
     token,
-    composeQuickNote(variantName, value, token),
+    variantName === null ? null : composeQuickNote(variantName, value, token),
   ])), [value, variantName]);
 
   useEffect(() => {
