@@ -107,14 +107,14 @@ export function GameScreen() {
   }), [game, height, ourIndex, width]);
 
   useEffect(() => {
-    interactionDispatch({ type: 'disarm-gameplay' });
+    interactionDispatch({ type: 'reset-lifecycle-transients' });
     setDiscardViewerOpen(false);
   }, [gameplayLayout.orientation]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
-      interactionDispatch({ type: 'disarm-gameplay' });
+      interactionDispatch({ type: 'reset-lifecycle-transients' });
       setDiscardViewerOpen(false);
     });
     return () => subscription.remove();
@@ -370,8 +370,10 @@ export function GameScreen() {
         cardIdentities={clientState.cardIdentities}
         cardsPerHand={getGameplayCardsPerHand(metadata)}
         canCommitCard={cardEnabled}
+        empathyPlayer={interaction.empathyPlayer}
         futureEfficiency={futureEfficiency}
         game={game}
+        globalEmpathy={interaction.globalEmpathy}
         historyAvailable={recentActions.length > 0}
         lastAction={reviewTemporal.last.summary}
         liveTurn={liveTemporal.liveTurn}
@@ -393,6 +395,8 @@ export function GameScreen() {
           if (!replay.active) interactionDispatch({ type: 'select-card', order });
         }}
         onSelectRecentAction={jumpToAction}
+        onToggleEmpathyPlayer={(playerIndex) => interactionDispatch({ type: 'toggle-empathy-player', playerIndex })}
+        onToggleGlobalEmpathy={() => interactionDispatch({ type: 'toggle-global-empathy' })}
         ourIndex={ourIndex}
         pendingText={pendingText ?? null}
         recentActions={recentActions}
@@ -567,7 +571,9 @@ function C17DenseWorkspace({
   cardIdentities,
   cardsPerHand,
   canCommitCard,
+  empathyPlayer,
   game,
+  globalEmpathy,
   historyAvailable,
   metadata,
   notes,
@@ -590,6 +596,8 @@ function C17DenseWorkspace({
   onScrubAction,
   onSelectCard,
   onSelectRecentAction,
+  onToggleEmpathyPlayer,
+  onToggleGlobalEmpathy,
   pendingText,
   recentActions,
   reviewActive,
@@ -603,7 +611,9 @@ function C17DenseWorkspace({
   cardIdentities: readonly CardIdentity[];
   cardsPerHand: number;
   canCommitCard: boolean;
+  empathyPlayer: number | null;
   game: GameState;
+  globalEmpathy: boolean;
   historyAvailable: boolean;
   metadata: { playerNames: readonly string[] };
   notes: readonly CardNote[];
@@ -626,6 +636,8 @@ function C17DenseWorkspace({
   onScrubAction: (segment: number) => void;
   onSelectCard: (order: number) => void;
   onSelectRecentAction: (segment: number) => void;
+  onToggleEmpathyPlayer: (playerIndex: number) => void;
+  onToggleGlobalEmpathy: () => void;
   pendingText: string | null;
   recentActions: readonly C17TemporalEntry[];
   reviewActive: boolean;
@@ -704,13 +716,30 @@ function C17DenseWorkspace({
           {opponents.map((index) => {
             const currentActor = current === index;
             const compact = layout.mode === 'compact-overview';
+            const empathizing = globalEmpathy || empathyPlayer === index;
             return <View key={index} style={[styles.c17OpponentRow, { height: layout.opponentRowHeight }, currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }]}>
-              <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
+              <View style={styles.c17OpponentMeta}>
+                <Text numberOfLines={1} style={[styles.c17OpponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>{metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}</Text>
+                <Pressable
+                  accessibilityLabel={`Knowledge for ${metadata.playerNames[index] ?? `Player ${index + 1}`}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: empathizing }}
+                  disabled={reviewActive || globalEmpathy}
+                  onPress={() => onToggleEmpathyPlayer(index)}
+                >
+                  <Text style={[styles.c17KnowledgeLink, { color: empathizing ? theme.colors.accent : theme.colors.textMuted }]}>{empathizing ? 'KNOW ✓' : 'KNOW'}</Text>
+                </Pressable>
+              </View>
               <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
+                const cardNote = notes[order];
+                const empathyKnowledge = empathizing
+                  ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, cardIdentities[order])
+                  : null;
                 return <VisibleHanabiCard
-                  hasNote={(notes[order]?.text.trim().length ?? 0) > 0}
+                  empathyKnowledge={empathyKnowledge}
+                  hasNote={(cardNote?.text.trim().length ?? 0) > 0}
                   height={layout.opponentCardHeight}
                   key={order}
                   onPress={() => onOpenNote(order)}
@@ -735,7 +764,7 @@ function C17DenseWorkspace({
                 card,
                 notes[order],
                 false,
-                false,
+                globalEmpathy,
                 cardIdentities[order],
               )} onSelect={() => onSelectCard(order)}
               position={position} selected={selectedOwnCard === order} variantName={variantName} />;
@@ -757,7 +786,10 @@ function C17DenseWorkspace({
             <Text style={[styles.c17RewindHint, { color: theme.colors.textMuted }]}>Hold Back for start · Hold Forward for end</Text>
           </>
           : <>
-            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
+            <View style={styles.c17ActionRow}>
+              <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
+              <ActionButton compact title={globalEmpathy ? 'Open identities' : 'All knowledge'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+            </View>
             {selectedOwnCard === null
               ? <Text style={[styles.c17WorkbenchText, { color: theme.colors.textMuted }]}>Select a card</Text>
               : <>
@@ -935,7 +967,9 @@ const styles = StyleSheet.create({
   c17Hands: { flex: 1, gap: 5, minHeight: 0 },
   c17Opponents: { gap: 2 },
   c17OpponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 4 },
-  c17OpponentName: { fontSize: 10, fontWeight: '900', width: 64 },
+  c17OpponentMeta: { justifyContent: 'center', width: 64 },
+  c17OpponentName: { fontSize: 10, fontWeight: '900' },
+  c17KnowledgeLink: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
   c17OpponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 3, minWidth: 0 },
   c17OwnHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 6, padding: 5 },
   c17OwnTitle: { fontSize: 10, fontWeight: '900', width: 64 },
