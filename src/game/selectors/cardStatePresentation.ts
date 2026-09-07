@@ -29,15 +29,13 @@ export function getCardStatePresentation({
   game: GameState;
   state: CardState;
   note?: CardNote;
-  displaySuitIndex: SuitIndex | null;
-  displayRank: Rank | null;
+  displaySuitIndex: number | null;
+  displayRank: number | null;
   empathy: boolean;
   finished: boolean;
 }): CardStatePresentation {
   const leftHand = isCardPlayed(state) || isCardDiscarded(state);
-  const status = displaySuitIndex === null || displayRank === null
-    ? CardStatus.NeedsToBePlayed
-    : game.cardStatus[displaySuitIndex]?.[displayRank] ?? CardStatus.NeedsToBePlayed;
+  const status = getDisplayedCardStatus(game, displaySuitIndex, displayRank);
   const noteIndicatorsVisible = !empathy && !leftHand && !finished;
   const knownTrashFromEmpathy = !leftHand && state.isKnownTrashFromEmpathy;
 
@@ -53,4 +51,14 @@ export function getCardStatePresentation({
       && status !== CardStatus.Critical
       && !knownTrashFromEmpathy,
   };
+}
+
+function getDisplayedCardStatus(
+  game: GameState,
+  displaySuitIndex: number | null,
+  displayRank: number | null,
+): CardStatus {
+  if (displaySuitIndex === null || displayRank === null) return CardStatus.NeedsToBePlayed;
+  const suitStatuses = game.cardStatus[displaySuitIndex as SuitIndex];
+  return suitStatuses?.[displayRank as Rank] ?? CardStatus.NeedsToBePlayed;
 }
