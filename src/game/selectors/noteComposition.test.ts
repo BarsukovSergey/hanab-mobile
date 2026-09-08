@@ -19,11 +19,18 @@ describe('composeQuickNote', () => {
       .toBe('remember tempo | [f]');
   });
 
-  test('replaces conflicting border-affecting tokens like upstream appendNote', () => {
+  test('replaces conflicting border tokens exactly like upstream appendNote', () => {
     expect(composeQuickNote('No Variant', '[1] [cm]', 'f'))
       .toBe('[1] [cm] | [1] [f]');
     expect(composeQuickNote('No Variant', '[1] [f]', 'cm'))
       .toBe('[1] [f] | [1] [cm]');
+  });
+
+  test('preserves compact web-style history when switching finesse to chop move', () => {
+    const cm = composeQuickNote('No Variant', '[1][f]', 'cm');
+    expect(cm).toBe('[1][f] | [1] [cm]');
+    expect(composeQuickNote('No Variant', cm, 'f'))
+      .toBe('[1][f] | [1] [cm] | [1] [f]');
   });
 
   test('does not update when the requested semantic meaning is already active', () => {

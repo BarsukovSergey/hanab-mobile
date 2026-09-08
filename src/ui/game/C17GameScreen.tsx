@@ -434,17 +434,13 @@ function C17DenseWorkspace({
 }) {
   const { theme } = useHanabTheme();
   const [recentOpen, setRecentOpen] = useState(false);
-  const [focusedPlayer, setFocusedPlayer] = useState<number | null>(null);
   const [layoutMetrics, setLayoutMetrics] = useState({
     opponentCardLaneWidth: 0,
     handsRegionHeight: 0,
     ownCardLaneWidth: 0,
   });
   useEffect(() => {
-    if (reviewActive) {
-      setRecentOpen(false);
-      setFocusedPlayer(null);
-    }
+    if (reviewActive) setRecentOpen(false);
   }, [reviewActive]);
 
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
@@ -470,10 +466,6 @@ function C17DenseWorkspace({
       cardIdentities[noteCard ?? -1],
     );
   const empathyActive = globalEmpathy || persistentEmpathyPlayer !== null;
-  const focusedPlayerName = focusedPlayer === null
-    ? null
-    : metadata.playerNames[focusedPlayer] ?? `Player ${focusedPlayer + 1}`;
-  const focusedPlayerPersistent = focusedPlayer !== null && persistentEmpathyPlayer === focusedPlayer;
 
   return <View style={styles.workspace}>
     <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -517,24 +509,23 @@ function C17DenseWorkspace({
           const compact = layout.mode === 'compact-overview';
           const empathizing = !reviewActive && (globalEmpathy || empathyPlayer === index);
           const target = selectedTarget === index;
-          const focused = focusedPlayer === index;
+          const persistentEmpathy = persistentEmpathyPlayer === index;
           const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
           return <View
             key={index}
             style={[
               styles.opponentRow,
               { height: layout.opponentRowHeight },
-              focused && { borderColor: theme.colors.borderStrong },
               currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent },
               target && { borderColor: theme.colors.accent },
             ]}
           >
             <View style={styles.opponentMeta}>
               <Pressable
-                accessibilityLabel={`Player ${playerName}`}
+                accessibilityLabel={`Give clue to ${playerName}`}
                 accessibilityRole="button"
                 disabled={reviewActive}
-                onPress={() => setFocusedPlayer(index)}
+                onPress={() => onSelectClueTarget(target ? null : index)}
                 onPressIn={() => {
                   if (!globalEmpathy) onHoldEmpathy(index);
                 }}
@@ -556,10 +547,14 @@ function C17DenseWorkspace({
                   disabled={reviewActive}
                   title={target ? 'Clue ✓' : 'Clue'}
                   tone={target ? 'primary' : 'secondary'}
-                  onPress={() => {
-                    setFocusedPlayer(index);
-                    onSelectClueTarget(target ? null : index);
-                  }}
+                  onPress={() => onSelectClueTarget(target ? null : index)}
+                />
+                <ActionButton
+                  compact
+                  disabled={reviewActive || globalEmpathy}
+                  title={persistentEmpathy ? 'Emp ✓' : 'Emp'}
+                  tone={persistentEmpathy ? 'primary' : 'ghost'}
+                  onPress={() => onToggleEmpathyPlayer(index)}
                 />
               </View>
             </View>
@@ -594,9 +589,14 @@ function C17DenseWorkspace({
                   hasNote={(cardNote?.text.trim().length ?? 0) > 0}
                   height={layout.opponentCardHeight}
                   key={order}
-                  onLongPress={() => onHoldEmpathy(index)}
+                  onDoublePress={reviewActive ? undefined : () => onEditNote(order)}
                   onPress={() => onInspectNote(order)}
-                  onPressOut={() => onHoldEmpathy(null)}
+                  onPressIn={() => {
+                    if (!globalEmpathy) onHoldEmpathy(index);
+                  }}
+                  onPressOut={() => {
+                    if (!globalEmpathy) onHoldEmpathy(null);
+                  }}
                   position={position}
                   rank={card.rank}
                   semanticBorder={normalKnowledge.borderColor}
@@ -641,6 +641,7 @@ function C17DenseWorkspace({
               height={layout.ownCardHeight}
               key={order}
               knowledge={knowledge}
+              onDoublePress={reviewActive ? undefined : () => onEditNote(order)}
               onSelect={() => onSelectCard(order)}
               position={position}
               selected={selectedOwnCard === order}
@@ -672,23 +673,6 @@ function C17DenseWorkspace({
           </View>
         </View>
 
-        {focusedPlayer !== null && focusedPlayerName !== null && <View style={[styles.playerFocus, { borderColor: theme.colors.border }]}>
-          <View style={styles.rowBetween}>
-            <View style={styles.grow}>
-              <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>PLAYER</Text>
-              <Text numberOfLines={1} style={[styles.workbenchText, { color: theme.colors.text }]}>{focusedPlayerName}</Text>
-            </View>
-            <ActionButton
-              compact
-              disabled={globalEmpathy}
-              title={focusedPlayerPersistent ? 'Empathy ✓' : 'Empathy'}
-              tone={focusedPlayerPersistent ? 'primary' : 'secondary'}
-              onPress={() => onToggleEmpathyPlayer(focusedPlayer)}
-            />
-          </View>
-          <Text style={[styles.playerFocusHint, { color: theme.colors.textMuted }]}>Hold the player name or one of their cards for a temporary empathy peek.</Text>
-        </View>}
-
         {selectedOwnCard !== null && <View style={styles.rowBetween}>
           <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
           <View style={styles.actionButtons}>
@@ -717,7 +701,7 @@ function C17DenseWorkspace({
             {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
           </Text>
           {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
-        </View> : selectedOwnCard === null && selectedTarget === null && focusedPlayer === null
+        </View> : selectedOwnCard === null && selectedTarget === null
           ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Tap a card to inspect its note.</Text>
           : null}
 
@@ -790,15 +774,13 @@ const styles = StyleSheet.create({
   opponentMeta: { gap: 3, justifyContent: 'center', width: HAND_META_WIDTH },
   namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 22, paddingHorizontal: 2 },
   opponentName: { fontSize: 10, fontWeight: '900' },
-  metaButtons: { alignItems: 'flex-start', flexDirection: 'row', gap: 3 },
+  metaButtons: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
   opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 5 },
   ownTitle: { fontSize: 10, fontWeight: '900', width: HAND_META_WIDTH },
   ownCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 5, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
-  playerFocus: { borderTopWidth: 1, gap: 3, paddingTop: 5 },
-  playerFocusHint: { fontSize: 9, lineHeight: 12 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },
   pendingText: { fontSize: 10, lineHeight: 14 },
