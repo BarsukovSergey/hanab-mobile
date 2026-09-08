@@ -3,28 +3,30 @@ import { describe, expect, test } from '@jest/globals';
 import { composeQuickNote } from './noteComposition';
 
 describe('composeQuickNote', () => {
-  test('turns an identity note plus finesse into separate upstream keywords', () => {
-    expect(composeQuickNote('No Variant', 'r2', 'f')).toBe('[r2] [f]');
+  test('ports upstream appendNote history behavior for identity plus finesse', () => {
+    expect(composeQuickNote('No Variant', '1', 'f')).toBe('1 | [1] [f]');
+    expect(composeQuickNote('No Variant', '[1]', 'f')).toBe('[1] | [1] [f]');
+    expect(composeQuickNote('No Variant', 'r2', 'f')).toBe('r2 | [r2] [f]');
   });
 
-  test('preserves an existing semantic token while adding another one', () => {
-    expect(composeQuickNote('No Variant', 'f', 'cm')).toBe('[f] [cm]');
-    expect(composeQuickNote('No Variant', '[r2] [f]', 'kt')).toBe('[r2] [f] [kt]');
+  test('repeats the active pipe segment and appends a new semantic token', () => {
+    expect(composeQuickNote('No Variant', 'old thought | 1', 'kt'))
+      .toBe('old thought | 1 | [1] [kt]');
   });
 
-  test('preserves prose that previously had no parser meaning', () => {
-    expect(composeQuickNote('No Variant', 'remember tempo', 'f')).toBe('remember tempo [f]');
+  test('keeps prose in history while stripping it from the new active interpretation', () => {
+    expect(composeQuickNote('No Variant', 'remember tempo', 'f'))
+      .toBe('remember tempo | [f]');
   });
 
-  test('only edits the active segment after the final pipe', () => {
-    expect(composeQuickNote('No Variant', 'old thought | cm', 'f')).toBe('old thought | [cm] [f]');
+  test('replaces conflicting border-affecting tokens like upstream appendNote', () => {
+    expect(composeQuickNote('No Variant', '[1] [cm]', 'f'))
+      .toBe('[1] [cm] | [1] [f]');
+    expect(composeQuickNote('No Variant', '[1] [f]', 'cm'))
+      .toBe('[1] [f] | [1] [cm]');
   });
 
-  test('does not duplicate an already-active marker', () => {
-    expect(composeQuickNote('No Variant', '[r2] [f]', 'f')).toBe('[r2] [f]');
-  });
-
-  test('refuses malformed bracket syntax instead of guessing', () => {
-    expect(composeQuickNote('No Variant', '[r2', 'f')).toBeNull();
+  test('does not update when the requested semantic meaning is already active', () => {
+    expect(composeQuickNote('No Variant', '[1] [f]', 'f')).toBe('[1] [f]');
   });
 });
