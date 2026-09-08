@@ -274,7 +274,10 @@ export function C17GameScreen() {
       onReturnLive={returnLive}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
-        if (!replay.active) interactionDispatch({ type: 'select-card', order });
+        if (!replay.active) {
+          interactionDispatch({ type: 'select-card', order });
+          inspectNote(order);
+        }
       }}
       onSelectClueTarget={(playerIndex) => interactionDispatch({ type: 'select-clue-target', playerIndex })}
       onSelectRecentAction={jumpToAction}
@@ -426,13 +429,17 @@ function C17DenseWorkspace({
 }) {
   const { theme } = useHanabTheme();
   const [recentOpen, setRecentOpen] = useState(false);
+  const [focusedPlayer, setFocusedPlayer] = useState<number | null>(null);
   const [layoutMetrics, setLayoutMetrics] = useState({
     opponentCardLaneWidth: 0,
     handsRegionHeight: 0,
     ownCardLaneWidth: 0,
   });
   useEffect(() => {
-    if (reviewActive) setRecentOpen(false);
+    if (reviewActive) {
+      setRecentOpen(false);
+      setFocusedPlayer(null);
+    }
   }, [reviewActive]);
 
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
@@ -458,6 +465,10 @@ function C17DenseWorkspace({
       cardIdentities[noteCard ?? -1],
     );
   const empathyActive = globalEmpathy || persistentEmpathyPlayer !== null;
+  const focusedPlayerName = focusedPlayer === null
+    ? null
+    : metadata.playerNames[focusedPlayer] ?? `Player ${focusedPlayer + 1}`;
+  const focusedPlayerPersistent = focusedPlayer !== null && persistentEmpathyPlayer === focusedPlayer;
 
   return <View style={styles.workspace}>
     <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -500,32 +511,51 @@ function C17DenseWorkspace({
           const currentActor = current === index;
           const compact = layout.mode === 'compact-overview';
           const empathizing = !reviewActive && (globalEmpathy || empathyPlayer === index);
-          const persistent = persistentEmpathyPlayer === index;
           const target = selectedTarget === index;
+          const focused = focusedPlayer === index;
+          const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
           return <View
             key={index}
             style={[
               styles.opponentRow,
               { height: layout.opponentRowHeight },
+              focused && { borderColor: theme.colors.borderStrong },
               currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent },
               target && { borderColor: theme.colors.accent },
             ]}
           >
             <View style={styles.opponentMeta}>
               <Pressable
-                accessibilityLabel={`Peek empathy for ${metadata.playerNames[index] ?? `Player ${index + 1}`}`}
-                disabled={reviewActive || globalEmpathy}
-                onPressIn={() => onHoldEmpathy(index)}
-                onPressOut={() => onHoldEmpathy(null)}
-                style={styles.namePeekArea}
+                accessibilityLabel={`Player ${playerName}`}
+                accessibilityRole="button"
+                disabled={reviewActive}
+                onPress={() => setFocusedPlayer(index)}
+                onPressIn={() => {
+                  if (!globalEmpathy) onHoldEmpathy(index);
+                }}
+                onPressOut={() => {
+                  if (!globalEmpathy) onHoldEmpathy(null);
+                }}
+                style={({ pressed }) => [
+                  styles.namePeekArea,
+                  pressed && { backgroundColor: theme.colors.overlay },
+                ]}
               >
                 <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
-                  {metadata.playerNames[index]}{currentActor ? ' · TURN' : ''}
+                  {playerName}{currentActor ? ' · TURN' : ''}
                 </Text>
               </Pressable>
               <View style={styles.metaButtons}>
-                <ActionButton compact disabled={reviewActive} title={target ? 'Clue ✓' : 'Clue'} tone={target ? 'primary' : 'ghost'} onPress={() => onSelectClueTarget(target ? null : index)} />
-                <ActionButton compact disabled={reviewActive || globalEmpathy} title={persistent ? 'Empathy ✓' : 'Empathy'} tone={persistent ? 'primary' : 'ghost'} onPress={() => onToggleEmpathyPlayer(index)} />
+                <ActionButton
+                  compact
+                  disabled={reviewActive}
+                  title={target ? 'Clue ✓' : 'Clue'}
+                  tone={target ? 'primary' : 'secondary'}
+                  onPress={() => {
+                    setFocusedPlayer(index);
+                    onSelectClueTarget(target ? null : index);
+                  }}
+                />
               </View>
             </View>
             <View
@@ -637,6 +667,23 @@ function C17DenseWorkspace({
           </View>
         </View>
 
+        {focusedPlayer !== null && focusedPlayerName !== null && <View style={[styles.playerFocus, { borderColor: theme.colors.border }]}>
+          <View style={styles.rowBetween}>
+            <View style={styles.grow}>
+              <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>PLAYER</Text>
+              <Text numberOfLines={1} style={[styles.workbenchText, { color: theme.colors.text }]}>{focusedPlayerName}</Text>
+            </View>
+            <ActionButton
+              compact
+              disabled={globalEmpathy}
+              title={focusedPlayerPersistent ? 'Empathy ✓' : 'Empathy'}
+              tone={focusedPlayerPersistent ? 'primary' : 'secondary'}
+              onPress={() => onToggleEmpathyPlayer(focusedPlayer)}
+            />
+          </View>
+          <Text style={[styles.playerFocusHint, { color: theme.colors.textMuted }]}>Hold the player name or one of their cards for a temporary empathy peek.</Text>
+        </View>}
+
         {selectedOwnCard !== null && <View style={styles.rowBetween}>
           <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
           <View style={styles.actionButtons}>
@@ -665,7 +712,7 @@ function C17DenseWorkspace({
             {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
           </Text>
           {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
-        </View> : selectedOwnCard === null && selectedTarget === null
+        </View> : selectedOwnCard === null && selectedTarget === null && focusedPlayer === null
           ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Tap a card to inspect its note.</Text>
           : null}
 
@@ -735,16 +782,18 @@ const styles = StyleSheet.create({
   hands: { flex: 1, gap: 5, minHeight: 0 },
   opponents: { gap: 2 },
   opponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 4 },
-  opponentMeta: { gap: 2, justifyContent: 'center', width: 112 },
-  namePeekArea: { minHeight: 20, justifyContent: 'center' },
+  opponentMeta: { gap: 3, justifyContent: 'center', width: 112 },
+  namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 22, paddingHorizontal: 2 },
   opponentName: { fontSize: 10, fontWeight: '900' },
-  metaButtons: { flexDirection: 'row', gap: 3 },
+  metaButtons: { alignItems: 'flex-start', flexDirection: 'row', gap: 3 },
   opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 3, minWidth: 0 },
   ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 6, padding: 5 },
   ownTitle: { fontSize: 10, fontWeight: '900', width: 64 },
   ownCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 4, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 5, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
+  playerFocus: { borderTopWidth: 1, gap: 3, paddingTop: 5 },
+  playerFocusHint: { fontSize: 9, lineHeight: 12 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },
   pendingText: { fontSize: 10, lineHeight: 14 },
