@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { AppState, Modal, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import {
+  AppState,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
 
 import type { CardIdentity, CardNote, GameState } from '../../game/bootstrap/types';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -22,7 +32,11 @@ import { CompactTable } from './CompactTable';
 import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
-import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout';
+import {
+  getC17DenseLayout,
+  getC17WorkbenchHeight,
+  getRelativeOpponentIndices,
+} from './c17DenseLayout';
 import {
   countC17TemporalStatesAfter,
   getC17TemporalContext,
@@ -43,6 +57,7 @@ type C17ReviewSelection = {
 const HAND_META_WIDTH = 112;
 const HAND_ROW_CONTENT_GAP = 5;
 const HAND_ROW_HORIZONTAL_PADDING = 4;
+const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
 export function C17GameScreen() {
@@ -433,22 +448,52 @@ function C17DenseWorkspace({
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
+  const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
+  const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
+  const workbenchHeight = getC17WorkbenchHeight(viewportHeight);
+  const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
-    opponentCardLaneWidth: 0,
+    shellKey: '',
     handsRegionHeight: 0,
-    ownCardLaneWidth: 0,
+    handsRegionWidth: 0,
   });
   useEffect(() => {
     if (reviewActive) setRecentOpen(false);
   }, [reviewActive]);
 
-  const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
+  const shellMeasured = layoutMetrics.shellKey === shellKey
+    && layoutMetrics.handsRegionHeight > 0
+    && layoutMetrics.handsRegionWidth > 0;
+  const cardLaneWidth = Math.max(
+    1,
+    layoutMetrics.handsRegionWidth
+      - HAND_META_WIDTH
+      - HAND_ROW_CONTENT_GAP
+      - HAND_ROW_HORIZONTAL_PADDING * 2
+      - HAND_ROW_BORDER_WIDTH * 2,
+  );
   const layout = getC17DenseLayout({
-    ...layoutMetrics,
+    opponentCardLaneWidth: cardLaneWidth,
+    handsRegionHeight: layoutMetrics.handsRegionHeight,
+    ownCardLaneWidth: cardLaneWidth,
     opponentCount: opponents.length,
     cardsPerHand,
+    workbenchHeight,
   });
+  const captureHandsRegion = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
+    setLayoutMetrics((currentMetrics) => {
+      const sameShell = currentMetrics.shellKey === shellKey;
+      const sameWidth = Math.abs(currentMetrics.handsRegionWidth - next.width) < 0.5;
+      if (sameShell && currentMetrics.handsRegionHeight > 0 && sameWidth) return currentMetrics;
+      return {
+        shellKey,
+        handsRegionHeight: next.height,
+        handsRegionWidth: next.width,
+      };
+    });
+  };
+
   const current = game.turn.currentPlayerIndex;
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
@@ -468,40 +513,42 @@ function C17DenseWorkspace({
   const empathyActive = globalEmpathy || persistentEmpathyPlayer !== null;
 
   return <View style={styles.workspace}>
-    <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <View style={styles.grow}>
-        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
-        <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+    <View style={styles.ledgerChrome}>
+      <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={styles.grow}>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
+          <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+        </View>
+        <HudStat label="Score" value={game.score} />
+        <HudStat label="Max" value={game.stats.maxScore} />
+        <HudStat label="Clues" value={getDisplayedClueTokens(game.clueTokens, variantName)} />
+        <HudStat label="Strikes" value={game.strikes.length} />
+        <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
+        {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
+        {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
       </View>
-      <HudStat label="Score" value={game.score} />
-      <HudStat label="Max" value={game.stats.maxScore} />
-      <HudStat label="Clues" value={getDisplayedClueTokens(game.clueTokens, variantName)} />
-      <HudStat label="Strikes" value={game.strikes.length} />
-      <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
-      {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
-      {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
-    </View>
 
-    <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
+      <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
 
-    <View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-      <View style={styles.rowBetween}>
-        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
-        {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
+      <View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+        <View style={[styles.rowBetween, styles.lastActionHeader]}>
+          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
+          {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
+        </View>
+        <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.lastActionPressable}>
+          <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+          <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
+        </Pressable>
       </View>
-      <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.lastActionPressable}>
-        <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
-        <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
-      </Pressable>
     </View>
 
     <View
-      onLayout={({ nativeEvent: { layout: next } }: LayoutChangeEvent) => setLayoutMetrics((currentMetrics) => (
-        currentMetrics.handsRegionHeight === next.height
-          ? currentMetrics
-          : { ...currentMetrics, handsRegionHeight: next.height }
-      ))}
-      style={styles.hands}
+      onLayout={captureHandsRegion}
+      style={[
+        styles.hands,
+        shellMeasured ? { height: layout.handsHeight } : styles.handsMeasuring,
+        !shellMeasured && styles.shellPending,
+      ]}
     >
       <View style={styles.opponents}>
         {opponents.map((index) => {
@@ -545,6 +592,7 @@ function C17DenseWorkspace({
                 <ActionButton
                   compact
                   disabled={reviewActive}
+                  style={styles.metaActionButton}
                   title={target ? 'Clue ✓' : 'Clue'}
                   tone={target ? 'primary' : 'secondary'}
                   onPress={() => onSelectClueTarget(target ? null : index)}
@@ -552,20 +600,14 @@ function C17DenseWorkspace({
                 <ActionButton
                   compact
                   disabled={reviewActive || globalEmpathy}
+                  style={styles.metaActionButton}
                   title={persistentEmpathy ? 'Emp ✓' : 'Emp'}
                   tone={persistentEmpathy ? 'primary' : 'ghost'}
                   onPress={() => onToggleEmpathyPlayer(index)}
                 />
               </View>
             </View>
-            <View
-              onLayout={index === opponents[0] ? ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => setLayoutMetrics((currentMetrics) => (
-                currentMetrics.opponentCardLaneWidth === next.width
-                  ? currentMetrics
-                  : { ...currentMetrics, opponentCardLaneWidth: next.width }
-              )) : undefined}
-              style={styles.opponentCards}
-            >
+            <View style={styles.opponentCards}>
               {getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
@@ -613,14 +655,7 @@ function C17DenseWorkspace({
 
       <View style={[styles.ownHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <Text style={[styles.ownTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
-        <View
-          onLayout={({ nativeEvent: { layout: next } }: LayoutChangeEvent) => setLayoutMetrics((currentMetrics) => (
-            currentMetrics.ownCardLaneWidth === next.width
-              ? currentMetrics
-              : { ...currentMetrics, ownCardLaneWidth: next.width }
-          ))}
-          style={styles.ownCards}
-        >
+        <View style={styles.ownCards}>
           {ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
@@ -653,35 +688,23 @@ function C17DenseWorkspace({
       </View>
     </View>
 
-    <View style={[styles.workbench, { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }]}>
-      {reviewActive ? <>
-        <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
-        <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
-        <View style={styles.rowBetween}>
-          <View style={styles.actionButtons}>
-            <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
-            <ActionButton compact disabled={!canReviewForward} title="Forward →" onLongPress={onReviewEnd} onPress={onReviewForward} />
+    <View style={[
+      styles.workbench,
+      { height: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
+      !shellMeasured && styles.shellPending,
+    ]}>
+      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
+        {reviewActive ? <>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+          <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
+          <View style={styles.rowBetween}>
+            <View style={styles.actionButtons}>
+              <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
+              <ActionButton compact disabled={!canReviewForward} title="Forward →" onLongPress={onReviewEnd} onPress={onReviewForward} />
+            </View>
+            <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
           </View>
-          <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
-        </View>
-      </> : <>
-        <View style={styles.rowBetween}>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
-          <View style={styles.actionButtons}>
-            {empathyActive && <ActionButton compact title="Normal" tone="primary" onPress={onClearEmpathy} />}
-            <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
-          </View>
-        </View>
-
-        {selectedOwnCard !== null && <View style={styles.rowBetween}>
-          <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
-          <View style={styles.actionButtons}>
-            <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
-            <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
-          </View>
-        </View>}
-
-        {selectedTarget !== null && <ClueComposer
+        </> : selectedTarget !== null ? <ClueComposer
           choices={clueChoices}
           enabled={clueEnabled}
           onClear={onClearCluePreview}
@@ -690,28 +713,46 @@ function C17DenseWorkspace({
           preview={cluePreview}
           previewState={cluePreviewState}
           targetName={targetName}
-        />}
-
-        {noteCard !== null ? <View style={styles.noteInspect}>
+        /> : <>
           <View style={styles.rowBetween}>
-            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
-            <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
+            <View style={styles.actionButtons}>
+              {empathyActive && <ActionButton compact title="Normal" tone="primary" onPress={onClearEmpathy} />}
+              <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+            </View>
           </View>
-          <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
-            {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
-          </Text>
-          {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
-        </View> : selectedOwnCard === null && selectedTarget === null
-          ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Tap a card to inspect its note.</Text>
-          : null}
 
-        {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
-      </>}
+          {selectedOwnCard !== null && <View style={styles.rowBetween}>
+            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+            <View style={styles.actionButtons}>
+              <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
+              <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+            </View>
+          </View>}
+
+          {noteCard !== null ? <View style={styles.noteInspect}>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
+              <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
+            </View>
+            <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
+              {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
+            </Text>
+            {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
+          </View> : selectedOwnCard === null
+            ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Tap a card to inspect its note.</Text>
+            : null}
+
+          {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
+        </>}
+      </ScrollView>
     </View>
 
+    {shellMeasured && <View style={styles.workspaceTail} />}
+
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
-      <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
-        <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+      <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}> 
+        <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}> 
           <View style={styles.rowBetween}>
             <Text style={[styles.recentTitle, { color: theme.colors.text }]}>Recent actions</Text>
             <ActionButton compact title="Close" onPress={() => setRecentOpen(false)} />
@@ -754,7 +795,8 @@ function getCardLabel(game: GameState, playerNames: readonly string[], order: nu
 }
 
 const styles = StyleSheet.create({
-  workspace: { flex: 1, gap: 5, minHeight: 0, paddingBottom: 4 },
+  workspace: { flex: 1, minHeight: 0, paddingBottom: 4 },
+  ledgerChrome: { gap: 5 },
   grow: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   hud: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
@@ -763,23 +805,30 @@ const styles = StyleSheet.create({
   hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
   hudLabel: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
   lastAction: { borderRadius: 8, borderWidth: 1, gap: 3, minHeight: 37, paddingHorizontal: 7, paddingVertical: 4 },
+  lastActionHeader: { minHeight: 32 },
   lastActionPressable: { alignItems: 'center', flexDirection: 'row', gap: 7, minHeight: 24 },
   lastActionText: { flex: 1, fontSize: 10, fontWeight: '700', minWidth: 0 },
   link: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   rowBetween: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
   actionButtons: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  hands: { flex: 1, gap: 5, minHeight: 0 },
+  hands: { gap: 5, marginTop: 5, minHeight: 0 },
+  handsMeasuring: { flex: 1 },
+  shellPending: { opacity: 0 },
   opponents: { gap: 2 },
-  opponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING },
-  opponentMeta: { gap: 3, justifyContent: 'center', width: HAND_META_WIDTH },
-  namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 22, paddingHorizontal: 2 },
+  opponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING },
+  opponentMeta: { gap: 2, justifyContent: 'center', width: HAND_META_WIDTH },
+  namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 19, paddingHorizontal: 2 },
   opponentName: { fontSize: 10, fontWeight: '900' },
-  metaButtons: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
+  metaButtons: { alignItems: 'flex-start', flexDirection: 'row', gap: 3 },
+  metaActionButton: { minHeight: 30, paddingHorizontal: 6, paddingVertical: 4 },
   opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
-  ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 5 },
+  ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 5 },
   ownTitle: { fontSize: 10, fontWeight: '900', width: HAND_META_WIDTH },
   ownCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
-  workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 5, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
+  workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
+  workbenchScroll: { flex: 1 },
+  workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
+  workspaceTail: { flex: 1, minHeight: 0 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },
