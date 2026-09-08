@@ -14,7 +14,6 @@ export function ClueComposer({
   preview,
   onPreview,
   onClear,
-  onCancel,
   onConfirm,
 }: {
   targetName: string | null;
@@ -25,7 +24,6 @@ export function ClueComposer({
   preview: CluePreview | null;
   onPreview: (type: 'color' | 'rank', value: number) => void;
   onClear: () => void;
-  onCancel: () => void;
   onConfirm: () => void;
 }) {
   const { theme } = useHanabTheme();
@@ -61,7 +59,7 @@ export function ClueComposer({
         <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CLUE TO</Text>
         <Text numberOfLines={1} style={[styles.target, landscapePhone && styles.targetLandscape, { color: theme.colors.text }]}>{targetName}</Text>
       </View>
-      <ActionButton compact title="Close" tone="ghost" onPress={onCancel} />
+      <ActionButton compact title="Close" tone="ghost" onPress={onClear} />
     </View>
 
     <View style={styles.choiceGroups}>
@@ -103,10 +101,7 @@ export function ClueComposer({
                 : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
           </Text>
         </View>
-        <View style={styles.confirmActions}>
-          <ActionButton compact title="Clear" tone="ghost" onPress={onClear} />
-          <ActionButton disabled={!confirmAllowed || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
-        </View>
+        <ActionButton disabled={!confirmAllowed || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
       </View>}
     </View>
   </View>;
@@ -128,7 +123,6 @@ const styles = StyleSheet.create({
   choiceRowLandscape: { gap: 3 },
   confirmSlot: { justifyContent: 'center', minHeight: 42 },
   confirmRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
-  confirmActions: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   previewCopy: { flex: 1, minWidth: 0 },
   previewTitle: { fontSize: 13, fontWeight: '900' },
   previewDetail: { fontSize: 10, lineHeight: 13 },
