@@ -10,6 +10,7 @@ import type { ClueCardMarker } from './clueIndication';
 import { getKnowledgeOverlayMetrics } from './knowledgeOverlayLayout';
 import { UpstreamCardFace } from './UpstreamCardFace';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
+import { WebCardMarker } from './WebCardMarker';
 
 type GameCardProps = {
   position: number;
@@ -83,7 +84,11 @@ export function GameCard({
         {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
         {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
-        <CardStateIndicators compact={compactIndicator} presentation={statePresentation} />
+        <CardStateIndicators
+          clued={knowledge.borderColor === 'orange'}
+          knownRank={knowledge.displayRank !== null}
+          presentation={statePresentation}
+        />
         {hasNote && <NoteIndicator compact={compactIndicator} />}
       </View>
       {height !== undefined && <View pointerEvents="none" style={[
@@ -157,7 +162,11 @@ export function VisibleHanabiCard({
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
     {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
     {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
-    <CardStateIndicators compact={compactIndicator} presentation={statePresentation} />
+    <CardStateIndicators
+      clued={activeSemanticBorder === 'orange'}
+      knownRank={faceRank !== null}
+      presentation={statePresentation}
+    />
     {hasNote && <NoteIndicator compact={compactIndicator} />}
   </View>;
 
@@ -287,24 +296,45 @@ function KnowledgeRankLegend({ knowledge }: { knowledge: CardKnowledgeViewModel 
   ))}</View>;
 }
 
-function CardStateIndicators({ presentation, compact }: { presentation: CardStatePresentation | null; compact: boolean }) {
+function CardStateIndicators({ presentation, knownRank, clued }: {
+  presentation: CardStatePresentation | null;
+  knownRank: boolean;
+  clued: boolean;
+}) {
   if (presentation === null) return null;
-  const markers: Array<{ key: string; label: string; style: object }> = [];
-  if (presentation.critical) markers.push({ key: 'critical', label: '◆', style: styles.stateBadgeCritical });
-  if (presentation.knownTrashNote) markers.push({ key: 'kt', label: 'KT', style: styles.stateBadgeNeutral });
-  if (presentation.knownTrashFromEmpathy) markers.push({ key: 'trash', label: 'T', style: styles.stateBadgeNeutral });
-  if (presentation.doubleDiscard) markers.push({ key: 'dda', label: 'DDA', style: styles.stateBadgeWarning });
-  if (markers.length === 0) return null;
-  return <View pointerEvents="none" style={styles.stateIndicators}>
-    {markers.map((marker) => <View key={marker.key} style={[styles.stateBadge, marker.style, compact && styles.stateBadgeCompact]}>
-      <Text style={[styles.stateBadgeText, compact && styles.stateBadgeTextCompact]}>{marker.label}</Text>
-    </View>)}
+
+  // Web suppresses the DDA marker when a clue border or explicit trash marker takes precedence.
+  const showDoubleDiscard = presentation.doubleDiscard && !clued && !presentation.knownTrashNote;
+  const cornerStyle = knownRank ? styles.webMarkerSmallBottom : styles.webMarkerSmallTop;
+
+  return <View pointerEvents="none" style={styles.webMarkerLayer}>
+    {presentation.knownTrashNote && <View style={styles.webMarkerTrash}>
+      <WebCardMarker kind="trash" />
+    </View>}
+    {presentation.questionMark && <View style={styles.webMarkerQuestion}>
+      <WebCardMarker kind="question" />
+    </View>}
+    {presentation.exclamationMark && <View style={styles.webMarkerQuestion}>
+      <WebCardMarker kind="exclamation" />
+    </View>}
+    {presentation.needsFix && <View style={styles.webMarkerFix}>
+      <WebCardMarker kind="fix" />
+    </View>}
+    {presentation.critical && <View style={styles.webMarkerCritical}>
+      <WebCardMarker kind="critical" />
+    </View>}
+    {presentation.knownTrashFromEmpathy && <View style={cornerStyle}>
+      <WebCardMarker kind="trash-mini" />
+    </View>}
+    {showDoubleDiscard && <View style={cornerStyle}>
+      <WebCardMarker kind="dda" />
+    </View>}
   </View>;
 }
 
 function NoteIndicator({ compact = false }: { compact?: boolean }) {
-  return <View style={[styles.noteIndicator, compact && styles.noteIndicatorCompact]}>
-    <Text style={[styles.noteIndicatorText, compact && styles.noteIndicatorTextCompact]}>✎</Text>
+  return <View pointerEvents="none" style={[styles.noteIndicator, compact && styles.noteIndicatorCompact]}>
+    <WebCardMarker kind="note" />
   </View>;
 }
 
@@ -348,18 +378,15 @@ const styles = StyleSheet.create({
   clueCircle: { alignItems: 'center', borderColor: '#111111', borderRadius: 7, borderWidth: 1, height: 14, justifyContent: 'center', width: 14 },
   rankClueCircle: { backgroundColor: '#111111', borderColor: '#ffffff' },
   rankClueText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 9, maxWidth: 11 },
-  stateIndicators: { alignItems: 'flex-start', bottom: 3, gap: 2, left: 3, position: 'absolute', zIndex: 10 },
-  stateBadge: { alignItems: 'center', borderColor: '#f4f4ee', borderRadius: 3, borderWidth: 1, justifyContent: 'center', minHeight: 14, minWidth: 14, paddingHorizontal: 2 },
-  stateBadgeCompact: { minHeight: 10, minWidth: 10, paddingHorizontal: 1 },
-  stateBadgeCritical: { backgroundColor: '#7b1e1e' },
-  stateBadgeNeutral: { backgroundColor: '#171717' },
-  stateBadgeWarning: { backgroundColor: '#8a5a00' },
-  stateBadgeText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 10 },
-  stateBadgeTextCompact: { fontSize: 6, lineHeight: 7 },
-  noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 16, justifyContent: 'center', position: 'absolute', right: 4, top: 4, transform: [{ rotate: '-8deg' }], width: 16, zIndex: 10 },
-  noteIndicatorCompact: { height: 11, right: 2, top: 2, width: 11 },
-  noteIndicatorText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900', lineHeight: 12 },
-  noteIndicatorTextCompact: { fontSize: 7, lineHeight: 8 },
+  webMarkerLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
+  webMarkerTrash: { height: '60%', left: '15%', position: 'absolute', top: '20%', width: '70%' },
+  webMarkerQuestion: { aspectRatio: 1, left: '15%', position: 'absolute', top: '20%', width: '80%' },
+  webMarkerFix: { aspectRatio: 1, left: '10%', position: 'absolute', top: '33%', width: '80%' },
+  webMarkerCritical: { aspectRatio: 1, bottom: '4%', left: '6%', position: 'absolute', width: '20%' },
+  webMarkerSmallTop: { aspectRatio: 1, left: '5%', position: 'absolute', top: '5%', width: '20%' },
+  webMarkerSmallBottom: { aspectRatio: 1, bottom: '4%', left: '6%', position: 'absolute', width: '20%' },
+  noteIndicator: { aspectRatio: 1, position: 'absolute', right: '2%', top: '3%', width: '20%', zIndex: 10 },
+  noteIndicatorCompact: { right: '2%', top: '3%', width: '21%' },
   details: { gap: 5 },
   detailMuted: { fontSize: 11, fontStyle: 'italic' },
 });
