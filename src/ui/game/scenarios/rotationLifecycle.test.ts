@@ -52,6 +52,7 @@ describe('gameplay rotation lifecycle', () => {
       clueTarget: 1,
       cluePreview: { type: 'rank' as const, value: 2 },
       empathyPlayer: 1,
+      persistentEmpathyPlayer: 1,
       globalEmpathy: false,
       noteCard: 5,
     };
