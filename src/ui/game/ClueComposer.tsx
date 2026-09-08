@@ -54,7 +54,7 @@ export function ClueComposer({
   return <View style={[
     styles.surface,
     landscapePhone && styles.surfaceLandscape,
-    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+    { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong },
   ]}>
     <View style={styles.header}>
       <View style={styles.headerCopy}>
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   idleSurface: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, paddingHorizontal: 9, paddingVertical: 7 },
   idleSurfaceLandscape: { paddingHorizontal: 7, paddingVertical: 4 },
   idleText: { flex: 1, fontSize: 10, fontWeight: '700' },
-  surface: { borderRadius: 12, borderWidth: 1, gap: 5, paddingHorizontal: 8, paddingVertical: 7 },
+  surface: { borderRadius: 12, borderWidth: 1, bottom: 7, elevation: 12, gap: 5, left: 8, paddingHorizontal: 8, paddingVertical: 7, position: 'absolute', right: 8, shadowColor: '#000000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.35, shadowRadius: 5, zIndex: 30 },
   surfaceLandscape: { gap: 3, paddingHorizontal: 6, paddingVertical: 4 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   headerCopy: { flex: 1, minWidth: 0 },
