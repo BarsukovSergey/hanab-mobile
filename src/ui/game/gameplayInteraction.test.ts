@@ -45,6 +45,19 @@ describe('gameplayInteractionReducer', () => {
     expect(retargeted.cluePreview).toBeNull();
   });
 
+  test('closing clue planning clears target and preview without discarding preserved card context', () => {
+    const selected = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-card', order: 12 });
+    const targeted = gameplayInteractionReducer(selected, { type: 'select-clue-target', playerIndex: 2 });
+    const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'rank', value: 3 });
+
+    expect(gameplayInteractionReducer(previewed, { type: 'clear-clue-preview' })).toMatchObject({
+      selectedCard: 12,
+      noteCard: 12,
+      clueTarget: null,
+      cluePreview: null,
+    });
+  });
+
   test('toggles persistent per-hand empathy', () => {
     const enabled = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-empathy-player', playerIndex: 1 });
     expect(enabled).toMatchObject({ empathyPlayer: 1, persistentEmpathyPlayer: 1, globalEmpathy: false });
