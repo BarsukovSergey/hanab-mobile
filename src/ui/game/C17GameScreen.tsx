@@ -40,6 +40,11 @@ type C17ReviewSelection = {
   liveSegmentAtEntry: number;
 };
 
+const HAND_META_WIDTH = 112;
+const HAND_ROW_CONTENT_GAP = 5;
+const HAND_ROW_HORIZONTAL_PADDING = 4;
+const HAND_CARD_GAP = 3;
+
 export function C17GameScreen() {
   const { theme } = useHanabTheme();
   const dispatch = useAppDispatch();
@@ -781,15 +786,15 @@ const styles = StyleSheet.create({
   actionButtons: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   hands: { flex: 1, gap: 5, minHeight: 0 },
   opponents: { gap: 2 },
-  opponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 4 },
-  opponentMeta: { gap: 3, justifyContent: 'center', width: 112 },
+  opponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: 1, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING },
+  opponentMeta: { gap: 3, justifyContent: 'center', width: HAND_META_WIDTH },
   namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 22, paddingHorizontal: 2 },
   opponentName: { fontSize: 10, fontWeight: '900' },
   metaButtons: { alignItems: 'flex-start', flexDirection: 'row', gap: 3 },
-  opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 3, minWidth: 0 },
-  ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 6, padding: 5 },
-  ownTitle: { fontSize: 10, fontWeight: '900', width: 64 },
-  ownCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 4, minWidth: 0 },
+  opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
+  ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 5 },
+  ownTitle: { fontSize: 10, fontWeight: '900', width: HAND_META_WIDTH },
+  ownCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, gap: 5, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
   playerFocus: { borderTopWidth: 1, gap: 3, paddingTop: 5 },
