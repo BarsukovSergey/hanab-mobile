@@ -6,11 +6,15 @@ function read(relativePath: string) {
   return fs.readFileSync(path.join(process.cwd(), ...relativePath.split('/')), 'utf8');
 }
 
-test('every GameScreen runtime call is covered by the scenario-gallery command gate', () => {
-  const gameScreen = read('src/ui/game/GameScreen.tsx');
+test('every production gameplay-screen runtime call is covered by the scenario-gallery command gate', () => {
+  const gameplayScreens = [
+    read('src/ui/game/GameScreen.tsx'),
+    read('src/ui/game/C17GameScreen.tsx'),
+    read('src/ui/game/LegacyGameScreen.tsx'),
+  ].join('\n');
   const application = read('src/runtime/application.ts');
 
-  const runtimeCalls = [...gameScreen.matchAll(/\blobbyRuntime\.([A-Za-z0-9_]+)\s*\(/g)]
+  const runtimeCalls = [...gameplayScreens.matchAll(/\blobbyRuntime\.([A-Za-z0-9_]+)\s*\(/g)]
     .flatMap((match) => match[1] === undefined ? [] : [match[1]]);
   const gateMatch = application.match(/createRuntimeCommandGate\(rawLobbyRuntime,\s*\[([\s\S]*?)\]\s*\)/);
   expect(gateMatch).not.toBeNull();
