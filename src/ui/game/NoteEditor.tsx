@@ -101,6 +101,7 @@ export function NoteEditor({
           blurOnSubmit={editing}
           editable={editing}
           enterKeyHint={editing ? 'done' : undefined}
+          key={editing ? 'editing' : 'readonly'}
           maxLength={editing ? 300 : undefined}
           multiline={!editing}
           onChangeText={editing ? change : undefined}
