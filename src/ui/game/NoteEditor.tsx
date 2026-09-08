@@ -21,6 +21,7 @@ export function NoteEditor({
   value,
   editable,
   visible,
+  startEditing = false,
   onSave,
   onClear,
   onClose,
@@ -29,6 +30,7 @@ export function NoteEditor({
   value: string;
   editable: boolean;
   visible: boolean;
+  startEditing?: boolean;
   onChange: (value: string) => void;
   onSave: (value: string) => void;
   onClear: () => void;
@@ -48,11 +50,11 @@ export function NoteEditor({
     if (visible) {
       setDraft(value);
       setDirty(false);
-      setEditing(false);
+      setEditing(editable && startEditing);
       return;
     }
     setEditing(false);
-  }, [visible]);
+  }, [editable, startEditing, visible]);
 
   useEffect(() => {
     if (visible && !dirty) setDraft(value);
@@ -71,7 +73,7 @@ export function NoteEditor({
   const applyQuickToken = (token: QuickNoteToken) => {
     if (variantName === null) return;
     const candidate = composeQuickNote(variantName, draft, token);
-    if (candidate === null || candidate === draft) return;
+    if (candidate === draft) return;
     setDraft(candidate);
     setDirty(true);
   };
