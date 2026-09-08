@@ -14,6 +14,7 @@ export function ClueComposer({
   preview,
   onPreview,
   onClear,
+  onCancel,
   onConfirm,
 }: {
   targetName: string | null;
@@ -24,6 +25,7 @@ export function ClueComposer({
   preview: CluePreview | null;
   onPreview: (type: 'color' | 'rank', value: number) => void;
   onClear: () => void;
+  onCancel: () => void;
   onConfirm: () => void;
 }) {
   const { theme } = useHanabTheme();
@@ -59,38 +61,54 @@ export function ClueComposer({
         <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CLUE TO</Text>
         <Text numberOfLines={1} style={[styles.target, landscapePhone && styles.targetLandscape, { color: theme.colors.text }]}>{targetName}</Text>
       </View>
-      {previewState !== null && <ActionButton compact title="Cancel" tone="ghost" onPress={onClear} />}
+      <ActionButton compact title="Close" tone="ghost" onPress={onCancel} />
     </View>
-    {previewState === null ? <View style={styles.choiceGroups}>
-      <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.colors.map((choice) => <ActionButton
-        compact
-        disabled={!enabled}
-        key={`color-${choice.value}`}
-        title={choice.label}
-        onPress={() => onPreview('color', choice.value)}
-      />)}</View>
-      <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.ranks.map((choice) => <ActionButton
-        compact
-        disabled={!enabled}
-        key={`rank-${choice.value}`}
-        title={choice.label}
-        onPress={() => onPreview('rank', choice.value)}
-      />)}</View>
-    </View> : <View style={styles.confirmRow}>
-      <View style={styles.previewCopy}>
-        <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{previewLabel}</Text>
-        <Text style={[styles.previewDetail, { color: validPreview ? theme.colors.textMuted : theme.colors.danger }]}>
-          {preview === null
-            ? 'Invalid clue preview'
-            : preview.touchedOrders.length === 0
-              ? allowEmptyClues
-                ? 'No cards touched — Empty Clues allows this clue'
-                : 'No cards touched — enable Empty Clues to give this clue'
-              : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
-        </Text>
-      </View>
-      <ActionButton disabled={!confirmAllowed || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
-    </View>}
+
+    <View style={styles.choiceGroups}>
+      <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.colors.map((choice) => {
+        const selected = previewState?.type === 'color' && previewState.value === choice.value;
+        return <ActionButton
+          compact
+          disabled={!enabled}
+          key={`color-${choice.value}`}
+          title={choice.label}
+          tone={selected ? 'primary' : 'secondary'}
+          onPress={() => onPreview('color', choice.value)}
+        />;
+      })}</View>
+      <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.ranks.map((choice) => {
+        const selected = previewState?.type === 'rank' && previewState.value === choice.value;
+        return <ActionButton
+          compact
+          disabled={!enabled}
+          key={`rank-${choice.value}`}
+          title={choice.label}
+          tone={selected ? 'primary' : 'secondary'}
+          onPress={() => onPreview('rank', choice.value)}
+        />;
+      })}</View>
+    </View>
+
+    <View style={styles.confirmSlot}>
+      {previewState === null ? <Text style={[styles.previewDetail, { color: theme.colors.textMuted }]}>Choose a color or rank.</Text> : <View style={styles.confirmRow}>
+        <View style={styles.previewCopy}>
+          <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{previewLabel}</Text>
+          <Text style={[styles.previewDetail, { color: validPreview ? theme.colors.textMuted : theme.colors.danger }]}>
+            {preview === null
+              ? 'Invalid clue preview'
+              : preview.touchedOrders.length === 0
+                ? allowEmptyClues
+                  ? 'No cards touched — Empty Clues allows this clue'
+                  : 'No cards touched — enable Empty Clues to give this clue'
+                : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
+          </Text>
+        </View>
+        <View style={styles.confirmActions}>
+          <ActionButton compact title="Clear" tone="ghost" onPress={onClear} />
+          <ActionButton disabled={!confirmAllowed || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
+        </View>
+      </View>}
+    </View>
   </View>;
 }
 
@@ -98,18 +116,20 @@ const styles = StyleSheet.create({
   idleSurface: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 8, paddingHorizontal: 9, paddingVertical: 7 },
   idleSurfaceLandscape: { paddingHorizontal: 7, paddingVertical: 4 },
   idleText: { flex: 1, fontSize: 10, fontWeight: '700' },
-  surface: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 10 },
-  surfaceLandscape: { gap: 4, padding: 6 },
+  surface: { borderRadius: 12, borderWidth: 1, gap: 5, paddingHorizontal: 8, paddingVertical: 7 },
+  surfaceLandscape: { gap: 3, paddingHorizontal: 6, paddingVertical: 4 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
   target: { fontSize: 14, fontWeight: '900' },
   targetLandscape: { fontSize: 12 },
-  choiceGroups: { gap: 5 },
-  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  choiceRowLandscape: { gap: 4 },
-  confirmRow: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
+  choiceGroups: { gap: 4 },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  choiceRowLandscape: { gap: 3 },
+  confirmSlot: { justifyContent: 'center', minHeight: 42 },
+  confirmRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  confirmActions: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   previewCopy: { flex: 1, minWidth: 0 },
-  previewTitle: { fontSize: 15, fontWeight: '900' },
-  previewDetail: { fontSize: 11, lineHeight: 15 },
+  previewTitle: { fontSize: 13, fontWeight: '900' },
+  previewDetail: { fontSize: 10, lineHeight: 13 },
 });
