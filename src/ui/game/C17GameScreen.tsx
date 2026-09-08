@@ -107,7 +107,7 @@ export function C17GameScreen() {
     && !replay.active
     && !clientState.pause.active
     && roomState.pendingGameplayAction === null;
-  const cardEnabled = enabled && selectedCard !== null && ourHand.includes(selectedCard);
+  const cardEnabled = enabled && selectedCard !== null && ourHand.some((order) => order === selectedCard);
   const clueChoices = getGameplayClueChoicesForPlayer(metadata);
   const clueEnabled = enabled
     && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName)
@@ -444,7 +444,7 @@ function C17DenseWorkspace({
   const current = game.turn.currentPlayerIndex;
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
-  const selectedOwnCard = selectedCard !== null && ownHand.includes(selectedCard) ? selectedCard : null;
+  const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
   const inspectedNote = noteCard === null ? '' : notes[noteCard]?.text ?? '';
   const inspectedCard = noteCard === null ? undefined : game.deck[noteCard];
   const inspectedKnowledge = inspectedCard === undefined
@@ -638,7 +638,7 @@ function C17DenseWorkspace({
         </View>
 
         {selectedOwnCard !== null && <View style={styles.rowBetween}>
-          <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.indexOf(selectedOwnCard) + 1}</Text>
+          <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
           <View style={styles.actionButtons}>
             <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
             <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
@@ -711,7 +711,7 @@ function HudStat({ label, value }: { label: string; value: number | string }) {
 function getCardLabel(game: GameState, playerNames: readonly string[], order: number): string {
   for (const [playerIndex, hand] of game.hands.entries()) {
     const displayed = getDisplayedHandOrders(hand);
-    const position = displayed.indexOf(order);
+    const position = displayed.findIndex((candidate) => candidate === order);
     if (position >= 0) return `${playerNames[playerIndex] ?? `Player ${playerIndex + 1}`} · card ${position + 1}`;
   }
   return `Card ${order}`;
