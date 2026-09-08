@@ -73,8 +73,11 @@ export function gameplayInteractionReducer(
           cluePreview: { type: action.clueType, value: action.value },
         };
     case 'clear-clue-preview':
+      // This is the Workbench clue-planner exit. Closing never sends a clue and restores
+      // the previously preserved card/note context underneath the planner.
       return {
         ...state,
+        clueTarget: null,
         cluePreview: null,
       };
     case 'open-note':
