@@ -45,7 +45,7 @@ export function ClueComposer({
       { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
     ]}>
       <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CLUE</Text>
-      <Text numberOfLines={1} style={[styles.idleText, { color: theme.colors.textMuted }]}>Tap a player name to choose a clue target</Text>
+      <Text numberOfLines={1} style={[styles.idleText, { color: theme.colors.textMuted }]}>Tap a player to choose a clue target</Text>
     </View>;
   }
 
@@ -91,13 +91,11 @@ export function ClueComposer({
       {previewState === null ? <Text style={[styles.previewDetail, { color: theme.colors.textMuted }]}>Choose a color or rank.</Text> : <View style={styles.confirmRow}>
         <View style={styles.previewCopy}>
           <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{previewLabel}</Text>
-          <Text style={[styles.previewDetail, { color: validPreview ? theme.colors.textMuted : theme.colors.danger }]}>
+          <Text style={[styles.previewDetail, { color: theme.colors.textMuted }]}>
             {preview === null
-              ? 'Invalid clue preview'
+              ? 'Unavailable'
               : preview.touchedOrders.length === 0
-                ? allowEmptyClues
-                  ? 'No cards touched — Empty Clues allows this clue'
-                  : 'No cards touched — enable Empty Clues to give this clue'
+                ? 'Touches no cards'
                 : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
           </Text>
         </View>
