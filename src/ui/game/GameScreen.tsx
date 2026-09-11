@@ -12,8 +12,7 @@ export function GameScreen() {
   const room = useAppSelector((state) => state.room.room);
   const liveRoom = room.kind === 'live_game' ? room : null;
   const clientState = liveRoom?.clientState ?? null;
-  const playerRoom = liveRoom?.role === 'player' && clientState?.playing ? liveRoom : null;
-  const ourIndex = playerRoom?.clientState.metadata.ourPlayerIndex ?? null;
+  const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;
   const game = clientState?.visibleState ?? null;
   const gameplayLayout = useMemo(() => getGameplayLayout({
     viewportWidth: width,
@@ -23,7 +22,7 @@ export function GameScreen() {
   }), [game, height, ourIndex, width]);
 
   const useC17 = isC17WorkspaceEligible({
-    isPlayer: playerRoom !== null,
+    isLiveParticipant: liveRoom !== null,
     playerCount: clientState?.metadata.playerNames.length ?? 0,
     portrait: gameplayLayout.orientation === 'portrait',
     finished: clientState?.finished ?? false,

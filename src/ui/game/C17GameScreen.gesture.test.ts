@@ -27,6 +27,21 @@ test('C17 wires hold-only empathy and authoritative clue-card highlighting', () 
   expect(screen).not.toContain('title="Normal"');
 });
 
+test('C17 keeps spectator interaction observational while retaining the workspace tools', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain("const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true;");
+  expect(screen).toContain('const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;');
+  expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
+  expect(screen).toContain('empathyPlayers,');
+  expect(screen).toContain("isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'");
+  expect(screen).toContain("canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName");
+  expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
+  expect(screen).toContain('if (isPlayingPlayer && !replay.active) {');
+  expect(screen).toContain('const selectedTarget = isPlayingPlayer ? interaction.clueTarget : null;');
+  expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.rowBetween}>');
+});
+
 test('ClueComposer leaves touched and invalid clues to card highlighting and disabled Give', () => {
   const composer = readClueComposer();
 

@@ -68,12 +68,15 @@ export function C17GameScreen() {
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
   const clientState = liveRoom?.clientState ?? null;
   const game = clientState?.visibleState ?? null;
-  const playerRoom = liveRoom?.role === 'player' && clientState?.playing ? liveRoom : null;
-  const ourIndex = playerRoom?.clientState.metadata.ourPlayerIndex ?? null;
+  const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true;
+  const isSpectator = liveRoom?.role === 'spectator';
+  const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;
   const ourHand = useMemo(() => ourIndex === null ? [] : game?.hands[ourIndex] ?? [], [game, ourIndex]);
-  const clueTargets = useMemo(() => playerRoom?.clientState.metadata.playerNames
+  const clueTargets = useMemo(() => isPlayingPlayer ? clientState?.metadata.playerNames
     .map((_, index) => index)
-    .filter((index) => index !== ourIndex) ?? [], [ourIndex, playerRoom]);
+    .filter((index) => index !== ourIndex) ?? [] : [], [clientState, isPlayingPlayer, ourIndex]);
+  const empathyPlayers = useMemo(() => clientState?.metadata.playerNames
+    .map((_, index) => index) ?? [], [clientState]);
   const [interaction, interactionDispatch] = useReducer(gameplayInteractionReducer, initialGameplayInteractionState);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [discardViewerOpen, setDiscardViewerOpen] = useState(false);
@@ -86,16 +89,20 @@ export function C17GameScreen() {
       type: 'sync-hands',
       ownOrders: ourHand,
       clueTargets,
-      empathyPlayers: ourIndex === null ? clueTargets : [...clueTargets, ourIndex],
+      empathyPlayers,
       visibleOrders: liveNoteOrders,
     });
-  }, [clueTargets, liveNoteOrders, ourHand, ourIndex]);
+  }, [clueTargets, empathyPlayers, liveNoteOrders, ourHand]);
 
   const replayActive = clientState?.replay.active ?? false;
   useEffect(() => {
     interactionDispatch({ type: 'disarm-gameplay' });
     if (!replayActive) setC17Review(null);
   }, [replayActive]);
+
+  useEffect(() => {
+    if (!isPlayingPlayer) interactionDispatch({ type: 'disarm-gameplay' });
+  }, [isPlayingPlayer]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -115,14 +122,15 @@ export function C17GameScreen() {
     if (noteCard === null) setNoteEditorOpen(false);
   }, [noteCard]);
 
-  if (liveRoom === null || clientState === null || game === null || playerRoom === null || ourIndex === null) return null;
+  if (liveRoom === null || clientState === null || game === null || ourIndex === null) return null;
 
   const { metadata, replay, ongoingGame } = clientState;
   const latest = ongoingGame.turn.segment ?? 0;
-  const selectedCard = interaction.selectedCard;
-  const selectedTarget = interaction.clueTarget;
-  const isOurTurn = game.turn.currentPlayerIndex === ourIndex;
-  const enabled = sessionPhase === 'ready'
+  const selectedCard = isPlayingPlayer ? interaction.selectedCard : null;
+  const selectedTarget = isPlayingPlayer ? interaction.clueTarget : null;
+  const isOurTurn = isPlayingPlayer && game.turn.currentPlayerIndex === ourIndex;
+  const enabled = isPlayingPlayer
+    && sessionPhase === 'ready'
     && isOurTurn
     && !replay.active
     && !clientState.pause.active
@@ -177,7 +185,7 @@ export function C17GameScreen() {
     ? null
     : metadata.playerNames[selectedTarget] ?? `Player ${selectedTarget + 1}`;
   const confirmClue = () => {
-    if (selectedTarget === null || interaction.cluePreview === null) return;
+    if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;
     const sent = interaction.cluePreview.type === 'color'
       ? lobbyRuntime.colorClue(selectedTarget, interaction.cluePreview.value)
       : lobbyRuntime.rankClue(selectedTarget, interaction.cluePreview.value);
@@ -253,6 +261,7 @@ export function C17GameScreen() {
     <C17DenseWorkspace
       actionSegments={actionSegments}
       canCommitCard={cardEnabled}
+      canPlayGameplay={isPlayingPlayer}
       canReviewBack={reviewTemporal.previousActionSegment !== null}
       canReviewForward={reviewTemporal.nextActionSegment !== null}
       cardIdentities={clientState.cardIdentities}
@@ -266,6 +275,7 @@ export function C17GameScreen() {
       game={game}
       globalEmpathy={interaction.globalEmpathy}
       historyAvailable={recentActions.length > 0}
+      isSpectator={isSpectator}
       lastAction={reviewTemporal.last.summary}
       liveTurn={liveTemporal.liveTurn}
       metadata={metadata}
@@ -293,10 +303,10 @@ export function C17GameScreen() {
       onReturnLive={returnLive}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
-        if (!replay.active) {
+        if (isPlayingPlayer && !replay.active) {
           interactionDispatch({ type: 'select-card', order });
-          inspectNote(order);
         }
+        inspectNote(order);
       }}
       onSelectClueTarget={(playerIndex) => interactionDispatch({ type: 'select-clue-target', playerIndex })}
       onSelectRecentAction={jumpToAction}
@@ -337,6 +347,7 @@ export function C17GameScreen() {
 function C17DenseWorkspace({
   actionSegments,
   canCommitCard,
+  canPlayGameplay,
   canReviewBack,
   canReviewForward,
   cardIdentities,
@@ -351,6 +362,7 @@ function C17DenseWorkspace({
   game,
   globalEmpathy,
   historyAvailable,
+  isSpectator,
   lastAction,
   liveTurn,
   metadata,
@@ -390,6 +402,7 @@ function C17DenseWorkspace({
 }: {
   actionSegments: readonly number[];
   canCommitCard: boolean;
+  canPlayGameplay: boolean;
   canReviewBack: boolean;
   canReviewForward: boolean;
   cardIdentities: readonly CardIdentity[];
@@ -404,6 +417,7 @@ function C17DenseWorkspace({
   game: GameState;
   globalEmpathy: boolean;
   historyAvailable: boolean;
+  isSpectator: boolean;
   lastAction: string;
   liveTurn: number;
   metadata: { playerNames: readonly string[] };
@@ -510,7 +524,7 @@ function C17DenseWorkspace({
       <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.grow}>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
-          <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+          <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text>
         </View>
         <HudStat label="Score" value={game.score} />
         <HudStat label="Max" value={game.stats.maxScore} />
@@ -631,7 +645,7 @@ function C17DenseWorkspace({
         onPressOut={() => onHoldEmpathy(null)}
         style={[styles.ownHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       >
-        <Text style={[styles.ownTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
+        <Text style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'}</Text>
         <View style={styles.ownCards}>
           {ownHand.map((order, position) => {
             const card = game.deck[order];
@@ -701,7 +715,7 @@ function C17DenseWorkspace({
             </View>
           </View>
 
-          {selectedOwnCard !== null && <View style={styles.rowBetween}>
+          {canPlayGameplay && selectedOwnCard !== null && <View style={styles.rowBetween}>
             <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
