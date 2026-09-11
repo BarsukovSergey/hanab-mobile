@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AppState,
   Modal,
@@ -86,10 +86,10 @@ export function C17GameScreen() {
       type: 'sync-hands',
       ownOrders: ourHand,
       clueTargets,
-      empathyPlayers: clueTargets,
+      empathyPlayers: ourIndex === null ? clueTargets : [...clueTargets, ourIndex],
       visibleOrders: liveNoteOrders,
     });
-  }, [clueTargets, liveNoteOrders, ourHand]);
+  }, [clueTargets, liveNoteOrders, ourHand, ourIndex]);
 
   const replayActive = clientState?.replay.active ?? false;
   useEffect(() => {
@@ -273,7 +273,6 @@ export function C17GameScreen() {
       noteCard={noteCard}
       notes={clientState.notes.ourNotes}
       onClearCluePreview={() => interactionDispatch({ type: 'clear-clue-preview' })}
-      onClearEmpathy={() => interactionDispatch({ type: 'clear-empathy' })}
       onConfirmClue={confirmClue}
       onDiscard={() => {
         if (cardEnabled && selectedCard !== null) lobbyRuntime.discard(selectedCard);
@@ -301,11 +300,10 @@ export function C17GameScreen() {
       }}
       onSelectClueTarget={(playerIndex) => interactionDispatch({ type: 'select-clue-target', playerIndex })}
       onSelectRecentAction={jumpToAction}
-      onToggleEmpathyPlayer={(playerIndex) => interactionDispatch({ type: 'toggle-empathy-player', playerIndex })}
       onToggleGlobalEmpathy={() => interactionDispatch({ type: 'toggle-global-empathy' })}
       ourIndex={ourIndex}
       pendingText={pendingText ?? null}
-      persistentEmpathyPlayer={interaction.persistentEmpathyPlayer}
+      canEnterClue={enabled}
       recentActions={recentActions}
       reviewActive={replay.active}
       selectedActionSegment={reviewTemporal.selectedSegment}
@@ -343,6 +341,7 @@ function C17DenseWorkspace({
   canReviewForward,
   cardIdentities,
   cardsPerHand,
+  canEnterClue,
   clueChoices,
   clueEnabled,
   cluePreview,
@@ -359,7 +358,6 @@ function C17DenseWorkspace({
   noteCard,
   notes,
   onClearCluePreview,
-  onClearEmpathy,
   onConfirmClue,
   onDiscard,
   onEditNote,
@@ -378,11 +376,9 @@ function C17DenseWorkspace({
   onSelectCard,
   onSelectClueTarget,
   onSelectRecentAction,
-  onToggleEmpathyPlayer,
   onToggleGlobalEmpathy,
   ourIndex,
   pendingText,
-  persistentEmpathyPlayer,
   recentActions,
   reviewActive,
   selectedActionSegment,
@@ -398,6 +394,7 @@ function C17DenseWorkspace({
   canReviewForward: boolean;
   cardIdentities: readonly CardIdentity[];
   cardsPerHand: number;
+  canEnterClue: boolean;
   clueChoices: ReturnType<typeof getGameplayClueChoicesForPlayer>;
   clueEnabled: boolean;
   cluePreview: ReturnType<typeof getCluePreview> | null;
@@ -414,7 +411,6 @@ function C17DenseWorkspace({
   noteCard: number | null;
   notes: readonly CardNote[];
   onClearCluePreview: () => void;
-  onClearEmpathy: () => void;
   onConfirmClue: () => void;
   onDiscard: () => void;
   onEditNote: (order: number) => void;
@@ -433,11 +429,9 @@ function C17DenseWorkspace({
   onSelectCard: (order: number) => void;
   onSelectClueTarget: (playerIndex: number | null) => void;
   onSelectRecentAction: (segment: number) => void;
-  onToggleEmpathyPlayer: (playerIndex: number) => void;
   onToggleGlobalEmpathy: () => void;
   ourIndex: number;
   pendingText: string | null;
-  persistentEmpathyPlayer: number | null;
   recentActions: readonly C17TemporalEntry[];
   reviewActive: boolean;
   selectedActionSegment: number;
@@ -450,6 +444,7 @@ function C17DenseWorkspace({
   const { theme } = useHanabTheme();
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
+  const longPressedOpponent = useRef<number | null>(null);
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight);
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
@@ -510,8 +505,6 @@ function C17DenseWorkspace({
       false,
       cardIdentities[noteCard ?? -1],
     );
-  const empathyActive = globalEmpathy || persistentEmpathyPlayer !== null;
-
   return <View style={styles.workspace}>
     <View style={styles.ledgerChrome}>
       <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -554,12 +547,27 @@ function C17DenseWorkspace({
         {opponents.map((index) => {
           const currentActor = current === index;
           const compact = layout.mode === 'compact-overview';
-          const empathizing = !reviewActive && (globalEmpathy || empathyPlayer === index);
+          const empathizing = globalEmpathy || empathyPlayer === index;
           const target = selectedTarget === index;
-          const persistentEmpathy = persistentEmpathyPlayer === index;
           const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
-          return <View
+          return <Pressable
+            accessibilityLabel={`Player ${playerName}`}
+            accessibilityRole="button"
+            delayLongPress={350}
+            disabled={globalEmpathy}
             key={index}
+            onLongPress={() => {
+              longPressedOpponent.current = index;
+              onHoldEmpathy(index);
+            }}
+            onPress={() => {
+              if (longPressedOpponent.current === index) {
+                longPressedOpponent.current = null;
+                return;
+              }
+              if (canEnterClue) onSelectClueTarget(index);
+            }}
+            onPressOut={() => onHoldEmpathy(null)}
             style={[
               styles.opponentRow,
               { height: layout.opponentRowHeight },
@@ -568,43 +576,10 @@ function C17DenseWorkspace({
             ]}
           >
             <View style={styles.opponentMeta}>
-              <Pressable
-                accessibilityLabel={`Give clue to ${playerName}`}
-                accessibilityRole="button"
-                disabled={reviewActive}
-                onPress={() => onSelectClueTarget(target ? null : index)}
-                onPressIn={() => {
-                  if (!globalEmpathy) onHoldEmpathy(index);
-                }}
-                onPressOut={() => {
-                  if (!globalEmpathy) onHoldEmpathy(null);
-                }}
-                style={({ pressed }) => [
-                  styles.namePeekArea,
-                  pressed && { backgroundColor: theme.colors.overlay },
-                ]}
-              >
+              <View style={styles.namePeekArea}>
                 <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
                   {playerName}{currentActor ? ' · TURN' : ''}
                 </Text>
-              </Pressable>
-              <View style={styles.metaButtons}>
-                <ActionButton
-                  compact
-                  disabled={reviewActive}
-                  style={styles.metaActionButton}
-                  title={target ? 'Clue ✓' : 'Clue'}
-                  tone={target ? 'primary' : 'secondary'}
-                  onPress={() => onSelectClueTarget(target ? null : index)}
-                />
-                <ActionButton
-                  compact
-                  disabled={reviewActive || globalEmpathy}
-                  style={styles.metaActionButton}
-                  title={persistentEmpathy ? 'Emp ✓' : 'Emp'}
-                  tone={persistentEmpathy ? 'primary' : 'ghost'}
-                  onPress={() => onToggleEmpathyPlayer(index)}
-                />
               </View>
             </View>
             <View style={styles.opponentCards}>
@@ -630,15 +605,12 @@ function C17DenseWorkspace({
                   empathyKnowledge={empathyKnowledge}
                   hasNote={(cardNote?.text.trim().length ?? 0) > 0}
                   height={layout.opponentCardHeight}
+                  highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}
                   key={order}
                   onDoublePress={reviewActive ? undefined : () => onEditNote(order)}
+                  onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
                   onPress={() => onInspectNote(order)}
-                  onPressIn={() => {
-                    if (!globalEmpathy) onHoldEmpathy(index);
-                  }}
-                  onPressOut={() => {
-                    if (!globalEmpathy) onHoldEmpathy(null);
-                  }}
+                  onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
                   position={position}
                   rank={card.rank}
                   semanticBorder={normalKnowledge.borderColor}
@@ -649,26 +621,32 @@ function C17DenseWorkspace({
                 />;
               })}
             </View>
-          </View>;
+          </Pressable>;
         })}
       </View>
 
-      <View style={[styles.ownHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <Pressable
+        delayLongPress={350}
+        disabled={globalEmpathy}
+        onLongPress={() => onHoldEmpathy(ourIndex)}
+        onPressOut={() => onHoldEmpathy(null)}
+        style={[styles.ownHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+      >
         <Text style={[styles.ownTitle, { color: theme.colors.text }]}>YOUR HAND</Text>
         <View style={styles.ownCards}>
           {ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
-            const globalOwnEmpathy = !reviewActive && globalEmpathy;
+            const ownEmpathy = globalEmpathy || empathyPlayer === ourIndex;
             const cardNote = notes[order];
-            const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, globalOwnEmpathy, cardIdentities[order]);
+            const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, ownEmpathy, cardIdentities[order]);
             const statePresentation = getCardStatePresentation({
               game,
               state: card,
               note: cardNote,
               displaySuitIndex: knowledge.displaySuitIndex,
               displayRank: knowledge.displayRank,
-              empathy: globalOwnEmpathy,
+              empathy: ownEmpathy,
               finished: false,
             });
             return <GameCard
@@ -677,6 +655,8 @@ function C17DenseWorkspace({
               key={order}
               knowledge={knowledge}
               onDoublePress={reviewActive ? undefined : () => onEditNote(order)}
+              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(ourIndex)}
+              onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               onSelect={() => onSelectCard(order)}
               position={position}
               selected={selectedOwnCard === order}
@@ -685,7 +665,7 @@ function C17DenseWorkspace({
             />;
           })}
         </View>
-      </View>
+      </Pressable>
     </View>
 
     <View style={[
@@ -717,7 +697,6 @@ function C17DenseWorkspace({
           <View style={styles.rowBetween}>
             <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
             <View style={styles.actionButtons}>
-              {empathyActive && <ActionButton compact title="Normal" tone="primary" onPress={onClearEmpathy} />}
               <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
             </View>
           </View>
@@ -819,8 +798,6 @@ const styles = StyleSheet.create({
   opponentMeta: { gap: 2, justifyContent: 'center', width: HAND_META_WIDTH },
   namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 19, paddingHorizontal: 2 },
   opponentName: { fontSize: 10, fontWeight: '900' },
-  metaButtons: { alignItems: 'flex-start', flexDirection: 'row', gap: 3 },
-  metaActionButton: { minHeight: 30, paddingHorizontal: 6, paddingVertical: 4 },
   opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 5 },
   ownTitle: { fontSize: 10, fontWeight: '900', width: HAND_META_WIDTH },

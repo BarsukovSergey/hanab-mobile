@@ -1,0 +1,32 @@
+import { expect, test } from '@jest/globals';
+import fs from 'node:fs';
+import path from 'node:path';
+
+function readC17Screen() {
+  return fs.readFileSync(path.join(process.cwd(), 'src/ui/game/C17GameScreen.tsx'), 'utf8');
+}
+
+function readClueComposer() {
+  return fs.readFileSync(path.join(process.cwd(), 'src/ui/game/ClueComposer.tsx'), 'utf8');
+}
+
+test('C17 wires hold-only empathy and authoritative clue-card highlighting', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('delayLongPress={350}');
+  expect(screen).toContain('onLongPress={() => onHoldEmpathy(ourIndex)}');
+  expect(screen).toContain('onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}');
+  expect(screen).toContain('highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}');
+  expect(screen).toContain('if (canEnterClue) onSelectClueTarget(index);');
+  expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
+  expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
+  expect(screen).not.toContain('title="Normal"');
+});
+
+test('ClueComposer leaves touched and invalid clues to card highlighting and disabled Give', () => {
+  const composer = readClueComposer();
+
+  expect(composer).not.toContain('Touches no cards');
+  expect(composer).not.toContain('card${preview.touchedOrders.length');
+  expect(composer).not.toContain('Unavailable');
+});

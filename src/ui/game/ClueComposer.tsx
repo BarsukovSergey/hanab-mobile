@@ -91,13 +91,6 @@ export function ClueComposer({
       {previewState === null ? <Text style={[styles.previewDetail, { color: theme.colors.textMuted }]}>Choose a color or rank.</Text> : <View style={styles.confirmRow}>
         <View style={styles.previewCopy}>
           <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{previewLabel}</Text>
-          <Text style={[styles.previewDetail, { color: theme.colors.textMuted }]}>
-            {preview === null
-              ? 'Unavailable'
-              : preview.touchedOrders.length === 0
-                ? 'Touches no cards'
-                : `${preview.touchedOrders.length} card${preview.touchedOrders.length === 1 ? '' : 's'} touched`}
-          </Text>
         </View>
         <ActionButton compact disabled={!confirmAllowed || !validPreview} title="Give clue" tone="primary" onPress={onConfirm} />
       </View>}
