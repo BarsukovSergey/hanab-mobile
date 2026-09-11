@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,7 +12,8 @@ import {
 import { composeQuickNote, type QuickNoteToken } from '../../game/selectors/noteComposition';
 import { useAppSelector } from '../../store/hooks';
 import { ActionButton, Field, useHanabTheme } from '../designSystem';
-import { normalizeSubmittedNote } from './noteEditing';
+import { beginNoteEdit, normalizeSubmittedNote, prependTurnToNote } from './noteEditing';
+import { getHumanTurnNumber } from './c17Temporal';
 
 const QUICK_TOKENS: readonly { label: string; token: QuickNoteToken }[] = [
   { label: 'F', token: 'f' },
@@ -31,8 +31,8 @@ export function NoteEditor({
   editable,
   visible,
   startEditing = false,
+  onChange,
   onSave,
-  onClear,
   onClose,
 }: {
   title: string;
@@ -49,53 +49,75 @@ export function NoteEditor({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [dirty, setDirty] = useState(false);
-  const variantName = useAppSelector((state) => (
+  const lastSubmittedNote = useRef('');
+  const gameContext = useAppSelector((state) => (
     state.room.room.kind === 'live_game'
-      ? state.room.room.clientState.metadata.options.variantName
+      ? {
+        variantName: state.room.room.clientState.metadata.options.variantName,
+        turn: getHumanTurnNumber(state.room.room.clientState.ongoingGame.turn.turnNum),
+      }
       : null
   ));
 
   useEffect(() => {
-    if (visible) {
-      setDraft(value);
-      setDirty(false);
-      setEditing(editable && startEditing);
+    if (!visible) {
+      setEditing(false);
       return;
     }
-    setEditing(false);
+    const shouldEdit = editable && startEditing;
+    const initial = shouldEdit ? beginNoteEdit(value) : value;
+    setDraft(initial);
+    onChange(initial);
+    setDirty(false);
+    setEditing(shouldEdit);
   }, [editable, startEditing, visible]);
 
   useEffect(() => {
-    if (visible && !dirty) setDraft(value);
-  }, [dirty, value, visible]);
+    if (!visible || dirty) return;
+    const next = editing ? beginNoteEdit(value) : value;
+    setDraft(next);
+    onChange(next);
+  }, [dirty, editing, onChange, value, visible]);
 
-  const submitValue = (nextValue: string) => onSave(normalizeSubmittedNote(nextValue));
+  const setDraftValue = (next: string) => {
+    setDraft(next);
+    onChange(next);
+    setDirty(true);
+  };
+  const submitValue = (nextValue: string) => {
+    const normalized = normalizeSubmittedNote(nextValue);
+    lastSubmittedNote.current = normalized;
+    onSave(normalized);
+  };
   const submit = () => submitValue(draft);
   const change = (nextValue: string) => {
     if (nextValue.includes('\n') || nextValue.includes('\r')) {
       submitValue(nextValue.replace(/[\r\n]+/g, ''));
       return;
     }
-    setDraft(nextValue);
-    setDirty(true);
+    setDraftValue(nextValue);
   };
   const applyQuickToken = (token: QuickNoteToken) => {
-    if (variantName === null) return;
-    const candidate = composeQuickNote(variantName, draft, token);
-    if (candidate === draft) return;
-    setDraft(candidate);
-    setDirty(true);
+    if (gameContext === null) return;
+    const candidate = composeQuickNote(gameContext.variantName, draft, token);
+    if (candidate !== draft) setDraftValue(candidate);
   };
-  const requestClose = () => {
-    if (editing) {
-      Keyboard.dismiss();
-      setEditing(false);
-      return;
-    }
+  const startEdit = () => {
+    const next = beginNoteEdit(value);
+    setDraft(next);
+    onChange(next);
+    setDirty(false);
+    setEditing(true);
+  };
+  const cancelAndClose = () => {
+    setDraft(value);
+    onChange(value);
+    setDirty(false);
+    setEditing(false);
     onClose();
   };
 
-  return <Modal animationType="slide" onRequestClose={requestClose} statusBarTranslucent transparent visible={visible}>
+  return <Modal animationType="slide" onRequestClose={cancelAndClose} statusBarTranslucent transparent visible={visible}>
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.keyboardAvoider}
@@ -112,7 +134,7 @@ export function NoteEditor({
                 <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CARD NOTE</Text>
                 <Text numberOfLines={2} style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
               </View>
-              <ActionButton compact title="Close" tone="ghost" onPress={requestClose} />
+              <ActionButton compact title="Close" tone="ghost" onPress={cancelAndClose} />
             </View>
             <Field
               autoFocus={editing}
@@ -131,27 +153,39 @@ export function NoteEditor({
               value={draft}
             />
             {editable && !editing && <View style={styles.actions}>
-              <ActionButton title="Edit" tone="primary" onPress={() => setEditing(true)} />
+              <ActionButton title="Edit" tone="primary" onPress={startEdit} />
             </View>}
             {editable && editing && <>
               <View style={styles.quickActions}>
                 {QUICK_TOKENS.map(({ label, token }) => <ActionButton
                   compact
-                  disabled={variantName === null}
+                  disabled={gameContext === null}
                   key={token}
                   title={label}
                   tone="ghost"
                   onPress={() => applyQuickToken(token)}
                 />)}
+                <ActionButton
+                  compact
+                  disabled={gameContext === null}
+                  title="Turn"
+                  tone="ghost"
+                  onPress={() => {
+                    if (gameContext !== null) setDraftValue(prependTurnToNote(draft, gameContext.turn));
+                  }}
+                />
+                <ActionButton
+                  compact
+                  disabled={lastSubmittedNote.current.length === 0}
+                  title="Repeat"
+                  tone="ghost"
+                  onPress={() => setDraftValue(lastSubmittedNote.current)}
+                />
               </View>
-              <Text style={[styles.quickHint, { color: theme.colors.textMuted }]}>Quick tags update the draft only. Unsupported syntax stays manual.</Text>
+              <Text style={[styles.quickHint, { color: theme.colors.textMuted }]}>Quick actions update the draft only.</Text>
               <View style={styles.actions}>
                 <ActionButton title="Save" tone="primary" onPress={submit} />
-                <ActionButton disabled={draft.length === 0} title="Clear" onPress={onClear} />
-                <ActionButton title="Done editing" tone="ghost" onPress={() => {
-                  Keyboard.dismiss();
-                  setEditing(false);
-                }} />
+                <ActionButton disabled={draft.length === 0} title="Clear" onPress={() => setDraftValue('')} />
               </View>
             </>}
           </ScrollView>
