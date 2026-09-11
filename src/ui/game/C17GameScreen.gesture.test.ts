@@ -18,6 +18,10 @@ test('C17 wires hold-only empathy and authoritative clue-card highlighting', () 
   expect(screen).toContain('onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}');
   expect(screen).toContain('highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}');
   expect(screen).toContain('if (canEnterClue) onSelectClueTarget(index);');
+  const opponentRow = screen.slice(screen.indexOf('accessibilityLabel={`Player ${playerName}`}'), screen.indexOf('<View style={styles.opponentMeta}>'));
+  expect(opponentRow).not.toContain('disabled={globalEmpathy}');
+  expect(opponentRow).toContain('onLongPress={globalEmpathy ? undefined : () => {');
+  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(2);
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
   expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');

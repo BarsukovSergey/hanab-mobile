@@ -554,9 +554,8 @@ function C17DenseWorkspace({
             accessibilityLabel={`Player ${playerName}`}
             accessibilityRole="button"
             delayLongPress={350}
-            disabled={globalEmpathy}
             key={index}
-            onLongPress={() => {
+            onLongPress={globalEmpathy ? undefined : () => {
               longPressedOpponent.current = index;
               onHoldEmpathy(index);
             }}
@@ -567,7 +566,7 @@ function C17DenseWorkspace({
               }
               if (canEnterClue) onSelectClueTarget(index);
             }}
-            onPressOut={() => onHoldEmpathy(null)}
+            onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
             style={[
               styles.opponentRow,
               { height: layout.opponentRowHeight },
@@ -683,6 +682,7 @@ function C17DenseWorkspace({
               <ActionButton compact disabled={!canReviewForward} title="Forward →" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
             <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
+            <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
           </View>
         </> : selectedTarget !== null ? <ClueComposer
           choices={clueChoices}
