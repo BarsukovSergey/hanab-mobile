@@ -1,7 +1,7 @@
 # C17 Product & Gameplay UX Contract
 
-Version: **1.2 — ratified product baseline**  
-Date: 2026-09-11  
+Version: **1.2 — ratified product baseline**
+Date: 2026-09-11
 Scope: Android-first Hanab Mobile C17 product/gameplay UX
 
 This is the authoritative C17 product/UI contract. It supersedes conflicting presentation and gesture decisions in earlier C17/C16/Astra documents. C16 networking, protocol, reconnect, authoritative-state, and upstream-semantic guarantees remain in force.

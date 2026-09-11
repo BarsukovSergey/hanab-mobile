@@ -1,6 +1,6 @@
 # C17 Validation Plan
 
-Status: **active**  
+Status: **active**
 Date: 2026-09-11
 
 This document tracks what C17 must prove on real devices after the v1.2 product review. The authoritative product contract is `docs/C17_UX_CONTRACT.md`; explicit deferred items are in `docs/C17_BACKLOG.md`.

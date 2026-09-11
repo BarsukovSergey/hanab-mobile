@@ -1,6 +1,6 @@
 # C17 UX Decisions
 
-Date: 2026-09-11  
+Date: 2026-09-11
 Status: **ratified**
 
 This file records explicit product decisions made while reviewing C17 discrepancies. The authoritative current contract is `docs/C17_UX_CONTRACT.md` v1.2. Earlier entries in this file that conflict with the list below are superseded.

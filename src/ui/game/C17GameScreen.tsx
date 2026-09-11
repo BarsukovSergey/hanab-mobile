@@ -751,8 +751,8 @@ function C17DenseWorkspace({
     {shellMeasured && <View style={styles.workspaceTail} />}
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
-      <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}> 
-        <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}> 
+      <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
+        <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
           <View style={styles.rowBetween}>
             <Text style={[styles.recentTitle, { color: theme.colors.text }]}>Recent actions</Text>
             <ActionButton compact title="Close" onPress={() => setRecentOpen(false)} />
