@@ -60,13 +60,19 @@ describe('gameplayInteractionReducer', () => {
   test('per-hand empathy is temporary hold-only', () => {
     const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 2 });
     expect(held.empathyPlayer).toBe(2);
+    expect(held.persistentEmpathyPlayer).toBeNull();
     expect(gameplayInteractionReducer(held, { type: 'hold-empathy', playerIndex: null }).empathyPlayer).toBeNull();
+  });
+
+  test('persistent per-player toggle is disabled', () => {
+    expect(gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-empathy-player', playerIndex: 2 }))
+      .toMatchObject({ empathyPlayer: null, persistentEmpathyPlayer: null, globalEmpathy: false });
   });
 
   test('per-hand hold is a no-op while global empathy is on', () => {
     const global = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-global-empathy' });
     expect(gameplayInteractionReducer(global, { type: 'hold-empathy', playerIndex: 2 }))
-      .toMatchObject({ globalEmpathy: true, empathyPlayer: null });
+      .toMatchObject({ globalEmpathy: true, empathyPlayer: null, persistentEmpathyPlayer: null });
   });
 
   test('lifecycle interruption clears temporary empathy but keeps global empathy', () => {
@@ -85,6 +91,7 @@ describe('gameplayInteractionReducer', () => {
       clueTarget: 4,
       cluePreview: { type: 'rank' as const, value: 3 },
       empathyPlayer: 4,
+      persistentEmpathyPlayer: null,
       globalEmpathy: false,
       noteCard: 88,
     };
@@ -101,6 +108,7 @@ describe('gameplayInteractionReducer', () => {
       clueTarget: null,
       cluePreview: null,
       empathyPlayer: null,
+      persistentEmpathyPlayer: null,
       globalEmpathy: false,
       noteCard: 88,
     });
@@ -112,6 +120,7 @@ describe('gameplayInteractionReducer', () => {
       clueTarget: 2,
       cluePreview: { type: 'color' as const, value: 0 },
       empathyPlayer: null,
+      persistentEmpathyPlayer: null,
       globalEmpathy: false,
       noteCard: 20,
     };
