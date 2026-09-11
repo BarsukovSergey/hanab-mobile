@@ -46,7 +46,7 @@ describe('gameplay rotation lifecycle', () => {
     expect(room.clientState.ongoingGame).toBe(game);
   });
 
-  test('preserves recoverable reasoning context at orientation and background boundaries', () => {
+  test('preserves durable reasoning context while clearing hold empathy at lifecycle boundaries', () => {
     const active = {
       selectedCard: 3,
       clueTarget: 1,
@@ -56,11 +56,16 @@ describe('gameplay rotation lifecycle', () => {
       globalEmpathy: false,
       noteCard: 5,
     };
+    const expected = {
+      ...active,
+      empathyPlayer: null,
+      persistentEmpathyPlayer: null,
+    };
 
     const afterRotation = gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' });
-    expect(afterRotation).toEqual(active);
+    expect(afterRotation).toEqual(expected);
 
     const afterBackground = gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' });
-    expect(afterBackground).toEqual(active);
+    expect(afterBackground).toEqual(expected);
   });
 });

@@ -12,7 +12,7 @@ test('production gameplay screens keep live and replay hands free of horizontal 
   const legacy = read('src/ui/game/LegacyGameScreen.tsx');
   const source = [wrapper, c17, legacy].join('\n');
 
-  expect(source).not.toMatch(/\bScrollView\b/);
+  expect(source).not.toMatch(/<ScrollView\b[^>]*\bhorizontal(?:\s|=|>)/s);
   expect(legacy).toContain('flexWrap: \'wrap\'');
   expect(legacy).toContain('replayHand');
 });
