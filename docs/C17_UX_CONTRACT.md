@@ -1,517 +1,371 @@
 # C17 Product & Gameplay UX Contract
 
-Version: **1.1 — frozen product baseline**
-Date: 2026-09-06
+Version: **1.2 — ratified product baseline**  
+Date: 2026-09-11  
 Scope: Android-first Hanab Mobile C17 product/gameplay UX
 
-This is the authoritative C17 product/UI contract for the mobile client. It supersedes presentation and gesture decisions in `docs/MOBILE_GAMEPLAY_REDESIGN.md` and C16 where they conflict. C16 networking, protocol, upstream-semantic, reconnect, and authoritative-state boundaries remain in force.
+This is the authoritative C17 product/UI contract. It supersedes conflicting presentation and gesture decisions in earlier C17/C16/Astra documents. C16 networking, protocol, reconnect, authoritative-state, and upstream-semantic guarantees remain in force.
 
-The contract is based on the Astra Pro v1.0 product/gameplay review plus explicit product ratification after review. Exact density numbers are validation hypotheses until they pass physical-device testing.
+## 1. Product model
 
-## 1. Product verdict
-
-The game must behave as a continuously available decision workspace, not as a long document containing panels.
-
-Primary composition:
+The game is a continuously available decision workspace, not a document of panels.
 
 - **Table Ledger**: stable seating, all hands, current actor, resources, stacks/discard summary, last action.
-- **Decision Workbench**: card actions, clue planning, note read/edit, knowledge/empathy, discard inspection, recent history/chat.
-- Ordinary live play has **no root gameplay scroll** and **no per-hand horizontal scrollers**.
-- The current actor is highlighted but never reorders player rows.
-- The local player's hand is a stable anchor adjacent to the workbench.
-- Entering a tool must preserve the reasoning context needed to return to the same decision.
+- **Decision Workbench**: card actions, clue planning, note read/edit, empathy/knowledge, discard inspection, history/replay context.
+- Ordinary certified phone portrait play has no root gameplay scroll and no per-hand horizontal scrollers.
+- Current actor highlighting never reorders players.
+- The local/observed hand is a stable anchor next to the Workbench.
+- A Workbench tool change must not move or resize Ledger hands/cards.
 
-The product goal is expert playability and low context-switch cost, not decorative minimalism.
+The release goal is expert playability and low context-switch cost, not decorative minimalism.
 
-## 2. Frozen technical/semantic boundary
+## 2. Technical and semantic boundary
 
 C17 does not rewrite Hanabi.
 
 - Server/upstream state is authoritative.
 - Do not implement a second Hanabi rules engine in UI code.
-- Use pinned upstream reducers/selectors/rules for clue touch, card knowledge, notes semantics, variants, DDA, replay/hypothetical behavior, and related game semantics.
-- Gameplay sends are never queued/retried across reconnect.
+- Use pinned upstream reducers/selectors/rules for clue touch, card knowledge, note parsing, variants/options, DDA, replay/hypothetical behavior, results, and card identity.
+- Gameplay sends are never queued, persisted, retried, or replayed across reconnect.
 - A selected/previewed action is not committed state.
-- Normal card faces remain based on the pinned upstream renderer/presentation source; mobile owns layout, overlays, and interaction.
-- Notes/actions are keyed by authoritative card identity/order, never by a slot that can be occupied by a later draw.
-- Latest clue, permanent knowledge, personal notes, candidate preview, and last action are separate concepts and must remain visually/semantically separate.
+- Mobile does not optimistically mutate committed game state.
+- Notes/actions are keyed by authoritative card `order`, never by the displayed slot.
+- History/replay/hypothetical inspection must never mutate authoritative live gameplay.
+- Latest clue, permanent knowledge, personal notes, candidate preview, and last action remain separate concepts.
 
-Upstream semantic baseline: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`.
-Card-presentation pin: `7a9c601b66f5966f7e33564855e25f82e68a94ed`.
+## 3. Stable spatial invariants
 
-## 3. Protected reasoning context
-
-A successful interaction preserves what the player was thinking about.
-
-Examples:
-
-- Start comparing clue candidates -> inspect a note -> inspect discard -> return to the same clue target/candidate.
-- Open a note for a card -> rotate -> keep the same draft/card identity.
-- Inspect empathy -> rotate/background/foreground -> keep the perspective if still valid.
-- Inspect an older live event -> return to Live in one action without arming an old gameplay action.
-
-A workbench content swap is not a destructive context switch if the referent/return task is preserved.
-
-## 4. Stable spatial invariants
-
-1. Local player is the stable seating anchor.
-2. Opponents follow deterministic server seating order relative to that anchor.
+1. Local/observed player is the stable seating anchor.
+2. Other players follow deterministic server seating order relative to that anchor.
 3. Current turn never changes row order.
-4. Slot numbers are temporal display positions; card order/identity is the durable key.
-5. Own hand does not move during ordinary selection, clue planning, note reading, or knowledge inspection.
-6. Current actor/resources and last-action anchors retain stable positions.
-7. Clue targeting does not resize or move the target hand.
-8. Common tools change only the Workbench, not the overall table geometry.
-9. Receiving an unrelated action does not steal focus or close an inspection surface.
-10. A card leaving a hand ends live editing/action eligibility for that card; its draft never migrates to the replacement slot occupant.
-11. Geometry is selected by window/text-scale class and is not continuously recomputed as hands shrink late-game.
-12. Perspective changes must never reveal information not allowed by upstream visibility rules.
+4. Slot numbers are temporal positions; card `order` is the durable key.
+5. Own/observed hand does not move during ordinary selection, clue planning, note reading/editing, empathy, or history inspection.
+6. Actor/resources and last-action anchors retain stable positions.
+7. Clue targeting does not resize or move a target hand.
+8. Common tools change the Workbench, not Ledger geometry.
+9. An unrelated incoming live action does not steal focus from a safe inspection surface.
+10. A card leaving a hand never retargets a note draft or action to the replacement slot occupant.
+11. Perspective changes never reveal information disallowed by upstream visibility rules.
 
-## 5. Phone density and responsive strategy
+## 4. Phone density and responsive strategy
 
 ### Full Ledger
 
-The target is to represent every hand simultaneously when the measured safe window and text scale allow it.
+Represent every hand simultaneously when the measured safe window and text scale make that readable. Exact dp allocations are implementation hypotheses, not product truth.
 
-The Astra v1.0 feasibility model used a 360 x 640 dp usable portrait rectangle and roughly:
+### Compact Overview fallback
 
-- 48 dp actor/resources
-- 48 dp stacks/discard
-- 48 dp last action
-- five opponent rows at ~52 dp each
-- 76 dp own-hand band
-- 156 dp Workbench
+If Full Ledger falls below the readability floor for a phone/window/text-scale class, switch to Compact Overview:
 
-These numbers are **not frozen usability truth**. They are a starting hypothesis only.
+- all players remain spatially represented in stable order;
+- compact summaries replace unreadably tiny full cards;
+- the Workbench can show the selected hand/card at readable size;
+- do not solve density with clipping, unreadable shrink-to-fit, or per-hand sideways scrolling.
 
-### VALIDATE FIRST: dense readability
-
-Before building the rest of C17 around exact dimensions, validate a production-path dense 6P prototype on a physical Android device using real upstream card faces and worst-case supported hand sizes.
-
-The question is not “does it mathematically fit?” but “can an experienced player rapidly read and compare all hands for a serious game?”
-
-If Full Ledger is not legible at a window/text-scale class, use **Compact Overview**:
-
-- all opponents remain spatially represented in stable order;
-- compact tiles/summaries replace unreadably tiny card faces;
-- the Workbench supplies a focused full-size hand/card view;
-- up to two hands/cards can be pinned for comparison;
-- comparing two hands must remain bounded and must not fall back to the old long feed.
-
-Never solve density by clipping, unreadable shrink-to-fit, or per-hand sideways scrolling.
+Comparison pins are not C17 scope; they are backlog.
 
 ### Landscape / tablet
 
-- Landscape uses two purposeful columns: decision/own-hand/workbench and table/opponents.
-- Side system navigation/cutouts are part of the safe-area calculation.
-- Tablet uses a stable table pane plus persistent Workbench side pane when it fits.
-- Breakpoints are fit tests based on usable width/height, font scale, hand capacity, suit/control count, and IME state; do not use only a hard-coded tablet flag.
+C17 release requires safe, usable rotation/system-inset behavior and no broken gameplay. A dedicated two-column landscape/tablet composition and large-screen polish are backlog and do not block C17 phone-portrait release.
 
-## 6. Information hierarchy in live play
+## 5. Information hierarchy
 
 Always visible when meaningful:
 
-- human-readable turn and current actor, with a stronger `YOUR TURN` state;
-- current score and achievable maximum;
-- clue count (normally shown as the current number, e.g. `Clues 3`; do not waste permanent space on `/8` when capacity is the standard known value);
+- human-readable turn/current actor with strong `YOUR TURN` state;
+- score and achievable maximum;
+- clue count;
 - strikes;
 - deck count;
 - pace;
-- **FRE (Future Required Efficiency)** as a normal glanceable live metric when upstream supplies a meaningful value;
-- stack state by suit;
-- compact informative discard summary;
+- FRE when upstream supplies a meaningful value;
+- stack/firework state;
+- compact discard summary;
 - last-action anchor;
-- all hands/self anchor;
-- active mode/target.
+- all hands/self-or-observed anchor;
+- active Workbench mode/target.
 
-Detailed statistics are one deliberate action away in the Workbench. This includes MRE and metric explanations. Do not invent or collapse upstream efficiency concepts into a different mobile-only number.
+Detailed statistics such as MRE remain one deliberate action away. Do not invent a mobile-only efficiency metric.
 
-Special resource states become explicit when relevant:
+## 6. Direct card actions
 
-- zero clues;
-- discard restriction at clue capacity;
-- DDA or other upstream-derived warning;
-- deck exhaustion/final round;
-- timed-game clock when applicable.
-
-Ordinary elapsed duration does not consume permanent live space.
-
-## 7. Direct card actions
-
-C17 MVP control mode:
+C17 primary control mode:
 
 1. Tap an own card to select it.
 2. Show explicit `Play` and `Discard` actions in the Workbench.
-3. A separate deliberate tap sends the chosen action after current eligibility is checked.
+3. A separate deliberate tap sends the chosen action after current authoritative eligibility is checked.
 
-Selecting a card never sends an action.
+Selecting a card never sends an action. Illegal Play/Discard remain visible but disabled; explanatory reason text is not required. Drag-to-play/discard is optional backlog, not a C17 blocker.
 
-An illegal action remains visible but unavailable with a useful reason instead of silently doing nothing.
+## 7. Functional animation
 
-### Later optional control mode
+Short, non-blocking motion is C17 scope for temporal awareness after authoritative updates are locally applied:
 
-Drag-to-play / drag-to-discard may be evaluated **after the C17 MVP interaction passes acceptance** as an optional input preference. It must not replace the safe button mode or introduce ambiguous gesture conflicts. It is not a blocker for C17 MVP.
-
-## 8. Functional animation policy
-
-C17 should not be visually static. Short functional animations are part of temporal awareness, but they never own game truth or block input.
-
-Examples:
-
-- play/discard departure or destination emphasis;
-- clue-touch preview/commit emphasis;
+- play/discard departure/destination emphasis;
+- clue-touch/commit emphasis;
 - current-actor transition;
 - resource delta pulse;
 - last-action update.
 
-Guideline: roughly 120-180 ms for small state-change emphasis after the authoritative update is locally applied. The next inspection must not wait for the animation to finish. Reduced-motion mode gets immediate replacement plus the same persistent textual/state feedback.
+Animation never owns game meaning and never blocks input. Reduced-motion keeps equivalent persistent state feedback. Richer/prettier/cinematic animation is backlog.
 
-Decorative particle systems, bespoke cinematic effects, skins, and animation work unrelated to acceptance remain later work.
+## 8. Last action and Recent
 
-## 9. Last action and temporal awareness
+Current turn and last action are separate anchors. Last-action summaries should expose enough authoritative information to understand actor/action and relevant card/resource changes.
 
-Current turn and last action are separate anchors.
+There is **no separate Before/After inspector** in C17.
 
-Every meaningful action should expose enough authoritative information to reconstruct what happened:
+- Tapping the Last Action enters/jumps Rewind at that authoritative action.
+- Back/Forward in Rewind provide the adjacent temporal states.
+- Recent remains a compact list for direct jumps to nearby authoritative actions.
+- Keep at least one seating rotation of recent actions where data permits.
 
-- actor;
-- action type;
-- revealed card identity where allowed;
-- pre-action slot/card mapping;
-- clue target/touched cards;
-- resource/table deltas;
-- associated temporal position.
+## 9. Live History / Rewind — MUST
 
-Example style: `T18 Cal discarded Red 3 from slot 4. Clues +1; deck -1.`
+Live history is release-gated C17 functionality.
 
-One tap from the concise last-action bar opens before/after reconstruction. This must identify the exact old slot/card even when multiple visible cards looked identical.
-
-Keep recent events for at least one seating rotation. Do not append a giant full log beneath all hands.
-
-## 10. Live in-game history — A29 MUST
-
-Live rewind/history is a release-gated C17 capability, not merely replay prose.
-
-**A29 — Live in-game history inspection**
-
-The user can:
-
-- enter history from an active game;
-- select a prior authoritative turn/action;
-- see an explicit state such as `Reviewing T12` distinct from `Live T18`;
-- inspect relevant hands, knowledge, notes/discard/history for that prior position;
-- never send Play/Discard/Clue while reviewing history;
-- return to the current state with one `Live` action;
-- see new-live-action count/urgency without being forcibly kicked out of inspection;
-- return with no stale old card/clue action armed.
+- Enter history from an active game.
+- Select a prior authoritative action.
+- `REWIND Tn` is visually distinct from `LIVE Tm`.
+- No Play/Discard/Clue send route is available while reviewing.
+- Table/resources/hands all come from the same selected historical state.
+- Notes, discard, empathy/knowledge, and recent history remain inspectable.
+- Back moves one authoritative action backward.
+- Forward moves one authoritative action forward.
+- Long-press Back jumps to the first available action.
+- Long-press Forward jumps to the latest available rewind action.
+- The touch scrubber snaps to authoritative actions.
+- `Live` returns to the current authoritative state in one action.
+- New live actions while rewinding do **not** auto-jump or force an exit; show/update `N NEW`.
+- Entering/scrubbing/leaving review disarms stale card/clue action arming.
 
 The authoritative live game is never mutated by inspection.
 
-## 11. Notes and personal hypotheses
+## 10. Notes and personal hypotheses
 
-### Read first, edit explicitly
+### Read/edit gestures
 
-Tap a card to read its saved note and clue facts without opening the keyboard. Editing is a separate action.
+- Single tap reads/inspects without opening the keyboard.
+- Double tap enters Edit note immediately and opens the keyboard.
+- Long-press is reserved for transient empathy where that gesture applies.
 
-Edit mode keeps an explicit draft. Save/Done submits; ordinary Back hides the IME first and preserves the draft. Do not autosave because focus changed.
+### Edit transaction
 
-### Semantic-preserving quick annotations
+- Edit mode owns an explicit local draft.
+- Entering Edit on a non-empty note prepares `saved note | `, matching web interpretation-entry behavior; this is not saved until Save.
+- `Save` commits and exits.
+- Keyboard submit/Done may act as Save.
+- Android Back while editing cancels the unsaved draft and exits the editor; there is no intermediate hidden-keyboard editing state.
+- `Clear` clears the draft only. Saving the empty draft deletes the note.
+- There is no separate `Done editing` action.
+- Rotation/background preserves the open Note Editor and unsaved draft. Exact cursor/selection restoration is not a C17 MUST.
 
-Quick controls should cover supported upstream concepts such as F, CM, PTD, KT, Needs Fix, `?`, `!`, identity/possibility, and turn insertion, with advanced controls for less-common tokens.
+### Quick note actions
 
-Do not blindly append ` | token` for every quick action. The upstream parser treats the final pipe segment as the active interpretation, so text-preserving pipe append can silently deactivate prior meaning.
+Inside Edit, quick actions may update only the draft. C17 includes:
 
-Example intent: `r2` + F must become a semantic equivalent of `[r2] [f]`, not `r2 | f`.
+- F, CM, PTD, KT, Needs Fix, `?`, `!`;
+- current-turn insertion using upstream semantics;
+- Repeat previous note, replacing the current draft with the previous entered note.
 
-Use the upstream parser/semantics to transform notes safely. Preserve unrelated prose/effects. Unknown syntax should fall back to explicit text editing, not guessed grammar.
+Ordinary web note strings, including identity/possibility syntax and reserved `clued`/`unclued`/`blank` forms, must parse and save with upstream-compatible semantics. Dedicated identity picker, dedicated Clued/Unclued/Blank buttons, instant read-mode quick tags, and Previous/Next/Save-and-next are backlog.
 
 ### Identity lifecycle
 
-- Notes/drafts follow card identity/order.
-- Previous/Next and Save-and-next follow current live identities, not stale slots.
-- If the card leaves, editing ends and an unsaved draft can be recovered/copied but cannot be saved onto the replacement card.
-- Personal assumptions are visibly separate from authoritative clue facts.
+- Draft/save follows card `order`.
+- If a card leaves its hand while Edit is open, editing continues for that same `order` and may still be saved to that card.
+- Never migrate the draft to the replacement card in the old slot.
+- During live in-game History/Rewind, the current saved personal note remains editable for a historically visible card by `order`, including cards no longer in current live hands.
+- No extra temporal-warning label is shown merely because the note is current while the table is rewound.
+- Dedicated/finished replay notes remain read-only where upstream does not permit editing.
 
-Live note hypotheses are not the same feature as shared-replay Hypotheticals.
+### Note validation
 
-## 12. Empathy / knowledge
+Mirror the web semantic impossibility warning for parsed identity possibilities. The warning is advisory: Save remains allowed. C17 has no invented revision/merge/conflict protocol.
 
-C17 supports both:
+## 11. Empathy / knowledge
 
-### Per-hand persistent empathy
+C17 has two modes:
 
-A visible Knowledge action toggles clue-knowledge perspective for one selected player/hand. Geometry and seating stay unchanged. The Workbench can inspect one or two selected cards deeply. Hold is not required.
+### Transient per-hand empathy
+
+- Long-press/hold anywhere on a player row/hand, including cards, shows that hand in empathy until release.
+- The same applies to the local/observed hand.
+- A recognized long press consumes the gesture: release must not also fire the short-tap Clue/card action.
+- Temporary empathy clears on release and on background/rotation/interruption.
+- It works while live, while Rewinding, and while ClueComposer remains visible.
+- In History/Rewind it applies to the selected historical state and is strictly read-only.
+
+There is **no persistent per-player empathy mode**.
 
 ### Global empathy
 
-C17 also includes an explicit **global empathy toggle** analogous to the web client's whole-table knowledge view.
+- One explicit `All empathy` toggle applies the upstream empathy presentation to all applicable hands.
+- The same control toggles it off; there is no separate `Normal` button.
+- Global empathy persists across ordinary rotation/background.
+- If global empathy is on, per-hand long hold is a no-op; there is no isolate-hand third mode.
+- Entering Clue mode automatically turns global empathy off.
+- Global empathy is available in History/Rewind.
 
-- It is optional, explicit, and visibly labeled.
-- It applies the same upstream empathy/knowledge presentation to all applicable hands without changing seat geometry.
-- One action exits back to ordinary open identities.
-- Rotation/background preserves the selected empathy mode if still valid.
-- Notes remain a separate personal layer and are not merged into another player's knowledge.
+Deep Knowledge, two-card compare, and pinning are backlog.
 
-Global empathy is therefore removed from the C17 STOP list.
+## 12. Card-state visual language
 
-## 13. Card-state visual language
+Keep distinct channels for identity, permanent clue knowledge, authoritative latest-clue marker, candidate clue preview, selected/action target, personal note, critical/DDA/semantic caution, trash/uselessness versus personal KT, and empathy.
 
-Keep separate visual channels for:
+### Trash/useless presentation — web parity
 
-- identity face;
-- permanent clue knowledge;
-- authoritative latest-clue marker;
-- candidate clue preview;
-- selected/action target;
-- personal note summary;
-- critical/DDA/semantic caution;
-- semantic trash/uselessness versus personal KT;
-- empathy perspective at the row/mode level.
+C17 must follow the pinned web logic rather than a blanket `engine trash -> opacity` rule.
 
-Do not create badge soup. Important identity and suit information must remain readable in light/dark themes and must not rely only on color; Black/Rainbow require symbol/abbreviation/contrast support.
+- Explicit known-trash note with zero positive clues can force fade as web does.
+- Otherwise engine-trash fade follows the same web exclusions for clued/played/discarded cards, Blank/CM note state, Throw It in a Hole, and speedrun mode.
+- Known-trash-from-empathy remains the corresponding mini-trash indicator behavior rather than being conflated with the normal trashcan/fade.
+- DDA/trash indicators retain the same semantic exclusions as web.
 
-### Trash/useless-card treatment — VALIDATE FIRST
+## 13. Clue planning
 
-Do **not** freeze Astra v1.0's rejection of transparency.
+Clue planning is one visible composer, not a hidden parked draft.
 
-The frozen requirement is outcome-based:
+### Entry
 
-- an engine-proven trash/useless card must be immediately scannable at normal table-reading distance;
-- its rank/suit identity must remain readable;
-- it must not be confused with KT, critical, selected, or disabled state.
+- Short tap on another player opens ClueComposer only when it is our turn and live gameplay interaction is otherwise available.
+- Off-turn short tap does not open the composer.
+- On our turn with zero clue tokens, short tap may open the composer, but candidate controls/Give are disabled.
+- Entering Clue turns global empathy off.
+- A separate per-player `Clue` button is not used.
 
-First visual candidate: the familiar semi-transparent/subdued treatment. Compare it on-device with other low-emphasis treatments only if readability suffers.
+### Candidate / retarget
 
-## 14. Clue planning
+- Color/rank choices stay visible.
+- Selecting a candidate previews authoritative touched cards directly in the target hand.
+- No textual slot list is required.
+- Changing candidate is one tap.
+- Retargeting to another player preserves the current candidate and recomputes touched cards/legality authoritatively.
+- Candidate remains selected even if no longer legal; `Give clue` becomes disabled.
+- Invalid/empty candidates do not require explanatory configuration text; disabled Give is sufficient.
 
-Clues are a comparison workspace, not a cancel/restart wizard.
+### Lifetime
 
-- Enter by player header or Clue -> player.
-- Available color/rank controls remain visible after choosing a candidate.
-- Preview marks the affected cards in place and lists ascending displayed slots.
-- Permanent knowledge is unchanged during preview.
-- Changing clue candidate is one tap.
-- Retargeting is one tap; preserve the current clue when valid and recalculate touches.
-- Notes, discard, recent events, and knowledge can be inspected without losing the plan.
-- Empty Clues behavior is metadata/upstream-driven.
-- Explicit commit is required, e.g. `Give Red to Cal — slots 1, 3`.
-- Candidate selection, rotation, becoming the current actor, or returning from an inspection never sends the clue.
-- State change invalidates/revalidates the preview and removes stale arming.
+The clue plan exists exactly while ClueComposer remains the current visible Workbench tool.
 
-Latest-clue lifecycle, retouch semantics, and actual giver/Quacker semantics remain authoritative.
+- An overlay that does not replace the composer, such as discard inspection, may preserve it.
+- Replacing the composer with Notes, History/Rewind, or another Workbench mode clears target/candidate/preview.
+- Rotation/background alone does not clear it if the composer remains the current task.
+- No hidden clue-plan restoration exists.
 
-## 15. Rotation / background / foreground
+Only explicit `Give clue` sends. State changes are revalidated against authoritative state; C17 does not invent a stale-review modal or a mobile clue rules engine.
 
-C17 intentionally replaces the old C16 blanket transient-reset UX policy.
+Off-turn planning, zero-token rehearsal, and multi-candidate pins/Compare are backlog.
 
-Preserve recoverable reasoning context across rotation and app background/foreground when still valid:
+## 14. Lifecycle safety
 
-- selected card identity;
-- note draft/cursor;
-- clue target/type/value;
-- comparison pins;
-- empathy target/mode;
-- replay position/follow state.
+Across rotation/background/foreground:
 
-Clear unsafe physical interaction state:
+- preserve recoverable note draft/editor state;
+- preserve global empathy;
+- preserve current replay position/follow state where valid;
+- preserve a clue plan only when ClueComposer remains the current visible task;
+- clear pointer-down/long-hold state and transient per-hand empathy;
+- clear unsafe action arming/stale commit readiness;
+- never queue, resend, or retry gameplay commands.
 
-- pointer-down/gesture in progress;
-- action arming;
-- stale commit readiness.
+## 15. Replay, finished game, shared review, Hypothetical
 
-On return, revalidate against current authoritative state. Never resend or queue a gameplay command.
+Live, live Rewind, finished game, ordinary replay, shared review, and Hypothetical use the same C17 Table Ledger + Workbench spatial model on the target phone-portrait path. Do not fall back to a separate LegacyGameScreen merely because the game finished or replay became active.
 
-## 16. Replay / finished game
+Replay/finished requirements:
 
-Finished game, History, live history entry, and shared review converge on a temporal Replay Workspace.
-
-Keep together:
-
-- exact selected temporal position;
 - compact authoritative result/reason;
-- table/resources at that position;
-- stable ordered hands;
-- selected local event;
-- Before/After;
-- timeline;
-- perspective/empathy;
-- shared leader/follow/local state where applicable.
+- same stable ordered hands/table/resources;
+- one authoritative-action timeline with scrubber + Back/Forward + long-press edge jumps;
+- empathy/knowledge at the selected temporal point;
+- no separate Before/After axis;
+- Quick rematch / Remake where authoritative eligibility permits.
 
-Do not show a giant generic `GAME OVER` hero that must be scrolled past.
+Shared review is C17 MUST:
 
-Timeline is continuously draggable but snaps to available authoritative positions. Provide Start, Last turn, Final state, Previous/Next, and precise step/jump behavior.
+- local manual timeline movement may detach a follower without silently broadcasting;
+- `Follow leader` restores shared synchronization;
+- leader control/transfer uses existing authoritative capability only;
+- shared state is visibly identified.
 
-Saved notes are not assumed to be turn-versioned. When historical note timing cannot be proven, label them as saved notes that may include later information rather than claiming “what player knew at T8”.
+Hypothetical is C17 MUST:
 
-Shared replay:
+- active Hypothetical is clearly labeled and never presented as recorded history;
+- use upstream/server hypothetical semantics; do not build a second mobile hypothetical rules engine.
 
-- local inspection must not silently broadcast;
-- manual timeline movement can detach from leader;
-- Follow leader restores sync;
-- leader transfer uses authoritative capability and pending/result state;
-- active Hypothetical mode is clearly labeled and never presented as recorded history.
+## 16. Spectator
 
-Quick rematch and Remake are required where existing authoritative eligibility supports them.
+Live spectator is a first-class C17 workspace, not a Legacy fallback.
 
-## 17. Pregame and product shell
+- Same Table Ledger/Workbench composition.
+- No Play/Discard/Clue send route.
+- Notes, empathy/knowledge, history/replay and shared-review tools follow authoritative spectator capabilities.
+- The observed player index from authoritative metadata is the seating anchor.
 
-Required C17 workflow:
+## 17. Pregame and table lifecycle
 
-`Home/Lobby -> inspect/create table -> choose role -> review setup -> start/spectate -> live/review -> return/remake`
+Required workflow:
 
-Pregame must expose:
+`Lobby -> create/inspect table -> choose/switch role -> review setup -> start/spectate -> C17 live/review -> result/replay -> remake/return`
 
-- actual role;
-- meaningful seating order;
-- owner;
-- spectators;
-- selected variant/options;
-- Join as player / Switch to spectator when eligible;
-- owner Start eligibility;
-- table Settings immediately;
-- bounded chat with Enter/Send behavior above the IME.
+Pregame must expose role, seating, owner, spectators, selected variant/options, owner Start eligibility, table settings, and bounded chat.
 
-Create Table opens a creation flow; do not create a server table until the final explicit Create.
+- Create Table sends only after final explicit Create.
+- Join as player / Switch to spectator must be available in-room when authoritative eligibility permits.
+- Owner changes use authoritative table update.
+- Non-owner option changes use the same ordinary `tableUpdate`; the server/web capability turns them into a proposal and gives the owner the authoritative apply action. Do not invent a mobile voting protocol or fake plain-chat fallback.
 
-Lobby navigation and leaving/releasing attendance are different intents.
+## 18. More / secondary actions
 
-### Propose Variant — capability check required
+Do not add a second permanent Table/overflow control. The existing **More** surface is the single overflow for secondary live/replay actions, such as table chat, participants/spectators, Leave/return-to-lobby attendance action, Pause/Unpause where supported, table/app settings, VTK/administration where an existing authoritative capability exists, and Sign out.
 
-Do **not** freeze the Astra plain-chat proposal fallback as the final C17 behavior.
+Do not crowd the gameplay surface with one-off admin buttons.
 
-Before implementing this part of C17-6, inspect the actual web/upstream/server proposal capability. If a structured authoritative proposal operation exists, use it. Only if no such capability exists may a bounded chat suggestion be considered as fallback. Do not invent a synthetic protocol/vote.
-
-## 18. App navigation and People
-
-No permanent bottom app-navigation bar inside live play or replay; that space belongs to the Workbench/timeline.
-
-Table/Home/secondary controls must still be clearly reachable. Administration such as participants/spectators, settings, leave, pause/VTK where applicable must be discoverable without living only inside chat.
-
-C17 includes a minimal functional People layer when supported by existing server capabilities:
-
-- online/user search;
-- compact profile;
-- friend state/list and find-online-friends affordance.
-
-Rich profiles, feeds, recommendations, achievements, and messaging redesign remain later scope.
+People/profile/friends/social functionality is backlog and does not block C17.
 
 ## 19. Android / IME / touch contract
 
-- One composition owner calculates system bars, cutouts, gesture/navigation insets, and IME occlusion; overlapping exclusions are treated as a union, not blindly added twice.
-- Primary controls have non-overlapping ~48 x 48 dp hit regions.
-- Normal important text targets ~14-16 sp; compact secondary text can be ~12 sp; tiny slot text is never the sole identifier.
-- Android Back closes IME first, then inspection, then transient task, then navigates.
-- Typing may reduce non-target table context on a small phone, but must preserve actor/action context, target card/hand, draft, safe Save/Back, and one-action restoration.
-- Dark mode and suit identity must work without color-only meaning.
-- Physical acceptance covers gesture and three-button navigation, both landscape directions, keyboard states, suggestions, normal/enlarged font, themes, and rotation during active tasks.
+- One composition owner handles system bars, cutouts, navigation insets, and IME occlusion.
+- Important controls have safe, non-overlapping touch regions.
+- Tiny slot text is never the sole card identifier.
+- Keyboard-open composition preserves actor/action context, target card/hand, draft, Save/Back, and one-action restoration.
+- Dark mode and suit identity must not rely only on color.
+- Physical acceptance covers gesture and three-button navigation, keyboard states, normal/enlarged font scale, themes, and rotation/interruption behavior.
 
-## 20. Acceptance additions/changes from v1.0
-
-The Astra v1.0 acceptance matrix remains the base, with these ratified changes:
-
-- **A14 Empathy**: must validate persistent per-hand empathy and explicit global empathy; neither requires hold.
-- **A24 resources**: normal live clue display may show current clue count without permanently displaying `/8`; capacity/restriction is shown when strategically relevant. Legality remains upstream-owned.
-- **A25 lifecycle**: reasoning state survives rotation/background/foreground while gesture/arming is cleared.
-- **A29 Live in-game history**: defined in section 10 and is a MUST release case.
-- **Dense 5P/6P geometry**: exact 52/76/156 dp allocations are not pass criteria by themselves; real-device readability and task success decide Full Ledger versus Compact Overview.
-- **Live stats**: FRE is glanceable by default when meaningful; MRE/details remain one action away.
-- **Animations**: functional action feedback exists but no essential meaning depends on animation.
-
-## 21. Validation gates
-
-Before broad C17 implementation, validate the dense workspace prototype on a physical Android device.
+## 20. C17 release gates
 
 Before C17 release:
 
-- deterministic fixtures cover seating anchors, hand capacity, last-clue lifecycle, note semantic composition, and invalidation;
-- one serious full 5P and one serious full 6P session are completed on target phone composition;
-- dense notes, three-candidate clue comparison, discard consultation, and look-away reconstruction are exercised;
+- deterministic tests cover seating anchors, hand capacity, clue touch/retarget, note parsing/draft identity, trash presentation parity, and stale-action invalidation;
+- one serious full 5P and one serious full 6P session are completed on target phone portrait;
+- dense notes, multiple clue candidates, discard consultation, empathy, live history, shared review/Hypothetical, spectator, and replay analysis are exercised;
 - no root gameplay scrolling in certified Full Ledger states;
 - no unintended gameplay commits;
 - no note migration;
 - no required-control occlusion by system UI/IME;
-- no lost reasoning draft across documented transitions;
-- replay gets a separate analysis/review session;
-- timing targets are diagnostic engineering targets, not sacred release numbers when user task quality is otherwise clear.
+- no lost note draft across documented lifecycle transitions;
+- replay/finished game stay in the C17 workspace;
+- the experienced player would willingly play a full serious game using the final composition.
 
-A look-away probe may use the Astra target of >=90% correct actor/action/original-slot/key-delta within five seconds as a diagnostic. Small samples are not treated as statistical proof; every wrong slot/target answer is investigated.
-
-## 22. Migration slices
-
-### C17-0 Density prototype / layout validation
-
-Production-path prototype using real card faces and dense 6P fixtures. Decide Full Ledger fit classes versus Compact Overview. No broad feature rewrite yet.
-
-### C17-1 Workspace and direct actions
-
-Stable table/hand composition, deterministic seating, safe areas, direct tap -> Play/Discard, spectator-safe action surface. Remove root live ScrollView / oversized independent hand panels / actor reorder / duplicate action regions.
-
-### C17-2 Temporal awareness and table inspection
-
-Current actor, useful resources/stats including FRE, discard/stacks, last action, before/after reconstruction, recent events, A29 live history.
-
-### C17-3 Knowledge, empathy, and notes
-
-Read-first notes, semantic-preserving quick annotations, keyboard-safe editing, per-hand and global empathy, identity-keyed draft lifecycle.
-
-### C17-4 Clue decision workspace
-
-Persistent palette, candidate comparison, retargeting, note/pile consultation, explicit authoritative commit.
-
-### C17-5 Result, replay, and history
-
-Temporal Replay Workspace, real result semantics, timeline, before/after, shared follow/leader/hypothetical viewing, rematch/remake.
-
-### C17-6 Table lifecycle and shell
-
-Create/join/spectate/roles/options/start/chat/navigation, capability-verified Propose Variant, Settings, minimal People/profile/friends surface.
-
-### C17-7 Integration and freeze
-
-Complete serious games and replay sessions without workaround navigation. Remove obsolete presentation paths and temporary migration switches after parity.
-
-## 23. STOP LIST
+## 21. STOP list
 
 Until C17 acceptance is complete, do not:
 
-- rewrite Hanabi semantics, reconnect protocol, or upstream parity under UX work;
+- rewrite Hanabi semantics, reconnect behavior, or upstream protocol under UX work;
 - silently advance upstream pins;
 - redesign normal card artwork;
-- enable unsupported variant families as accidental scope expansion;
-- reintroduce root live/replay documents or per-hand horizontal carousels;
+- enable unsupported variant families accidentally;
+- reintroduce root live/replay documents or per-hand horizontal carousels on certified phone portrait;
 - reorder players by current actor;
 - build giant expanded knowledge under every card;
-- add drag/swipe as a required C17 MVP control path;
-- make hold-only empathy;
+- make persistent per-player empathy;
 - queue/pre-play/auto-commit gameplay actions;
-- build a mobile strategy solver or second hypothetical engine;
-- expand into rich social feeds/profile systems;
-- spend the acceptance budget on decorative animation/skins/sound design;
+- create a second hypothetical/strategy engine;
+- spend the release gate on rich social features, decorative animation, skins, or sound design;
 - invent a new efficiency metric;
-- leave old and new presentation architectures alive indefinitely;
-- reopen a passed slice for subjective polish without a failed acceptance case or newly evidenced defect.
+- keep Legacy and C17 gameplay/replay presentations as permanent parallel architectures.
 
-Explicit exceptions ratified in v1.1:
+## 22. Change control
 
-- global empathy **is** in C17;
-- short functional animations **are** in C17;
-- minimal People/profile/friends parity **is** in C17 where existing capabilities support it;
-- drag input may be evaluated later as an optional mode after MVP acceptance.
-
-## 24. Change control
-
-After this freeze, a C17 product/UX change requires one of:
-
-1. a failed acceptance case;
-2. newly evidenced semantic/platform defect;
-3. explicit versioned product decision.
-
-Record the affected states and revised observable criterion. Aesthetic preference alone does not reopen completed slices.
-
-## 25. Human gate
-
-The final release question is simple:
-
-> Would an experienced player genuinely want to play a full serious Hanabi game on this phone UI?
-
-If not, fix the failed contract/validation point. Do not hide the failure behind mathematical fit, screenshot polish, or eventual reachability through scrolling.
+A further C17 product/UX change requires a failed acceptance case, newly evidenced semantic/platform defect, or explicit versioned product decision. Record the affected observable behavior rather than silently changing the contract.
