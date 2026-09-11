@@ -7,10 +7,8 @@ export type GameplayInteractionState = {
   selectedCard: number | null;
   clueTarget: number | null;
   cluePreview: GameplayCluePreviewState;
-  /** Effective per-hand empathy target used by the presentation layer. */
+  /** Temporary hold-only empathy target. Never persisted across lifecycle interruption. */
   empathyPlayer: number | null;
-  /** Persistent per-hand empathy target restored after a temporary hold peek. */
-  persistentEmpathyPlayer: number | null;
   globalEmpathy: boolean;
   noteCard: number | null;
 };
@@ -21,10 +19,8 @@ export type GameplayInteractionAction =
   | { type: 'preview-clue'; clueType: 'color' | 'rank'; value: number }
   | { type: 'clear-clue-preview' }
   | { type: 'open-note'; order: number | null }
-  | { type: 'toggle-empathy-player'; playerIndex: number }
   | { type: 'toggle-global-empathy' }
   | { type: 'hold-empathy'; playerIndex: number | null }
-  | { type: 'clear-empathy' }
   | { type: 'cancel-transient' }
   | { type: 'disarm-gameplay' }
   | { type: 'reset-lifecycle-transients' }
@@ -41,7 +37,6 @@ export const initialGameplayInteractionState: GameplayInteractionState = {
   clueTarget: null,
   cluePreview: null,
   empathyPlayer: null,
-  persistentEmpathyPlayer: null,
   globalEmpathy: false,
   noteCard: null,
 };
@@ -58,12 +53,18 @@ export function gameplayInteractionReducer(
         noteCard: action.order ?? state.noteCard,
         clueTarget: null,
         cluePreview: null,
+        empathyPlayer: null,
       };
     case 'select-clue-target':
       return {
         ...state,
         clueTarget: action.playerIndex,
-        cluePreview: action.playerIndex === state.clueTarget ? state.cluePreview : null,
+        // Web-style retargeting keeps the candidate. The authoritative preview selector
+        // recomputes touched cards and legality for the new target.
+        cluePreview: action.playerIndex === null ? null : state.cluePreview,
+        empathyPlayer: null,
+        // Entering clue mode always leaves global empathy.
+        globalEmpathy: action.playerIndex === null ? state.globalEmpathy : false,
       };
     case 'preview-clue':
       return state.clueTarget === null
@@ -73,56 +74,37 @@ export function gameplayInteractionReducer(
           cluePreview: { type: action.clueType, value: action.value },
         };
     case 'clear-clue-preview':
-      // This is the Workbench clue-planner exit. Closing never sends a clue and restores
-      // the previously preserved card/note context underneath the planner.
       return {
         ...state,
         clueTarget: null,
         cluePreview: null,
+        empathyPlayer: null,
       };
     case 'open-note':
-      // Note inspection is a Workbench content swap, not a destructive clue-context switch.
+      // Notes replace ClueComposer in the Workbench, so there is no hidden parked clue plan.
       return {
         ...state,
         noteCard: action.order,
+        clueTarget: null,
+        cluePreview: null,
+        empathyPlayer: null,
       };
-    case 'toggle-empathy-player': {
-      const nextPlayer = state.persistentEmpathyPlayer === action.playerIndex
-        ? null
-        : action.playerIndex;
-      return {
-        ...state,
-        empathyPlayer: nextPlayer,
-        persistentEmpathyPlayer: nextPlayer,
-        globalEmpathy: false,
-      };
-    }
-    case 'toggle-global-empathy': {
-      const nextGlobal = !state.globalEmpathy;
+    case 'toggle-global-empathy':
       return {
         ...state,
         empathyPlayer: null,
-        persistentEmpathyPlayer: null,
-        globalEmpathy: nextGlobal,
+        globalEmpathy: !state.globalEmpathy,
       };
-    }
     case 'hold-empathy':
-      // A hold is only a temporary peek. Releasing restores the persistent per-hand mode.
-      return {
-        ...state,
-        empathyPlayer: action.playerIndex ?? state.persistentEmpathyPlayer,
-      };
-    case 'clear-empathy':
+      // Per-hand empathy is hold-only. Global empathy has no isolate-hand third mode.
+      return state.globalEmpathy
+        ? { ...state, empathyPlayer: null }
+        : { ...state, empathyPlayer: action.playerIndex };
+    case 'cancel-transient':
+    case 'reset-lifecycle-transients':
       return {
         ...state,
         empathyPlayer: null,
-        persistentEmpathyPlayer: null,
-        globalEmpathy: false,
-      };
-    case 'cancel-transient':
-      return {
-        ...state,
-        empathyPlayer: state.persistentEmpathyPlayer,
       };
     case 'disarm-gameplay':
       return {
@@ -130,12 +112,7 @@ export function gameplayInteractionReducer(
         selectedCard: null,
         clueTarget: null,
         cluePreview: null,
-        empathyPlayer: state.persistentEmpathyPlayer,
-      };
-    case 'reset-lifecycle-transients':
-      return {
-        ...state,
-        empathyPlayer: state.persistentEmpathyPlayer,
+        empathyPlayer: null,
       };
     case 'sync-hands': {
       const selectedCard = state.selectedCard !== null && action.ownOrders.includes(state.selectedCard)
@@ -144,28 +121,19 @@ export function gameplayInteractionReducer(
       const clueTarget = state.clueTarget !== null && action.clueTargets.includes(state.clueTarget)
         ? state.clueTarget
         : null;
-      const noteCard = state.noteCard !== null && action.visibleOrders.includes(state.noteCard)
-        ? state.noteCard
-        : null;
       const empathyPlayers = action.empathyPlayers ?? action.clueTargets;
-      const persistentEmpathyPlayer = state.persistentEmpathyPlayer !== null
-        && empathyPlayers.includes(state.persistentEmpathyPlayer)
-        ? state.persistentEmpathyPlayer
-        : null;
-      const heldEmpathyPlayer = state.empathyPlayer !== null
-        && empathyPlayers.includes(state.empathyPlayer)
+      const empathyPlayer = state.empathyPlayer !== null && empathyPlayers.includes(state.empathyPlayer)
         ? state.empathyPlayer
         : null;
-      const empathyPlayer = heldEmpathyPlayer ?? persistentEmpathyPlayer;
-      const cluePreview = clueTarget !== null && clueTarget === state.clueTarget ? state.cluePreview : null;
       return {
         selectedCard,
         clueTarget,
-        cluePreview,
+        cluePreview: clueTarget === null ? null : state.cluePreview,
         empathyPlayer,
-        persistentEmpathyPlayer,
         globalEmpathy: state.globalEmpathy,
-        noteCard,
+        // A note editor is durable by card order. Hand sync must never retarget or close it merely
+        // because the card left a hand; explicit UI close owns that lifecycle.
+        noteCard: state.noteCard,
       };
     }
     default:
