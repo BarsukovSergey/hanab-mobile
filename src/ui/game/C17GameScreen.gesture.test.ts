@@ -30,7 +30,8 @@ test('C17 wires hold-only empathy and authoritative clue-card highlighting', () 
 test('C17 keeps spectator interaction observational while retaining the workspace tools', () => {
   const screen = readC17Screen();
 
-  expect(screen).toContain("const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true && !isFinishedReplay;");
+  expect(screen).toContain("const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true");
+  expect(screen).toContain('&& !isFinishedReplay && !isSharedReplay;');
   expect(screen).toContain('const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;');
   expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
   expect(screen).toContain('empathyPlayers,');
