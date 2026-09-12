@@ -11,14 +11,15 @@ test('C17 finished replay is an authoritative read-only timeline with available 
 
   expect(screen).toContain('const isFinishedReplay = clientState?.finished === true;');
   expect(screen).toContain('selectedSegment: replay.segment,');
-  expect(screen).toContain('reviewActive={isFinishedReplay || replay.active || isSharedReplay}');
+  expect(screen).toContain('reviewActive={!hypotheticalActive && (isFinishedReplay || replay.active || isSharedReplay)}');
   expect(screen).toContain('replayNotes={clientState.notes.allNotes}');
   expect(screen).toContain('const readOnlyReplay = finishedReplay || sharedReplay !== null;');
   expect(screen).toContain('const hasAvailableNote = (order: number) => readOnlyReplay');
   expect(screen).toContain('replayNotes[order]?.some((entry) => entry.text.trim().length > 0)');
   expect(screen).toContain("'No replay notes'");
   expect(screen).toContain("`Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`");
-  expect(screen).toContain('{reviewActive && !finishedReplay && sharedReplay === null ? <>');
+  expect(screen).toContain('{hypothetical !== null ? <>');
+  expect(screen).toContain('</> : reviewActive && !finishedReplay && sharedReplay === null ? <>');
   expect(screen).toContain('isQuickRematchEligible(clientState, roomState.pendingRestartTableID)');
   expect(screen).toContain('isRestartToPregameEligible(clientState, roomState.pendingRestartTableID)');
   expect(screen).toContain('onQuickRematch={() => lobbyRuntime.quickRematch()}');

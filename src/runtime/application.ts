@@ -17,6 +17,14 @@ const gameplayCommandGate = createRuntimeCommandGate(rawLobbyRuntime, [
   'followReplayLeader',
   'quickRematch',
   'restartToPregame',
+  'startHypothetical',
+  'endHypothetical',
+  'backHypothetical',
+  'toggleHypotheticalDrawnCards',
+  'hypotheticalPlay',
+  'hypotheticalDiscard',
+  'hypotheticalColorClue',
+  'hypotheticalRankClue',
 ]);
 
 export const lobbyRuntime = gameplayCommandGate.runtime;
