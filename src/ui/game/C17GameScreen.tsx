@@ -22,6 +22,7 @@ import {
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
 } from '../../game/selectors/gameplay';
+import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
@@ -54,6 +55,13 @@ type C17ReviewSelection = {
   liveSegmentAtEntry: number;
 };
 
+const END_CONDITIONS: Record<number, string> = {
+  0: 'In progress', 1: 'Normal completion', 2: 'Strikeout', 3: 'Timeout',
+  4: 'Terminated by player', 5: 'Speedrun failed', 6: 'Idle timeout',
+  7: 'Character softlock', 8: 'All or Nothing failed',
+  9: 'All or Nothing softlock', 10: 'Terminated by vote',
+};
+
 const HAND_META_WIDTH = 112;
 const HAND_ROW_CONTENT_GAP = 5;
 const HAND_ROW_HORIZONTAL_PADDING = 4;
@@ -68,7 +76,8 @@ export function C17GameScreen() {
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
   const clientState = liveRoom?.clientState ?? null;
   const game = clientState?.visibleState ?? null;
-  const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true;
+  const isFinishedReplay = clientState?.finished === true;
+  const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true && !isFinishedReplay;
   const isSpectator = liveRoom?.role === 'spectator';
   const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;
   const ourHand = useMemo(() => ourIndex === null ? [] : game?.hands[ourIndex] ?? [], [game, ourIndex]);
@@ -141,6 +150,7 @@ export function C17GameScreen() {
     && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName)
     && selectedTarget !== null;
   const notesEditable = sessionPhase === 'ready'
+    && !clientState.finished
     && !replay.active
     && !liveRoom.sharedReplay
     && noteCard !== null
@@ -198,17 +208,25 @@ export function C17GameScreen() {
     selectedSegment: latest,
     variantName: metadata.options.variantName,
   });
-  const reviewTemporal = replay.active && c17Review !== null
+  const reviewTemporal = isFinishedReplay
+    ? getC17TemporalContext({
+      states: replay.states,
+      selectedSegment: replay.segment,
+      variantName: metadata.options.variantName,
+    })
+    : replay.active && c17Review !== null
     ? getC17TemporalContext({
       states: replay.states,
       selectedSegment: c17Review.actionSegment,
       variantName: metadata.options.variantName,
     })
     : liveTemporal;
-  const newerActionCount = replay.active && c17Review !== null
+  const newerActionCount = !isFinishedReplay && replay.active && c17Review !== null
     ? countC17TemporalStatesAfter(replay.states, c17Review.liveSegmentAtEntry)
     : 0;
-  const recentTemporal = replay.active && c17Review !== null ? reviewTemporal : liveTemporal;
+  const recentTemporal = isFinishedReplay || replay.active && c17Review !== null
+    ? reviewTemporal
+    : liveTemporal;
   const recentActions = [...recentTemporal.recent, recentTemporal.last]
     .filter((entry, index, entries) => entry.segment > 0
       && entries.findIndex((candidate) => candidate.segment === entry.segment) === index)
@@ -225,10 +243,12 @@ export function C17GameScreen() {
       variantName: metadata.options.variantName,
     });
     disarmGameplay();
-    setC17Review({
-      actionSegment: temporal.selectedSegment,
-      liveSegmentAtEntry: c17Review?.liveSegmentAtEntry ?? latest,
-    });
+    if (!isFinishedReplay) {
+      setC17Review({
+        actionSegment: temporal.selectedSegment,
+        liveSegmentAtEntry: c17Review?.liveSegmentAtEntry ?? latest,
+      });
+    }
     lobbyRuntime.navigateReplaySegment(temporal.afterSegment);
   };
   const enterRewind = () => {
@@ -246,6 +266,7 @@ export function C17GameScreen() {
     if (target !== null) jumpToAction(target);
   };
   const returnLive = () => {
+    if (isFinishedReplay) return;
     if (!replay.active) return;
     disarmGameplay();
     setC17Review(null);
@@ -256,12 +277,25 @@ export function C17GameScreen() {
       segment: null,
     }));
   };
+  const gameOver = [...replay.actions].reverse().find((action) => action.type === 'gameOver');
+  const endCondition = liveRoom.gameHistory?.endCondition
+    ?? (gameOver?.type === 'gameOver' ? gameOver.endCondition : null);
+  const result = isFinishedReplay ? {
+    score: ongoingGame.score,
+    reason: endCondition === null ? null : END_CONDITIONS[endCondition] ?? `End condition ${endCondition}`,
+  } : null;
+  const canQuickRematch = sessionPhase === 'ready'
+    && isQuickRematchEligible(clientState, roomState.pendingRestartTableID);
+  const canRemake = sessionPhase === 'ready'
+    && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID);
 
   return <>
     <C17DenseWorkspace
       actionSegments={actionSegments}
       canCommitCard={cardEnabled}
       canPlayGameplay={isPlayingPlayer}
+      canQuickRematch={canQuickRematch}
+      canRemake={canRemake}
       canReviewBack={reviewTemporal.previousActionSegment !== null}
       canReviewForward={reviewTemporal.nextActionSegment !== null}
       cardIdentities={clientState.cardIdentities}
@@ -282,6 +316,7 @@ export function C17GameScreen() {
       newerActionCount={newerActionCount}
       noteCard={noteCard}
       notes={clientState.notes.ourNotes}
+      replayNotes={clientState.notes.allNotes}
       onClearCluePreview={() => interactionDispatch({ type: 'clear-clue-preview' })}
       onConfirmClue={confirmClue}
       onDiscard={() => {
@@ -301,6 +336,8 @@ export function C17GameScreen() {
       onReviewForward={() => navigateReviewAction('forward')}
       onReviewStart={() => jumpReviewEdge('start')}
       onReturnLive={returnLive}
+      onQuickRematch={() => lobbyRuntime.quickRematch()}
+      onRemake={() => lobbyRuntime.restartToPregame()}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
         if (isPlayingPlayer && !replay.active) {
@@ -315,7 +352,9 @@ export function C17GameScreen() {
       pendingText={pendingText ?? null}
       canEnterClue={enabled}
       recentActions={recentActions}
-      reviewActive={replay.active}
+      result={result}
+      reviewActive={isFinishedReplay || replay.active}
+      finishedReplay={isFinishedReplay}
       selectedActionSegment={reviewTemporal.selectedSegment}
       selectedCard={selectedCard}
       selectedTarget={selectedTarget}
@@ -348,6 +387,8 @@ function C17DenseWorkspace({
   actionSegments,
   canCommitCard,
   canPlayGameplay,
+  canQuickRematch,
+  canRemake,
   canReviewBack,
   canReviewForward,
   cardIdentities,
@@ -369,6 +410,7 @@ function C17DenseWorkspace({
   newerActionCount,
   noteCard,
   notes,
+  replayNotes,
   onClearCluePreview,
   onConfirmClue,
   onDiscard,
@@ -384,6 +426,8 @@ function C17DenseWorkspace({
   onReviewForward,
   onReviewStart,
   onReturnLive,
+  onQuickRematch,
+  onRemake,
   onScrubAction,
   onSelectCard,
   onSelectClueTarget,
@@ -392,7 +436,9 @@ function C17DenseWorkspace({
   ourIndex,
   pendingText,
   recentActions,
+  result,
   reviewActive,
+  finishedReplay,
   selectedActionSegment,
   selectedCard,
   selectedTarget,
@@ -403,6 +449,8 @@ function C17DenseWorkspace({
   actionSegments: readonly number[];
   canCommitCard: boolean;
   canPlayGameplay: boolean;
+  canQuickRematch: boolean;
+  canRemake: boolean;
   canReviewBack: boolean;
   canReviewForward: boolean;
   cardIdentities: readonly CardIdentity[];
@@ -424,6 +472,7 @@ function C17DenseWorkspace({
   newerActionCount: number;
   noteCard: number | null;
   notes: readonly CardNote[];
+  replayNotes: ReadonlyArray<ReadonlyArray<{ name: string; text: string }>>;
   onClearCluePreview: () => void;
   onConfirmClue: () => void;
   onDiscard: () => void;
@@ -439,6 +488,8 @@ function C17DenseWorkspace({
   onReviewForward: () => void;
   onReviewStart: () => void;
   onReturnLive: () => void;
+  onQuickRematch: () => void;
+  onRemake: () => void;
   onScrubAction: (segment: number) => void;
   onSelectCard: (order: number) => void;
   onSelectClueTarget: (playerIndex: number | null) => void;
@@ -447,7 +498,9 @@ function C17DenseWorkspace({
   ourIndex: number;
   pendingText: string | null;
   recentActions: readonly C17TemporalEntry[];
+  result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
+  finishedReplay: boolean;
   selectedActionSegment: number;
   selectedCard: number | null;
   selectedTarget: number | null;
@@ -508,6 +561,12 @@ function C17DenseWorkspace({
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
   const inspectedNote = noteCard === null ? '' : notes[noteCard]?.text ?? '';
+  const inspectedReplayNotes = noteCard === null
+    ? []
+    : replayNotes[noteCard]?.filter((entry) => entry.text.trim().length > 0) ?? [];
+  const hasAvailableNote = (order: number) => finishedReplay
+    ? (replayNotes[order]?.some((entry) => entry.text.trim().length > 0) ?? false)
+    : (notes[order]?.text.trim().length ?? 0) > 0;
   const inspectedCard = noteCard === null ? undefined : game.deck[noteCard];
   const inspectedKnowledge = inspectedCard === undefined
     ? null
@@ -523,7 +582,9 @@ function C17DenseWorkspace({
     <View style={styles.ledgerChrome}>
       <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.grow}>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{finishedReplay
+            ? `REPLAY T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · END' : ''}`
+            : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
           <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text>
         </View>
         <HudStat label="Score" value={game.score} />
@@ -534,6 +595,15 @@ function C17DenseWorkspace({
         {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
         {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
       </View>
+
+      {result !== null && <View style={[styles.result, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>FINAL SCORE · {result.score}</Text>
+        {result.reason !== null && <Text style={[styles.resultReason, { color: theme.colors.text }]}>{result.reason}</Text>}
+        {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
+          {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
+          {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
+        </View>}
+      </View>}
 
       <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
 
@@ -612,11 +682,11 @@ function C17DenseWorkspace({
                   displaySuitIndex: activeKnowledge.displaySuitIndex,
                   displayRank: activeKnowledge.displayRank,
                   empathy: empathizing,
-                  finished: false,
+                  finished: finishedReplay,
                 });
                 return <VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
-                  hasNote={(cardNote?.text.trim().length ?? 0) > 0}
+                  hasNote={hasAvailableNote(order)}
                   height={layout.opponentCardHeight}
                   highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}
                   key={order}
@@ -660,10 +730,10 @@ function C17DenseWorkspace({
               displaySuitIndex: knowledge.displaySuitIndex,
               displayRank: knowledge.displayRank,
               empathy: ownEmpathy,
-              finished: false,
+              finished: finishedReplay,
             });
             return <GameCard
-              hasNote={(cardNote?.text.trim().length ?? 0) > 0}
+              hasNote={hasAvailableNote(order)}
               height={layout.ownCardHeight}
               key={order}
               knowledge={knowledge}
@@ -687,7 +757,7 @@ function C17DenseWorkspace({
       !shellMeasured && styles.shellPending,
     ]}>
       <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
-        {reviewActive ? <>
+        {reviewActive && !finishedReplay ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
@@ -698,6 +768,25 @@ function C17DenseWorkspace({
             <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
             <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
           </View>
+        </> : finishedReplay ? <>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{`Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`}</Text>
+          <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
+          <View style={styles.rowBetween}>
+            <View style={styles.actionButtons}>
+              <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
+              <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
+            </View>
+            <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+          </View>
+          {noteCard !== null && <View style={styles.noteInspect}>
+            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
+            <Text style={[styles.notePreview, { color: inspectedReplayNotes.length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
+              {inspectedReplayNotes.length > 0
+                ? inspectedReplayNotes.map((entry) => `${entry.name}: ${entry.text}`).join('\n')
+                : 'No replay notes'}
+            </Text>
+            {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
+          </View>}
         </> : selectedTarget !== null ? <ClueComposer
           choices={clueChoices}
           enabled={clueEnabled}
@@ -801,6 +890,8 @@ const styles = StyleSheet.create({
   lastActionHeader: { minHeight: 32 },
   lastActionPressable: { alignItems: 'center', flexDirection: 'row', gap: 7, minHeight: 24 },
   lastActionText: { flex: 1, fontSize: 10, fontWeight: '700', minWidth: 0 },
+  result: { borderRadius: 8, borderWidth: 1, gap: 3, paddingHorizontal: 7, paddingVertical: 5 },
+  resultReason: { fontSize: 11, fontWeight: '700' },
   link: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   rowBetween: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
   actionButtons: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 5 },

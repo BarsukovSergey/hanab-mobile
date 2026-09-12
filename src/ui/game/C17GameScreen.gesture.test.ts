@@ -21,7 +21,7 @@ test('C17 wires hold-only empathy and authoritative clue-card highlighting', () 
   const opponentRow = screen.slice(screen.indexOf('accessibilityLabel={`Player ${playerName}`}'), screen.indexOf('<View style={styles.opponentMeta}>'));
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
   expect(opponentRow).toContain('onLongPress={globalEmpathy ? undefined : () => {');
-  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(2);
+  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(3);
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
   expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');
@@ -30,7 +30,7 @@ test('C17 wires hold-only empathy and authoritative clue-card highlighting', () 
 test('C17 keeps spectator interaction observational while retaining the workspace tools', () => {
   const screen = readC17Screen();
 
-  expect(screen).toContain("const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true;");
+  expect(screen).toContain("const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true && !isFinishedReplay;");
   expect(screen).toContain('const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;');
   expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
   expect(screen).toContain('empathyPlayers,');

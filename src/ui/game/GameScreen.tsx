@@ -27,6 +27,7 @@ export function GameScreen() {
     portrait: gameplayLayout.orientation === 'portrait',
     finished: clientState?.finished ?? false,
     replayActive: clientState?.replay.active ?? false,
+    sharedReplay: liveRoom?.sharedReplay ?? false,
   });
 
   return useC17 ? <C17GameScreen /> : <LegacyGameScreen />;
