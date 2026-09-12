@@ -119,6 +119,8 @@ function replayReducerFunction(
         drawnCardsInHypothetical: [],
         morphedIdentities: [],
         startingPlayerIndex: ongoing.turn.currentPlayerIndex,
+        actions: [],
+        stateActionLengths: [0],
       };
       for (const hypoAction of action.actions) hypoReduce(state, hypoAction, finished, metadata);
       break;
@@ -132,6 +134,9 @@ function replayReducerFunction(
     case 'hypoBack': {
       assertNotNull(state.hypothetical, 'A "hypoBack" action was dispatched with a null hypothetical state.');
       state.hypothetical.states.pop();
+      state.hypothetical.stateActionLengths.pop();
+      const retainedActionLength = state.hypothetical.stateActionLengths.at(-1);
+      if (retainedActionLength !== undefined) state.hypothetical.actions.splice(retainedActionLength);
       const lastState = state.hypothetical.states.at(-1);
       if (lastState !== undefined) state.hypothetical.ongoing = lastState;
       break;
@@ -167,11 +172,15 @@ function hypoReduce(state: Draft<ReplayState>, action: ActionIncludingHypothetic
     if (!state.hypothetical.showDrawnCards) state.hypothetical.morphedIdentities[action.order] = { suitIndex: null, rank: null };
   }
   if (action.type === 'morph' || action.type === 'unmorph') return;
+  state.hypothetical.actions.push(castDraft(action));
   const reduceAction = action.type === 'clue' && !state.hypothetical.showDrawnCards && state.hypothetical.startingPlayerIndex === action.target
     ? { ...action, ignoreNegative: true }
     : action;
   const oldSegment = state.hypothetical.ongoing.turn.segment;
-  const next = gameReducer(state.hypothetical.ongoing, reduceAction, true, false, finished, true, metadata);
+  const next = gameReducer(state.hypothetical.ongoing, reduceAction as never, true, false, finished, true, metadata);
   state.hypothetical.ongoing = castDraft(next);
-  if (oldSegment !== next.turn.segment) state.hypothetical.states.push(castDraft(next));
+  if (oldSegment !== next.turn.segment) {
+    state.hypothetical.states.push(castDraft(next));
+    state.hypothetical.stateActionLengths.push(state.hypothetical.actions.length);
+  }
 }

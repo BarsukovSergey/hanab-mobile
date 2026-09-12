@@ -53,6 +53,7 @@ import {
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
 import type { ActionIncludingHypothetical } from '../game/client/types/actions';
+import { getHypotheticalActions } from '../game/client/hypotheticalActions';
 import { chatActions } from '../store/chatSlice';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
@@ -624,7 +625,7 @@ export class LobbyRuntime {
       || room.clientState.replay.hypothetical !== null) return false;
     const shared = room.clientState.replay.shared;
     if (shared !== null) {
-      if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
+      if (!shared.amLeader || !shared.useSharedSegments || room.clientState.visibleState?.turn.currentPlayerIndex === null || !this.isReadyCurrentRoom(room.tableID)) return false;
       return this.sendEncoded(encodeReplayHypoStartFrame(room.tableID));
     }
     this.store.dispatch(roomActions.hypotheticalStarted({
@@ -661,6 +662,38 @@ export class LobbyRuntime {
     }
     if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
     return this.sendEncoded(encodeReplayHypoActionFrame(room.tableID, JSON.stringify(parsed)));
+  }
+
+  hypotheticalPlay(order: number): boolean {
+    return this.sendHypotheticalClientAction({ type: 'play', order });
+  }
+
+  hypotheticalDiscard(order: number): boolean {
+    return this.sendHypotheticalClientAction({ type: 'discard', order });
+  }
+
+  hypotheticalColorClue(target: number, value: number): boolean {
+    return this.sendHypotheticalClientAction({ type: 'colorClue', target, value });
+  }
+
+  hypotheticalRankClue(target: number, value: number): boolean {
+    return this.sendHypotheticalClientAction({ type: 'rankClue', target, value });
+  }
+
+  private sendHypotheticalClientAction(action: Parameters<typeof getHypotheticalActions>[0]): boolean {
+    const room = this.store.getState().room.room;
+    if (room.kind !== 'live_game') return false;
+    const hypothetical = room.clientState.replay.hypothetical;
+    if (hypothetical === null) return false;
+    const actions = getHypotheticalActions(
+      action,
+      hypothetical.ongoing,
+      room.clientState.metadata,
+      room.clientState.cardIdentities,
+      hypothetical.morphedIdentities,
+    );
+    if (actions === null) return false;
+    return actions.every((hypoAction) => this.sendHypotheticalAction(hypoAction));
   }
 
   backHypothetical(): boolean {

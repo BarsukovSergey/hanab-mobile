@@ -432,6 +432,9 @@ describe('lobby protocol decoder', () => {
     expect(decodeServerFrame('hypoAction {"type":"turn","num":1,"currentPlayerIndex":1}')).toMatchObject({
       kind: 'event', event: { command: 'hypoAction' },
     });
+    expect(decodeServerFrame('hypoAction {"type":"strike","num":4,"turn":4,"order":0}')).toMatchObject({
+      kind: 'event', event: { command: 'hypoAction', data: { num: 4 } },
+    });
     expect(decodeServerFrame('hypoAction {"type":"turn","num":1,"currentPlayerIndex":1,"extra":true}')).toMatchObject({
       kind: 'malformed', issue: 'invalid-payload',
     });

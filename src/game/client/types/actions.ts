@@ -33,7 +33,8 @@ export type ReplayAction =
   | ActionHypotheticalBack
   | ActionHypotheticalShowDrawnCards;
 
-export type ActionIncludingHypothetical = GameAction
+export type ActionIncludingHypothetical = Exclude<GameAction, { readonly type: 'strike' }>
+  | ActionHypotheticalStrike
   | ActionHypotheticalMorph
   | ActionHypotheticalUnmorph;
 
@@ -148,4 +149,12 @@ export interface ActionHypotheticalMorph {
 export interface ActionHypotheticalUnmorph {
   readonly type: 'unmorph';
   readonly order: CardOrder;
+}
+
+/** Hypotheticals intentionally permit more than three strikes (pinned upstream behavior). */
+export interface ActionHypotheticalStrike {
+  readonly type: 'strike';
+  readonly num: number;
+  readonly order: CardOrder;
+  readonly turn: number;
 }

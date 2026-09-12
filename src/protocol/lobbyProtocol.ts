@@ -179,7 +179,7 @@ const hypotheticalActionSchema = z.discriminatedUnion('type', [
     z.object({ type: z.literal(0), value: colorIndex }).strict(),
     z.object({ type: z.literal(1), value: rankClueNumber }).strict(),
   ]), giver: playerIndex, list: z.array(cardOrder).readonly(), target: playerIndex, ignoreNegative: z.boolean() }).strict(),
-  z.object({ type: z.literal('strike'), num: z.union([z.literal(1), z.literal(2), z.literal(3)]), order: cardOrder, turn: z.number().int().nonnegative() }).strict(),
+  z.object({ type: z.literal('strike'), num: z.number().int().positive(), order: cardOrder, turn: z.number().int().nonnegative() }).strict(),
   z.object({ type: z.literal('turn'), num: z.number().int().nonnegative(), currentPlayerIndex: playerIndex }).strict(),
   z.object({ type: z.literal('morph'), order: cardOrder, suitIndex: unknownSuitSchema, rank: unknownRankSchema }).strict(),
   z.object({ type: z.literal('unmorph'), order: cardOrder }).strict(),
