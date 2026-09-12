@@ -2,6 +2,7 @@ import { ClueType } from '../upstream/enums/ClueType';
 import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
 import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { GameState } from '../upstream/interfaces/GameState';
+import type { CardOrder } from '../upstream/types/CardOrder';
 import type { Clue } from '../upstream/types/Clue';
 import type { Variant } from '../upstream/interfaces/Variant';
 import { isCardTouchedByClue } from '../upstream/rules/clues';
@@ -20,7 +21,7 @@ export function getHypotheticalTouchedOrders(
   targetPlayerIndex: number,
   clue: Clue,
   context: HypotheticalClueTouchContext,
-): readonly number[] {
+): readonly CardOrder[] {
   const hand = game.hands[targetPlayerIndex];
   if (hand === undefined) return [];
 
