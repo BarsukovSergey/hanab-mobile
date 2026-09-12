@@ -8,7 +8,6 @@ import type {
 import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
-import { cardOrder } from '../game/upstream/types/CardOrder';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
@@ -794,8 +793,12 @@ describe('deterministic lobby runtime', () => {
     if (room.kind !== 'live_game') throw new Error('Expected shared replay');
     expect(room.clientState.replay.hypothetical).toBeNull();
     socket.emitMessage('hypoStart {"TableID":123}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    const touchedOrder = room.clientState.replay.hypothetical?.ongoing.hands[0]?.[0];
+    if (touchedOrder === undefined) throw new Error('Expected a touched card in the hypothetical state');
     const hypotheticalClue = {
-      type: 'clue' as const, clue: { type: 1 as const, value: 1 as const }, giver: 1 as const, list: [cardOrder.parse(0)], target: 0 as const,
+      type: 'clue' as const, clue: { type: 1 as const, value: 1 as const }, giver: 1 as const, list: [touchedOrder], target: 0 as const,
       ignoreNegative: false,
     };
     expect(runtime.sendHypotheticalAction(hypotheticalClue)).toBe(true);
