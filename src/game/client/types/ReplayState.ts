@@ -1,6 +1,7 @@
 import type { GameState } from '../../upstream/interfaces/GameState';
 import type { GameAction } from '../../upstream/types/gameActions';
 import type { SharedReplayState } from './SharedReplayState';
+import type { HypotheticalState } from './HypotheticalState';
 
 export interface ReplayState {
   readonly active: boolean;
@@ -13,4 +14,5 @@ export interface ReplayState {
 
   readonly databaseID: number | null; // `null` if we are in an ongoing game.
   readonly shared: SharedReplayState | null;
+  readonly hypothetical: HypotheticalState | null;
 }

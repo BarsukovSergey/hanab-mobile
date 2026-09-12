@@ -19,7 +19,7 @@ import type {
   Pause,
   Clock,
 } from '../protocol/gameProtocol';
-import type { NoteAction } from '../game/client/types/actions';
+import type { ActionIncludingHypothetical, NoteAction } from '../game/client/types/actions';
 import { lobbyActions } from './lobbySlice';
 import { sessionActions } from './sessionSlice';
 
@@ -1185,6 +1185,55 @@ export const roomSlice = createSlice({
         segment: shared.segment,
       });
       state.room.clientState = castDraft(next);
+    },
+    hypotheticalStarted(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; showDrawnCards: boolean; actions: readonly ActionIncludingHypothetical[] }>,
+    ) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || !state.room.clientState.replay.active
+        || state.room.clientState.replay.hypothetical !== null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'hypoStart', showDrawnCards: payload.showDrawnCards, actions: payload.actions,
+      }));
+    },
+    hypotheticalEnded(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, { type: 'hypoEnd' }));
+    },
+    hypotheticalActionReceived(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; action: ActionIncludingHypothetical }>,
+    ) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, { type: 'hypoAction', action: payload.action }));
+    },
+    hypotheticalBackReceived(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, { type: 'hypoBack' }));
+    },
+    hypotheticalDrawnCardsChanged(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; showDrawnCards: boolean }>,
+    ) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'hypoShowDrawnCards', showDrawnCards: payload.showDrawnCards,
+      }));
     },
     clientStateAccepted(
       state,

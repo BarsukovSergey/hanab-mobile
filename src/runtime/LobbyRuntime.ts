@@ -32,6 +32,12 @@ import {
   encodeReplayCreateFrame,
   encodeClientFrame,
   encodeReplayActionFrame,
+  encodeReplayHypoActionFrame,
+  encodeReplayHypoBackFrame,
+  encodeReplayHypoEndFrame,
+  encodeReplayHypoStartFrame,
+  encodeReplayHypoToggleRevealedFrame,
+  hypoActionSchema,
   encodeTableRestartFrame,
   encodeTableCreateFrame,
   encodeTableReattendFrame,
@@ -46,6 +52,7 @@ import {
   type MobileTableOptions,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
+import type { ActionIncludingHypothetical } from '../game/client/types/actions';
 import { chatActions } from '../store/chatSlice';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
@@ -610,6 +617,83 @@ export class LobbyRuntime {
     return true;
   }
 
+  startHypothetical(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (room.kind !== 'live_game' || !room.clientState.replay.active
+      || room.clientState.replay.hypothetical !== null) return false;
+    const shared = room.clientState.replay.shared;
+    if (shared !== null) {
+      if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
+      return this.sendEncoded(encodeReplayHypoStartFrame(room.tableID));
+    }
+    this.store.dispatch(roomActions.hypotheticalStarted({
+      epoch: state.session.connectionEpoch, tableID: room.tableID, showDrawnCards: false, actions: [],
+    }));
+    return true;
+  }
+
+  endHypothetical(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (room.kind !== 'live_game' || room.clientState.replay.hypothetical === null) return false;
+    const shared = room.clientState.replay.shared;
+    if (shared !== null) {
+      if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
+      return this.sendEncoded(encodeReplayHypoEndFrame(room.tableID));
+    }
+    this.store.dispatch(roomActions.hypotheticalEnded({ epoch: state.session.connectionEpoch, tableID: room.tableID }));
+    return true;
+  }
+
+  sendHypotheticalAction(action: ActionIncludingHypothetical): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (room.kind !== 'live_game' || room.clientState.replay.hypothetical === null) return false;
+    let parsed: ActionIncludingHypothetical;
+    try { parsed = hypoActionSchema.parse(action) as ActionIncludingHypothetical; } catch { return false; }
+    const shared = room.clientState.replay.shared;
+    if (shared === null) {
+      this.store.dispatch(roomActions.hypotheticalActionReceived({
+        epoch: state.session.connectionEpoch, tableID: room.tableID, action: parsed,
+      }));
+      return true;
+    }
+    if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
+    return this.sendEncoded(encodeReplayHypoActionFrame(room.tableID, JSON.stringify(parsed)));
+  }
+
+  backHypothetical(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (room.kind !== 'live_game' || room.clientState.replay.hypothetical === null
+      || room.clientState.replay.hypothetical.states.length <= 1) return false;
+    const shared = room.clientState.replay.shared;
+    if (shared === null) {
+      this.store.dispatch(roomActions.hypotheticalBackReceived({ epoch: state.session.connectionEpoch, tableID: room.tableID }));
+      return true;
+    }
+    return shared.amLeader && this.isReadyCurrentRoom(room.tableID)
+      && this.sendEncoded(encodeReplayHypoBackFrame(room.tableID));
+  }
+
+  toggleHypotheticalDrawnCards(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    const hypothetical = room.kind === 'live_game' ? room.clientState.replay.hypothetical : null;
+    if (room.kind !== 'live_game' || hypothetical === null) return false;
+    const shared = room.clientState.replay.shared;
+    if (shared === null) {
+      this.store.dispatch(roomActions.hypotheticalDrawnCardsChanged({
+        epoch: state.session.connectionEpoch, tableID: room.tableID,
+        showDrawnCards: !hypothetical.showDrawnCards,
+      }));
+      return true;
+    }
+    return shared.amLeader && this.isReadyCurrentRoom(room.tableID)
+      && this.sendEncoded(encodeReplayHypoToggleRevealedFrame(room.tableID));
+  }
+
   quickRematch(): boolean {
     return this.restartSharedReplay(true);
   }
@@ -981,6 +1065,48 @@ export class LobbyRuntime {
           epoch,
           tableID: event.data.tableID,
           name: event.data.name,
+        }));
+        break;
+      case 'hypothetical': {
+        const room = this.store.getState().room.room;
+        if (room.kind !== 'live_game' || room.clientState.replay.shared === null) break;
+        try {
+          const actions = event.data.actions.map((encoded) => (
+            hypoActionSchema.parse(JSON.parse(encoded)) as ActionIncludingHypothetical
+          ));
+          this.store.dispatch(roomActions.hypotheticalStarted({
+            epoch, tableID: room.tableID, showDrawnCards: event.data.showDrawnCards, actions,
+          }));
+        } catch {
+          this.recordInboundDiagnostic(epoch, { command: 'hypothetical', classification: 'malformed' });
+        }
+        break;
+      }
+      case 'hypoStart':
+        this.store.dispatch(roomActions.hypotheticalStarted({
+          epoch, tableID: event.data.TableID, showDrawnCards: false, actions: [],
+        }));
+        break;
+      case 'hypoEnd':
+        this.store.dispatch(roomActions.hypotheticalEnded({ epoch, tableID: event.data.TableID }));
+        break;
+      case 'hypoAction':
+        {
+          const room = this.store.getState().room.room;
+          if (room.kind !== 'live_game') break;
+        this.store.dispatch(roomActions.hypotheticalActionReceived({
+          epoch,
+          tableID: room.tableID,
+          action: event.data as ActionIncludingHypothetical,
+        }));
+        }
+        break;
+      case 'hypoBack':
+        this.store.dispatch(roomActions.hypotheticalBackReceived({ epoch, tableID: event.data.TableID }));
+        break;
+      case 'hypoShowDrawnCards':
+        this.store.dispatch(roomActions.hypotheticalDrawnCardsChanged({
+          epoch, tableID: event.data.tableID, showDrawnCards: event.data.showDrawnCards,
         }));
         break;
       case 'spectators':

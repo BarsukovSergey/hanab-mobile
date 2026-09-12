@@ -8,6 +8,7 @@ import type {
 import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
+import { cardOrder } from '../game/upstream/types/CardOrder';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
@@ -783,6 +784,35 @@ describe('deterministic lobby runtime', () => {
     expect(room.clientState.replay.segment).toBe(0);
     expect(room.clientState.replay.shared?.useSharedSegments).toBe(true);
     expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('hypothetical shared leader waits for authoritative action events and followers cannot send', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    expect(socket.sent.at(-1)).toBe('replayAction {"tableID":123,"type":3}');
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).toBeNull();
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const hypotheticalClue = {
+      type: 'clue' as const, clue: { type: 1 as const, value: 1 as const }, giver: 1 as const, list: [cardOrder.parse(0)], target: 0 as const,
+      ignoreNegative: false,
+    };
+    expect(runtime.sendHypotheticalAction(hypotheticalClue)).toBe(true);
+    expect(socket.sent.at(-1)).toContain('"type":5');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical?.ongoing.turn.turnNum).toBe(1);
+    socket.emitMessage('hypoAction {"type":"clue","clue":{"type":1,"value":1},"giver":1,"list":[0],"target":0,"ignoreNegative":false}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical?.ongoing.clueTokens).toBe(6);
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Bob"}');
+    const sent = socket.sent.length;
+    expect(runtime.backHypothetical()).toBe(false);
+    expect(runtime.endHypothetical()).toBe(false);
+    expect(socket.sent).toHaveLength(sent);
   });
 
   test('leader and spectator events are table-scoped and drive rematch eligibility', async () => {

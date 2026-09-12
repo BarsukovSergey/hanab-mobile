@@ -25,6 +25,7 @@ export function initialState(metadata: GameMetadata): State {
 
       databaseID: null,
       shared: null,
+      hypothetical: null,
     },
     notes: {
       ourNotes: newArray(notesSize, {
