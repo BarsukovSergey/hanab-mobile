@@ -7,7 +7,7 @@ export type C17WorkspaceEligibility = {
   portrait: boolean;
   finished: boolean;
   replayActive: boolean;
-  /** Shared replay retains its existing Legacy route until leader/follow support moves here. */
+  /** Shared replay uses the same portrait C17 workspace as other replay states. */
   sharedReplay?: boolean;
 };
 
@@ -17,11 +17,9 @@ export function isC17WorkspaceEligible({
   isLiveParticipant,
   playerCount,
   portrait,
-  sharedReplay = false,
 }: C17WorkspaceEligibility): boolean {
   return (isLiveParticipant ?? isPlayer ?? false)
     && playerCount >= 2
     && playerCount <= 6
-    && portrait
-    && !sharedReplay;
+    && portrait;
 }

@@ -77,7 +77,9 @@ export function C17GameScreen() {
   const clientState = liveRoom?.clientState ?? null;
   const game = clientState?.visibleState ?? null;
   const isFinishedReplay = clientState?.finished === true;
-  const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true && !isFinishedReplay;
+  const isSharedReplay = clientState?.replay.shared !== null;
+  const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true
+    && !isFinishedReplay && !isSharedReplay;
   const isSpectator = liveRoom?.role === 'spectator';
   const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;
   const ourHand = useMemo(() => ourIndex === null ? [] : game?.hands[ourIndex] ?? [], [game, ourIndex]);
@@ -208,7 +210,7 @@ export function C17GameScreen() {
     selectedSegment: latest,
     variantName: metadata.options.variantName,
   });
-  const reviewTemporal = isFinishedReplay
+  const reviewTemporal = isFinishedReplay || isSharedReplay
     ? getC17TemporalContext({
       states: replay.states,
       selectedSegment: replay.segment,
@@ -221,10 +223,10 @@ export function C17GameScreen() {
       variantName: metadata.options.variantName,
     })
     : liveTemporal;
-  const newerActionCount = !isFinishedReplay && replay.active && c17Review !== null
+  const newerActionCount = !isFinishedReplay && !isSharedReplay && replay.active && c17Review !== null
     ? countC17TemporalStatesAfter(replay.states, c17Review.liveSegmentAtEntry)
     : 0;
-  const recentTemporal = isFinishedReplay || replay.active && c17Review !== null
+  const recentTemporal = isFinishedReplay || isSharedReplay || replay.active && c17Review !== null
     ? reviewTemporal
     : liveTemporal;
   const recentActions = [...recentTemporal.recent, recentTemporal.last]
@@ -243,7 +245,7 @@ export function C17GameScreen() {
       variantName: metadata.options.variantName,
     });
     disarmGameplay();
-    if (!isFinishedReplay) {
+    if (!isFinishedReplay && !isSharedReplay) {
       setC17Review({
         actionSegment: temporal.selectedSegment,
         liveSegmentAtEntry: c17Review?.liveSegmentAtEntry ?? latest,
@@ -266,7 +268,7 @@ export function C17GameScreen() {
     if (target !== null) jumpToAction(target);
   };
   const returnLive = () => {
-    if (isFinishedReplay) return;
+    if (isFinishedReplay || isSharedReplay) return;
     if (!replay.active) return;
     disarmGameplay();
     setC17Review(null);
@@ -285,9 +287,11 @@ export function C17GameScreen() {
     reason: endCondition === null ? null : END_CONDITIONS[endCondition] ?? `End condition ${endCondition}`,
   } : null;
   const canQuickRematch = sessionPhase === 'ready'
-    && isQuickRematchEligible(clientState, roomState.pendingRestartTableID);
+    && isQuickRematchEligible(clientState, roomState.pendingRestartTableID)
+    && (replay.shared === null || replay.shared.amLeader);
   const canRemake = sessionPhase === 'ready'
-    && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID);
+    && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID)
+    && (replay.shared === null || replay.shared.amLeader);
 
   return <>
     <C17DenseWorkspace
@@ -353,12 +357,13 @@ export function C17GameScreen() {
       canEnterClue={enabled}
       recentActions={recentActions}
       result={result}
-      reviewActive={isFinishedReplay || replay.active}
+      reviewActive={isFinishedReplay || replay.active || isSharedReplay}
       finishedReplay={isFinishedReplay}
       selectedActionSegment={reviewTemporal.selectedSegment}
       selectedCard={selectedCard}
       selectedTarget={selectedTarget}
       selectedTurn={reviewTemporal.selectedTurn}
+      sharedReplay={replay.shared}
       targetName={targetName}
       variantName={metadata.options.variantName}
     />
@@ -443,6 +448,7 @@ function C17DenseWorkspace({
   selectedCard,
   selectedTarget,
   selectedTurn,
+  sharedReplay,
   targetName,
   variantName,
 }: {
@@ -505,6 +511,7 @@ function C17DenseWorkspace({
   selectedCard: number | null;
   selectedTarget: number | null;
   selectedTurn: number;
+  sharedReplay: { amLeader: boolean; leader: string; segment: number; useSharedSegments: boolean } | null;
   targetName: string | null;
   variantName: string;
 }) {
@@ -561,10 +568,11 @@ function C17DenseWorkspace({
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
   const inspectedNote = noteCard === null ? '' : notes[noteCard]?.text ?? '';
+  const readOnlyReplay = finishedReplay || sharedReplay !== null;
   const inspectedReplayNotes = noteCard === null
     ? []
     : replayNotes[noteCard]?.filter((entry) => entry.text.trim().length > 0) ?? [];
-  const hasAvailableNote = (order: number) => finishedReplay
+  const hasAvailableNote = (order: number) => readOnlyReplay
     ? (replayNotes[order]?.some((entry) => entry.text.trim().length > 0) ?? false)
     : (notes[order]?.text.trim().length ?? 0) > 0;
   const inspectedCard = noteCard === null ? undefined : game.deck[noteCard];
@@ -582,7 +590,9 @@ function C17DenseWorkspace({
     <View style={styles.ledgerChrome}>
       <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.grow}>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{finishedReplay
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
+            ? `SHARED REVIEW T${selectedTurn}`
+            : finishedReplay
             ? `REPLAY T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · END' : ''}`
             : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
           <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text>
@@ -757,7 +767,7 @@ function C17DenseWorkspace({
       !shellMeasured && styles.shellPending,
     ]}>
       <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
-        {reviewActive && !finishedReplay ? <>
+        {reviewActive && !finishedReplay && sharedReplay === null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
@@ -768,8 +778,18 @@ function C17DenseWorkspace({
             <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
             <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
           </View>
-        </> : finishedReplay ? <>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{`Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`}</Text>
+        </> : finishedReplay || sharedReplay !== null ? <>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay === null
+            ? `Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`
+            : `SHARED REPLAY · Leader: ${sharedReplay.leader}`}</Text>
+          {sharedReplay !== null && <View style={styles.noteInspect}>
+            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{sharedReplay.amLeader
+              ? 'You control the shared segment.'
+              : sharedReplay.useSharedSegments
+                ? `Following ${sharedReplay.leader} at shared segment ${sharedReplay.segment}.`
+                : `Viewing segment ${selectedActionSegment}; shared segment is ${sharedReplay.segment}.`}</Text>
+            {!sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+          </View>}
           <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>

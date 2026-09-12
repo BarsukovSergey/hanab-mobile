@@ -34,10 +34,14 @@ describe('C17 workspace route', () => {
     })).toBe(true);
   });
 
+  test.each([2, 3, 4, 5, 6])('uses C17 for a shared %ip replay', (playerCount) => {
+    expect(isC17WorkspaceEligible({
+      ...livePlayerPortrait, playerCount, finished: true, replayActive: true, sharedReplay: true,
+    })).toBe(true);
+  });
+
   test.each([
-    { ...livePlayerPortrait, playerCount: 6, portrait: false },
-    { ...livePlayerPortrait, playerCount: 6, finished: true, sharedReplay: true },
-    { ...livePlayerPortrait, playerCount: 6, replayActive: true, sharedReplay: true },
+    { ...livePlayerPortrait, playerCount: 6, portrait: false, sharedReplay: true },
     { ...livePlayerPortrait, playerCount: 6, isLiveParticipant: false },
     { ...livePlayerPortrait, playerCount: 1 },
     { ...livePlayerPortrait, playerCount: 7 },
