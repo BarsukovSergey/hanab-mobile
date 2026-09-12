@@ -691,6 +691,7 @@ export class LobbyRuntime {
       room.clientState.metadata,
       room.clientState.cardIdentities,
       hypothetical.morphedIdentities,
+      room.clientState.notes.ourNotes,
     );
     if (actions === null) return false;
     return actions.every((hypoAction) => this.sendHypotheticalAction(hypoAction));

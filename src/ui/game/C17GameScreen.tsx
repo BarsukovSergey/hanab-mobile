@@ -203,6 +203,11 @@ export function C17GameScreen() {
       selectedTarget,
       interaction.cluePreview.type,
       interaction.cluePreview.value,
+      hypotheticalActive ? {
+        cardIdentities: clientState.cardIdentities,
+        morphedIdentities: hypothetical!.morphedIdentities,
+        notes: clientState.notes.ourNotes,
+      } : undefined,
     );
   const targetName = selectedTarget === null
     ? null

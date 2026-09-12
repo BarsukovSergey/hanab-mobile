@@ -1,6 +1,7 @@
 import { ClueType } from '../upstream/enums/ClueType';
 import { getVariant } from '../upstream/gameData';
 import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
+import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
 import type { GameState } from '../upstream/interfaces/GameState';
 import type { MsgClue } from '../upstream/types/MsgClue';
@@ -8,7 +9,7 @@ import { newColorClue, newRankClue } from '../upstream/types/Clue';
 import type { CardOrder } from '../upstream/types/CardOrder';
 import type { PlayerIndex } from '../upstream/types/PlayerIndex';
 import { getNextPlayableRanks } from '../upstream/rules/playStacks';
-import { isCardTouchedByClue } from '../upstream/rules/clues';
+import { getHypotheticalTouchedOrders } from './hypotheticalClueTouch';
 import type { ActionIncludingHypothetical } from './types/actions';
 
 /** Platform-independent port of upstream sendHypotheticalAction's input. */
@@ -26,6 +27,7 @@ export function getHypotheticalActions(
   metadata: GameMetadata,
   cardIdentities: readonly CardIdentity[],
   morphedIdentities: readonly CardIdentity[],
+  notes: readonly CardNote[],
 ): readonly ActionIncludingHypothetical[] | null {
   const actor = game.turn.currentPlayerIndex;
   if (actor === null) return null;
@@ -85,10 +87,10 @@ export function getHypotheticalActions(
       return rank === undefined ? null : newRankClue(rank);
     })();
   if (clue === null) return null;
-  const list = game.hands[clueAction.target]!.filter((order) => {
-    const card = game.deck[order];
-    return card !== undefined && card.suitIndex !== null && card.rank !== null
-      && isCardTouchedByClue(variant, clue, card.suitIndex, card.rank);
+  const list = getHypotheticalTouchedOrders(game, variant, clueAction.target, clue, {
+    cardIdentities,
+    morphedIdentities,
+    notes,
   });
   return [{ type: 'clue', clue: clue as unknown as MsgClue, giver: actor, list, target: clueAction.target as PlayerIndex, ignoreNegative: false }, nextTurn(game, metadata.options.numPlayers)];
 }
