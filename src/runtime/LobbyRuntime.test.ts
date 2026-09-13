@@ -1392,6 +1392,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -1471,6 +1472,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -1580,6 +1582,76 @@ describe('deterministic lobby runtime', () => {
       expect(store.getState().room.room).toEqual({ kind: 'none' });
     },
   );
+
+  test('pregame player-to-spectator sends leave then spectate, stays present through left, and confirms from game plus joined', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    expect(runtime.switchToSpectator()).toBe(true);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'tableLeave {"tableID":123}',
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    socket.emitMessage('left {"TableID":123}');
+    expect(store.getState().room.room.kind).toBe('pregame');
+    socket.emitMessage(createdPregameFrame(['Bob'], 123).replace('"you":true', '"you":false'));
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+  });
+
+  test('pregame spectator-to-player requires and passes password, then confirms only after game plus joined', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    const spectatorRoom = store.getState().room.room;
+    if (spectatorRoom.kind !== 'pregame') throw new Error('Expected pregame spectator room');
+    store.dispatch(roomActions.gameReceived({
+      epoch: 1,
+      game: { ...spectatorRoom.data, passwordProtected: true },
+    }));
+
+    expect(runtime.joinAsPlayer()).toBe(false);
+    expect(runtime.joinAsPlayer('open sesame')).toBe(true);
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+      'tableJoin {"tableID":123,"password":"open sesame"}',
+    ]);
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    expect(JSON.stringify(store.getState())).not.toContain('open sesame');
+  });
+
+  test.each(['warning', 'error'] as const)('pregame role switching rejects a full spectator seat and a solo player, and %s clears its pending intent', async (rejection) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Bob'], 123, 'Pregame table', tableOptions, 1)
+      .replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.joinAsPlayer()).toBe(false);
+    store.dispatch(roomActions.roleSwitchRequested({ epoch: 1, tableID: 123, targetRole: 'player' }));
+    socket.emitMessage(`${rejection} ${JSON.stringify({ [rejection]: 'Rejected' })}`);
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+
+    const playerReady = await makeReadyRuntime();
+    addJoinableTable(playerReady.store);
+    expect(playerReady.runtime.join(123)).toBe(true);
+    playerReady.socket.emitMessage(createdPregameFrame(['Ada'], 123));
+    playerReady.socket.emitMessage('joined {"tableID":123}');
+    expect(playerReady.runtime.switchToSpectator()).toBe(false);
+  });
 
   test('create validates v1 input, sends the exact frame once, and is not optimistic', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
@@ -1971,6 +2043,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -2016,6 +2089,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,

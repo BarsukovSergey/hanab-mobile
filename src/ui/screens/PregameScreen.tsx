@@ -23,6 +23,7 @@ export function PregameScreen() {
   const roomState = useAppSelector((state) => state.room);
   const room = roomState.room.kind === 'pregame' ? roomState.room : null;
   const [editName, setEditName] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState(5);
   const [editOptions, setEditOptions] = useState<MobileTableOptions>({
     variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
@@ -49,6 +50,9 @@ export function PregameScreen() {
 
   if (room === null) return null;
   const isOwner = room.role === 'player' && session.authenticatedUser?.userID === room.data.owner;
+  const roleSwitchPending = roomState.pendingRoleSwitch !== null;
+  const canSwitchToSpectator = room.role === 'player' && room.data.players.length >= 2;
+  const canJoinAsPlayer = room.role === 'spectator' && room.data.players.length < room.data.maxPlayers;
 
   return (
     <View style={styles.root}>
@@ -108,6 +112,33 @@ export function PregameScreen() {
                 onPress={() => lobbyRuntime.startGame()}
               />
             )}
+            <View style={styles.roleSwitch}>
+              {room.role === 'player' ? (
+                <ActionButton
+                  disabled={!canSwitchToSpectator || roleSwitchPending}
+                  title={roleSwitchPending ? 'Switching…' : 'Switch to spectator'}
+                  onPress={() => lobbyRuntime.switchToSpectator()}
+                />
+              ) : (
+                <>
+                  {room.data.passwordProtected && (
+                    <Field
+                      onChangeText={setJoinPassword}
+                      placeholder="Table password"
+                      secureTextEntry
+                      value={joinPassword}
+                    />
+                  )}
+                  <ActionButton
+                    disabled={!canJoinAsPlayer || roleSwitchPending
+                      || (room.data.passwordProtected && joinPassword.length === 0)}
+                    title={roleSwitchPending ? 'Joining…' : 'Join as player'}
+                    tone="primary"
+                    onPress={() => lobbyRuntime.joinAsPlayer(joinPassword)}
+                  />
+                </>
+              )}
+            </View>
           </Panel>
           <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />
         </View>
@@ -153,6 +184,7 @@ const styles = StyleSheet.create({
   columnsWide: { alignItems: 'flex-start', flexDirection: 'row' },
   column: { flex: 1, gap: 16, minWidth: 0 },
   players: { gap: 8 },
+  roleSwitch: { gap: 10 },
   playerRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingTop: 9 },
   playerCopy: { flex: 1, gap: 2 },
   playerName: { fontSize: 15, fontWeight: '800' },

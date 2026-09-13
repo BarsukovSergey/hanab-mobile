@@ -563,6 +563,56 @@ export class LobbyRuntime {
     return true;
   }
 
+  switchToSpectator(): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'pregame'
+      || room.role !== 'player'
+      || room.data.players.length < 2
+      || state.room.pendingRoleSwitch !== null
+      || state.room.pendingLeaveTableID !== null
+      || state.room.pendingStart !== null
+    ) return false;
+    this.store.dispatch(roomActions.roleSwitchRequested({
+      epoch: state.session.connectionEpoch, tableID: room.tableID, targetRole: 'spectator',
+    }));
+    if (!this.sendEncoded(encodeTableLeaveFrame(room.tableID))
+      || !this.sendEncoded(encodeTableSpectateFrame(room.tableID))) {
+      this.store.dispatch(roomActions.roleSwitchCancelled({
+        epoch: state.session.connectionEpoch, tableID: room.tableID,
+      }));
+      return false;
+    }
+    return this.store.getState().room.pendingRoleSwitch?.tableID === room.tableID;
+  }
+
+  joinAsPlayer(password?: string): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      room.kind !== 'pregame'
+      || room.role !== 'spectator'
+      || room.data.players.length >= room.data.maxPlayers
+      || state.room.pendingRoleSwitch !== null
+      || state.room.pendingLeaveTableID !== null
+      || state.room.pendingStart !== null
+      || (room.data.passwordProtected && (password === undefined || password.length === 0))
+    ) return false;
+    this.store.dispatch(roomActions.roleSwitchRequested({
+      epoch: state.session.connectionEpoch, tableID: room.tableID, targetRole: 'player',
+    }));
+    if (!this.sendEncoded(encodeTableJoinFrame(
+      room.tableID, room.data.passwordProtected ? password : undefined,
+    ))) {
+      this.store.dispatch(roomActions.roleSwitchCancelled({
+        epoch: state.session.connectionEpoch, tableID: room.tableID,
+      }));
+      return false;
+    }
+    return this.store.getState().room.pendingRoleSwitch?.tableID === room.tableID;
+  }
+
   unattendLiveGame(tableID: number): boolean {
     const state = this.store.getState();
     const room = state.room.room;
