@@ -1,10 +1,8 @@
 import { possibleCardsFromNoteAndClues } from './cardPresentation';
 import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
 import type { CardNote } from '../upstream/interfaces/CardNote';
-import type { GameState } from '../upstream/interfaces/GameState';
+import type { CardState } from '../upstream/interfaces/CardState';
 import type { SuitRankTuple } from '../upstream/types/SuitRankTuple';
-
-type HypotheticalCardState = Pick<GameState['deck'][number], 'possibleCards' | 'possibleCardsFromClues'>;
 
 export type HypotheticalCardRepresentation = {
   readonly identity: CardIdentity;
@@ -13,7 +11,7 @@ export type HypotheticalCardRepresentation = {
 
 /** Pure pinned-HanabiCard representation used for hypothetical actions and clue touches. */
 export function getHypotheticalCardRepresentation(
-  state: HypotheticalCardState,
+  state: CardState,
   cardIdentity: CardIdentity,
   note: CardNote,
   morph: CardIdentity | undefined,
