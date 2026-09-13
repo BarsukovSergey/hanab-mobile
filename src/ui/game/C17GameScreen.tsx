@@ -13,6 +13,7 @@ import {
 
 import type { CardIdentity, CardNote, GameState } from '../../game/bootstrap/types';
 import type { HypotheticalState } from '../../game/client/types/HypotheticalState';
+import { canToggleHypotheticalDrawnCards } from '../../game/client/hypotheticalEligibility';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardStatePresentation } from '../../game/selectors/cardStatePresentation';
 import { getCluePreview } from '../../game/selectors/cluePreview';
@@ -832,14 +833,12 @@ function C17DenseWorkspace({
           {hypotheticalController ? <View style={styles.actionButtons}>
             <ActionButton compact disabled={hypothetical.states.length <= 1} title="Back" onPress={onBackHypothetical} />
             <ActionButton compact title="End Hypothetical" tone="primary" onPress={onEndHypothetical} />
-            {finishedReplay && <ActionButton
+            <ActionButton
               compact
-              disabled={hypothetical.actions.some((action) => (action.type === 'play' || action.type === 'discard')
-                ? hypothetical.drawnCardsInHypothetical.includes(action.order)
-                : action.type === 'clue' && action.list.some((order) => hypothetical.drawnCardsInHypothetical.includes(order)))}
+              disabled={!canToggleHypotheticalDrawnCards(hypothetical)}
               title={hypothetical.showDrawnCards ? 'Hide drawn cards' : 'Reveal drawn cards'}
               onPress={onToggleHypotheticalDrawn}
-            />}
+            />
           </View> : <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Following the shared hypothetical branch.</Text>}
           {selectedTarget !== null ? <ClueComposer
             choices={clueChoices}

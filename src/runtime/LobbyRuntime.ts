@@ -54,6 +54,7 @@ import {
 } from '../protocol/lobbyProtocol';
 import type { ActionIncludingHypothetical } from '../game/client/types/actions';
 import { getHypotheticalActions } from '../game/client/hypotheticalActions';
+import { canToggleHypotheticalDrawnCards } from '../game/client/hypotheticalEligibility';
 import { chatActions } from '../store/chatSlice';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
@@ -715,7 +716,7 @@ export class LobbyRuntime {
     const state = this.store.getState();
     const room = state.room.room;
     const hypothetical = room.kind === 'live_game' ? room.clientState.replay.hypothetical : null;
-    if (room.kind !== 'live_game' || hypothetical === null) return false;
+    if (room.kind !== 'live_game' || hypothetical === null || !canToggleHypotheticalDrawnCards(hypothetical)) return false;
     const shared = room.clientState.replay.shared;
     if (shared === null) {
       this.store.dispatch(roomActions.hypotheticalDrawnCardsChanged({
