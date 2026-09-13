@@ -1798,6 +1798,31 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.room).toMatchObject({ data: { name: 'Changed' } });
   });
 
+  test('a non-owner pregame attendee sends a proposal without local update state', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    const before = store.getState().room.room;
+    const changes = {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: true, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+      allOrNothing: false,
+    };
+
+    expect(runtime.updateTable('Suggested', 4, changes)).toBe(true);
+    expect(socket.sent.at(-1)).toBe(
+      'tableUpdate {"tableID":123,"name":"Suggested","options":{'
+      + '"variantName":"No Variant","timed":false,"timeBase":0,"timePerTurn":0,'
+      + '"speedrun":false,"cardCycle":true,"deckPlays":false,"emptyClues":false,'
+      + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
+      + '"detrimentalCharacters":false},"maxPlayers":4}',
+    );
+    expect(store.getState().room.pendingUpdate).toBeNull();
+    expect(store.getState().room.room).toEqual(before);
+  });
+
   test('owner leader transfer waits for the authoritative reordered game snapshot', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     runtime.createTable('Mobile table', 5, 'No Variant');

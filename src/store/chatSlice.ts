@@ -6,6 +6,7 @@ import { sessionActions } from './sessionSlice';
 
 export type ReadableChatMessage = Omit<ChatMessage, 'msg' | 'room'> & {
   msg: string;
+  rawMsg: string;
   room: string;
 };
 
@@ -30,6 +31,7 @@ function readable(message: ChatMessage): ReadableChatMessage | null {
   return {
     ...message,
     room: message.room,
+    rawMsg: message.msg,
     msg: chatMarkupToPlainText(message.msg),
   };
 }

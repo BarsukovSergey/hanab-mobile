@@ -502,11 +502,10 @@ export class LobbyRuntime {
     if (
       ownerUserID === undefined
       || room.kind !== 'pregame'
-      || room.role !== 'player'
-      || room.data.owner !== ownerUserID
       || state.room.pendingRoleSwitch !== null
-      || state.room.pendingUpdate !== null
     ) return false;
+    const isOwner = room.data.owner === ownerUserID;
+    if (isOwner && state.room.pendingUpdate !== null) return false;
     let frame: string;
     try {
       frame = encodeTableUpdateFrame(
@@ -516,6 +515,7 @@ export class LobbyRuntime {
       return false;
     }
     if (!this.sendEncoded(frame)) return false;
+    if (!isOwner) return true;
     this.store.dispatch(roomActions.updateRequested({
       epoch: state.session.connectionEpoch, tableID: room.tableID, ownerUserID,
       name: name.trim(), maxPlayers, changes,

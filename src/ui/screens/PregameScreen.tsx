@@ -145,9 +145,13 @@ export function PregameScreen() {
           <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />
         </View>
 
-        {isOwner && (
-          <Panel style={styles.column}>
-            <SectionHeading title="Table settings" detail="Changes are applied authoritatively to the room." />
+        <Panel style={styles.column}>
+            <SectionHeading
+              title="Table settings"
+              detail={isOwner
+                ? 'Changes are applied authoritatively to the room.'
+                : 'Changes are sent to the table owner as a proposal.'}
+            />
             <Field maxLength={45} onChangeText={setEditName} placeholder="Table name" value={editName} />
             <View style={styles.stepperRow}>
               <View style={styles.stepperCopy}>
@@ -163,13 +167,14 @@ export function PregameScreen() {
             </View>
             <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
             <ActionButton
-              disabled={roleSwitchPending || roomState.pendingUpdate !== null || editName.trim().length === 0}
-              title={roomState.pendingUpdate === null ? 'Apply changes' : 'Applying…'}
+              disabled={roleSwitchPending || (isOwner && roomState.pendingUpdate !== null) || editName.trim().length === 0}
+              title={isOwner
+                ? (roomState.pendingUpdate === null ? 'Apply changes' : 'Applying…')
+                : 'Propose changes'}
               tone="primary"
               onPress={() => lobbyRuntime.updateTable(editName, editMaxPlayers, editOptions)}
             />
-          </Panel>
-        )}
+        </Panel>
       </View>
     </View>
   );
