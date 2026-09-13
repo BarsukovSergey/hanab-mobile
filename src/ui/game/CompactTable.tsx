@@ -8,6 +8,7 @@ import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
 import { useAppSelector } from '../../store/hooks';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { VisibleHanabiCard } from './GameCard';
+import { AuthoritativePulse } from './AuthoritativePulse';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
 import {
   getCompactTableFireworksLayout,
@@ -19,11 +20,17 @@ export function CompactTable({
   variantName,
   onOpenDiscards,
   dense = false,
+  pulseDiscard,
+  pulseEnabled = true,
+  pulsePlay,
 }: {
   game: GameState;
   variantName: string;
   onOpenDiscards?: () => void;
   dense?: boolean;
+  pulseDiscard?: number | null;
+  pulseEnabled?: boolean;
+  pulsePlay?: { segment: number; suitIndex: number } | null;
 }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
@@ -64,7 +71,7 @@ export function CompactTable({
         const topOrder = stack[stack.length - 1];
         const card = topOrder === undefined ? undefined : game.deck[topOrder];
         const visual = suitVisuals[suit.suitIndex];
-        return <View key={suit.suitIndex} style={styles.firework}>
+        return <AuthoritativePulse enabled={pulseEnabled} key={suit.suitIndex} pulseKey={pulsePlay?.suitIndex === suit.suitIndex ? pulsePlay.segment : null}><View style={styles.firework}>
           {card === undefined
             ? <View style={[styles.emptyStack, { borderColor: theme.colors.borderStrong, height: fireworksLayout.stackHeight }]}>
               {visual !== undefined && hasUpstreamSvgPip(visual.pip) && <View style={styles.emptyStackPip}>
@@ -84,10 +91,10 @@ export function CompactTable({
               variantName={variantName}
             />}
           {!landscapePhone && <Text numberOfLines={1} style={[styles.suitName, { color: theme.colors.textMuted }]}>{suit.suitName}</Text>}
-        </View>;
+        </View></AuthoritativePulse>;
       })}
     </View>
-    <Pressable
+    <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseDiscard ?? null}><Pressable
       accessibilityRole={onOpenDiscards === undefined ? undefined : 'button'}
       disabled={onOpenDiscards === undefined}
       onPress={onOpenDiscards}
@@ -135,7 +142,7 @@ export function CompactTable({
               </View>
             </View>;
           })}</View>}
-    </Pressable>
+    </Pressable></AuthoritativePulse>
   </View>;
 }
 

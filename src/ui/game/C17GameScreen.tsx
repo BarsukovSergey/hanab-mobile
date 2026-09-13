@@ -33,6 +33,7 @@ import { ActionButton, Notice, useHanabTheme } from '../designSystem';
 import { C17RewindScrubber } from './C17RewindScrubber';
 import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
+import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
@@ -262,6 +263,11 @@ export function C17GameScreen() {
   const actionSegments = replay.states.flatMap((state, segment) => state === undefined ? [] : [segment]);
   const firstActionSegment = actionSegments[0] ?? null;
   const lastActionSegment = actionSegments.at(-1) ?? null;
+  const liveBefore = liveTemporal.beforeSegment === null ? undefined : replay.states[liveTemporal.beforeSegment];
+  const livePulseSegment = !hypotheticalActive && !isFinishedReplay && !isSharedReplay
+    && liveTemporal.last.segment > 0 && liveBefore !== undefined
+    ? liveTemporal.last.segment
+    : null;
 
   const disarmGameplay = () => interactionDispatch({ type: 'disarm-gameplay' });
   const jumpToAction = (actionSegment: number) => {
@@ -348,6 +354,10 @@ export function C17GameScreen() {
       hyphenatedConventions={hyphenatedConventions}
       isSpectator={isSpectator}
       lastAction={reviewTemporal.last.summary}
+      liveBefore={liveBefore}
+      livePulseSegment={livePulseSegment}
+      livePulseEnabled={!replay.active}
+      liveTransition={liveTemporal.last}
       liveTurn={liveTemporal.liveTurn}
       metadata={metadata}
       newerActionCount={newerActionCount}
@@ -461,6 +471,10 @@ function C17DenseWorkspace({
   hyphenatedConventions,
   isSpectator,
   lastAction,
+  liveBefore,
+  livePulseSegment,
+  livePulseEnabled,
+  liveTransition,
   liveTurn,
   metadata,
   newerActionCount,
@@ -534,6 +548,10 @@ function C17DenseWorkspace({
   hyphenatedConventions: boolean;
   isSpectator: boolean;
   lastAction: string;
+  liveBefore: GameState | undefined;
+  livePulseSegment: number | null;
+  livePulseEnabled: boolean;
+  liveTransition: C17TemporalEntry;
   liveTurn: number;
   metadata: { playerNames: readonly string[]; hardVariant: boolean };
   newerActionCount: number;
@@ -630,6 +648,21 @@ function C17DenseWorkspace({
   };
 
   const current = game.turn.currentPlayerIndex;
+  const actorPulse = liveBefore !== undefined && liveBefore.turn.currentPlayerIndex !== current ? livePulseSegment : null;
+  const resourcePulse = (before: number, after: number) => before !== after ? livePulseSegment : null;
+  const playPulse = livePulseSegment !== null && liveTransition.actionType === 'play' && liveTransition.cardOrder !== null
+    ? { segment: livePulseSegment, suitIndex: game.deck[liveTransition.cardOrder]?.suitIndex ?? -1 }
+    : null;
+  const discardPulse = liveTransition.actionType === 'discard' ? livePulseSegment : null;
+  const sourcePulse = (index: number) => (
+    (liveTransition.actionType === 'play' || liveTransition.actionType === 'discard')
+      && liveTransition.actorIndex === index ? livePulseSegment : null
+  );
+  const cluePulse = (index: number, position: number) => (
+    liveTransition.actionType === 'clue'
+      && liveTransition.targetIndex === index
+      && liveTransition.touchedSlots.includes(position + 1) ? livePulseSegment : null
+  );
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const displayIdentity = (order: number) => hypothetical?.morphedIdentities[order] ?? cardIdentities[order];
@@ -669,13 +702,13 @@ function C17DenseWorkspace({
             : finishedReplay
             ? `REPLAY T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · END' : ''}`
             : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
-          <Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text>
+          <AuthoritativePulse enabled={livePulseEnabled} pulseKey={actorPulse}><Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text></AuthoritativePulse>
         </View>
-        <HudStat label="Score" value={game.score} />
+        <HudStat label="Score" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.score, game.score)} value={game.score} />
         <HudStat label="Max" value={game.stats.maxScore} />
-        <HudStat label="Clues" value={getDisplayedClueTokens(game.clueTokens, variantName)} />
-        <HudStat label="Strikes" value={game.strikes.length} />
-        <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
+        <HudStat label="Clues" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(getDisplayedClueTokens(liveBefore.clueTokens, variantName), getDisplayedClueTokens(game.clueTokens, variantName))} value={getDisplayedClueTokens(game.clueTokens, variantName)} />
+        <HudStat label="Strikes" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.strikes.length, game.strikes.length)} value={game.strikes.length} />
+        <HudStat label="Deck" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)} value={game.cardsRemainingInTheDeck} />
         {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
         {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
       </View>
@@ -689,9 +722,9 @@ function C17DenseWorkspace({
         </View>}
       </View>}
 
-      <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} variantName={variantName} />
+      <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
 
-      <View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
         <View style={[styles.rowBetween, styles.lastActionHeader]}>
           <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
           {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
@@ -700,7 +733,7 @@ function C17DenseWorkspace({
           <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
           <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
         </Pressable>
-      </View>
+      </View></AuthoritativePulse>
     </View>
 
     <View
@@ -718,11 +751,10 @@ function C17DenseWorkspace({
           const empathizing = globalEmpathy || empathyPlayer === index;
           const target = selectedTarget === index;
           const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
-          return <Pressable
+          return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={sourcePulse(index)}><Pressable
             accessibilityLabel={`Player ${playerName}`}
             accessibilityRole="button"
             delayLongPress={350}
-            key={index}
             onLongPress={globalEmpathy ? undefined : () => {
               longPressedOpponent.current = index;
               onHoldEmpathy(index);
@@ -773,12 +805,11 @@ function C17DenseWorkspace({
                   hyphenatedConventions,
                   hardVariant: metadata.hardVariant,
                 });
-                return <VisibleHanabiCard
+                return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
                   hasNote={hasAvailableNote(order)}
                   height={layout.opponentCardHeight}
                   highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}
-                  key={order}
                   onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
                   onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
                   onPress={() => onInspectNote(order)}
@@ -790,14 +821,14 @@ function C17DenseWorkspace({
                   statePresentation={statePresentation}
                   suitIndex={hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex}
                   variantName={variantName}
-                />;
+                /></AuthoritativePulse>;
               })}
             </View>
-          </Pressable>;
+          </Pressable></AuthoritativePulse>;
         })}
       </View>
 
-      <Pressable
+      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={sourcePulse(ourIndex)}><Pressable
         delayLongPress={350}
         disabled={globalEmpathy}
         onLongPress={() => onHoldEmpathy(ourIndex)}
@@ -828,10 +859,9 @@ function C17DenseWorkspace({
               hyphenatedConventions,
               hardVariant: metadata.hardVariant,
             });
-            return <GameCard
+            return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(ourIndex, position)}><GameCard
               hasNote={hasAvailableNote(order)}
               height={layout.ownCardHeight}
-              key={order}
               knowledge={knowledge}
               onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
               onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(ourIndex)}
@@ -841,10 +871,10 @@ function C17DenseWorkspace({
               selected={selectedOwnCard === order}
               statePresentation={statePresentation}
               variantName={variantName}
-            />;
+            /></AuthoritativePulse>;
           })}
         </View>
-      </Pressable>
+      </Pressable></AuthoritativePulse>
     </View>
 
     <View style={[
@@ -1005,12 +1035,12 @@ function C17DenseWorkspace({
   </View>;
 }
 
-function HudStat({ label, value }: { label: string; value: number | string }) {
+function HudStat({ label, pulseEnabled, pulseKey, value }: { label: string; pulseEnabled?: boolean; pulseKey?: number | null; value: number | string }) {
   const { theme } = useHanabTheme();
-  return <View style={styles.hudStat}>
+  return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}><View style={styles.hudStat}>
     <Text style={[styles.hudValue, { color: theme.colors.text }]}>{value}</Text>
     <Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text>
-  </View>;
+  </View></AuthoritativePulse>;
 }
 
 function getCardLabel(game: GameState, playerNames: readonly string[], order: number): string {
