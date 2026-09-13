@@ -17,6 +17,7 @@ import { canToggleHypotheticalDrawnCards } from '../../game/client/hypotheticalE
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardStatePresentation } from '../../game/selectors/cardStatePresentation';
 import { getCluePreview } from '../../game/selectors/cluePreview';
+import { getNoteImpossibilityWarning } from '../../game/selectors/noteImpossibility';
 import {
   getDisplayedClueTokens,
   getDisplayedLiveFutureEfficiency,
@@ -99,6 +100,7 @@ export function C17GameScreen() {
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [discardViewerOpen, setDiscardViewerOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [noteWarning, setNoteWarning] = useState<string | null>(null);
   const [c17Review, setC17Review] = useState<C17ReviewSelection | null>(null);
 
   const liveNoteOrders = useMemo(() => getLiveNoteOrders(game), [game]);
@@ -186,6 +188,12 @@ export function C17GameScreen() {
     if (persistNote(value)) {
       setNote(value);
       setNoteEditorOpen(false);
+      setNoteWarning(getNoteImpossibilityWarning({
+        card: game.deck[noteCard ?? -1],
+        noteText: value,
+        ourPlayerIndex: metadata.ourPlayerIndex,
+        variantName: metadata.options.variantName,
+      }));
     }
   };
   const clearNote = () => {
@@ -405,6 +413,9 @@ export function C17GameScreen() {
       variantName={metadata.options.variantName}
     />
     {clientState.pause.active && <Notice tone="error">Game paused</Notice>}
+    {noteWarning !== null && <View style={[styles.noteWarning, { borderColor: theme.colors.warning }]}>
+      <Text style={[styles.noteWarningText, { color: theme.colors.warning }]}>{noteWarning}</Text>
+    </View>}
     <DiscardViewer
       game={game}
       onClose={() => setDiscardViewerOpen(false)}
@@ -1039,6 +1050,8 @@ const styles = StyleSheet.create({
   workbenchText: { fontSize: 12, lineHeight: 16 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },
+  noteWarning: { borderLeftWidth: 3, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  noteWarningText: { lineHeight: 20 },
   pendingText: { fontSize: 10, lineHeight: 14 },
   recentBackdrop: { flex: 1, justifyContent: 'center', padding: 18 },
   recentPopup: { borderRadius: 14, borderWidth: 1, gap: 10, maxHeight: '78%', padding: 12 },
