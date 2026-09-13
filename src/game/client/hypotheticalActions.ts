@@ -9,6 +9,7 @@ import { newColorClue, newRankClue } from '../upstream/types/Clue';
 import type { CardOrder } from '../upstream/types/CardOrder';
 import type { PlayerIndex } from '../upstream/types/PlayerIndex';
 import { getNextPlayableRanks } from '../upstream/rules/playStacks';
+import { getHypotheticalCardRepresentation } from './hypotheticalCardRepresentation';
 import { getHypotheticalTouchedOrders } from './hypotheticalClueTouch';
 import type { ActionIncludingHypothetical } from './types/actions';
 
@@ -28,6 +29,7 @@ export function getHypotheticalActions(
   cardIdentities: readonly CardIdentity[],
   morphedIdentities: readonly CardIdentity[],
   notes: readonly CardNote[],
+  playing: boolean,
 ): readonly ActionIncludingHypothetical[] | null {
   const actor = game.turn.currentPlayerIndex;
   if (actor === null) return null;
@@ -37,8 +39,13 @@ export function getHypotheticalActions(
     const order = action.order as CardOrder;
     if (!(game.hands[actor] ?? []).includes(order)) return null;
     const card = game.deck[order];
-    const identity = morphedIdentities[order] ?? card;
-    if (card === undefined || identity === undefined || identity.suitIndex === null || identity.rank === null) return null;
+    const cardIdentity = cardIdentities[order];
+    const note = notes[order];
+    if (card === undefined || cardIdentity === undefined || note === undefined) return null;
+    const { identity } = getHypotheticalCardRepresentation(
+      card, cardIdentity, note, morphedIdentities[order], playing,
+    );
+    if (identity.suitIndex === null || identity.rank === null) return null;
     const { suitIndex, rank } = identity;
     const suit = variant.suits[suitIndex];
     let actualType: 'play' | 'discard' = action.type;
@@ -91,6 +98,7 @@ export function getHypotheticalActions(
     cardIdentities,
     morphedIdentities,
     notes,
+    playing,
   });
   return [{ type: 'clue', clue: clue as unknown as MsgClue, giver: actor, list, target: clueAction.target as PlayerIndex, ignoreNegative: false }, nextTurn(game, metadata.options.numPlayers)];
 }

@@ -208,6 +208,7 @@ export function C17GameScreen() {
         cardIdentities: clientState.cardIdentities,
         morphedIdentities: hypothetical!.morphedIdentities,
         notes: clientState.notes.ourNotes,
+        playing: clientState.playing,
       } : undefined,
     );
   const targetName = selectedTarget === null

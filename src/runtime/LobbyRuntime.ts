@@ -693,6 +693,7 @@ export class LobbyRuntime {
       room.clientState.cardIdentities,
       hypothetical.morphedIdentities,
       room.clientState.notes.ourNotes,
+      room.clientState.playing,
     );
     if (actions === null) return false;
     return actions.every((hypoAction) => this.sendHypotheticalAction(hypoAction));
