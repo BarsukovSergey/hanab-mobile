@@ -74,6 +74,9 @@ const HAND_CARD_GAP = 3;
 
 export function C17GameScreen() {
   const { theme } = useHanabTheme();
+  const { width, height } = useWindowDimensions();
+  const orientation = width > height ? 'landscape' : 'portrait';
+  const orientationRef = useRef(orientation);
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
   const hyphenatedConventions = useAppSelector((state) => {
@@ -107,6 +110,12 @@ export function C17GameScreen() {
   const [note, setNote] = useState('');
   const [noteWarning, setNoteWarning] = useState<string | null>(null);
   const [c17Review, setC17Review] = useState<C17ReviewSelection | null>(null);
+
+  useEffect(() => {
+    if (orientationRef.current === orientation) return;
+    orientationRef.current = orientation;
+    interactionDispatch({ type: 'reset-lifecycle-transients' });
+  }, [orientation]);
 
   const liveNoteOrders = useMemo(() => getLiveNoteOrders(game), [game]);
   useEffect(() => {

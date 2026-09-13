@@ -226,13 +226,15 @@ function AppContent() {
       : liveClientState.ongoingGame.turn.currentPlayerIndex === liveClientState.metadata.ourPlayerIndex
         ? 'Pause'
         : liveClientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
-    const c17DensePortrait = isC17WorkspaceEligible({
-      isPlayer: roomState.room.role === 'player' && roomState.room.clientState.playing,
+    const c17Workspace = isC17WorkspaceEligible({
+      isLiveParticipant: true,
       playerCount: roomState.room.clientState.metadata.playerNames.length,
-      portrait: width <= height,
+      portrait: true,
       finished: roomState.room.clientState.finished,
       replayActive: roomState.room.clientState.replay.active,
+      sharedReplay: roomState.room.sharedReplay,
     });
+    const gameRootScrollable = !c17Workspace || width > height || height < 700;
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -259,18 +261,22 @@ function AppContent() {
           </View>
         )}
         <SafeAreaView edges={['bottom']} style={styles.flex}>
-        {c17DensePortrait
-          ? <View style={[styles.gameWorkspace, { maxWidth: contentMaxWidth }]}>
-            <GameScreen />
-          </View>
-          : <ScrollView contentContainerStyle={[
+        <ScrollView
+          contentContainerStyle={[
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
+          c17Workspace && styles.gameContainerC17,
           { maxWidth: contentMaxWidth },
-        ]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-          <LastClueNotice />
-          <GameScreen />
-          </ScrollView>}
+          ]}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={gameRootScrollable}
+        >
+          {!c17Workspace && <LastClueNotice />}
+          <View style={c17Workspace ? styles.gameWorkspace : undefined}>
+            <GameScreen />
+          </View>
+        </ScrollView>
         </SafeAreaView>
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
           <View style={styles.sheetBackdrop}>
@@ -394,6 +400,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
+  gameContainerC17: { flex: 1 },
   gameContainerLandscape: { gap: 4, paddingBottom: 10, paddingHorizontal: 8, paddingTop: 4 },
   gameWorkspace: { alignSelf: 'center', flex: 1, paddingBottom: 10, paddingHorizontal: 10, paddingTop: 7, width: '100%' },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },

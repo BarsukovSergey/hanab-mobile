@@ -4,6 +4,7 @@ export type C17WorkspaceEligibility = {
   /** A live player or spectator may use the C17 workspace. */
   isLiveParticipant?: boolean;
   playerCount: number;
+  /** Retained for compatibility; C17 stays mounted in either orientation. */
   portrait: boolean;
   finished: boolean;
   replayActive: boolean;
@@ -11,15 +12,13 @@ export type C17WorkspaceEligibility = {
   sharedReplay?: boolean;
 };
 
-/** The non-scrolling C17 workspace stays active for a live player or spectator while reviewing history. */
+/** C17 stays mounted for an eligible live participant while reviewing history or rotating. */
 export function isC17WorkspaceEligible({
   isPlayer,
   isLiveParticipant,
   playerCount,
-  portrait,
 }: C17WorkspaceEligibility): boolean {
   return (isLiveParticipant ?? isPlayer ?? false)
     && playerCount >= 2
-    && playerCount <= 6
-    && portrait;
+    && playerCount <= 6;
 }
