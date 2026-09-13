@@ -75,6 +75,10 @@ export function C17GameScreen() {
   const { theme } = useHanabTheme();
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
+  const hyphenatedConventions = useAppSelector((state) => {
+    const userID = state.session.authenticatedUser?.userID;
+    return userID !== undefined && state.lobby.users.entities[userID]?.hyphenated === true;
+  });
   const roomState = useAppSelector((state) => state.room);
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
   const clientState = liveRoom?.clientState ?? null;
@@ -341,6 +345,7 @@ export function C17GameScreen() {
       hypotheticalController={canHypotheticalControl}
       globalEmpathy={interaction.globalEmpathy}
       historyAvailable={recentActions.length > 0}
+      hyphenatedConventions={hyphenatedConventions}
       isSpectator={isSpectator}
       lastAction={reviewTemporal.last.summary}
       liveTurn={liveTemporal.liveTurn}
@@ -453,6 +458,7 @@ function C17DenseWorkspace({
   hypotheticalController,
   globalEmpathy,
   historyAvailable,
+  hyphenatedConventions,
   isSpectator,
   lastAction,
   liveTurn,
@@ -525,10 +531,11 @@ function C17DenseWorkspace({
   hypotheticalController: boolean;
   globalEmpathy: boolean;
   historyAvailable: boolean;
+  hyphenatedConventions: boolean;
   isSpectator: boolean;
   lastAction: string;
   liveTurn: number;
-  metadata: { playerNames: readonly string[] };
+  metadata: { playerNames: readonly string[]; hardVariant: boolean };
   newerActionCount: number;
   noteCard: number | null;
   notes: readonly CardNote[];
@@ -763,6 +770,8 @@ function C17DenseWorkspace({
                   finished: finishedReplay,
                   variantName,
                   speedrun,
+                  hyphenatedConventions,
+                  hardVariant: metadata.hardVariant,
                 });
                 return <VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
@@ -816,6 +825,8 @@ function C17DenseWorkspace({
               finished: finishedReplay,
               variantName,
               speedrun,
+              hyphenatedConventions,
+              hardVariant: metadata.hardVariant,
             });
             return <GameCard
               hasNote={hasAvailableNote(order)}

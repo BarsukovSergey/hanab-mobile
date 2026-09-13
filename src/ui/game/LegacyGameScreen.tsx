@@ -64,6 +64,10 @@ export function GameScreen() {
   const sessionPhase = useAppSelector((state) => state.session.phase);
   const roomState = useAppSelector((state) => state.room);
   const lobbyUsers = useAppSelector((state) => state.lobby.users.entities);
+  const hyphenatedConventions = useAppSelector((state) => {
+    const userID = state.session.authenticatedUser?.userID;
+    return userID !== undefined && state.lobby.users.entities[userID]?.hyphenated === true;
+  });
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
   const clientState = liveRoom?.clientState ?? null;
   const game = clientState?.visibleState ?? null;
@@ -369,6 +373,7 @@ export function GameScreen() {
         game={game}
         globalEmpathy={interaction.globalEmpathy}
         historyAvailable={recentActions.length > 0}
+        hyphenatedConventions={hyphenatedConventions}
         lastAction={reviewTemporal.last.summary}
         liveTurn={liveTemporal.liveTurn}
         metadata={metadata}
@@ -568,6 +573,7 @@ function C17DenseWorkspace({
   game,
   globalEmpathy,
   historyAvailable,
+  hyphenatedConventions,
   metadata,
   notes,
   ourIndex,
@@ -609,7 +615,8 @@ function C17DenseWorkspace({
   game: GameState;
   globalEmpathy: boolean;
   historyAvailable: boolean;
-  metadata: { playerNames: readonly string[] };
+  hyphenatedConventions: boolean;
+  metadata: { playerNames: readonly string[]; hardVariant: boolean };
   notes: readonly CardNote[];
   ourIndex: number;
   selectedCard: number | null;
@@ -744,6 +751,8 @@ function C17DenseWorkspace({
                   finished: false,
                   variantName,
                   speedrun,
+                  hyphenatedConventions,
+                  hardVariant: metadata.hardVariant,
                 });
                 return <VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
@@ -788,6 +797,8 @@ function C17DenseWorkspace({
               finished: false,
               variantName,
               speedrun,
+              hyphenatedConventions,
+              hardVariant: metadata.hardVariant,
             });
             return <GameCard height={layout.ownCardHeight} hasNote={(cardNote?.text.trim().length ?? 0) > 0} key={order}
               knowledge={knowledge} onSelect={() => onSelectCard(order)}

@@ -29,6 +29,8 @@ export function getCardStatePresentation({
   finished,
   variantName,
   speedrun,
+  hyphenatedConventions,
+  hardVariant,
 }: {
   game: GameState;
   state: CardState;
@@ -39,6 +41,8 @@ export function getCardStatePresentation({
   finished: boolean;
   variantName: string;
   speedrun: boolean;
+  hyphenatedConventions: boolean;
+  hardVariant: boolean;
 }): CardStatePresentation {
   const leftHand = isCardPlayed(state) || isCardDiscarded(state);
   const status = getDisplayedCardStatus(game, displaySuitIndex, displayRank);
@@ -66,6 +70,8 @@ export function getCardStatePresentation({
     questionMark: noteIndicatorsVisible && (note?.questionMark ?? false),
     exclamationMark: noteIndicatorsVisible && (note?.exclamationMark ?? false),
     doubleDiscard: state.inDoubleDiscard
+      && hyphenatedConventions
+      && !hardVariant
       && status !== CardStatus.Critical
       && !knownTrashFromEmpathy,
   };

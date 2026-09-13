@@ -42,6 +42,8 @@ function presentation({
   finished = false,
   variantName = 'No Variant',
   speedrun = false,
+  hyphenatedConventions = false,
+  hardVariant = false,
 }: {
   status?: CardStatus;
   state?: CardState;
@@ -52,6 +54,8 @@ function presentation({
   finished?: boolean;
   variantName?: string;
   speedrun?: boolean;
+  hyphenatedConventions?: boolean;
+  hardVariant?: boolean;
 } = {}) {
   return getCardStatePresentation({
     game: gameWith(status),
@@ -63,6 +67,8 @@ function presentation({
     finished,
     variantName,
     speedrun,
+    hyphenatedConventions,
+    hardVariant,
   });
 }
 
@@ -169,5 +175,25 @@ describe('getCardStatePresentation', () => {
       status: CardStatus.Trash,
       displaySuitIndex: null,
     })).toMatchObject({ engineTrash: false, critical: false, shouldFade: false });
+  });
+
+  test('shows DDA only for non-hard hyphenated-convention variants', () => {
+    const state = { ...baseCard, inDoubleDiscard: true } as CardState;
+    expect(presentation({ state }).doubleDiscard).toBe(false);
+    expect(presentation({ state, hyphenatedConventions: true, hardVariant: true }).doubleDiscard).toBe(false);
+    expect(presentation({ state, hyphenatedConventions: true }).doubleDiscard).toBe(true);
+  });
+
+  test('retains Critical and empathy-known-trash DDA suppression', () => {
+    const options = { hyphenatedConventions: true };
+    expect(presentation({
+      ...options,
+      status: CardStatus.Critical,
+      state: { ...baseCard, inDoubleDiscard: true } as CardState,
+    }).doubleDiscard).toBe(false);
+    expect(presentation({
+      ...options,
+      state: { ...baseCard, inDoubleDiscard: true, isKnownTrashFromEmpathy: true } as CardState,
+    }).doubleDiscard).toBe(false);
   });
 });
