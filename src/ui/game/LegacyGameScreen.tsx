@@ -223,7 +223,6 @@ export function GameScreen() {
       <NoteEditor
         editable={false}
         onChange={setNote}
-        onClear={() => undefined}
         onClose={() => setNoteEditorOpen(false)}
         onSave={() => undefined}
         title={selectedReplayLabel}
@@ -257,12 +256,6 @@ export function GameScreen() {
   const saveNote = (value: string) => {
     if (persistNote(value)) {
       setNote(value);
-      setNoteEditorOpen(false);
-    }
-  };
-  const clearNote = () => {
-    if (persistNote('')) {
-      setNote('');
       setNoteEditorOpen(false);
     }
   };
@@ -411,7 +404,6 @@ export function GameScreen() {
       <NoteEditor
         editable={notesEditable}
         onChange={setNote}
-        onClear={clearNote}
         onClose={() => setNoteEditorOpen(false)}
         onSave={saveNote}
         title={noteCardLabel}
@@ -555,7 +547,6 @@ export function GameScreen() {
     <NoteEditor
       editable={notesEditable}
       onChange={setNote}
-      onClear={clearNote}
       onClose={() => setNoteEditorOpen(false)}
       onSave={saveNote}
       title={noteCardLabel}

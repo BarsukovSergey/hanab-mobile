@@ -42,7 +42,6 @@ export function NoteEditor({
   startEditing?: boolean;
   onChange: (value: string) => void;
   onSave: (value: string) => void;
-  onClear: () => void;
   onClose: () => void;
 }) {
   const { theme } = useHanabTheme();

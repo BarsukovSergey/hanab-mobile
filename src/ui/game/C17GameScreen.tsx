@@ -196,13 +196,6 @@ export function C17GameScreen() {
       }));
     }
   };
-  const clearNote = () => {
-    if (persistNote('')) {
-      setNote('');
-      setNoteEditorOpen(false);
-    }
-  };
-
   const cluePreview = interaction.cluePreview === null || selectedTarget === null
     ? null
     : getCluePreview(
@@ -425,7 +418,6 @@ export function C17GameScreen() {
     <NoteEditor
       editable={notesEditable}
       onChange={setNote}
-      onClear={clearNote}
       onClose={() => setNoteEditorOpen(false)}
       onSave={saveNote}
       startEditing
