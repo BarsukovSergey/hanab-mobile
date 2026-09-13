@@ -165,10 +165,9 @@ export function C17GameScreen() {
     && selectedTarget !== null;
   const notesEditable = !hypotheticalActive && sessionPhase === 'ready'
     && !clientState.finished
-    && !replay.active
     && !liveRoom.sharedReplay
     && noteCard !== null
-    && liveNoteOrders.includes(noteCard);
+    && clientState.notes.ourNotes[noteCard] !== undefined;
   const pending = roomState.pendingGameplayAction?.action ?? null;
   const pendingText = pending === null
     ? null
@@ -763,7 +762,7 @@ function C17DenseWorkspace({
                   height={layout.opponentCardHeight}
                   highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}
                   key={order}
-                  onDoublePress={reviewActive ? undefined : () => onEditNote(order)}
+                  onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
                   onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
                   onPress={() => onInspectNote(order)}
                   onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
@@ -813,7 +812,7 @@ function C17DenseWorkspace({
               height={layout.ownCardHeight}
               key={order}
               knowledge={knowledge}
-              onDoublePress={reviewActive ? undefined : () => onEditNote(order)}
+              onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
               onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(ourIndex)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               onSelect={() => onSelectCard(order)}
@@ -873,6 +872,16 @@ function C17DenseWorkspace({
             <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
           </View>
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
+          {noteCard !== null && <View style={styles.noteInspect}>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
+              <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
+            </View>
+            <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
+              {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
+            </Text>
+            {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
+          </View>}
         </> : finishedReplay || sharedReplay !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay === null
             ? `Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`

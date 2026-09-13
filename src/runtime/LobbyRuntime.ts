@@ -838,7 +838,6 @@ export class LobbyRuntime {
       room.kind !== 'live_game'
       || room.clientState.finished
       || room.sharedReplay
-      || room.clientState.replay.active
       || !Number.isInteger(cardOrder)
       || cardOrder < 0
       || text.length > 300
@@ -852,8 +851,7 @@ export class LobbyRuntime {
     });
     if (!parsed.success) return false;
     const order = parsed.data.order;
-    const hands = room.clientState.ongoingGame.hands;
-    if (!isEditableLiveNoteOrder(hands, order)) return false;
+    if (!isEditableLiveNoteOrder(room.clientState.notes.ourNotes, order)) return false;
 
     let sent = false;
     try {

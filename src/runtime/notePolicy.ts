@@ -1,8 +1,8 @@
 export function isEditableLiveNoteOrder(
-  hands: readonly (readonly number[])[],
+  notes: readonly unknown[],
   order: number,
 ): boolean {
   return Number.isInteger(order)
     && order >= 0
-    && hands.some((hand) => hand.includes(order));
+    && notes[order] !== undefined;
 }

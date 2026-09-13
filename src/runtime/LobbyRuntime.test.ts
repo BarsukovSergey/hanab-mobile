@@ -335,6 +335,33 @@ describe('deterministic lobby runtime', () => {
     },
   );
 
+  test('edits a historical card while locally rewinding after it has left the live hand', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"discard","playerIndex":1,"order":5,"suitIndex":0,"rank":1,"failed":false}}',
+    );
+
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.replay.active).toBe(true);
+    expect(room.clientState.visibleState?.hands[1]).toContain(5);
+    expect(room.clientState.ongoingGame.hands[1]).not.toContain(5);
+
+    expect(runtime.editNote(5, 'rewind note')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('note {"tableID":123,"order":5,"note":"rewind note"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.notes.ourNotes[5]?.text).toBe('rewind note');
+  });
+
   test('accepts current note/presence events and ignores wrong table or cardinality', async () => {
     const { socket, store } = await makeLiveRuntime('spectator');
     socket.emitMessage('noteListPlayer {"tableID":999,"notes":["wrong"]}');

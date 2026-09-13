@@ -3,17 +3,21 @@ import { describe, expect, test } from '@jest/globals';
 import { isEditableLiveNoteOrder } from './notePolicy';
 
 describe('isEditableLiveNoteOrder', () => {
-  const hands = [[0, 1, 2], [5, 6, 7], [10, 11, 12]] as const;
+  const notes = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}] as const;
 
-  test('accepts cards in our hand or an opponent hand', () => {
-    expect(isEditableLiveNoteOrder(hands, 1)).toBe(true);
-    expect(isEditableLiveNoteOrder(hands, 6)).toBe(true);
-    expect(isEditableLiveNoteOrder(hands, 12)).toBe(true);
+  test('accepts card orders in the authoritative notes domain', () => {
+    expect(isEditableLiveNoteOrder(notes, 1)).toBe(true);
+    expect(isEditableLiveNoteOrder(notes, 6)).toBe(true);
+    expect(isEditableLiveNoteOrder(notes, 12)).toBe(true);
   });
 
-  test('rejects cards that are no longer in a live hand', () => {
-    expect(isEditableLiveNoteOrder(hands, 3)).toBe(false);
-    expect(isEditableLiveNoteOrder(hands, -1)).toBe(false);
-    expect(isEditableLiveNoteOrder(hands, 1.5)).toBe(false);
+  test('accepts a historical card no longer in a current hand', () => {
+    expect(isEditableLiveNoteOrder(notes, 3)).toBe(true);
+  });
+
+  test('rejects orders outside the authoritative notes domain', () => {
+    expect(isEditableLiveNoteOrder(notes, 13)).toBe(false);
+    expect(isEditableLiveNoteOrder(notes, -1)).toBe(false);
+    expect(isEditableLiveNoteOrder(notes, 1.5)).toBe(false);
   });
 });

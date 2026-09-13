@@ -14,6 +14,8 @@ test('C17 finished replay is an authoritative read-only timeline with available 
   expect(screen).toContain('reviewActive={!hypotheticalActive && (isFinishedReplay || replay.active || isSharedReplay)}');
   expect(screen).toContain('replayNotes={clientState.notes.allNotes}');
   expect(screen).toContain('const readOnlyReplay = finishedReplay || sharedReplay !== null;');
+  expect(screen).toContain('onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}');
+  expect(screen).toContain('reviewActive && !finishedReplay && sharedReplay === null ? <>');
   expect(screen).toContain('const hasAvailableNote = (order: number) => readOnlyReplay');
   expect(screen).toContain('replayNotes[order]?.some((entry) => entry.text.trim().length > 0)');
   expect(screen).toContain("'No replay notes'");
