@@ -29,6 +29,7 @@ import {
 } from './src/ui/designSystem';
 import { GameScreen } from './src/ui/game/GameScreen';
 import { LastClueNotice } from './src/ui/game/LastClueNotice';
+import { TerminationControls } from './src/ui/game/TerminationControls';
 import { isC17WorkspaceEligible } from './src/ui/game/c17Workspace';
 import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
@@ -211,7 +212,20 @@ function AppContent() {
 
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
+    const liveClientState = roomState.room.clientState;
     const liveConnectionProblem = session.phase === 'failed' || session.phase === 'closed';
+    const pauseEligible = session.phase === 'ready'
+      && roomState.room.role === 'player'
+      && !roomState.room.sharedReplay
+      && !liveClientState.finished
+      && !liveClientState.replay.active
+      && liveClientState.ongoingGame.turn.currentPlayerIndex !== null
+      && liveClientState.metadata.options.timed;
+    const pauseLabel = liveClientState.pause.active
+      ? 'Unpause'
+      : liveClientState.ongoingGame.turn.currentPlayerIndex === liveClientState.metadata.ourPlayerIndex
+        ? 'Pause'
+        : liveClientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
     const c17DensePortrait = isC17WorkspaceEligible({
       isPlayer: roomState.room.role === 'player' && roomState.room.clientState.playing,
       playerCount: roomState.room.clientState.metadata.playerNames.length,
@@ -236,17 +250,6 @@ function AppContent() {
           </View>}
           <View style={[styles.headerActions, landscapePhone && styles.headerActionsLandscape]}>
             <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
-            <ActionButton
-              compact
-              disabled={roomState.pendingUnattendTableID !== null}
-              title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving…'}
-              onPress={() => {
-                setLiveSheet(null);
-                setReturnAfterUnattend(null);
-                setLocalScreen('lobby');
-                lobbyRuntime.unattendLiveGame(liveTableID);
-              }}
-            />
           </View>
         </View>
         {liveConnectionProblem && (
@@ -277,6 +280,25 @@ function AppContent() {
                   <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
                   <View style={styles.menuActions}>
                     <ActionButton title="Table chat" onPress={() => setLiveSheet('chat')} />
+                    <SectionHeading title="Players" detail={liveClientState.metadata.playerNames.join(', ')} />
+                    <SectionHeading
+                      title={`Spectators (${liveClientState.spectators.length})`}
+                      detail={liveClientState.spectators.length === 0
+                        ? 'No spectators'
+                        : liveClientState.spectators.map((spectator) => spectator.name).join(', ')}
+                    />
+                    <ActionButton
+                      disabled={roomState.pendingUnattendTableID !== null}
+                      title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
+                      onPress={() => {
+                        setLiveSheet(null);
+                        setReturnAfterUnattend(null);
+                        setLocalScreen('lobby');
+                        lobbyRuntime.unattendLiveGame(liveTableID);
+                      }}
+                    />
+                    {pauseEligible && <ActionButton title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />}
+                    <TerminationControls />
                     <ActionButton title="Settings" onPress={() => setLiveSheet('settings')} />
                     <ActionButton title="Sign out" tone="ghost" onPress={() => void signOut()} />
                   </View>

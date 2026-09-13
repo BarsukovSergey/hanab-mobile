@@ -5,7 +5,6 @@ import { lobbyRuntime } from '../runtime/application';
 import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
 import { useAppSelector } from '../store/hooks';
 import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
-import { TerminationControls } from './game/TerminationControls';
 
 type Props = {
   room: string;
@@ -36,7 +35,6 @@ export function ChatPanel({ room, title }: Props) {
 
   return (
     <Panel>
-      <TerminationControls />
       <SectionHeading title={title} detail={ready ? 'Connected' : 'Chat reconnecting…'} />
       <ScrollView
         contentContainerStyle={styles.historyContent}
