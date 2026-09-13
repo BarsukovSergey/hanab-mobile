@@ -33,6 +33,7 @@ type ListenerMap = {
 class FakeSocket implements NetworkSocket {
   readyState = 0;
   failSend = false;
+  failOnSendNumber: number | null = null;
   readonly sent: string[] = [];
   readonly closeCalls: Array<{ code?: number; reason?: string }> = [];
   private readonly listeners: ListenerMap = {
@@ -56,7 +57,7 @@ class FakeSocket implements NetworkSocket {
   }
 
   send(data: string): void {
-    if (this.failSend) throw new Error('send failed');
+    if (this.failSend || this.failOnSendNumber === this.sent.length + 1) throw new Error('send failed');
     this.sent.push(data);
   }
   close(code?: number, reason?: string): void {
@@ -1606,6 +1607,51 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.pendingRoleSwitch).toBeNull();
   });
 
+  test('player-to-spectator retains the leave transition when local spectate send fails and authoritative left exits pregame', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    socket.failOnSendNumber = 3;
+
+    expect(runtime.switchToSpectator()).toBe(false);
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}', 'tableLeave {"tableID":123}']);
+    expect(store.getState().room.pendingRoleSwitch).toMatchObject({
+      targetRole: 'spectator', leaveSent: true, spectateSent: false,
+    });
+    socket.emitMessage('left {"TableID":123}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+  });
+
+  test.each(['warning', 'error'] as const)(
+    'player-to-spectator %s before or after left safely exits the stale player room',
+    async (rejection) => {
+      for (const order of ['before-left', 'after-left'] as const) {
+        const { runtime, socket, store } = await makeReadyRuntime();
+        addJoinableTable(store);
+        expect(runtime.join(123)).toBe(true);
+        socket.emitMessage(pregameFrame());
+        socket.emitMessage('joined {"tableID":123}');
+        expect(runtime.switchToSpectator()).toBe(true);
+        const rejected = `${rejection} ${JSON.stringify({ [rejection]: 'Rejected' })}`;
+        if (order === 'before-left') {
+          socket.emitMessage(rejected);
+          expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+          expect(store.getState().room.pendingRoleSwitch).toMatchObject({ rejected: true });
+          socket.emitMessage('left {"TableID":123}');
+        } else {
+          socket.emitMessage('left {"TableID":123}');
+          expect(store.getState().room.room.kind).toBe('pregame');
+          socket.emitMessage(rejected);
+        }
+        expect(store.getState().room.room).toEqual({ kind: 'none' });
+        expect(store.getState().room.pendingRoleSwitch).toBeNull();
+      }
+    },
+  );
+
   test('pregame spectator-to-player requires and passes password, then confirms only after game plus joined', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     addJoinableTable(store);
@@ -1630,6 +1676,41 @@ describe('deterministic lobby runtime', () => {
     socket.emitMessage('joined {"tableID":123}');
     expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
     expect(JSON.stringify(store.getState())).not.toContain('open sesame');
+  });
+
+  test.each(['warning', 'error'] as const)('spectator-to-player %s clears only its intent and remains spectator', async (rejection) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.joinAsPlayer()).toBe(true);
+    socket.emitMessage(`${rejection} ${JSON.stringify({ [rejection]: 'Rejected' })}`);
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+  });
+
+  test('pregame mutations do not send while a role switch is pending', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob'], 123));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.switchToSpectator()).toBe(true);
+
+    expect(runtime.leave(123)).toBe(false);
+    expect(runtime.startGame()).toBe(false);
+    expect(runtime.updateTable('Changed', 3, {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+      allOrNothing: false,
+    })).toBe(false);
+    expect(runtime.setTableLeader('Bob')).toBe(false);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'tableLeave {"tableID":123}',
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
   });
 
   test.each(['warning', 'error'] as const)('pregame role switching rejects a full spectator seat and a solo player, and %s clears its pending intent', async (rejection) => {

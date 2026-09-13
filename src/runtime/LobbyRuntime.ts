@@ -472,6 +472,7 @@ export class LobbyRuntime {
       || room.kind !== 'pregame'
       || room.data.owner !== ownerUserID
       || room.data.players.length < 2
+      || state.room.pendingRoleSwitch !== null
       || state.room.pendingStart !== null
       || state.room.pendingLeaveTableID !== null
     ) return false;
@@ -503,6 +504,7 @@ export class LobbyRuntime {
       || room.kind !== 'pregame'
       || room.role !== 'player'
       || room.data.owner !== ownerUserID
+      || state.room.pendingRoleSwitch !== null
       || state.room.pendingUpdate !== null
     ) return false;
     let frame: string;
@@ -530,6 +532,7 @@ export class LobbyRuntime {
       || room.kind !== 'pregame'
       || room.role !== 'player'
       || room.data.owner !== ownerUserID
+      || state.room.pendingRoleSwitch !== null
       || !room.data.players.some((player) => player.name === name && !player.you)
       || state.room.pendingLeaderName !== null
     ) return false;
@@ -545,6 +548,7 @@ export class LobbyRuntime {
     if (
       state.room.room.kind !== 'pregame'
       || state.room.room.tableID !== tableID
+      || state.room.pendingRoleSwitch !== null
       || state.room.pendingLeaveTableID !== null
       || state.room.pendingStart !== null
     ) {
@@ -577,13 +581,19 @@ export class LobbyRuntime {
     this.store.dispatch(roomActions.roleSwitchRequested({
       epoch: state.session.connectionEpoch, tableID: room.tableID, targetRole: 'spectator',
     }));
-    if (!this.sendEncoded(encodeTableLeaveFrame(room.tableID))
-      || !this.sendEncoded(encodeTableSpectateFrame(room.tableID))) {
+    if (!this.sendEncoded(encodeTableLeaveFrame(room.tableID))) {
       this.store.dispatch(roomActions.roleSwitchCancelled({
         epoch: state.session.connectionEpoch, tableID: room.tableID,
       }));
       return false;
     }
+    this.store.dispatch(roomActions.roleSwitchLeaveSent({
+      epoch: state.session.connectionEpoch, tableID: room.tableID,
+    }));
+    if (!this.sendEncoded(encodeTableSpectateFrame(room.tableID))) return false;
+    this.store.dispatch(roomActions.roleSwitchSpectateSent({
+      epoch: state.session.connectionEpoch, tableID: room.tableID,
+    }));
     return this.store.getState().room.pendingRoleSwitch?.tableID === room.tableID;
   }
 

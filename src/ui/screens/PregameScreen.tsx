@@ -68,7 +68,7 @@ export function PregameScreen() {
         </View>
         <ActionButton
           compact
-          disabled={roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
+          disabled={roleSwitchPending || roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
           title={roomState.pendingLeaveTableID === null ? 'Leave' : 'Leaving…'}
           onPress={() => lobbyRuntime.leave(room.tableID)}
         />
@@ -95,7 +95,7 @@ export function PregameScreen() {
                   {isOwner && !player.you && (
                     <ActionButton
                       compact
-                      disabled={roomState.pendingLeaderName !== null}
+                      disabled={roleSwitchPending || roomState.pendingLeaderName !== null}
                       title={roomState.pendingLeaderName === player.name ? 'Transferring…' : 'Make leader'}
                       onPress={() => lobbyRuntime.setTableLeader(player.name)}
                     />
@@ -106,7 +106,7 @@ export function PregameScreen() {
             {isOwner && (
               <ActionButton
                 disabled={room.data.players.length < 2
-                  || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
+                  || roleSwitchPending || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
                 title={roomState.pendingStart === null ? 'Start game' : 'Starting…'}
                 tone="primary"
                 onPress={() => lobbyRuntime.startGame()}
@@ -134,7 +134,9 @@ export function PregameScreen() {
                       || (room.data.passwordProtected && joinPassword.length === 0)}
                     title={roleSwitchPending ? 'Joining…' : 'Join as player'}
                     tone="primary"
-                    onPress={() => lobbyRuntime.joinAsPlayer(joinPassword)}
+                    onPress={() => {
+                      if (lobbyRuntime.joinAsPlayer(joinPassword)) setJoinPassword('');
+                    }}
                   />
                 </>
               )}
@@ -161,7 +163,7 @@ export function PregameScreen() {
             </View>
             <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
             <ActionButton
-              disabled={roomState.pendingUpdate !== null || editName.trim().length === 0}
+              disabled={roleSwitchPending || roomState.pendingUpdate !== null || editName.trim().length === 0}
               title={roomState.pendingUpdate === null ? 'Apply changes' : 'Applying…'}
               tone="primary"
               onPress={() => lobbyRuntime.updateTable(editName, editMaxPlayers, editOptions)}
