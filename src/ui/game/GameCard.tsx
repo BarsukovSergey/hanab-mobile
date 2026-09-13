@@ -108,7 +108,7 @@ export function GameCard({
       <View style={[
         styles.hiddenCard,
         height === undefined ? null : styles.sizedHiddenCard,
-        statePresentation?.engineTrash && styles.engineTrashCard,
+        statePresentation?.shouldFade && styles.engineTrashCard,
       ]}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
         {knowledge.borderColor !== null && <SemanticBorder color={knowledge.borderColor} height={height} />}
@@ -187,7 +187,7 @@ export function VisibleHanabiCard({
     sizeStyles,
     height === undefined ? null : { height },
     empathyActive && styles.empathyCard,
-    statePresentation?.engineTrash && styles.engineTrashCard,
+    statePresentation?.shouldFade && styles.engineTrashCard,
     {
       borderColor: selected ? theme.colors.accent : 'transparent',
       borderWidth: selected ? 5 : 0,

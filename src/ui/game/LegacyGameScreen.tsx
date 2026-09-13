@@ -398,6 +398,7 @@ export function GameScreen() {
         selectedActionSegment={reviewTemporal.selectedSegment}
         selectedCard={selectedCard}
         selectedTurn={reviewTemporal.selectedTurn}
+        speedrun={metadata.options.speedrun}
         variantName={metadata.options.variantName}
       />
       <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
@@ -595,6 +596,7 @@ function C17DenseWorkspace({
   reviewActive,
   selectedActionSegment,
   selectedTurn,
+  speedrun,
   variantName,
 }: {
   actionSegments: readonly number[];
@@ -635,6 +637,7 @@ function C17DenseWorkspace({
   reviewActive: boolean;
   selectedActionSegment: number;
   selectedTurn: number;
+  speedrun: boolean;
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
@@ -739,6 +742,8 @@ function C17DenseWorkspace({
                   displayRank: activeKnowledge.displayRank,
                   empathy: empathizing,
                   finished: false,
+                  variantName,
+                  speedrun,
                 });
                 return <VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
@@ -781,6 +786,8 @@ function C17DenseWorkspace({
               displayRank: knowledge.displayRank,
               empathy: empathyActive,
               finished: false,
+              variantName,
+              speedrun,
             });
             return <GameCard height={layout.ownCardHeight} hasNote={(cardNote?.text.trim().length ?? 0) > 0} key={order}
               knowledge={knowledge} onSelect={() => onSelectCard(order)}

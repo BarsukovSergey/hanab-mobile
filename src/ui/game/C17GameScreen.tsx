@@ -402,6 +402,7 @@ export function C17GameScreen() {
       selectedTarget={selectedTarget}
       selectedTurn={reviewTemporal.selectedTurn}
       sharedReplay={replay.shared}
+      speedrun={metadata.options.speedrun}
       targetName={targetName}
       variantName={metadata.options.variantName}
     />
@@ -497,6 +498,7 @@ function C17DenseWorkspace({
   selectedTarget,
   selectedTurn,
   sharedReplay,
+  speedrun,
   targetName,
   variantName,
 }: {
@@ -568,6 +570,7 @@ function C17DenseWorkspace({
   selectedTarget: number | null;
   selectedTurn: number;
   sharedReplay: { amLeader: boolean; leader: string; segment: number; useSharedSegments: boolean } | null;
+  speedrun: boolean;
   targetName: string | null;
   variantName: string;
 }) {
@@ -758,6 +761,8 @@ function C17DenseWorkspace({
                   displayRank: activeKnowledge.displayRank,
                   empathy: empathizing,
                   finished: finishedReplay,
+                  variantName,
+                  speedrun,
                 });
                 return <VisibleHanabiCard
                   empathyKnowledge={empathyKnowledge}
@@ -809,6 +814,8 @@ function C17DenseWorkspace({
               displayRank: knowledge.displayRank,
               empathy: ownEmpathy,
               finished: finishedReplay,
+              variantName,
+              speedrun,
             });
             return <GameCard
               hasNote={hasAvailableNote(order)}
