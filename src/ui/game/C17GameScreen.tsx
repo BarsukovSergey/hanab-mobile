@@ -620,6 +620,10 @@ function C17DenseWorkspace({
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
   const displayIdentity = (order: number) => hypothetical?.morphedIdentities[order] ?? cardIdentities[order];
+  const hasExplicitBlankMorph = (order: number) => {
+    const morph = hypothetical?.morphedIdentities[order];
+    return morph?.suitIndex === null && morph.rank === null;
+  };
   const startingHandHidden = !hypothetical?.showDrawnCards && hypothetical?.startingPlayerIndex !== null;
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
   const inspectedNote = noteCard === null ? '' : notes[noteCard]?.text ?? '';
@@ -738,9 +742,9 @@ function C17DenseWorkspace({
                 if (card === undefined) return null;
                 const cardNote = notes[order];
                 const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === index;
-                const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order));
+                const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
                 const empathyKnowledge = empathizing || forcedStartingEmpathy
-                  ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order))
+                  ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
                   : null;
                 const activeKnowledge = empathyKnowledge ?? normalKnowledge;
                 const statePresentation = getCardStatePresentation({
@@ -793,7 +797,7 @@ function C17DenseWorkspace({
             const ownEmpathy = globalEmpathy || empathyPlayer === ourIndex
               || (startingHandHidden && hypothetical?.startingPlayerIndex === ourIndex);
             const cardNote = notes[order];
-            const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, ownEmpathy, displayIdentity(order));
+            const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, ownEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
             const statePresentation = getCardStatePresentation({
               game,
               state: card,
