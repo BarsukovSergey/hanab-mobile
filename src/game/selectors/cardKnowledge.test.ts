@@ -165,7 +165,7 @@ describe('card knowledge view model', () => {
   });
 
   test('keeps an explicit blank hypothetical morph blank despite note or empathy knowledge', () => {
-    const card = {
+    const card: CardState = {
       ...freshCard(17),
       suitIndex: 0,
       rank: 3,
