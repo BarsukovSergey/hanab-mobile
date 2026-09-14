@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { getC17DenseLayout, getC17WorkbenchHeight, getRelativeOpponentIndices } from './c17DenseLayout';
+import { getC17CardLaneWidth, getC17DenseLayout, getC17WorkbenchHeight, getRelativeOpponentIndices } from './c17DenseLayout';
 
 function layout(overrides: Partial<Parameters<typeof getC17DenseLayout>[0]> = {}) {
   return getC17DenseLayout({
@@ -49,7 +49,7 @@ describe('C17 dense portrait layout', () => {
   });
 
   test('does not enlarge cards when width remains the limiting dimension', () => {
-    const ordinary = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 500 });
+    const ordinary = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 505 });
     const tall = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 900 });
 
     expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
@@ -83,7 +83,7 @@ describe('C17 dense portrait layout', () => {
     const constrained = layout({
       opponentCardLaneWidth: 300,
       ownCardLaneWidth: 300,
-      handsRegionHeight: 341,
+      handsRegionHeight: 421,
       opponentCount: 5,
       cardsPerHand: 4,
     });
@@ -92,7 +92,7 @@ describe('C17 dense portrait layout', () => {
     expect(constrained.opponentCardHeight).toBeGreaterThanOrEqual(46);
   });
 
-  test('keeps the player metadata rail inside its row even when cards become compact', () => {
+  test('uses the compact metadata line row height when cards become compact', () => {
     const constrained = layout({
       opponentCardLaneWidth: 300,
       ownCardLaneWidth: 300,
@@ -102,7 +102,21 @@ describe('C17 dense portrait layout', () => {
     });
 
     expect(constrained.mode).toBe('compact-overview');
-    expect(constrained.opponentRowHeight).toBeGreaterThanOrEqual(54);
+    expect(constrained.opponentRowHeight).toBe(constrained.opponentCardHeight + 22);
+  });
+
+  test('keeps ordinary portrait five-card hands at a readable shared height', () => {
+    const cardLaneWidth = getC17CardLaneWidth(370);
+    const result = layout({
+      opponentCardLaneWidth: cardLaneWidth,
+      ownCardLaneWidth: cardLaneWidth,
+      opponentCount: 1,
+      cardsPerHand: 5,
+      handsRegionHeight: 1000,
+    });
+
+    expect(result.ownCardHeight).toBeGreaterThanOrEqual(90);
+    expect(result.ownCardHeight).toBe(result.opponentCardHeight);
   });
 
   test('keeps shared cards and real row chrome inside the captured hands rectangle', () => {

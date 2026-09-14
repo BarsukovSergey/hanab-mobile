@@ -39,6 +39,7 @@ import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
 import {
+  getC17CardLaneWidth,
   getC17DenseLayout,
   getC17WorkbenchHeight,
   getRelativeOpponentIndices,
@@ -68,8 +69,6 @@ const END_CONDITIONS: Record<number, string> = {
   9: 'All or Nothing softlock', 10: 'Terminated by vote',
 };
 
-const HAND_META_WIDTH = 112;
-const HAND_ROW_CONTENT_GAP = 5;
 const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
@@ -635,14 +634,7 @@ function C17DenseWorkspace({
   const shellMeasured = layoutMetrics.shellKey === shellKey
     && layoutMetrics.handsRegionHeight > 0
     && layoutMetrics.handsRegionWidth > 0;
-  const cardLaneWidth = Math.max(
-    1,
-    layoutMetrics.handsRegionWidth
-      - HAND_META_WIDTH
-      - HAND_ROW_CONTENT_GAP
-      - HAND_ROW_HORIZONTAL_PADDING * 2
-      - HAND_ROW_BORDER_WIDTH * 2,
-  );
+  const cardLaneWidth = getC17CardLaneWidth(layoutMetrics.handsRegionWidth);
   const layout = getC17DenseLayout({
     opponentCardLaneWidth: cardLaneWidth,
     handsRegionHeight: layoutMetrics.handsRegionHeight,
@@ -899,7 +891,7 @@ function C17DenseWorkspace({
 
     <View style={[
       styles.workbench,
-      { height: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
+      { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
       !shellMeasured && styles.shellPending,
     ]}>
       <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
@@ -1026,8 +1018,6 @@ function C17DenseWorkspace({
       </ScrollView>
     </View>
 
-    {shellMeasured && <View style={styles.workspaceTail} />}
-
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
       <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
         <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
@@ -1095,18 +1085,17 @@ const styles = StyleSheet.create({
   handsMeasuring: { flex: 1 },
   shellPending: { opacity: 0 },
   opponents: { gap: 2 },
-  opponentRow: { alignItems: 'center', borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING },
-  opponentMeta: { gap: 2, justifyContent: 'center', width: HAND_META_WIDTH },
-  namePeekArea: { borderRadius: 6, justifyContent: 'center', minHeight: 19, paddingHorizontal: 2 },
-  opponentName: { fontSize: 10, fontWeight: '900' },
-  opponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
-  ownHand: { alignItems: 'center', borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, flexDirection: 'row', gap: HAND_ROW_CONTENT_GAP, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 5 },
-  ownTitle: { fontSize: 10, fontWeight: '900', width: HAND_META_WIDTH },
-  ownCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
-  workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
+  opponentRow: { borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
+  opponentMeta: { height: 14, justifyContent: 'center' },
+  namePeekArea: { borderRadius: 6, height: 14, justifyContent: 'center' },
+  opponentName: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
+  opponentCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, marginTop: 2, minWidth: 0 },
+  ownHand: { borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
+  ownTitle: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
+  ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, marginTop: 2, minWidth: 0 },
+  workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, flex: 1, marginTop: 5, overflow: 'hidden' },
   workbenchScroll: { flex: 1 },
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
-  workspaceTail: { flex: 1, minHeight: 0 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },

@@ -273,7 +273,7 @@ function AppContent() {
           scrollEnabled={gameRootScrollable}
         >
           {!c17Workspace && <LastClueNotice />}
-          <View style={c17Workspace ? styles.gameWorkspace : undefined}>
+          <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
             <GameScreen />
           </View>
         </ScrollView>
@@ -403,6 +403,7 @@ const styles = StyleSheet.create({
   gameContainerC17: { flex: 1 },
   gameContainerLandscape: { gap: 4, paddingBottom: 10, paddingHorizontal: 8, paddingTop: 4 },
   gameWorkspace: { alignSelf: 'center', flex: 1, paddingBottom: 10, paddingHorizontal: 10, paddingTop: 7, width: '100%' },
+  gameWorkspaceC17: { paddingHorizontal: 0 },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },

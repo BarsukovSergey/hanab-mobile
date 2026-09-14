@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 
 import { getDiscardSummary } from '../../../game/selectors/discardSummary';
 import { getGameTableSuits } from '../../../game/selectors/gameplay';
-import { getCompactTableFireworksLayout } from '../tableLayout';
+import { getCompactTableFireworkCellWidth, getCompactTableFireworksLayout } from '../tableLayout';
 import { getTableSurfaceScenarios } from './gameplayScenarios';
 
 describe('table surface acceptance', () => {
@@ -44,5 +44,11 @@ describe('table surface acceptance', () => {
       expect(layout.stackWidth).toBeGreaterThan(0);
       expect(layout.usedWidth).toBeLessThanOrEqual(width + 0.001);
     }
+  });
+
+  test('applies the computed stack width to every production firework cell', () => {
+    const layout = getCompactTableFireworksLayout(286, 6, false);
+
+    expect(getCompactTableFireworkCellWidth(layout.stackWidth)).toBe(layout.stackWidth);
   });
 });

@@ -23,12 +23,14 @@ const OPPONENT_CARD_GAP = 3;
 const OWN_CARD_GAP = 3;
 const OPPONENT_ROW_GAP = 2;
 const HAND_ROW_GAP = 5;
-// The row chrome is not just the card border: the player rail has a name plus two compact actions.
-// Keep enough vertical room for that rail even when compact card faces become shorter.
-const OPPONENT_ROW_CHROME = 2;
-const MIN_OPPONENT_ROW_HEIGHT = 54;
-// Matches c17OwnHand's 5 dp vertical padding and 1 dp top/bottom border.
-const OWN_ROW_CHROME = 12;
+const HAND_ROW_VERTICAL_PADDING = 2;
+const HAND_ROW_METADATA_HEIGHT = 14;
+const HAND_ROW_METADATA_GAP = 2;
+const HAND_ROW_BORDER_WIDTH = 1;
+const HAND_ROW_CHROME = HAND_ROW_VERTICAL_PADDING * 2
+  + HAND_ROW_METADATA_HEIGHT
+  + HAND_ROW_METADATA_GAP
+  + HAND_ROW_BORDER_WIDTH * 2;
 const DEFAULT_WORKBENCH_HEIGHT = 156;
 const MIN_READABLE_OPPONENT_CARD_HEIGHT = 46;
 
@@ -41,6 +43,12 @@ export function getC17WorkbenchHeight(viewportHeight: number): number {
   if (viewportHeight >= 780) return 176;
   if (viewportHeight >= 640) return 156;
   return 140;
+}
+
+export function getC17CardLaneWidth(rowWidth: number): number {
+  const horizontalPadding = 4;
+  const borderWidth = 1;
+  return Math.max(1, rowWidth - horizontalPadding * 2 - borderWidth * 2);
 }
 
 /**
@@ -65,8 +73,8 @@ export function getC17DenseLayout({
   const ownWidthFit = cardHeightForWidth(ownCardLaneWidth, capacity, OWN_CARD_GAP);
   const widthFit = Math.max(1, Math.min(opponentWidthFit, ownWidthFit));
   const baseCardHeight = maxCardHeightThatFits(widthFit, handsRegionHeight, opponents);
-  const opponentRowHeight = Math.max(baseCardHeight + OPPONENT_ROW_CHROME, MIN_OPPONENT_ROW_HEIGHT);
-  const ownRowHeight = baseCardHeight + OWN_ROW_CHROME;
+  const opponentRowHeight = baseCardHeight + HAND_ROW_CHROME;
+  const ownRowHeight = baseCardHeight + HAND_ROW_CHROME;
   const handsHeight = getHandsHeight(baseCardHeight, opponents);
 
   return {
@@ -103,8 +111,8 @@ function maxCardHeightThatFits(widthFit: number, handsRegionHeight: number, oppo
 }
 
 function getHandsHeight(cardHeight: number, opponents: number): number {
-  const opponentRowHeight = Math.max(cardHeight + OPPONENT_ROW_CHROME, MIN_OPPONENT_ROW_HEIGHT);
-  const ownRowHeight = cardHeight + OWN_ROW_CHROME;
+  const opponentRowHeight = cardHeight + HAND_ROW_CHROME;
+  const ownRowHeight = cardHeight + HAND_ROW_CHROME;
   return opponents * opponentRowHeight
     + ownRowHeight
     + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
