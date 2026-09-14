@@ -11,13 +11,14 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 
-import type { CardIdentity, CardNote, GameState } from '../../game/bootstrap/types';
+import type { CardIdentity, CardNote, GameMetadata, GameState } from '../../game/bootstrap/types';
 import type { HypotheticalState } from '../../game/client/types/HypotheticalState';
 import { canToggleHypotheticalDrawnCards } from '../../game/client/hypotheticalEligibility';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardStatePresentation } from '../../game/selectors/cardStatePresentation';
 import { getCluePreview } from '../../game/selectors/cluePreview';
 import { getNoteImpossibilityWarning } from '../../game/selectors/noteImpossibility';
+import { getLastCluePresentationFromState } from '../../game/selectors/lastClue';
 import {
   getDisplayedClueTokens,
   getDisplayedLiveFutureEfficiency,
@@ -53,6 +54,7 @@ import {
 } from './gameplayInteraction';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
+import { getCommittedClueMarkerForMetadata } from './clueIndication';
 
 type C17ReviewSelection = {
   actionSegment: number;
@@ -110,10 +112,12 @@ export function C17GameScreen() {
   const [note, setNote] = useState('');
   const [noteWarning, setNoteWarning] = useState<string | null>(null);
   const [c17Review, setC17Review] = useState<C17ReviewSelection | null>(null);
+  const longPressedOpponent = useRef<number | null>(null);
 
   useEffect(() => {
     if (orientationRef.current === orientation) return;
     orientationRef.current = orientation;
+    longPressedOpponent.current = null;
     interactionDispatch({ type: 'reset-lifecycle-transients' });
   }, [orientation]);
 
@@ -145,6 +149,7 @@ export function C17GameScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
+      longPressedOpponent.current = null;
       interactionDispatch({ type: 'reset-lifecycle-transients' });
       setDiscardViewerOpen(false);
     });
@@ -368,6 +373,7 @@ export function C17GameScreen() {
       livePulseEnabled={!replay.active}
       liveTransition={liveTemporal.last}
       liveTurn={liveTemporal.liveTurn}
+      longPressedOpponent={longPressedOpponent}
       metadata={metadata}
       newerActionCount={newerActionCount}
       noteCard={noteCard}
@@ -485,6 +491,7 @@ function C17DenseWorkspace({
   livePulseEnabled,
   liveTransition,
   liveTurn,
+  longPressedOpponent,
   metadata,
   newerActionCount,
   noteCard,
@@ -562,7 +569,8 @@ function C17DenseWorkspace({
   livePulseEnabled: boolean;
   liveTransition: C17TemporalEntry;
   liveTurn: number;
-  metadata: { playerNames: readonly string[]; hardVariant: boolean };
+  longPressedOpponent: { current: number | null };
+  metadata: GameMetadata;
   newerActionCount: number;
   noteCard: number | null;
   notes: readonly CardNote[];
@@ -611,7 +619,7 @@ function C17DenseWorkspace({
   const { theme } = useHanabTheme();
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
-  const longPressedOpponent = useRef<number | null>(null);
+  const committedClue = getLastCluePresentationFromState(game);
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight);
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
@@ -764,6 +772,7 @@ function C17DenseWorkspace({
             accessibilityLabel={`Player ${playerName}`}
             accessibilityRole="button"
             delayLongPress={350}
+            onPressIn={() => { longPressedOpponent.current = null; }}
             onLongPress={globalEmpathy ? undefined : () => {
               longPressedOpponent.current = index;
               onHoldEmpathy(index);
@@ -819,6 +828,7 @@ function C17DenseWorkspace({
                   hasNote={hasAvailableNote(order)}
                   height={layout.opponentCardHeight}
                   highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}
+                  clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
                   onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
                   onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
                   onPress={() => onInspectNote(order)}
@@ -872,6 +882,7 @@ function C17DenseWorkspace({
               hasNote={hasAvailableNote(order)}
               height={layout.ownCardHeight}
               knowledge={knowledge}
+              clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
               onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
               onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(ourIndex)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}

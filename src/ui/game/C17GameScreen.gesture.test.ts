@@ -21,10 +21,18 @@ test('C17 wires hold-only empathy and authoritative clue-card highlighting', () 
   const opponentRow = screen.slice(screen.indexOf('accessibilityLabel={`Player ${playerName}`}'), screen.indexOf('<View style={styles.opponentMeta}>'));
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
   expect(opponentRow).toContain('onLongPress={globalEmpathy ? undefined : () => {');
+  expect(opponentRow).toContain('onPressIn={() => { longPressedOpponent.current = null; }}');
   expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(3);
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
   expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');
+});
+
+test('C17 clears a stale opponent long-press latch across lifecycle interruption', () => {
+  const screen = readC17Screen();
+
+  expect((screen.match(/longPressedOpponent\.current = null;/g) ?? []).length).toBeGreaterThanOrEqual(4);
+  expect(screen).toContain("interactionDispatch({ type: 'reset-lifecycle-transients' });");
 });
 
 test('C17 keeps spectator interaction observational while retaining the workspace tools', () => {

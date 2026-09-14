@@ -1,3 +1,6 @@
+import type { GameState } from '../bootstrap/types';
+import { ClueType } from '../upstream/enums/ClueType';
+
 type RelevantAction = {
   type: string;
   clue?: { type: number; value: number };
@@ -13,6 +16,25 @@ export type LastCluePresentation = {
   value: number;
   touchedOrders: readonly number[];
 };
+
+export function getLastCluePresentationFromState(state: GameState): LastCluePresentation | null {
+  const clue = state.clues.at(-1);
+  if (clue === undefined) return null;
+
+  const hasLaterCardAction = state.deck.some((card) => (
+    (card.segmentPlayed !== null && card.segmentPlayed > clue.segment)
+    || (card.segmentDiscarded !== null && card.segmentDiscarded > clue.segment)
+  ));
+  if (hasLaterCardAction) return null;
+
+  return {
+    giverPlayerIndex: clue.giver,
+    targetPlayerIndex: clue.target,
+    clueType: clue.type === ClueType.Color ? 'color' : 'rank',
+    value: clue.value,
+    touchedOrders: clue.list,
+  };
+}
 
 export function getLastCluePresentation(actions: readonly RelevantAction[]): LastCluePresentation | null {
   for (let index = actions.length - 1; index >= 0; index -= 1) {
