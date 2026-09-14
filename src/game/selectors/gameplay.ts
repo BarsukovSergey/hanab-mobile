@@ -7,6 +7,7 @@ import { getClueName } from '../upstream/rules/clues';
 import {
   getAdjustedClueTokens,
   getUnadjustedClueTokens,
+  isAtMaxClueTokens,
 } from '../upstream/rules/clueTokens';
 import { getCardsPerHand } from '../upstream/rules/hand';
 import { getEfficiency } from '../upstream/rules/stats';
@@ -121,6 +122,10 @@ export function getClueColorFill(variantName: string, value: number): string | n
 
 export function hasClueTokenForVariant(clueTokens: number, variantName: string): boolean {
   return clueTokens >= getAdjustedClueTokens(1, getVariant(variantName));
+}
+
+export function canDiscardForVariant(clueTokens: number, variantName: string): boolean {
+  return !isAtMaxClueTokens(clueTokens, getVariant(variantName));
 }
 
 export function getDisplayedClueTokens(clueTokens: number, variantName: string): number {

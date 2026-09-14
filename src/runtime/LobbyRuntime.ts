@@ -5,6 +5,7 @@ import type {
 } from '../network/types';
 import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
 import {
+  canDiscardForVariant,
   hasClueTokenForVariant,
   isCurrentVariantColorClueValue,
   isCurrentVariantRankClueValue,
@@ -1491,13 +1492,17 @@ export class LobbyRuntime {
       (action.type === 0 || action.type === 1)
       && !(room.clientState.ongoingGame.hands[ourPlayerIndex]?.includes(action.target) ?? false)
     ) return false;
+    const variantName = room.clientState.metadata.options.variantName;
+    if (
+      action.type === 1
+      && !canDiscardForVariant(room.clientState.ongoingGame.clueTokens, variantName)
+    ) return false;
     if (action.type === 2 || action.type === 3) {
       if (
         action.target === ourPlayerIndex
         || action.target < 0
         || action.target >= room.clientState.metadata.options.numPlayers
       ) return false;
-      const variantName = room.clientState.metadata.options.variantName;
       if (
         !hasClueTokenForVariant(room.clientState.ongoingGame.clueTokens, variantName)
         ||

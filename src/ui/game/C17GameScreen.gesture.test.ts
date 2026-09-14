@@ -81,6 +81,21 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.rowBetween}>');
 });
 
+test('C17 gives Play and Discard separate eligibility at maximum clue tokens', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('canDiscardForVariant,');
+  expect(screen).toContain('const discardEnabled = cardEnabled\n    && canDiscardForVariant(game.clueTokens, metadata.options.variantName);');
+  expect(screen).toContain('canPlayCard={cardEnabled}');
+  expect(screen).toContain('canDiscardCard={discardEnabled}');
+  expect(screen).toContain('canPlayCard: boolean;');
+  expect(screen).toContain('canDiscardCard: boolean;');
+  expect((screen.match(/disabled=\{!canPlayCard\} title="Play"/g) ?? []).length).toBe(2);
+  expect((screen.match(/disabled=\{!canDiscardCard\} title="Discard"/g) ?? []).length).toBe(2);
+  expect(screen).toContain('if (discardEnabled && selectedCard !== null) {');
+  expect(screen).not.toContain('canCommitCard');
+});
+
 test('ClueComposer leaves touched and invalid clues to card highlighting and disabled Give', () => {
   const composer = readClueComposer();
 

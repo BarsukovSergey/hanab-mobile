@@ -20,6 +20,7 @@ import { getCluePreview } from '../../game/selectors/cluePreview';
 import { getNoteImpossibilityWarning } from '../../game/selectors/noteImpossibility';
 import { getLastCluePresentationFromState } from '../../game/selectors/lastClue';
 import {
+  canDiscardForVariant,
   getDisplayedClueTokens,
   getDisplayedLiveFutureEfficiency,
   getGameplayCardsPerHand,
@@ -179,6 +180,8 @@ export function C17GameScreen() {
     && roomState.pendingGameplayAction === null;
   const hypotheticalEnabled = canHypotheticalControl && hypotheticalActor !== null;
   const cardEnabled = (enabled || hypotheticalEnabled) && selectedCard !== null && ourHand.some((order) => order === selectedCard);
+  const discardEnabled = cardEnabled
+    && canDiscardForVariant(game.clueTokens, metadata.options.variantName);
   const clueChoices = getGameplayClueChoicesForPlayer(metadata);
   const clueEnabled = (enabled || hypotheticalEnabled)
     && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName)
@@ -343,7 +346,8 @@ export function C17GameScreen() {
   return <>
     <C17DenseWorkspace
       actionSegments={actionSegments}
-      canCommitCard={cardEnabled}
+      canPlayCard={cardEnabled}
+      canDiscardCard={discardEnabled}
       canPlayGameplay={isPlayingPlayer || canHypotheticalControl}
       canStartHypothetical={canStartHypothetical}
       canQuickRematch={canQuickRematch}
@@ -382,7 +386,7 @@ export function C17GameScreen() {
       onCloseNote={() => interactionDispatch({ type: 'open-note', order: null })}
       onConfirmClue={confirmClue}
       onDiscard={() => {
-        if (cardEnabled && selectedCard !== null) {
+        if (discardEnabled && selectedCard !== null) {
           const sent = hypotheticalActive ? lobbyRuntime.hypotheticalDiscard(selectedCard) : lobbyRuntime.discard(selectedCard);
           if (sent) interactionDispatch({ type: 'disarm-gameplay' });
         }
@@ -461,7 +465,8 @@ export function C17GameScreen() {
 
 function C17DenseWorkspace({
   actionSegments,
-  canCommitCard,
+  canPlayCard,
+  canDiscardCard,
   canPlayGameplay,
   canStartHypothetical,
   canQuickRematch,
@@ -540,7 +545,8 @@ function C17DenseWorkspace({
   variantName,
 }: {
   actionSegments: readonly number[];
-  canCommitCard: boolean;
+  canPlayCard: boolean;
+  canDiscardCard: boolean;
   canPlayGameplay: boolean;
   canStartHypothetical: boolean;
   canQuickRematch: boolean;
@@ -939,8 +945,8 @@ function C17DenseWorkspace({
           /> : canPlayGameplay && selectedOwnCard !== null ? <View style={styles.rowBetween}>
             <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Actor card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
             <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
-              <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+              <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
+              <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
             </View>
           </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Select a card from the hypothetical actor hand or a player to plan a clue.</Text> : null}
         </> : reviewActive && !finishedReplay && sharedReplay === null ? <>
@@ -1016,8 +1022,8 @@ function C17DenseWorkspace({
           {canPlayGameplay && selectedOwnCard !== null && <View style={styles.rowBetween}>
             <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
             <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canCommitCard} title="Play" tone="primary" onPress={onPlay} />
-              <ActionButton compact disabled={!canCommitCard} title="Discard" onPress={onDiscard} />
+              <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
+              <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
             </View>
           </View>}
 

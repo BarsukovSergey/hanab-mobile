@@ -104,7 +104,21 @@ const playerTable = {
 beforeEach(() => { jest.useFakeTimers(); });
 afterEach(() => { jest.useRealTimers(); });
 
-function initialHistory(currentPlayerIndex = 0) {
+function initialHistory(currentPlayerIndex = 0, clueTokens = 8) {
+  const clueActionCount = Math.max(0, 8 - clueTokens);
+  const startingPlayerIndex = (currentPlayerIndex - clueActionCount + 2) % 2;
+  const clueActions = Array.from({ length: clueActionCount }, (_, index) => {
+    const giver = (startingPlayerIndex + index) % 2;
+    const target = (giver + 1) % 2;
+    return {
+      type: 'clue' as const,
+      clue: { type: 0 as const, value: 0 },
+      giver,
+      list: target === 0 ? [0] : [5],
+      target,
+      turn: 0,
+    };
+  });
   return {
     tableID: 123,
     list: [
@@ -114,7 +128,8 @@ function initialHistory(currentPlayerIndex = 0) {
       ...Array.from({ length: 5 }, (_, index) => ({
         type: 'draw', playerIndex: 1, order: index + 5, suitIndex: index, rank: index + 1,
       })),
-      { type: 'status', clues: 8, score: 0, maxScore: 25 },
+      ...clueActions,
+      { type: 'status', clues: clueTokens, score: 0, maxScore: 25 },
       { type: 'turn', num: 0, currentPlayerIndex },
     ],
   };
@@ -122,8 +137,12 @@ function initialHistory(currentPlayerIndex = 0) {
 
 async function makeLive(
   role: 'player' | 'spectator' = 'player',
-  options: { timed?: boolean; currentPlayerIndex?: number } = {},
+  options: { timed?: boolean; currentPlayerIndex?: number; clueTokens?: number } = {},
 ) {
+  const clueActionCount = Math.max(0, 8 - (options.clueTokens ?? 8));
+  const startingPlayer = options.clueTokens === undefined
+    ? 0
+    : ((options.currentPlayerIndex ?? 0) - clueActionCount + 2) % 2;
   const session = new FakeSession();
   const socket = new FakeSocket();
   session.sockets.push(socket);
@@ -149,11 +168,12 @@ async function makeLive(
   socket.emitMessage(`init ${JSON.stringify(makeInit({
     spectating: role === 'spectator',
     options: options.timed
-      ? { ...makeInit().options, timed: true, timeBase: 120, timePerTurn: 20 }
-      : makeInit().options,
+      ? { ...makeInit().options, startingPlayer, timed: true, timeBase: 120, timePerTurn: 20 }
+      : { ...makeInit().options, startingPlayer },
   }))}`);
   socket.emitMessage(`gameActionList ${JSON.stringify(initialHistory(
     options.currentPlayerIndex ?? 0,
+    options.clueTokens ?? 8,
   ))}`);
   expect(store.getState().room.room).toMatchObject({ kind: 'live_game', role });
   return { session, socket, store, runtime };
@@ -197,6 +217,26 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(runtime.colorClue(1, 5)).toBe(false);
     expect(runtime.rankClue(1, 6)).toBe(false);
     expect(socket.sent).toEqual(before);
+  });
+
+  test('discard eligibility rejects maximum clues and sends one frame below the maximum', async () => {
+    const atMaximum = await makeLive();
+    const maximumFrames = atMaximum.socket.sent.length;
+
+    expect(atMaximum.runtime.discard(0)).toBe(false);
+    expect(atMaximum.socket.sent).toHaveLength(maximumFrames);
+    expect(atMaximum.store.getState().room.pendingGameplayAction).toBeNull();
+
+    const belowMaximum = await makeLive('player', { clueTokens: 7 });
+    const belowMaximumFrames = belowMaximum.socket.sent.length;
+    const belowMaximumRoom = belowMaximum.store.getState().room.room;
+    if (belowMaximumRoom.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(belowMaximumRoom.clientState.ongoingGame.clueTokens).toBe(7);
+
+    expect(belowMaximum.runtime.discard(0)).toBe(true);
+    expect(belowMaximum.socket.sent.slice(belowMaximumFrames)).toEqual([
+      'action {"tableID":123,"type":1,"target":0}',
+    ]);
   });
 
   test('send is one-shot while pending and does not optimistically mutate GameState', async () => {
@@ -304,7 +344,7 @@ describe('C7 authoritative gameplay runtime', () => {
   });
 
   test('player LIVE actions reduce authoritatively and accepted turn settles pending', async () => {
-    const { runtime, socket, store } = await makeLive();
+    const { runtime, socket, store } = await makeLive('player', { clueTokens: 7 });
     expect(runtime.discard(0)).toBe(true);
     socket.emitMessage(
       'gameAction {"tableID":123,"action":{"type":"clue","clue":{"type":0,"value":0},"giver":0,"list":[5],"target":1,"turn":0}}',
@@ -317,9 +357,9 @@ describe('C7 authoritative gameplay runtime', () => {
     if (room.kind !== 'live_game') throw new Error('Expected LIVE');
     expect(room.role).toBe('player');
     expect(room.liveActionCount).toBe(2);
-    expect(room.clientState.ongoingGame.turn.turnNum).toBe(1);
+    expect(room.clientState.ongoingGame.turn.turnNum).toBe(2);
     expect(room.clientState.ongoingGame.turn.currentPlayerIndex).toBe(1);
-    expect(room.clientState.ongoingGame.clueTokens).toBe(7);
+    expect(room.clientState.ongoingGame.clueTokens).toBe(6);
     expect(store.getState().room.pendingGameplayAction).toBeNull();
   });
 

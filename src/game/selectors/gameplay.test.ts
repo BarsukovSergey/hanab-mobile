@@ -8,6 +8,7 @@ import {
   getGameplayClueChoices,
   getGameplayClueChoicesForPlayerIndex,
   hasClueTokenForVariant,
+  canDiscardForVariant,
   getDisplayedClockTime,
 } from './gameplay';
 
@@ -83,6 +84,13 @@ describe('getGameTableSuits', () => {
     expect(hasClueTokenForVariant(2, variantName)).toBe(true);
     expect(getDisplayedClueTokens(1, variantName)).toBe(0.5);
     expect(getDisplayedClueTokens(2, variantName)).toBe(1);
+  });
+
+  it('permits discards only below the upstream maximum clue-token threshold', () => {
+    expect(canDiscardForVariant(7, 'No Variant')).toBe(true);
+    expect(canDiscardForVariant(8, 'No Variant')).toBe(false);
+    expect(canDiscardForVariant(15, 'Clue Starved (5 Suits)')).toBe(true);
+    expect(canDiscardForVariant(16, 'Clue Starved (5 Suits)')).toBe(false);
   });
 
   it('matches pinned web live FRE semantics, including note and manual adjustments', () => {
