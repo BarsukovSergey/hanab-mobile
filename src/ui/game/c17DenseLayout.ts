@@ -4,6 +4,7 @@ export type C17DenseLayout = {
   mode: 'full-ledger' | 'compact-overview';
   opponentCardHeight: number;
   ownCardHeight: number;
+  cardTopHeadroom: number;
   opponentRowHeight: number;
   ownRowHeight: number;
   handsHeight: number;
@@ -73,14 +74,16 @@ export function getC17DenseLayout({
   const ownWidthFit = cardHeightForWidth(ownCardLaneWidth, capacity, OWN_CARD_GAP);
   const widthFit = Math.max(1, Math.min(opponentWidthFit, ownWidthFit));
   const baseCardHeight = maxCardHeightThatFits(widthFit, handsRegionHeight, opponents);
-  const opponentRowHeight = baseCardHeight + HAND_ROW_CHROME;
-  const ownRowHeight = baseCardHeight + HAND_ROW_CHROME;
+  const cardTopHeadroom = getCardTopHeadroom(baseCardHeight);
+  const opponentRowHeight = baseCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  const ownRowHeight = baseCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
   const handsHeight = getHandsHeight(baseCardHeight, opponents);
 
   return {
     mode: baseCardHeight >= MIN_READABLE_OPPONENT_CARD_HEIGHT ? 'full-ledger' : 'compact-overview',
     opponentCardHeight: baseCardHeight,
     ownCardHeight: baseCardHeight,
+    cardTopHeadroom,
     opponentRowHeight,
     ownRowHeight,
     handsHeight,
@@ -111,12 +114,17 @@ function maxCardHeightThatFits(widthFit: number, handsRegionHeight: number, oppo
 }
 
 function getHandsHeight(cardHeight: number, opponents: number): number {
-  const opponentRowHeight = cardHeight + HAND_ROW_CHROME;
-  const ownRowHeight = cardHeight + HAND_ROW_CHROME;
+  const cardTopHeadroom = getCardTopHeadroom(cardHeight);
+  const opponentRowHeight = cardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  const ownRowHeight = cardHeight + cardTopHeadroom + HAND_ROW_CHROME;
   return opponents * opponentRowHeight
     + ownRowHeight
     + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
     + HAND_ROW_GAP;
+}
+
+function getCardTopHeadroom(cardHeight: number): number {
+  return Math.max(3, Math.min(6, Math.round(cardHeight * 0.06)));
 }
 
 function cardHeightForWidth(width: number, cards: number, gap: number): number {

@@ -55,7 +55,7 @@ import {
 } from './gameplayInteraction';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
-import { getCommittedClueMarkerForMetadata } from './clueIndication';
+import { getCommittedClueMarkerForMetadata, getPreviewClueMarker } from './clueIndication';
 
 type C17ReviewSelection = {
   actionSegment: number;
@@ -379,6 +379,7 @@ export function C17GameScreen() {
       notes={clientState.notes.ourNotes}
       replayNotes={clientState.notes.allNotes}
       onClearCluePreview={() => interactionDispatch({ type: 'clear-clue-preview' })}
+      onCloseNote={() => interactionDispatch({ type: 'open-note', order: null })}
       onConfirmClue={confirmClue}
       onDiscard={() => {
         if (cardEnabled && selectedCard !== null) {
@@ -497,6 +498,7 @@ function C17DenseWorkspace({
   notes,
   replayNotes,
   onClearCluePreview,
+  onCloseNote,
   onConfirmClue,
   onDiscard,
   onEditNote,
@@ -575,6 +577,7 @@ function C17DenseWorkspace({
   notes: readonly CardNote[];
   replayNotes: ReadonlyArray<ReadonlyArray<{ name: string; text: string }>>;
   onClearCluePreview: () => void;
+  onCloseNote: () => void;
   onConfirmClue: () => void;
   onDiscard: () => void;
   onEditNote: (order: number) => void;
@@ -700,6 +703,8 @@ function C17DenseWorkspace({
       false,
       cardIdentities[noteCard ?? -1],
     );
+  const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
+    || selectedTarget !== null || selectedOwnCard !== null || noteCard !== null || pendingText !== null;
   return <View style={styles.workspace}>
     <View style={styles.ledgerChrome}>
       <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -819,8 +824,10 @@ function C17DenseWorkspace({
                   empathyKnowledge={empathyKnowledge}
                   hasNote={hasAvailableNote(order)}
                   height={layout.opponentCardHeight}
-                  highlighted={target && (cluePreview?.touchedOrders.includes(order) ?? false)}
                   clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+                  previewMarker={target && (cluePreview?.touchedOrders.includes(order) ?? false)
+                    ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
+                  cardTopHeadroom={layout.cardTopHeadroom}
                   onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
                   onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
                   onPress={() => onInspectNote(order)}
@@ -875,6 +882,9 @@ function C17DenseWorkspace({
               height={layout.ownCardHeight}
               knowledge={knowledge}
               clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+              previewMarker={selectedTarget === ourIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
+                ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
+              cardTopHeadroom={layout.cardTopHeadroom}
               onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
               onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(ourIndex)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
@@ -889,7 +899,7 @@ function C17DenseWorkspace({
       </Pressable></AuthoritativePulse>
     </View>
 
-    <View style={[
+    {(!shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
       { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
       shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
@@ -910,6 +920,7 @@ function C17DenseWorkspace({
           </View> : <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Following the shared hypothetical branch.</Text>}
           {selectedTarget !== null ? <ClueComposer
             choices={clueChoices}
+            variantName={variantName}
             enabled={clueEnabled}
             onClear={onClearCluePreview}
             onConfirm={onConfirmClue}
@@ -978,6 +989,7 @@ function C17DenseWorkspace({
           </View>}
         </> : selectedTarget !== null ? <ClueComposer
           choices={clueChoices}
+          variantName={variantName}
           enabled={clueEnabled}
           onClear={onClearCluePreview}
           onConfirm={onConfirmClue}
@@ -1004,7 +1016,7 @@ function C17DenseWorkspace({
           {noteCard !== null ? <View style={styles.noteInspect}>
             <View style={styles.rowBetween}>
               <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
-              <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
+              <View style={styles.actionButtons}><ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} /><ActionButton compact title="Close" onPress={onCloseNote} /></View>
             </View>
             <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
               {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
@@ -1017,7 +1029,7 @@ function C17DenseWorkspace({
           {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
         </>}
       </ScrollView>
-    </View>
+    </View> : <View style={styles.idleWorkbench}><ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} /></View>}
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
       <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
@@ -1098,6 +1110,7 @@ const styles = StyleSheet.create({
   workbenchExpanded: { flex: 1 },
   workbenchScroll: { flex: 1 },
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
+  idleWorkbench: { alignItems: 'flex-end', flex: 1, justifyContent: 'flex-start', marginTop: 5 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },

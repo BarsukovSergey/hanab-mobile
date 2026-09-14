@@ -18,8 +18,9 @@ type GameCardProps = {
   position: number;
   knowledge: CardKnowledgeViewModel;
   selected: boolean;
-  highlighted?: boolean;
   clueMarker?: ClueCardMarker | null;
+  previewMarker?: ClueCardMarker | null;
+  cardTopHeadroom?: number;
   hasNote?: boolean;
   height?: number;
   statePresentation?: CardStatePresentation | null;
@@ -55,8 +56,9 @@ export function GameCard({
   position,
   knowledge,
   selected,
-  highlighted = false,
   clueMarker = null,
+  previewMarker = null,
+  cardTopHeadroom = 0,
   hasNote = false,
   height,
   statePresentation = null,
@@ -72,6 +74,7 @@ export function GameCard({
   const handlePress = useImmediateDoubleTap(onSelect, onDoublePress);
   const compactIndicator = height !== undefined && height < 80;
   const renderedCardHeight = height ?? 88 / (286 / 406);
+  const geometry = getCardGeometry(renderedCardHeight);
 
   return <Pressable
     accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`}
@@ -97,25 +100,23 @@ export function GameCard({
     style={({ pressed }) => [
       styles.cardTouch,
       height === undefined ? null : styles.sizedCardTouch,
+      knowledge.borderColor === 'orange' && { transform: [{ translateY: -cardTopHeadroom }] },
       pressed && styles.pressed,
     ]}
   >
     <View style={[
-      styles.hiddenFrame,
-      height === undefined ? null : [styles.sizedHiddenFrame, { height, width: undefined }],
-      height === undefined ? { borderColor: selected ? theme.colors.accent : '#0d0d0d' } : null,
-      height === undefined && selected ? styles.selectedFrame : null,
+      styles.cardShell,
+      { borderRadius: geometry.radius, height: renderedCardHeight },
     ]}>
       <View style={[
-        styles.hiddenCard,
-        height === undefined ? null : styles.sizedHiddenCard,
+        styles.cardSurface,
+        { borderRadius: geometry.radius },
         statePresentation?.shouldFade && styles.engineTrashCard,
       ]}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
         {knowledge.borderColor !== null && <SemanticBorder color={knowledge.borderColor} height={height} />}
-        {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
-        {clueMarker !== null && <CommittedClueMarker height={renderedCardHeight} marker={clueMarker} variantName={variantName} />}
+        {(previewMarker ?? clueMarker) !== null && <CommittedClueMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
         <CardStateIndicators
           clued={knowledge.borderColor === 'orange'}
           knownRank={knowledge.displayRank !== null}
@@ -123,11 +124,7 @@ export function GameCard({
         />
         {hasNote && <NoteIndicator compact={compactIndicator} />}
       </View>
-      {height !== undefined && <View pointerEvents="none" style={[
-        styles.sizedHiddenFrameOverlay,
-        { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
-        selected && styles.sizedSelectedFrameOverlay,
-      ]} />}
+      {selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}
     </View>
   </Pressable>;
 }
@@ -138,8 +135,9 @@ export function VisibleHanabiCard({
   variantName,
   position,
   selected = false,
-  highlighted = false,
   clueMarker = null,
+  previewMarker = null,
+  cardTopHeadroom = 0,
   hasNote = false,
   semanticBorder = null,
   empathyKnowledge = null,
@@ -159,6 +157,8 @@ export function VisibleHanabiCard({
   selected?: boolean;
   highlighted?: boolean;
   clueMarker?: ClueCardMarker | null;
+  previewMarker?: ClueCardMarker | null;
+  cardTopHeadroom?: number;
   hasNote?: boolean;
   semanticBorder?: string | null;
   empathyKnowledge?: CardKnowledgeViewModel | null;
@@ -183,30 +183,31 @@ export function VisibleHanabiCard({
   const compactIndicator = size === 'mini' || (height !== undefined && height < 80);
   const activeSemanticBorder = empathyActive ? empathyKnowledge.borderColor : semanticBorder;
   const renderedCardHeight = height ?? (size === 'mini' ? 56 : size === 'table' ? 86 : 112);
+  const geometry = getCardGeometry(renderedCardHeight);
 
   const content = <View style={[
-    styles.visibleCard,
+    styles.cardShell,
     sizeStyles,
     height === undefined ? null : { height },
+    { borderRadius: geometry.radius },
+    activeSemanticBorder === 'orange' && { transform: [{ translateY: -cardTopHeadroom }] },
+  ]}><View style={[
+    styles.cardSurface,
+    { borderRadius: geometry.radius },
     empathyActive && styles.empathyCard,
     statePresentation?.shouldFade && styles.engineTrashCard,
-    {
-      borderColor: selected ? theme.colors.accent : 'transparent',
-      borderWidth: selected ? 5 : 0,
-    },
   ]}>
     <UpstreamCardFace rank={faceRank} suitIndex={faceSuitIndex} variantName={variantName} />
     {activeSemanticBorder !== null && size === 'hand' && <SemanticBorder color={activeSemanticBorder} height={height} />}
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
-    {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
-    {clueMarker !== null && <CommittedClueMarker height={renderedCardHeight} marker={clueMarker} variantName={variantName} />}
+    {(previewMarker ?? clueMarker) !== null && <CommittedClueMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
     <CardStateIndicators
       clued={activeSemanticBorder === 'orange'}
       knownRank={faceRank !== null}
       presentation={statePresentation}
     />
     {hasNote && <NoteIndicator compact={compactIndicator} />}
-  </View>;
+  </View>{selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}</View>;
 
   if (
     onPress === undefined
@@ -251,9 +252,9 @@ export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: Ca
 
 function SemanticBorder({ color, height }: { color: string; height?: number }) {
   const scale = (height ?? 112) / 406;
-  const outsideWidth = Math.max(3, Math.round(20 * scale));
-  const insideWidth = Math.max(2, Math.round(12 * scale));
-  const radius = Math.max(4, Math.round(6 * scale));
+  const outsideWidth = 20 * scale;
+  const insideWidth = 12 * scale;
+  const radius = 6 * scale;
 
   return <View pointerEvents="none" style={styles.semanticBorderLayer}>
     <View style={[styles.semanticBorderStroke, { borderColor: '#0d0d0d', borderRadius: radius, borderWidth: outsideWidth }]} />
@@ -317,7 +318,7 @@ function CommittedClueMarker({ height, marker, variantName }: { height?: number;
     ? getClueColorFill(variantName, marker.value) ?? '#ffffff'
     : '#111111';
   return <View pointerEvents="none" style={[styles.clueMarker, { height: stemHeight + circleDiameter, marginLeft: -circleDiameter / 2, width: circleDiameter }]}>
-    <View style={[styles.clueStem, { backgroundColor: arrowColor, height: stemHeight }]} />
+    <View style={[styles.clueStemOutline, { height: stemHeight + 2 }]}><View style={[styles.clueStem, { backgroundColor: arrowColor, height: stemHeight }]} /></View>
     <View style={[
       styles.clueCircle,
       { backgroundColor: clueFill, borderRadius: circleDiameter / 2, height: circleDiameter, width: circleDiameter },
@@ -326,6 +327,10 @@ function CommittedClueMarker({ height, marker, variantName }: { height?: number;
       {marker.kind === 'rank' && <Text numberOfLines={1} style={[styles.rankClueText, { fontSize: rankFontSize, lineHeight: rankFontSize }]}>{marker.label}</Text>}
     </View>
   </View>;
+}
+
+function getCardGeometry(height: number) {
+  return { radius: height * 286 / 406 * 0.12 };
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -418,13 +423,9 @@ const styles = StyleSheet.create({
   cardTouch: { alignItems: 'center' },
   sizedCardTouch: { marginRight: -1, transform: [{ translateX: -2 }] },
   pressed: { opacity: 0.82 },
-  hiddenFrame: { aspectRatio: 286 / 406, backgroundColor: '#0d0d0d', borderRadius: 8, borderWidth: 2, elevation: 2, shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.28, shadowRadius: 2, width: 88 },
-  selectedFrame: { borderWidth: 4 },
-  sizedHiddenFrame: { borderWidth: 0 },
-  sizedHiddenCard: { borderRadius: 7, margin: 0 },
-  sizedHiddenFrameOverlay: { bottom: 0, borderRadius: 7, borderWidth: 2, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 11 },
-  sizedSelectedFrameOverlay: { borderWidth: 4 },
-  hiddenCard: { backgroundColor: '#747a76', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
+  cardShell: { aspectRatio: 286 / 406, elevation: 2, position: 'relative', shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.26, shadowRadius: 2, width: 88 },
+  cardSurface: { backgroundColor: '#747a76', flex: 1, overflow: 'hidden' },
+  selectionHalo: { borderWidth: 2, bottom: -3, left: -3, position: 'absolute', right: -3, top: -3, zIndex: 12 },
   empathyCard: { backgroundColor: '#747a76' },
   engineTrashCard: { opacity: 0.6 },
   semanticBorderLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 3 },
@@ -442,12 +443,12 @@ const styles = StyleSheet.create({
   legendPip: { alignItems: 'center', height: 24, justifyContent: 'center', position: 'relative', width: 24 },
   legendRank: { alignItems: 'center', height: 20, justifyContent: 'center', position: 'relative', width: 20 },
   rankPipText: { color: '#ffffff', fontSize: 13, fontWeight: '900', textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
-  visibleCard: { aspectRatio: 286 / 406, backgroundColor: 'transparent', borderRadius: 7, elevation: 2, justifyContent: 'center', overflow: 'hidden', shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.26, shadowRadius: 2 },
+  visibleCard: { justifyContent: 'center' },
   visibleHand: { height: 112 },
   visibleTable: { height: 86 },
-  visibleMini: { borderRadius: 5, height: 56 },
-  previewInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 7 },
-  clueMarker: { alignItems: 'center', left: '50%', position: 'absolute', top: 1, zIndex: 9 },
+  visibleMini: { height: 56 },
+  clueMarker: { alignItems: 'center', left: '50%', position: 'absolute', top: -2, zIndex: 9 },
+  clueStemOutline: { alignItems: 'center', backgroundColor: '#111111', borderRadius: 2, justifyContent: 'flex-end', width: 3 },
   clueStem: { borderRadius: 1, width: 1.5 },
   clueCircle: { alignItems: 'center', borderColor: '#111111', borderWidth: 1, justifyContent: 'center' },
   rankClueCircle: { backgroundColor: '#111111', borderColor: '#ffffff' },

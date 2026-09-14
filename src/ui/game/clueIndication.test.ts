@@ -3,6 +3,7 @@ import { expect, test } from '@jest/globals';
 import {
   getCommittedClueMarker,
   getCommittedClueMarkerForMetadata,
+  getPreviewClueMarker,
 } from './clueIndication';
 
 const choices = {
@@ -46,6 +47,13 @@ test('shows rank labels and distinguishes retouched cards', () => {
   });
 });
 
+test('uses pre-application retouch timing for preview markers', () => {
+  const preview = { type: 'rank' as const, value: 2 };
+
+  expect(getPreviewClueMarker(preview, 0, choices)?.retouched).toBe(false);
+  expect(getPreviewClueMarker(preview, 1, choices)?.retouched).toBe(true);
+});
+
 test('uses the same compact O/E rank marker text as upstream Odds and Evens arrows', () => {
   const clue = {
     giverPlayerIndex: 0,
@@ -60,6 +68,7 @@ test('uses the same compact O/E rank marker text as upstream Odds and Evens arro
   };
 
   expect(getCommittedClueMarker(clue, 4, 1, oddsAndEvensChoices)?.label).toBe('E');
+  expect(getPreviewClueMarker({ type: 'rank', value: 1 }, 0, oddsAndEvensChoices)?.label).toBe('O');
 });
 
 test('uses the authoritative clue giver character for committed marker labels', () => {

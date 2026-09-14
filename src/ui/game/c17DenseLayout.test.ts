@@ -49,7 +49,7 @@ describe('C17 dense portrait layout', () => {
   });
 
   test('does not enlarge cards when width remains the limiting dimension', () => {
-    const ordinary = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 505 });
+    const ordinary = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 600 });
     const tall = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 900 });
 
     expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
@@ -83,7 +83,7 @@ describe('C17 dense portrait layout', () => {
     const constrained = layout({
       opponentCardLaneWidth: 300,
       ownCardLaneWidth: 300,
-      handsRegionHeight: 421,
+      handsRegionHeight: 439,
       opponentCount: 5,
       cardsPerHand: 4,
     });
@@ -102,7 +102,7 @@ describe('C17 dense portrait layout', () => {
     });
 
     expect(constrained.mode).toBe('compact-overview');
-    expect(constrained.opponentRowHeight).toBe(constrained.opponentCardHeight + 22);
+    expect(constrained.opponentRowHeight).toBe(constrained.opponentCardHeight + constrained.cardTopHeadroom + 22);
   });
 
   test('keeps ordinary portrait five-card hands at a readable shared height', () => {
@@ -122,6 +122,14 @@ describe('C17 dense portrait layout', () => {
   test('keeps shared cards and real row chrome inside the captured hands rectangle', () => {
     const result = layout({ handsRegionHeight: 360 });
 
+    expect(result.handsHeight).toBeLessThanOrEqual(360);
+  });
+
+  test('reserves bounded clued-card lift headroom in every hand row', () => {
+    const result = layout({ handsRegionHeight: 360 });
+
+    expect(result.cardTopHeadroom).toBeGreaterThanOrEqual(3);
+    expect(result.cardTopHeadroom).toBeLessThanOrEqual(6);
     expect(result.handsHeight).toBeLessThanOrEqual(360);
   });
 
