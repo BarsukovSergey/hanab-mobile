@@ -281,10 +281,11 @@ export function CompactHandCardSummary({
   const { theme } = useHanabTheme();
   const longPressed = useRef(false);
   const handlePress = useImmediateDoubleTap(onPress, onDoublePress);
-  const faceSuitIndex = empathyKnowledge?.displaySuitIndex ?? suitIndex;
-  const faceRank = empathyKnowledge?.displayRank ?? rank;
+  const empathyActive = empathyKnowledge !== null;
+  const faceSuitIndex = empathyActive ? empathyKnowledge.displaySuitIndex : suitIndex;
+  const faceRank = empathyActive ? empathyKnowledge.displayRank : rank;
   const suit = faceSuitIndex === null ? undefined : getCardSuitVisuals(variantName)[faceSuitIndex];
-  const activeSemanticBorder = empathyKnowledge?.borderColor ?? semanticBorder;
+  const activeSemanticBorder = empathyActive ? empathyKnowledge.borderColor : semanticBorder;
   const primaryMarker = statePresentation?.critical ? 'critical'
     : statePresentation?.knownTrashNote ? 'trash'
       : statePresentation?.knownTrashFromEmpathy ? 'trash-mini'
