@@ -670,6 +670,10 @@ function C17DenseWorkspace({
     (liveTransition.actionType === 'play' || liveTransition.actionType === 'discard')
       && liveTransition.actorIndex === index ? livePulseSegment : null
   );
+  const clueTargetPulse = (index: number) => (
+    liveTransition.actionType === 'clue'
+      && liveTransition.targetIndex === index ? livePulseSegment : null
+  );
   const cluePulse = (index: number, position: number) => (
     liveTransition.actionType === 'clue'
       && liveTransition.targetIndex === index
@@ -765,7 +769,7 @@ function C17DenseWorkspace({
           const empathizing = globalEmpathy || empathyPlayer === index;
           const target = selectedTarget === index;
           const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
-          return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={sourcePulse(index)}><Pressable
+          return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={compact ? (clueTargetPulse(index) ?? sourcePulse(index)) : sourcePulse(index)}><Pressable
             accessibilityLabel={`Player ${playerName}`}
             accessibilityRole="button"
             delayLongPress={350}

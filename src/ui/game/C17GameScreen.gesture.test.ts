@@ -46,6 +46,18 @@ test('C17 uses summaries only for compact opponents while retaining full own car
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
 });
 
+test('C17 pulses only the compact clue target row while keeping full-card clue pulses', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain("const clueTargetPulse = (index: number) => (");
+  expect(screen).toContain("liveTransition.actionType === 'clue'");
+  expect(screen).toContain('liveTransition.targetIndex === index ? livePulseSegment : null');
+  expect(screen).toContain('pulseKey={compact ? (clueTargetPulse(index) ?? sourcePulse(index)) : sourcePulse(index)}');
+  expect(screen).toContain('pulseKey={cluePulse(index, position)}');
+  expect(screen).toContain('? <CompactHandCardSummary key={order} {...cardProps} />');
+  expect(screen).not.toContain('? <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><CompactHandCardSummary');
+});
+
 test('C17 clears a stale opponent long-press latch across lifecycle interruption', () => {
   const screen = readC17Screen();
 
