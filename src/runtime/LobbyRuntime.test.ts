@@ -717,6 +717,25 @@ describe('deterministic lobby runtime', () => {
     );
   });
 
+  test('live runtime rejects zero-touch clues before creating pending gameplay state', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"discard","playerIndex":1,'
+      + '"order":9,"suitIndex":4,"rank":5,"failed":false}}',
+    );
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.ongoingGame.hands[1]).not.toContain(9);
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.rankClue(1, 5)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+
+    expect(runtime.rankClue(1, 1)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('action {"tableID":123,"type":3,"target":1,"value":1}');
+  });
+
   test('reattend uses the existing player recovery path and attendance guard', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     store.dispatch(lobbyActions.tableReceived({
@@ -901,6 +920,30 @@ describe('deterministic lobby runtime', () => {
     const roomAfter = store.getState().room.room;
     if (roomAfter.kind !== 'live_game') throw new Error('Expected shared replay');
     expect(roomAfter.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+  });
+
+  test('hypothetical runtime rejects zero-touch clues before generating actions', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    const hypotheticalBefore = room.clientState.replay.hypothetical;
+    if (hypotheticalBefore === null) throw new Error('Expected hypothetical state');
+    const actionsBefore = hypotheticalBefore.actions;
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalRankClue(0, 2)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+    expect(room.clientState.replay.hypothetical?.actions).toBe(actionsBefore);
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(true);
+    expect(socket.sent.slice(sentBefore)).toHaveLength(2);
+    expect(socket.sent.slice(sentBefore).every((frame) => frame.startsWith('replayAction '))).toBe(true);
   });
 
   test('detached follower promoted to shared replay leader can start hypothetical', async () => {

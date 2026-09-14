@@ -54,7 +54,7 @@ export function getCluePreview(
 export function isCluePreviewConfirmable(
   preview: CluePreview | null,
   allowEmptyClues: boolean,
-  variantName: string = 'No Variant',
+  variantName: string,
 ): boolean {
   if (preview === null) return false;
   if (preview.touchedOrders.length > 0 || allowEmptyClues) return true;

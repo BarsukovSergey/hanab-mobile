@@ -11,6 +11,10 @@ import {
   isCurrentVariantRankClueValue,
 } from '../game/selectors/gameplay';
 import {
+  getCluePreview,
+  isCluePreviewConfirmable,
+} from '../game/selectors/cluePreview';
+import {
   areTableOptionsSupported,
   isVariantNameSupported,
 } from '../game/client/supportedVariants';
@@ -754,6 +758,26 @@ export class LobbyRuntime {
       (action.type === 'colorClue' || action.type === 'rankClue')
       && !hasClueTokenForVariant(clueTokens, variantName)
     ) return false;
+    if (action.type === 'colorClue' || action.type === 'rankClue') {
+      const preview = getCluePreview(
+        hypothetical.ongoing,
+        variantName,
+        action.target,
+        action.type === 'colorClue' ? 'color' : 'rank',
+        action.value,
+        {
+          cardIdentities: room.clientState.cardIdentities,
+          morphedIdentities: hypothetical.morphedIdentities,
+          notes: room.clientState.notes.ourNotes,
+          playing: room.clientState.playing,
+        },
+      );
+      if (!isCluePreviewConfirmable(
+        preview,
+        room.clientState.metadata.options.emptyClues,
+        variantName,
+      )) return false;
+    }
     const actions = getHypotheticalActions(
       action,
       hypothetical.ongoing,
@@ -1518,6 +1542,18 @@ export class LobbyRuntime {
         || (action.type === 3
           && !isCurrentVariantRankClueValue(variantName, action.value))
       ) return false;
+      const preview = getCluePreview(
+        room.clientState.ongoingGame,
+        variantName,
+        action.target,
+        action.type === 2 ? 'color' : 'rank',
+        action.value,
+      );
+      if (!isCluePreviewConfirmable(
+        preview,
+        room.clientState.metadata.options.emptyClues,
+        variantName,
+      )) return false;
     }
 
     const pending = {
