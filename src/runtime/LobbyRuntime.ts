@@ -687,7 +687,7 @@ export class LobbyRuntime {
       || room.clientState.replay.hypothetical !== null) return false;
     const shared = room.clientState.replay.shared;
     if (shared !== null) {
-      if (!shared.amLeader || !shared.useSharedSegments || room.clientState.visibleState?.turn.currentPlayerIndex === null || !this.isReadyCurrentRoom(room.tableID)) return false;
+      if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
       return this.sendEncoded(encodeReplayHypoStartFrame(room.tableID));
     }
     this.store.dispatch(roomActions.hypotheticalStarted({

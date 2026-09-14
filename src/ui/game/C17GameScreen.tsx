@@ -341,7 +341,7 @@ export function C17GameScreen() {
     && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID)
     && (replay.shared === null || replay.shared.amLeader);
   const canStartHypothetical = replay.active && !hypotheticalActive
-    && (replay.shared === null || (replay.shared.amLeader && replay.shared.useSharedSegments && game.turn.currentPlayerIndex !== null));
+    && (replay.shared === null || replay.shared.amLeader);
 
   return <>
     <C17DenseWorkspace

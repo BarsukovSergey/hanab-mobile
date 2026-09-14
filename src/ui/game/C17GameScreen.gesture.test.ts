@@ -96,6 +96,18 @@ test('C17 gives Play and Discard separate eligibility at maximum clue tokens', (
   expect(screen).not.toContain('canCommitCard');
 });
 
+test('C17 permits shared replay Hypothetical start for the replay leader', () => {
+  const screen = readC17Screen();
+  const canStartHypothetical = screen.slice(
+    screen.indexOf('const canStartHypothetical'),
+    screen.indexOf('\n\n  return <>', screen.indexOf('const canStartHypothetical')),
+  );
+
+  expect(canStartHypothetical).toContain('replay.shared === null || replay.shared.amLeader');
+  expect(canStartHypothetical).not.toContain('replay.shared.useSharedSegments');
+  expect(canStartHypothetical).not.toContain('game.turn.currentPlayerIndex !== null');
+});
+
 test('ClueComposer leaves touched and invalid clues to card highlighting and disabled Give', () => {
   const composer = readClueComposer();
 

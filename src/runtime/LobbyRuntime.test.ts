@@ -846,6 +846,40 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toHaveLength(sent);
   });
 
+  test('detached follower promoted to shared replay leader can start hypothetical', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({
+      useSharedSegments: false, amLeader: false,
+    });
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({
+      amLeader: true, useSharedSegments: false,
+    });
+
+    const sentBefore = socket.sent.length;
+    expect(runtime.startHypothetical()).toBe(true);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'replayAction {"tableID":123,"type":3}',
+    ]);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).toBeNull();
+
+    socket.emitMessage('hypoStart {"TableID":123}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).not.toBeNull();
+    expect(room.clientState.replay.shared?.useSharedSegments).toBe(true);
+    expect(room.clientState.replay.segment).toBe(room.clientState.replay.shared?.segment);
+  });
+
   test('leader and spectator events are table-scoped and drive rematch eligibility', async () => {
     const { socket, store } = await makeSharedReplayRuntime();
     let room = store.getState().room.room;
