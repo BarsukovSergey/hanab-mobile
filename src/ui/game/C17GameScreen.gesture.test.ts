@@ -114,4 +114,5 @@ test('ClueComposer leaves touched and invalid clues to card highlighting and dis
   expect(composer).not.toContain('Touches no cards');
   expect(composer).not.toContain('card${preview.touchedOrders.length');
   expect(composer).not.toContain('Unavailable');
+  expect(composer).toContain('isCluePreviewConfirmable(preview, allowEmptyClues, variantName)');
 });

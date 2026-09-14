@@ -38,7 +38,7 @@ export function ClueComposer({
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
   const allowEmptyClues = choices?.allowEmptyClues ?? false;
-  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues);
+  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues, variantName);
   const confirmAllowed = confirmEnabled ?? enabled;
 
   if (targetName === null) {

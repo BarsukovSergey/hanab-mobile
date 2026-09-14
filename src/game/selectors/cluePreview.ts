@@ -54,6 +54,13 @@ export function getCluePreview(
 export function isCluePreviewConfirmable(
   preview: CluePreview | null,
   allowEmptyClues: boolean,
+  variantName: string = 'No Variant',
 ): boolean {
-  return preview !== null && (allowEmptyClues || preview.touchedOrders.length > 0);
+  if (preview === null) return false;
+  if (preview.touchedOrders.length > 0 || allowEmptyClues) return true;
+
+  const variant = getVariant(variantName);
+  return preview.type === 'color'
+    ? variant.colorCluesTouchNothing
+    : variant.rankCluesTouchNothing;
 }
