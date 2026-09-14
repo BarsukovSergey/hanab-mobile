@@ -36,7 +36,7 @@ import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
-import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
+import { CardKnowledgeDetails, CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
 import {
   getC17CardLaneWidth,
@@ -784,19 +784,20 @@ function C17DenseWorkspace({
             onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
             style={[
               styles.opponentRow,
+              compact && styles.compactOpponentRow,
               { height: layout.opponentRowHeight },
               currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent },
               target && { borderColor: theme.colors.accent },
             ]}
           >
-            <View style={styles.opponentMeta}>
+            <View style={compact ? styles.compactOpponentNameLane : styles.opponentMeta}>
               <View style={styles.namePeekArea}>
                 <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
                   {playerName}{currentActor ? ' · TURN' : ''}
                 </Text>
               </View>
             </View>
-            <View style={[styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
+            <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
               {getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
@@ -820,26 +821,29 @@ function C17DenseWorkspace({
                   hyphenatedConventions,
                   hardVariant: metadata.hardVariant,
                 });
-                return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><VisibleHanabiCard
-                  empathyKnowledge={empathyKnowledge}
-                  hasNote={hasAvailableNote(order)}
-                  height={layout.opponentCardHeight}
-                  clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
-                  previewMarker={target && (cluePreview?.touchedOrders.includes(order) ?? false)
-                    ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
-                  cardTopHeadroom={layout.cardTopHeadroom}
-                  onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
-                  onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
-                  onPress={() => onInspectNote(order)}
-                  onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
-                  position={position}
-                  rank={hypothetical === null ? card.rank : normalKnowledge.displayRank}
-                  semanticBorder={normalKnowledge.borderColor}
-                  size={compact ? 'mini' : 'hand'}
-                  statePresentation={statePresentation}
-                  suitIndex={hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex}
-                  variantName={variantName}
-                /></AuthoritativePulse>;
+                const cardProps = {
+                  empathyKnowledge,
+                  hasNote: hasAvailableNote(order),
+                  height: layout.opponentCardHeight,
+                  clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata),
+                  previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)
+                    ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null,
+                  onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order),
+                  onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index),
+                  onPress: () => onInspectNote(order),
+                  onPressOut: globalEmpathy ? undefined : () => onHoldEmpathy(null),
+                  position,
+                  rank: hypothetical === null ? card.rank : normalKnowledge.displayRank,
+                  semanticBorder: normalKnowledge.borderColor,
+                  statePresentation,
+                  suitIndex: hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex,
+                  variantName,
+                };
+                return compact
+                  ? <CompactHandCardSummary key={order} {...cardProps} />
+                  : <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}>
+                    <VisibleHanabiCard {...cardProps} cardTopHeadroom={layout.cardTopHeadroom} size="hand" />
+                  </AuthoritativePulse>;
               })}
             </View>
           </Pressable></AuthoritativePulse>;
@@ -1099,10 +1103,13 @@ const styles = StyleSheet.create({
   shellPending: { opacity: 0 },
   opponents: { gap: 2 },
   opponentRow: { borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
+  compactOpponentRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
   opponentMeta: { height: 14, justifyContent: 'center' },
+  compactOpponentNameLane: { flexShrink: 1, justifyContent: 'center', maxWidth: '36%', minWidth: 0 },
   namePeekArea: { borderRadius: 6, height: 14, justifyContent: 'center' },
   opponentName: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
   opponentCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
+  compactOpponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 2, minWidth: 0 },
   ownHand: { borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   ownTitle: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },

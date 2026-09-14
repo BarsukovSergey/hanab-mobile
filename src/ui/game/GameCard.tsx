@@ -243,6 +243,102 @@ export function VisibleHanabiCard({
   >{content}</Pressable>;
 }
 
+export function CompactHandCardSummary({
+  suitIndex,
+  rank,
+  variantName,
+  position,
+  semanticBorder = null,
+  empathyKnowledge = null,
+  statePresentation = null,
+  hasNote = false,
+  clueMarker = null,
+  previewMarker = null,
+  onPress,
+  onDoublePress,
+  onLongPress,
+  onPressIn,
+  onPressOut,
+  height = 24,
+}: {
+  suitIndex: number | null;
+  rank: number | null;
+  variantName: string;
+  position?: number;
+  semanticBorder?: string | null;
+  empathyKnowledge?: CardKnowledgeViewModel | null;
+  statePresentation?: CardStatePresentation | null;
+  hasNote?: boolean;
+  clueMarker?: ClueCardMarker | null;
+  previewMarker?: ClueCardMarker | null;
+  onPress?: () => void;
+  onDoublePress?: () => void;
+  onLongPress?: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
+  height?: number;
+}) {
+  const { theme } = useHanabTheme();
+  const longPressed = useRef(false);
+  const handlePress = useImmediateDoubleTap(onPress, onDoublePress);
+  const faceSuitIndex = empathyKnowledge?.displaySuitIndex ?? suitIndex;
+  const faceRank = empathyKnowledge?.displayRank ?? rank;
+  const suit = faceSuitIndex === null ? undefined : getCardSuitVisuals(variantName)[faceSuitIndex];
+  const activeSemanticBorder = empathyKnowledge?.borderColor ?? semanticBorder;
+  const primaryMarker = statePresentation?.critical ? 'critical'
+    : statePresentation?.knownTrashNote ? 'trash'
+      : statePresentation?.knownTrashFromEmpathy ? 'trash-mini'
+        : statePresentation?.doubleDiscard ? 'dda' : null;
+  const annotationMarker = statePresentation?.needsFix ? 'fix'
+    : statePresentation?.exclamationMark ? 'exclamation'
+      : statePresentation?.questionMark ? 'question' : null;
+
+  return <Pressable
+    accessibilityLabel={`${position === undefined ? 'Card' : `Card ${position + 1}`}, ${suit?.name ?? 'Unknown'} ${faceRank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
+    accessibilityRole="button"
+    delayLongPress={onLongPress === undefined ? undefined : 350}
+    onLongPress={onLongPress === undefined ? undefined : () => {
+      longPressed.current = true;
+      onLongPress();
+    }}
+    onPress={() => {
+      if (longPressed.current) {
+        longPressed.current = false;
+        return;
+      }
+      handlePress();
+    }}
+    onPressIn={() => {
+      longPressed.current = false;
+      onPressIn?.();
+    }}
+    onPressOut={onPressOut}
+    style={({ pressed }) => [styles.compactSummaryTouch, pressed && styles.pressed]}
+  >
+    <View style={[
+      styles.compactSummary,
+      { backgroundColor: theme.colors.surfaceRaised, borderColor: activeSemanticBorder ?? theme.colors.border, height },
+      activeSemanticBorder !== null && styles.compactSummarySemanticBorder,
+      statePresentation?.shouldFade && styles.engineTrashCard,
+    ]}>
+      <View style={styles.compactIdentity}>
+        {suit === undefined || !hasUpstreamSvgPip(suit.pip) ? <Text style={[styles.compactUnknown, { color: theme.colors.text }]}>?</Text> : <UpstreamPip
+          duplicatePip={suit.duplicatePip}
+          fillColors={suit.fillColors}
+          pip={suit.pip}
+          size={11}
+          suitName={suit.name}
+        />}
+        <Text style={[styles.compactRank, { color: theme.colors.text }]}>{faceRank ?? '?'}</Text>
+      </View>
+      {primaryMarker !== null && <View pointerEvents="none" style={styles.compactPrimaryMarker}><WebCardMarker kind={primaryMarker} /></View>}
+      {annotationMarker !== null && <View pointerEvents="none" style={styles.compactAnnotationMarker}><WebCardMarker kind={annotationMarker} /></View>}
+      {hasNote && <View pointerEvents="none" style={styles.compactNoteMarker}><WebCardMarker kind="note" /></View>}
+      {(previewMarker ?? clueMarker) !== null && <CluePointerMarker height={height} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
+    </View>
+  </Pressable>;
+}
+
 export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: CardKnowledgeViewModel; variantName: string }) {
   const { theme } = useHanabTheme();
   return <View style={styles.details}>
@@ -456,6 +552,15 @@ const styles = StyleSheet.create({
   visibleHand: { height: 112 },
   visibleTable: { height: 86 },
   visibleMini: { height: 56 },
+  compactSummaryTouch: { flex: 1, minWidth: 0 },
+  compactSummary: { alignItems: 'center', borderRadius: 6, borderWidth: 1, justifyContent: 'center', minWidth: 0, overflow: 'visible', position: 'relative' },
+  compactSummarySemanticBorder: { borderWidth: 2 },
+  compactIdentity: { alignItems: 'center', flexDirection: 'row', gap: 2, justifyContent: 'center' },
+  compactRank: { fontSize: 12, fontWeight: '900', lineHeight: 13 },
+  compactUnknown: { fontSize: 12, fontWeight: '900', lineHeight: 13 },
+  compactPrimaryMarker: { bottom: 1, height: 8, left: 1, position: 'absolute', width: 8, zIndex: 10 },
+  compactAnnotationMarker: { bottom: 1, height: 8, position: 'absolute', right: 1, width: 8, zIndex: 10 },
+  compactNoteMarker: { height: 8, position: 'absolute', right: 1, top: 1, width: 8, zIndex: 10 },
   clueMarker: { alignItems: 'center', left: '50%', position: 'absolute', top: -3, zIndex: 9 },
   clueArrow: { left: 0, position: 'absolute', top: 0 },
   clueBadge: { position: 'absolute', top: 0 },

@@ -15,13 +15,14 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
 
   expect(screen).toContain('delayLongPress={350}');
   expect(screen).toContain('onLongPress={() => onHoldEmpathy(ourIndex)}');
-  expect(screen).toContain('onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}');
-  expect(screen).toContain('previewMarker={target && (cluePreview?.touchedOrders.includes(order) ?? false)');
+  expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
+  expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
   expect(screen).toContain('styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }');
   expect(screen).toContain('styles.ownCards, { marginTop: 2 + layout.cardTopHeadroom }');
   expect(screen).toContain('if (canEnterClue) onSelectClueTarget(index);');
-  const opponentRow = screen.slice(screen.indexOf('accessibilityLabel={`Player ${playerName}`}'), screen.indexOf('<View style={styles.opponentMeta}>'));
+  const opponentStart = screen.indexOf('accessibilityLabel={`Player ${playerName}`}');
+  const opponentRow = screen.slice(opponentStart, opponentStart + 1000);
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
   expect(opponentRow).toContain('onLongPress={globalEmpathy ? undefined : () => {');
   expect(opponentRow).toContain('onPressIn={() => { longPressedOpponent.current = null; }}');
@@ -29,6 +30,20 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
   expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');
+});
+
+test('C17 uses summaries only for compact opponents while retaining full own cards', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain("import { CardKnowledgeDetails, CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';");
+  expect(screen).toContain('? <CompactHandCardSummary key={order} {...cardProps} />');
+  expect(screen).toContain('<VisibleHanabiCard {...cardProps} cardTopHeadroom={layout.cardTopHeadroom} size="hand" />');
+  expect(screen).not.toContain("size={compact ? 'mini' : 'hand'}");
+  expect(screen).toContain('height={layout.ownCardHeight}');
+  expect(screen).toContain('clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)');
+  expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
+  expect(screen).toContain('onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)');
+  expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
 });
 
 test('C17 clears a stale opponent long-press latch across lifecycle interruption', () => {
