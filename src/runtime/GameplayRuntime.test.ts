@@ -263,6 +263,36 @@ describe('C7 authoritative gameplay runtime', () => {
     });
   });
 
+  test('a sent gameplay action is not replayed after connection replacement', async () => {
+    const { session, runtime, socket: first, store } = await makeLive();
+    const second = new FakeSocket();
+    session.sockets.push(second);
+    const sentBefore = first.sent.length;
+
+    expect(runtime.play(0)).toBe(true);
+    expect(first.sent.slice(sentBefore)).toEqual([
+      'action {"tableID":123,"type":0,"target":0}',
+    ]);
+    expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+
+    first.emitClose();
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    second.emitOpen();
+    second.emitMessage(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}',
+    );
+
+    expect(second.sent).toEqual([
+      'tableReattend {"tableID":123}',
+    ]);
+    expect(second.sent).not.toContain(
+      'action {"tableID":123,"type":0,"target":0}',
+    );
+  });
+
   test('review mode cannot emit gameplay and returning live restores command eligibility', async () => {
     const { runtime, socket, store } = await makeLive();
     const room = store.getState().room.room;
