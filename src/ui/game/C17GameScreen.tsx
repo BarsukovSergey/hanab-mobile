@@ -22,10 +22,12 @@ import { getLastCluePresentationFromState } from '../../game/selectors/lastClue'
 import {
   canDiscardForVariant,
   getDisplayedClueTokens,
+  getDisplayedClockString,
   getDisplayedLiveFutureEfficiency,
   getGameplayCardsPerHand,
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
+  type LiveClock,
 } from '../../game/selectors/gameplay';
 import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
@@ -168,6 +170,15 @@ export function C17GameScreen() {
   if (liveRoom === null || clientState === null || game === null || ourIndex === null) return null;
 
   const { metadata, replay, ongoingGame } = clientState;
+  const liveClock = metadata.options.timed === true
+    && !clientState.finished
+    && !replay.active
+    && !hypotheticalActive
+    && !liveRoom.sharedReplay
+    && ongoingGame.turn.currentPlayerIndex !== null
+    && liveRoom.clock !== null
+    ? liveRoom.clock
+    : null;
   const latest = ongoingGame.turn.segment ?? 0;
   const selectedCard = isPlayingPlayer || canHypotheticalControl ? interaction.selectedCard : null;
   const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;
@@ -372,6 +383,8 @@ export function C17GameScreen() {
       isSpectator={isSpectator}
       lastAction={reviewTemporal.last.summary}
       liveBefore={liveBefore}
+      liveClock={liveClock}
+      clockPaused={clientState.pause.active}
       livePulseSegment={livePulseSegment}
       livePulseEnabled={!replay.active}
       liveTransition={liveTemporal.last}
@@ -480,6 +493,7 @@ function C17DenseWorkspace({
   clueEnabled,
   cluePreview,
   cluePreviewState,
+  clockPaused,
   empathyPlayer,
   futureEfficiency,
   game,
@@ -492,6 +506,7 @@ function C17DenseWorkspace({
   isSpectator,
   lastAction,
   liveBefore,
+  liveClock,
   livePulseSegment,
   livePulseEnabled,
   liveTransition,
@@ -560,6 +575,7 @@ function C17DenseWorkspace({
   clueEnabled: boolean;
   cluePreview: ReturnType<typeof getCluePreview> | null;
   cluePreviewState: { type: 'color' | 'rank'; value: number } | null;
+  clockPaused: boolean;
   empathyPlayer: number | null;
   futureEfficiency: number | null;
   game: GameState;
@@ -572,6 +588,7 @@ function C17DenseWorkspace({
   isSpectator: boolean;
   lastAction: string;
   liveBefore: GameState | undefined;
+  liveClock: LiveClock | null;
   livePulseSegment: number | null;
   livePulseEnabled: boolean;
   liveTransition: C17TemporalEntry;
@@ -805,6 +822,11 @@ function C17DenseWorkspace({
                 <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
                   {playerName}{currentActor ? ' · TURN' : ''}
                 </Text>
+                {liveClock !== null && <C17LiveClockText
+                  clock={liveClock}
+                  paused={clockPaused}
+                  playerIndex={index}
+                />}
               </View>
             </View>
             <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
@@ -867,9 +889,16 @@ function C17DenseWorkspace({
         onPressOut={() => onHoldEmpathy(null)}
         style={[styles.ownHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       >
-        <Text style={[styles.ownTitle, { color: theme.colors.text }]}>{hypothetical !== null
-          ? `ACTOR · ${metadata.playerNames[ourIndex] ?? `P${ourIndex + 1}`}`
-          : isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'}</Text>
+        <View style={styles.ownTitleLane}>
+          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{hypothetical !== null
+            ? `ACTOR · ${metadata.playerNames[ourIndex] ?? `P${ourIndex + 1}`}`
+            : isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'}</Text>
+          {liveClock !== null && <C17LiveClockText
+            clock={liveClock}
+            paused={clockPaused}
+            playerIndex={ourIndex}
+          />}
+        </View>
         <View style={[styles.ownCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
           {ownHand.map((order, position) => {
             const card = game.deck[order];
@@ -1072,6 +1101,20 @@ function C17DenseWorkspace({
   </View>;
 }
 
+function C17LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; playerIndex: number; paused: boolean }) {
+  const { theme } = useHanabTheme();
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    if (paused) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [clock.receivedAtMs, paused, playerIndex]);
+  const display = getDisplayedClockString(clock, playerIndex, paused, now);
+  if (display === null) return null;
+  return <Text style={[styles.clock, { color: theme.colors.text }]}>{display}</Text>;
+}
+
 function HudStat({ label, pulseEnabled, pulseKey, value }: { label: string; pulseEnabled?: boolean; pulseKey?: number | null; value: number | string }) {
   const { theme } = useHanabTheme();
   return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}><View style={styles.hudStat}>
@@ -1114,14 +1157,16 @@ const styles = StyleSheet.create({
   opponents: { gap: 2 },
   opponentRow: { borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   compactOpponentRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
-  opponentMeta: { height: 14, justifyContent: 'center' },
+  opponentMeta: { height: 14, justifyContent: 'center', minWidth: 0 },
   compactOpponentNameLane: { flexShrink: 1, justifyContent: 'center', maxWidth: '36%', minWidth: 0 },
-  namePeekArea: { borderRadius: 6, height: 14, justifyContent: 'center' },
-  opponentName: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
+  namePeekArea: { alignItems: 'center', borderRadius: 6, flexDirection: 'row', gap: 3, height: 14, justifyContent: 'center', minWidth: 0 },
+  opponentName: { flexShrink: 1, fontSize: 10, fontWeight: '900', lineHeight: 14, minWidth: 0 },
   opponentCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   compactOpponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 2, minWidth: 0 },
   ownHand: { borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
-  ownTitle: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
+  ownTitleLane: { alignItems: 'center', flexDirection: 'row', gap: 3, height: 14, minWidth: 0 },
+  ownTitle: { flexShrink: 1, fontSize: 10, fontWeight: '900', lineHeight: 14, minWidth: 0 },
+  clock: { flexShrink: 0, fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 14 },
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
   workbenchExpanded: { flex: 1 },
