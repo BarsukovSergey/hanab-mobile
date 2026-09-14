@@ -173,7 +173,6 @@ export function VisibleHanabiCard({
   onPressOut?: () => void;
   size?: VisibleCardSize;
   height?: number;
-  [legacyPresentationProp: string]: unknown;
 }) {
   const { theme } = useHanabTheme();
   const longPressed = useRef(false);
@@ -315,7 +314,10 @@ function CluePointerMarker({ height, marker, variantName }: { height?: number; m
   const arrowColor = marker.retouched ? '#737373' : '#ffffff';
   const cardHeight = height ?? 112;
   const circleDiameter = clamp(Math.round(cardHeight * 0.12), 8, 11);
-  const pointerHeight = clamp(Math.round(cardHeight * 0.11), 8, 13);
+  const arrowTail = clamp(Math.round(cardHeight * 0.07), 4, 7);
+  const pointerHeight = circleDiameter + arrowTail;
+  const headBaseY = circleDiameter - 1;
+  const tipY = pointerHeight - 1;
   const rankFontSize = Math.round(circleDiameter * 0.55);
   const clueFill = marker.kind === 'color'
     ? getClueColorFill(variantName, marker.value) ?? '#ffffff'
@@ -323,8 +325,8 @@ function CluePointerMarker({ height, marker, variantName }: { height?: number; m
   const center = circleDiameter / 2;
   return <View pointerEvents="none" style={[styles.clueMarker, { height: pointerHeight, marginLeft: -center, width: circleDiameter }]}>
     <Svg height={pointerHeight} style={styles.clueArrow} viewBox={`0 0 ${circleDiameter} ${pointerHeight}`} width={circleDiameter}>
-      <Path d={`M ${center - 3} 1 H ${center + 3} V ${pointerHeight - 5} L ${center} ${pointerHeight - 1} L ${center - 3} ${pointerHeight - 5} Z`} fill="#111111" />
-      <Path d={`M ${center - 1.5} 2 H ${center + 1.5} V ${pointerHeight - 5} L ${center} ${pointerHeight - 3} L ${center - 1.5} ${pointerHeight - 5} Z`} fill={arrowColor} />
+      <Path d={`M ${center - 3} 1 H ${center + 3} V ${headBaseY} L ${center} ${tipY} L ${center - 3} ${headBaseY} Z`} fill="#111111" />
+      <Path d={`M ${center - 1.5} 2 H ${center + 1.5} V ${headBaseY + 1} L ${center} ${tipY - 2} L ${center - 1.5} ${headBaseY + 1} Z`} fill={arrowColor} />
     </Svg>
     <View style={[
       styles.clueCircle,

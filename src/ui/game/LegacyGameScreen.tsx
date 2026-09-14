@@ -519,7 +519,6 @@ export function GameScreen() {
                     empathyKnowledge={empathyKnowledge}
                     hasNote={hasCardNote(order)}
                     height={gameplayLayout.opponentCardHeight}
-                    highlighted={previewTouched.has(order)}
                     key={order}
                     onLongPress={() => interactionDispatch({ type: 'hold-empathy', playerIndex: i })}
                     onPress={() => openNote(order)}
