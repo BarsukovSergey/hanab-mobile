@@ -18,6 +18,8 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).toContain('onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}');
   expect(screen).toContain('previewMarker={target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
+  expect(screen).toContain('styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.ownCards, { marginTop: 2 + layout.cardTopHeadroom }');
   expect(screen).toContain('if (canEnterClue) onSelectClueTarget(index);');
   const opponentRow = screen.slice(screen.indexOf('accessibilityLabel={`Player ${playerName}`}'), screen.indexOf('<View style={styles.opponentMeta}>'));
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');

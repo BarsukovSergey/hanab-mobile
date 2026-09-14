@@ -796,7 +796,7 @@ function C17DenseWorkspace({
                 </Text>
               </View>
             </View>
-            <View style={styles.opponentCards}>
+            <View style={[styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
               {getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
@@ -856,7 +856,7 @@ function C17DenseWorkspace({
         <Text style={[styles.ownTitle, { color: theme.colors.text }]}>{hypothetical !== null
           ? `ACTOR · ${metadata.playerNames[ourIndex] ?? `P${ourIndex + 1}`}`
           : isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'}</Text>
-        <View style={styles.ownCards}>
+        <View style={[styles.ownCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
           {ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
@@ -1102,10 +1102,10 @@ const styles = StyleSheet.create({
   opponentMeta: { height: 14, justifyContent: 'center' },
   namePeekArea: { borderRadius: 6, height: 14, justifyContent: 'center' },
   opponentName: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
-  opponentCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, marginTop: 2, minWidth: 0 },
+  opponentCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   ownHand: { borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   ownTitle: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
-  ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, marginTop: 2, minWidth: 0 },
+  ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
   workbenchExpanded: { flex: 1 },
   workbenchScroll: { flex: 1 },

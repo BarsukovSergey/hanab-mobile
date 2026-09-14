@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Path, Svg } from 'react-native-svg';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import type { CardStatePresentation } from '../../game/selectors/cardStatePresentation';
@@ -100,7 +101,10 @@ export function GameCard({
     style={({ pressed }) => [
       styles.cardTouch,
       height === undefined ? null : styles.sizedCardTouch,
-      knowledge.borderColor === 'orange' && { transform: [{ translateY: -cardTopHeadroom }] },
+      { transform: [
+        ...(height === undefined ? [] : [{ translateX: -2 }]),
+        ...(knowledge.borderColor === 'orange' ? [{ translateY: -cardTopHeadroom }] : []),
+      ] },
       pressed && styles.pressed,
     ]}
   >
@@ -116,7 +120,6 @@ export function GameCard({
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
         {knowledge.borderColor !== null && <SemanticBorder color={knowledge.borderColor} height={height} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
-        {(previewMarker ?? clueMarker) !== null && <CommittedClueMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
         <CardStateIndicators
           clued={knowledge.borderColor === 'orange'}
           knownRank={knowledge.displayRank !== null}
@@ -124,6 +127,7 @@ export function GameCard({
         />
         {hasNote && <NoteIndicator compact={compactIndicator} />}
       </View>
+      {(previewMarker ?? clueMarker) !== null && <CluePointerMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
       {selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}
     </View>
   </Pressable>;
@@ -155,7 +159,6 @@ export function VisibleHanabiCard({
   variantName: string;
   position?: number;
   selected?: boolean;
-  highlighted?: boolean;
   clueMarker?: ClueCardMarker | null;
   previewMarker?: ClueCardMarker | null;
   cardTopHeadroom?: number;
@@ -170,6 +173,7 @@ export function VisibleHanabiCard({
   onPressOut?: () => void;
   size?: VisibleCardSize;
   height?: number;
+  [legacyPresentationProp: string]: unknown;
 }) {
   const { theme } = useHanabTheme();
   const longPressed = useRef(false);
@@ -200,14 +204,13 @@ export function VisibleHanabiCard({
     <UpstreamCardFace rank={faceRank} suitIndex={faceSuitIndex} variantName={variantName} />
     {activeSemanticBorder !== null && size === 'hand' && <SemanticBorder color={activeSemanticBorder} height={height} />}
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
-    {(previewMarker ?? clueMarker) !== null && <CommittedClueMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
     <CardStateIndicators
       clued={activeSemanticBorder === 'orange'}
       knownRank={faceRank !== null}
       presentation={statePresentation}
     />
     {hasNote && <NoteIndicator compact={compactIndicator} />}
-  </View>{selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}</View>;
+  </View>{(previewMarker ?? clueMarker) !== null && <CluePointerMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}{selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}</View>;
 
   if (
     onPress === undefined
@@ -308,20 +311,24 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
   </View>;
 }
 
-function CommittedClueMarker({ height, marker, variantName }: { height?: number; marker: ClueCardMarker; variantName: string }) {
+function CluePointerMarker({ height, marker, variantName }: { height?: number; marker: ClueCardMarker; variantName: string }) {
   const arrowColor = marker.retouched ? '#737373' : '#ffffff';
   const cardHeight = height ?? 112;
   const circleDiameter = clamp(Math.round(cardHeight * 0.12), 8, 11);
-  const stemHeight = clamp(Math.round(cardHeight * 0.05), 3, 5);
+  const pointerHeight = clamp(Math.round(cardHeight * 0.11), 8, 13);
   const rankFontSize = Math.round(circleDiameter * 0.55);
   const clueFill = marker.kind === 'color'
     ? getClueColorFill(variantName, marker.value) ?? '#ffffff'
     : '#111111';
-  return <View pointerEvents="none" style={[styles.clueMarker, { height: stemHeight + circleDiameter, marginLeft: -circleDiameter / 2, width: circleDiameter }]}>
-    <View style={[styles.clueStemOutline, { height: stemHeight + 2 }]}><View style={[styles.clueStem, { backgroundColor: arrowColor, height: stemHeight }]} /></View>
+  const center = circleDiameter / 2;
+  return <View pointerEvents="none" style={[styles.clueMarker, { height: pointerHeight, marginLeft: -center, width: circleDiameter }]}>
+    <Svg height={pointerHeight} style={styles.clueArrow} viewBox={`0 0 ${circleDiameter} ${pointerHeight}`} width={circleDiameter}>
+      <Path d={`M ${center - 3} 1 H ${center + 3} V ${pointerHeight - 5} L ${center} ${pointerHeight - 1} L ${center - 3} ${pointerHeight - 5} Z`} fill="#111111" />
+      <Path d={`M ${center - 1.5} 2 H ${center + 1.5} V ${pointerHeight - 5} L ${center} ${pointerHeight - 3} L ${center - 1.5} ${pointerHeight - 5} Z`} fill={arrowColor} />
+    </Svg>
     <View style={[
       styles.clueCircle,
-      { backgroundColor: clueFill, borderRadius: circleDiameter / 2, height: circleDiameter, width: circleDiameter },
+      { backgroundColor: clueFill, borderRadius: circleDiameter / 2, height: circleDiameter, width: circleDiameter }, styles.clueBadge,
       marker.kind === 'rank' && styles.rankClueCircle,
     ]}>
       {marker.kind === 'rank' && <Text numberOfLines={1} style={[styles.rankClueText, { fontSize: rankFontSize, lineHeight: rankFontSize }]}>{marker.label}</Text>}
@@ -421,9 +428,9 @@ function NoteIndicator({ compact = false }: { compact?: boolean }) {
 
 const styles = StyleSheet.create({
   cardTouch: { alignItems: 'center' },
-  sizedCardTouch: { marginRight: -1, transform: [{ translateX: -2 }] },
+  sizedCardTouch: { marginRight: -1 },
   pressed: { opacity: 0.82 },
-  cardShell: { aspectRatio: 286 / 406, elevation: 2, position: 'relative', shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.26, shadowRadius: 2, width: 88 },
+  cardShell: { aspectRatio: 286 / 406, elevation: 2, position: 'relative', shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.26, shadowRadius: 2 },
   cardSurface: { backgroundColor: '#747a76', flex: 1, overflow: 'hidden' },
   selectionHalo: { borderWidth: 2, bottom: -3, left: -3, position: 'absolute', right: -3, top: -3, zIndex: 12 },
   empathyCard: { backgroundColor: '#747a76' },
@@ -447,9 +454,9 @@ const styles = StyleSheet.create({
   visibleHand: { height: 112 },
   visibleTable: { height: 86 },
   visibleMini: { height: 56 },
-  clueMarker: { alignItems: 'center', left: '50%', position: 'absolute', top: -2, zIndex: 9 },
-  clueStemOutline: { alignItems: 'center', backgroundColor: '#111111', borderRadius: 2, justifyContent: 'flex-end', width: 3 },
-  clueStem: { borderRadius: 1, width: 1.5 },
+  clueMarker: { alignItems: 'center', left: '50%', position: 'absolute', top: -3, zIndex: 9 },
+  clueArrow: { left: 0, position: 'absolute', top: 0 },
+  clueBadge: { position: 'absolute', top: 0 },
   clueCircle: { alignItems: 'center', borderColor: '#111111', borderWidth: 1, justifyContent: 'center' },
   rankClueCircle: { backgroundColor: '#111111', borderColor: '#ffffff' },
   rankClueText: { color: '#ffffff', fontWeight: '900', maxWidth: 11 },
