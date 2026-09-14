@@ -846,6 +846,63 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toHaveLength(sent);
   });
 
+  test('hypothetical runtime rejects discard at maximum clue tokens', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+
+    const roomBefore = store.getState().room.room;
+    if (roomBefore.kind !== 'live_game') throw new Error('Expected shared replay');
+    const hypotheticalBefore = roomBefore.clientState.replay.hypothetical;
+    if (hypotheticalBefore === null) throw new Error('Expected hypothetical state');
+    expect(hypotheticalBefore.ongoing.clueTokens).toBe(8);
+    const order = hypotheticalBefore.ongoing.hands[0]?.[0];
+    if (order === undefined) throw new Error('Expected actionable hypothetical card');
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalDiscard(order)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    const roomAfter = store.getState().room.room;
+    if (roomAfter.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(roomAfter.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+  });
+
+  test('hypothetical runtime rejects clues with zero clue tokens', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+
+    for (let turn = 0; turn < 8; turn += 1) {
+      const giver = turn % 2;
+      const target = giver === 0 ? 1 : 0;
+      const order = target === 0 ? 0 : 5;
+      socket.emitMessage(
+        `hypoAction {"type":"clue","clue":{"type":1,"value":1},"giver":${giver},`
+        + `"list":[${order}],"target":${target},"ignoreNegative":false}`,
+      );
+      socket.emitMessage(
+        `hypoAction {"type":"turn","num":${turn + 1},"currentPlayerIndex":${target}}`,
+      );
+    }
+
+    const roomBefore = store.getState().room.room;
+    if (roomBefore.kind !== 'live_game') throw new Error('Expected shared replay');
+    const hypotheticalBefore = roomBefore.clientState.replay.hypothetical;
+    if (hypotheticalBefore === null) throw new Error('Expected hypothetical state');
+    expect(hypotheticalBefore.ongoing.clueTokens).toBe(0);
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalRankClue(1, 1)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    const roomAfter = store.getState().room.room;
+    if (roomAfter.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(roomAfter.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+  });
+
   test('detached follower promoted to shared replay leader can start hypothetical', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
     expect(runtime.navigateReplaySegment(0)).toBe(true);

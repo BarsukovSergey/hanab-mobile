@@ -747,6 +747,13 @@ export class LobbyRuntime {
     if (room.kind !== 'live_game') return false;
     const hypothetical = room.clientState.replay.hypothetical;
     if (hypothetical === null) return false;
+    const variantName = room.clientState.metadata.options.variantName;
+    const clueTokens = hypothetical.ongoing.clueTokens;
+    if (action.type === 'discard' && !canDiscardForVariant(clueTokens, variantName)) return false;
+    if (
+      (action.type === 'colorClue' || action.type === 'rankClue')
+      && !hasClueTokenForVariant(clueTokens, variantName)
+    ) return false;
     const actions = getHypotheticalActions(
       action,
       hypothetical.ongoing,
