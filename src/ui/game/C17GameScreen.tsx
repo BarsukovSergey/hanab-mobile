@@ -892,6 +892,7 @@ function C17DenseWorkspace({
     <View style={[
       styles.workbench,
       { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
+      shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
       <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
@@ -1093,7 +1094,8 @@ const styles = StyleSheet.create({
   ownHand: { borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   ownTitle: { fontSize: 10, fontWeight: '900', lineHeight: 14 },
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, marginTop: 2, minWidth: 0 },
-  workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, flex: 1, marginTop: 5, overflow: 'hidden' },
+  workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
+  workbenchExpanded: { flex: 1 },
   workbenchScroll: { flex: 1 },
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
