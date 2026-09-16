@@ -33,6 +33,8 @@ const HAND_ROW_CHROME = HAND_ROW_VERTICAL_PADDING * 2
   + HAND_ROW_METADATA_GAP
   + HAND_ROW_BORDER_WIDTH * 2;
 const DEFAULT_WORKBENCH_HEIGHT = 156;
+const HANDS_TOP_MARGIN = 5;
+const WORKBENCH_TOP_MARGIN = 5;
 const MIN_FULL_LEDGER_CARD_HEIGHT = 76;
 const COMPACT_OPPONENT_SUMMARY_HEIGHT = 24;
 const COMPACT_OPPONENT_ROW_HEIGHT = 32;
@@ -52,6 +54,21 @@ export function getC17CardLaneWidth(rowWidth: number): number {
   const horizontalPadding = 4;
   const borderWidth = 1;
   return Math.max(1, rowWidth - horizontalPadding * 2 - borderWidth * 2);
+}
+
+/**
+ * The body is owned by the workspace/chrome. Reserve the existing Workbench minimum and
+ * inter-region spacing before allocating the hands within that ambient body.
+ */
+export function getC17HandsRegionHeight(ambientBodyHeight: number, workbenchHeight: number): number {
+  return Math.max(0, ambientBodyHeight - workbenchHeight - HANDS_TOP_MARGIN - WORKBENCH_TOP_MARGIN);
+}
+
+export function hasC17AmbientRegionChanged(
+  current: { height: number; width: number },
+  next: { height: number; width: number },
+): boolean {
+  return Math.abs(current.height - next.height) >= 0.5 || Math.abs(current.width - next.width) >= 0.5;
 }
 
 /**

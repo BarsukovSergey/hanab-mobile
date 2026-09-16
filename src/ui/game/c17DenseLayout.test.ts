@@ -1,5 +1,12 @@
 import { describe, expect, test } from '@jest/globals';
-import { getC17CardLaneWidth, getC17DenseLayout, getC17WorkbenchHeight, getRelativeOpponentIndices } from './c17DenseLayout';
+import {
+  getC17CardLaneWidth,
+  getC17DenseLayout,
+  getC17HandsRegionHeight,
+  getC17WorkbenchHeight,
+  getRelativeOpponentIndices,
+  hasC17AmbientRegionChanged,
+} from './c17DenseLayout';
 
 function layout(overrides: Partial<Parameters<typeof getC17DenseLayout>[0]> = {}) {
   return getC17DenseLayout({ opponentCardLaneWidth: 300, handsRegionHeight: 500, ownCardLaneWidth: 300, opponentCount: 5, cardsPerHand: 4, workbenchHeight: 156, ...overrides });
@@ -48,6 +55,30 @@ describe('C17 dense portrait layout', () => {
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(76);
     expect(result.ownRowHeight).toBe(result.ownCardHeight + result.cardTopHeadroom + 22);
     expect(result.handsHeight).toBeLessThanOrEqual(315);
+  });
+
+  test('recomputes same-width layouts when the ambient body grows', () => {
+    const workbenchHeight = 156;
+    const constrained = layout({
+      handsRegionHeight: getC17HandsRegionHeight(481, workbenchHeight),
+      workbenchHeight,
+    });
+    const expanded = layout({
+      handsRegionHeight: getC17HandsRegionHeight(866, workbenchHeight),
+      workbenchHeight,
+    });
+
+    expect(hasC17AmbientRegionChanged(
+      { width: 300, height: 481 },
+      { width: 300, height: 866 },
+    )).toBe(true);
+    expect(hasC17AmbientRegionChanged(
+      { width: 300, height: 866 },
+      { width: 300, height: 481 },
+    )).toBe(true);
+    expect(constrained.mode).toBe('compact-overview');
+    expect(expanded.mode).toBe('full-ledger');
+    expect(expanded.opponentCardHeight).toBeGreaterThanOrEqual(76);
   });
 
   test('does not let the opponent lane shrink compact own cards', () => {

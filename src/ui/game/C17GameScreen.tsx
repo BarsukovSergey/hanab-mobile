@@ -44,7 +44,9 @@ import { NoteEditor } from './NoteEditor';
 import {
   getC17CardLaneWidth,
   getC17DenseLayout,
+  getC17HandsRegionHeight,
   getC17WorkbenchHeight,
+  hasC17AmbientRegionChanged,
   getRelativeOpponentIndices,
 } from './c17DenseLayout';
 import {
@@ -658,34 +660,37 @@ function C17DenseWorkspace({
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
     shellKey: '',
-    handsRegionHeight: 0,
-    handsRegionWidth: 0,
+    ambientBodyHeight: 0,
+    ambientBodyWidth: 0,
   });
   useEffect(() => {
     if (reviewActive) setRecentOpen(false);
   }, [reviewActive]);
 
   const shellMeasured = layoutMetrics.shellKey === shellKey
-    && layoutMetrics.handsRegionHeight > 0
-    && layoutMetrics.handsRegionWidth > 0;
-  const cardLaneWidth = getC17CardLaneWidth(layoutMetrics.handsRegionWidth);
+    && layoutMetrics.ambientBodyHeight > 0
+    && layoutMetrics.ambientBodyWidth > 0;
+  const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
+  const cardLaneWidth = getC17CardLaneWidth(layoutMetrics.ambientBodyWidth);
   const layout = getC17DenseLayout({
     opponentCardLaneWidth: cardLaneWidth,
-    handsRegionHeight: layoutMetrics.handsRegionHeight,
+    handsRegionHeight,
     ownCardLaneWidth: cardLaneWidth,
     opponentCount: opponents.length,
     cardsPerHand,
     workbenchHeight,
   });
-  const captureHandsRegion = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
+  const captureAmbientBody = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((currentMetrics) => {
       const sameShell = currentMetrics.shellKey === shellKey;
-      const sameWidth = Math.abs(currentMetrics.handsRegionWidth - next.width) < 0.5;
-      if (sameShell && currentMetrics.handsRegionHeight > 0 && sameWidth) return currentMetrics;
+      if (sameShell && !hasC17AmbientRegionChanged(
+        { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
+        { height: next.height, width: next.width },
+      )) return currentMetrics;
       return {
         shellKey,
-        handsRegionHeight: next.height,
-        handsRegionWidth: next.width,
+        ambientBodyHeight: next.height,
+        ambientBodyWidth: next.width,
       };
     });
   };
@@ -785,14 +790,14 @@ function C17DenseWorkspace({
       </View></AuthoritativePulse>
     </View>
 
-    <View
-      onLayout={captureHandsRegion}
-      style={[
-        styles.hands,
-        shellMeasured ? { height: layout.handsHeight } : styles.handsMeasuring,
-        !shellMeasured && styles.shellPending,
-      ]}
-    >
+    <View onLayout={captureAmbientBody} style={styles.workspaceBody}>
+      <View
+        style={[
+          styles.hands,
+          shellMeasured ? { height: layout.handsHeight } : styles.handsPending,
+          !shellMeasured && styles.shellPending,
+        ]}
+      >
       <View style={styles.opponents}>
         {opponents.map((index) => {
           const currentActor = current === index;
@@ -948,9 +953,9 @@ function C17DenseWorkspace({
           })}
         </View>
       </Pressable></AuthoritativePulse>
-    </View>
+      </View>
 
-    {(!shellMeasured || showWorkbench) ? <View style={[
+      {(!shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
       { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
       shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
@@ -1081,6 +1086,7 @@ function C17DenseWorkspace({
         </>}
       </ScrollView>
     </View> : <View style={styles.idleWorkbench}><ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} /></View>}
+    </View>
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
       <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
@@ -1142,6 +1148,7 @@ function getCardLabel(game: GameState, playerNames: readonly string[], order: nu
 
 const styles = StyleSheet.create({
   workspace: { flex: 1, minHeight: 0, paddingBottom: 4 },
+  workspaceBody: { flex: 1, minHeight: 0 },
   ledgerChrome: { gap: 5 },
   grow: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
@@ -1160,7 +1167,7 @@ const styles = StyleSheet.create({
   rowBetween: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
   actionButtons: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   hands: { gap: 5, marginTop: 5, minHeight: 0 },
-  handsMeasuring: { flex: 1 },
+  handsPending: { height: 0, overflow: 'hidden' },
   shellPending: { opacity: 0 },
   opponents: { gap: 2 },
   opponentRow: { borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
