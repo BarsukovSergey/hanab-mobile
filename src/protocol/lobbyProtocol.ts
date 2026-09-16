@@ -439,6 +439,17 @@ export function decodeServerFrame(frame: string): DecodeResult {
     return { kind: 'malformed', command, issue: 'malformed-json' };
   }
 
+  if (command === 'hypoAction') {
+    if (typeof payload !== 'string') {
+      return { kind: 'malformed', command, issue: 'invalid-payload' };
+    }
+    try {
+      payload = JSON.parse(payload) as unknown;
+    } catch {
+      return { kind: 'malformed', command, issue: 'malformed-json' };
+    }
+  }
+
   const result = schemas[command].safeParse(payload);
   if (!result.success) {
     return { kind: 'malformed', command, issue: 'invalid-payload' };

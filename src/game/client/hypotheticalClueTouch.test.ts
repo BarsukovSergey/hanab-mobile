@@ -36,6 +36,71 @@ const cardIdentities: readonly CardIdentity[] = [
 ];
 
 describe('hypothetical clue touches', () => {
+  test('builds color clues from numeric message-color indexes', () => {
+    const context = {
+      cardIdentities,
+      morphedIdentities: [] as readonly CardIdentity[],
+      notes: [note, note],
+      playing: true,
+    };
+    const preview = getCluePreview(game as never, 'No Variant', 1, 'color', 1, context);
+    const actions = getHypotheticalActions(
+      { type: 'colorClue', target: 1, value: 1 }, game as never, metadata as never,
+      cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    );
+
+    expect(preview?.touchedOrders).toEqual([1]);
+    expect(actions?.[0]).toEqual({
+      type: 'clue', clue: { type: 0, value: 1 }, giver: 0, list: preview?.touchedOrders,
+      target: 1, ignoreNegative: false,
+    });
+  });
+
+  test('supports color message index zero and rejects invalid color indexes', () => {
+    const colorZeroGame = {
+      ...game,
+      deck: [
+        game.deck[0],
+        { ...game.deck[1], possibleCardsFromClues: [[0, 2]], possibleCards: [[0, 2]] },
+      ],
+    };
+    const colorZeroNote: CardNote = { ...note, possibilities: [[0, 2]] };
+    const context = {
+      cardIdentities,
+      morphedIdentities: [] as readonly CardIdentity[],
+      notes: [note, colorZeroNote],
+      playing: true,
+    };
+    const preview = getCluePreview(colorZeroGame as never, 'No Variant', 1, 'color', 0, context);
+    const actions = getHypotheticalActions(
+      { type: 'colorClue', target: 1, value: 0 }, colorZeroGame as never, metadata as never,
+      cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    );
+
+    expect(preview?.touchedOrders).toEqual([1]);
+    expect(actions?.[0]).toMatchObject({ clue: { type: 0, value: 0 }, list: preview?.touchedOrders });
+    expect(getHypotheticalActions(
+      { type: 'colorClue', target: 1, value: 6 }, game as never, metadata as never,
+      cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    )).toBeNull();
+  });
+
+  test('preserves rank clue message values', () => {
+    const context = {
+      cardIdentities,
+      morphedIdentities: [] as readonly CardIdentity[],
+      notes: [note, note],
+      playing: true,
+    };
+    const preview = getCluePreview(game as never, 'No Variant', 1, 'rank', 1, context);
+    const actions = getHypotheticalActions(
+      { type: 'rankClue', target: 1, value: 1 }, game as never, metadata as never,
+      cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    );
+
+    expect(actions?.[0]).toMatchObject({ clue: { type: 1, value: 1 }, list: preview?.touchedOrders });
+  });
+
   test('an explicit blank morph is never touched', () => {
     const context = {
       cardIdentities,

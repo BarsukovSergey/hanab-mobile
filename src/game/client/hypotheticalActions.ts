@@ -6,6 +6,7 @@ import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
 import type { GameState } from '../upstream/interfaces/GameState';
 import type { MsgClue } from '../upstream/types/MsgClue';
 import { newColorClue, newRankClue } from '../upstream/types/Clue';
+import { colorIndex } from '../upstream/types/ColorIndex';
 import type { CardOrder } from '../upstream/types/CardOrder';
 import type { PlayerIndex } from '../upstream/types/PlayerIndex';
 import { getNextPlayableRanks } from '../upstream/rules/playStacks';
@@ -84,23 +85,31 @@ export function getHypotheticalActions(
 
   const clueAction = action as Extract<HypotheticalClientAction, { readonly target: number }>;
   if (!Number.isInteger(clueAction.target) || clueAction.target === actor || game.hands[clueAction.target] === undefined) return null;
-  const clue = action.type === 'colorClue'
+  const clueAndMessage = action.type === 'colorClue'
     ? (() => {
-      const color = variant.clueColors.find((candidate) => Number(candidate) === clueAction.value);
-      return color === undefined ? null : newColorClue(color);
+      const parsedColorIndex = colorIndex.safeParse(clueAction.value);
+      if (!parsedColorIndex.success) return null;
+      const color = variant.clueColors[parsedColorIndex.data];
+      return color === undefined ? null : {
+        clue: newColorClue(color),
+        message: { type: ClueType.Color, value: parsedColorIndex.data } satisfies MsgClue,
+      };
     })()
     : (() => {
       const rank = variant.clueRanks.find((candidate) => candidate === clueAction.value);
-      return rank === undefined ? null : newRankClue(rank);
+      return rank === undefined ? null : {
+        clue: newRankClue(rank),
+        message: { type: ClueType.Rank, value: rank } satisfies MsgClue,
+      };
     })();
-  if (clue === null) return null;
-  const list = getHypotheticalTouchedOrders(game, variant, clueAction.target, clue, {
+  if (clueAndMessage === null) return null;
+  const list = getHypotheticalTouchedOrders(game, variant, clueAction.target, clueAndMessage.clue, {
     cardIdentities,
     morphedIdentities,
     notes,
     playing,
   });
-  return [{ type: 'clue', clue: clue as unknown as MsgClue, giver: actor, list, target: clueAction.target as PlayerIndex, ignoreNegative: false }, nextTurn(game, metadata.options.numPlayers)];
+  return [{ type: 'clue', clue: clueAndMessage.message, giver: actor, list, target: clueAction.target as PlayerIndex, ignoreNegative: false }, nextTurn(game, metadata.options.numPlayers)];
 }
 
 function nextTurn(game: GameState, numPlayers: number): ActionIncludingHypothetical {

@@ -853,7 +853,7 @@ describe('deterministic lobby runtime', () => {
     room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected shared replay');
     expect(room.clientState.replay.hypothetical?.ongoing.turn.turnNum).toBe(1);
-    socket.emitMessage('hypoAction {"type":"clue","clue":{"type":1,"value":1},"giver":1,"list":[0],"target":0,"ignoreNegative":false}');
+    socket.emitMessage('hypoAction "{\\"type\\":\\"clue\\",\\"clue\\":{\\"type\\":1,\\"value\\":1},\\"giver\\":1,\\"list\\":[0],\\"target\\":0,\\"ignoreNegative\\":false}"');
     room = store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected shared replay');
     expect(room.clientState.replay.hypothetical?.ongoing.clueTokens).toBe(6);
@@ -900,11 +900,15 @@ describe('deterministic lobby runtime', () => {
       const target = giver === 0 ? 1 : 0;
       const order = target === 0 ? 0 : 5;
       socket.emitMessage(
-        `hypoAction {"type":"clue","clue":{"type":1,"value":1},"giver":${giver},`
-        + `"list":[${order}],"target":${target},"ignoreNegative":false}`,
+        `hypoAction ${JSON.stringify(
+          `{"type":"clue","clue":{"type":1,"value":1},"giver":${giver},`
+          + `"list":[${order}],"target":${target},"ignoreNegative":false}`,
+        )}`,
       );
       socket.emitMessage(
-        `hypoAction {"type":"turn","num":${turn + 1},"currentPlayerIndex":${target}}`,
+        `hypoAction ${JSON.stringify(
+          `{"type":"turn","num":${turn + 1},"currentPlayerIndex":${target}}`,
+        )}`,
       );
     }
 
