@@ -22,6 +22,10 @@ test('C17 shared replay presents authoritative leader and follow state without g
   expect(screen).toContain('onPress={() => lobbyRuntime.followReplayLeader()}');
   expect(screen).toContain('reviewActive && !finishedReplay && sharedReplay === null');
   expect(screen).toContain('if (isFinishedReplay || isSharedReplay) return;');
+  expect(screen).toContain("{hypothetical !== null ? <>");
+  expect(screen).toContain('{sharedReplay !== null && <View style={styles.actionButtons}>');
+  expect(screen).toContain('title="Take leadership"');
+  expect(screen).toContain('title={`Pass to ${name}`}');
 });
 
 test('C17 shared replay preserves existing leader-only restart eligibility', () => {

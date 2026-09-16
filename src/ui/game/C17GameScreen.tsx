@@ -670,6 +670,7 @@ function C17DenseWorkspace({
   const { theme } = useHanabTheme();
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
+  const [scrubberDragging, setScrubberDragging] = useState(false);
   const committedClue = getLastCluePresentationFromState(game);
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight);
@@ -782,15 +783,6 @@ function C17DenseWorkspace({
         {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
         {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
       </View>
-
-      {result !== null && <View style={[styles.result, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-        <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>FINAL SCORE · {result.score}</Text>
-        {result.reason !== null && <Text style={[styles.resultReason, { color: theme.colors.text }]}>{result.reason}</Text>}
-        {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
-          {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
-          {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
-        </View>}
-      </View>}
 
       <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
 
@@ -977,7 +969,7 @@ function C17DenseWorkspace({
       shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
-      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
+      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled scrollEnabled={!scrubberDragging} style={styles.workbenchScroll}>
         {hypothetical !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HYPOTHETICAL · ACTOR {hypotheticalActor === null ? '—' : metadata.playerNames[hypotheticalActor] ?? `P${hypotheticalActor + 1}`}</Text>
           {hypotheticalController ? <View style={styles.actionButtons}>
@@ -990,6 +982,15 @@ function C17DenseWorkspace({
               onPress={onToggleHypotheticalDrawn}
             />
           </View> : <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Following the shared hypothetical branch.</Text>}
+          {sharedReplay !== null && <View style={styles.actionButtons}>
+            {!sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
+            {sharedReplay.amLeader && sharedReplayPassTargets.map((name) => <ActionButton
+              compact
+              key={name}
+              title={`Pass to ${name}`}
+              onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
+            />)}
+          </View>}
           {selectedTarget !== null ? <ClueComposer
             choices={clueChoices}
             variantName={variantName}
@@ -1009,7 +1010,7 @@ function C17DenseWorkspace({
           </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Select a card from the hypothetical actor hand or a player to plan a clue.</Text> : null}
         </> : reviewActive && !finishedReplay && sharedReplay === null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
-          <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
+          <C17RewindScrubber actionSegments={actionSegments} onDragStateChange={setScrubberDragging} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
@@ -1033,6 +1034,14 @@ function C17DenseWorkspace({
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay === null
             ? `Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`
             : `SHARED REPLAY · Leader: ${sharedReplay.leader}`}</Text>
+          {result !== null && <View style={[styles.result, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+            <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>FINAL SCORE · {result.score}</Text>
+            {result.reason !== null && <Text style={[styles.resultReason, { color: theme.colors.text }]}>{result.reason}</Text>}
+            {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
+              {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
+              {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
+            </View>}
+          </View>}
           {sharedReplay !== null && <View style={styles.noteInspect}>
             <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{sharedReplay.amLeader
               ? 'You control the shared segment.'
@@ -1048,7 +1057,7 @@ function C17DenseWorkspace({
               onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
             />)}
           </View>}
-          <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
+          <C17RewindScrubber actionSegments={actionSegments} onDragStateChange={setScrubberDragging} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />

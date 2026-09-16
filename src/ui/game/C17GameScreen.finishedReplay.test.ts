@@ -26,4 +26,8 @@ test('C17 finished replay is an authoritative read-only timeline with available 
   expect(screen).toContain('isRestartToPregameEligible(clientState, roomState.pendingRestartTableID)');
   expect(screen).toContain('onQuickRematch={() => lobbyRuntime.quickRematch()}');
   expect(screen).toContain('onRemake={() => lobbyRuntime.restartToPregame()}');
+  expect(screen).toContain('scrollEnabled={!scrubberDragging}');
+  expect(screen).toContain('onDragStateChange={setScrubberDragging}');
+  const ledgerChrome = screen.slice(screen.indexOf('<View style={styles.ledgerChrome}>'), screen.indexOf('<View onLayout={captureAmbientBody} style={styles.workspaceBody}>'));
+  expect(ledgerChrome).not.toContain('FINAL SCORE');
 });

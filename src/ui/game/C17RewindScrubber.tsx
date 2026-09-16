@@ -7,9 +7,10 @@ type Props = {
   actionSegments: readonly number[];
   selectedSegment: number;
   onSelectSegment: (segment: number) => void;
+  onDragStateChange?: (dragging: boolean) => void;
 };
 
-export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSegment }: Props) {
+export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSegment, onDragStateChange }: Props) {
   const { theme } = useHanabTheme();
   const [trackWidth, setTrackWidth] = useState(0);
   const timelineSegments = useMemo(() => (
@@ -29,7 +30,8 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
 
   useEffect(() => () => {
     if (navigationFrame.current !== null) cancelAnimationFrame(navigationFrame.current);
-  }, []);
+    if (dragging.current) onDragStateChange?.(false);
+  }, [onDragStateChange]);
 
   if (timelineSegments.length === 0) return null;
 
@@ -86,20 +88,25 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
       accessibilityRole="adjustable"
       accessibilityValue={{ min: 0, max: timelineSegments.length - 1, now: previewIndex }}
       onLayout={({ nativeEvent: { layout } }) => setTrackWidth(layout.width)}
+      onMoveShouldSetResponderCapture={() => true}
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(event) => {
         dragging.current = true;
+        onDragStateChange?.(true);
         scrubToX(event.nativeEvent.locationX, true);
       }}
       onResponderMove={(event) => scrubToX(event.nativeEvent.locationX, false)}
       onResponderRelease={(event) => {
         scrubToX(event.nativeEvent.locationX, true);
         dragging.current = false;
+        onDragStateChange?.(false);
       }}
       onResponderTerminate={(event) => {
         scrubToX(event.nativeEvent.locationX, true);
         dragging.current = false;
+        onDragStateChange?.(false);
       }}
+      onStartShouldSetResponderCapture={() => true}
       onStartShouldSetResponder={() => true}
       style={styles.touchTrack}
     >
