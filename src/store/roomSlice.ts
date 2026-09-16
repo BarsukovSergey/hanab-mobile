@@ -601,7 +601,7 @@ export const roomSlice = createSlice({
       action: PayloadAction<{
         epoch: number;
         tableID: number;
-        ownerUserID: number;
+        requesterUserID: number;
         name: string;
       }>,
     ) {
@@ -610,10 +610,15 @@ export const roomSlice = createSlice({
         || state.room.kind !== 'pregame'
         || state.room.role !== 'player'
         || state.room.tableID !== action.payload.tableID
-        || state.room.data.owner !== action.payload.ownerUserID
         || state.pendingRoleSwitch !== null
-        || !state.room.data.players.some((player) => player.name === action.payload.name)
         || state.pendingLeaderName !== null
+      ) return;
+      const requesterIsOwner = state.room.data.owner === action.payload.requesterUserID;
+      const target = state.room.data.players.find((player) => player.name === action.payload.name);
+      if (
+        state.room.data.players[0]?.name === action.payload.name
+        || target === undefined
+        || (!requesterIsOwner && !target.you)
       ) return;
       state.pendingLeaderName = action.payload.name;
     },

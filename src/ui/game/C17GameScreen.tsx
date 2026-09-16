@@ -85,6 +85,7 @@ export function C17GameScreen() {
   const orientationRef = useRef(orientation);
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
+  const username = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
   const hyphenatedConventions = useAppSelector((state) => {
     const userID = state.session.authenticatedUser?.userID;
     return userID !== undefined && state.lobby.users.entities[userID]?.hyphenated === true;
@@ -360,6 +361,15 @@ export function C17GameScreen() {
     && (replay.shared === null || replay.shared.amLeader);
   const canStartHypothetical = replay.active && !hypotheticalActive
     && (replay.shared === null || replay.shared.amLeader);
+  const sharedReplayOwnName = replay.shared !== null
+    && username !== null
+    && clientState.spectators.some((spectator) => spectator.name === username)
+    ? username
+    : null;
+  const sharedReplayPassTargets = replay.shared?.amLeader
+    ? clientState.spectators.map((spectator) => spectator.name)
+      .filter((name) => name !== replay.shared?.leader)
+    : [];
 
   return <>
     <C17DenseWorkspace
@@ -457,6 +467,8 @@ export function C17GameScreen() {
       selectedTarget={selectedTarget}
       selectedTurn={reviewTemporal.selectedTurn}
       sharedReplay={replay.shared}
+      sharedReplayOwnName={sharedReplayOwnName}
+      sharedReplayPassTargets={sharedReplayPassTargets}
       speedrun={metadata.options.speedrun}
       targetName={targetName}
       variantName={metadata.options.variantName}
@@ -564,6 +576,8 @@ function C17DenseWorkspace({
   selectedTarget,
   selectedTurn,
   sharedReplay,
+  sharedReplayOwnName,
+  sharedReplayPassTargets,
   speedrun,
   targetName,
   variantName,
@@ -647,6 +661,8 @@ function C17DenseWorkspace({
   selectedTarget: number | null;
   selectedTurn: number;
   sharedReplay: { amLeader: boolean; leader: string; segment: number; useSharedSegments: boolean } | null;
+  sharedReplayOwnName: string | null;
+  sharedReplayPassTargets: readonly string[];
   speedrun: boolean;
   targetName: string | null;
   variantName: string;
@@ -1024,6 +1040,13 @@ function C17DenseWorkspace({
                 ? `Following ${sharedReplay.leader} at shared segment ${sharedReplay.segment}.`
                 : `Viewing segment ${selectedActionSegment}; shared segment is ${sharedReplay.segment}.`}</Text>
             {!sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+            {!sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
+            {sharedReplay.amLeader && sharedReplayPassTargets.map((name) => <ActionButton
+              compact
+              key={name}
+              title={`Pass to ${name}`}
+              onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
+            />)}
           </View>}
           <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>

@@ -531,19 +531,24 @@ export class LobbyRuntime {
   setTableLeader(name: string): boolean {
     const state = this.store.getState();
     const room = state.room.room;
-    const ownerUserID = state.session.authenticatedUser?.userID;
+    const requesterUserID = state.session.authenticatedUser?.userID;
+    const target = room.kind === 'pregame'
+      ? room.data.players.find((player) => player.name === name)
+      : undefined;
     if (
-      ownerUserID === undefined
+      requesterUserID === undefined
       || room.kind !== 'pregame'
       || room.role !== 'player'
-      || room.data.owner !== ownerUserID
       || state.room.pendingRoleSwitch !== null
-      || !room.data.players.some((player) => player.name === name && !player.you)
+      || target === undefined
+      || room.data.players[0]?.name === name
+      || (room.data.owner !== requesterUserID && !target.you)
       || state.room.pendingLeaderName !== null
+      || !this.isReadyCurrentRoom(room.tableID, 'pregame')
     ) return false;
     if (!this.sendEncoded(encodeTableSetLeaderFrame(room.tableID, name))) return false;
     this.store.dispatch(roomActions.leaderRequested({
-      epoch: state.session.connectionEpoch, tableID: room.tableID, ownerUserID, name,
+      epoch: state.session.connectionEpoch, tableID: room.tableID, requesterUserID, name,
     }));
     return this.store.getState().room.pendingLeaderName === name;
   }
@@ -698,6 +703,20 @@ export class LobbyRuntime {
       epoch: state.session.connectionEpoch, tableID: room.tableID, showDrawnCards: false, actions: [],
     }));
     return true;
+  }
+
+  setSharedReplayLeader(name: string): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    const shared = room.kind === 'live_game' ? room.clientState.replay.shared : null;
+    if (
+      room.kind !== 'live_game'
+      || shared === null
+      || shared.leader === name
+      || !room.clientState.spectators.some((spectator) => spectator.name === name)
+      || !this.isReadyCurrentRoom(room.tableID)
+    ) return false;
+    return this.sendEncoded(encodeTableSetLeaderFrame(room.tableID, name));
   }
 
   endHypothetical(): boolean {
@@ -1504,7 +1523,7 @@ export class LobbyRuntime {
     }
   }
 
-  private isReadyCurrentRoom(tableID: number): boolean {
+  private isReadyCurrentRoom(tableID: number, kind: 'pregame' | 'live_game' = 'live_game'): boolean {
     const state = this.store.getState();
     const owned = this.current;
     return owned !== null
@@ -1514,7 +1533,7 @@ export class LobbyRuntime {
       && owned.socket.readyState === SOCKET_OPEN
       && state.session.phase === 'ready'
       && state.room.connectionEpoch === owned.epoch
-      && state.room.room.kind === 'live_game'
+      && state.room.room.kind === kind
       && state.room.room.tableID === tableID;
   }
 

@@ -847,6 +847,33 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toHaveLength(sentBefore);
   });
 
+  test('shared replay follower takes leadership only after the authoritative echo', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+
+    expect(runtime.setSharedReplayLeader('Ada')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":123,"name":"Ada"}');
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({ leader: 'Bob', amLeader: false });
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({ leader: 'Ada', amLeader: true });
+  });
+
+  test('shared replay leader can pass only to an active spectator', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+
+    expect(runtime.setSharedReplayLeader('Cy')).toBe(false);
+    expect(runtime.setSharedReplayLeader('Ada')).toBe(false);
+    expect(runtime.setSharedReplayLeader('Bob')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":123,"name":"Bob"}');
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({ leader: 'Ada', amLeader: true });
+  });
+
   test('hypothetical shared leader waits for authoritative action events and followers cannot send', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime();
     expect(runtime.startHypothetical()).toBe(true);
@@ -2089,6 +2116,31 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.room).toMatchObject({
       data: { owner: 2, players: [{ name: 'Bob' }, { name: 'Ada' }] },
     });
+  });
+
+  test('non-owner player can take pregame leadership, but a spectator cannot', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    expect(runtime.setTableLeader('Ada')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":123,"name":"Ada"}');
+    expect(store.getState().room.pendingLeaderName).toBe('Ada');
+    expect(runtime.setTableLeader('Bob')).toBe(false);
+
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.pendingLeaderName).toBe('Ada');
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob'], 123, 'Pregame table'));
+    expect(store.getState().room.pendingLeaderName).toBeNull();
+
+    const spectator = await makeReadyRuntime();
+    addJoinableTable(spectator.store);
+    expect(spectator.runtime.spectate(123)).toBe(true);
+    spectator.socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    spectator.socket.emitMessage('joined {"tableID":123}');
+    expect(spectator.runtime.setTableLeader('Ada')).toBe(false);
   });
 
   test.each(['game-first', 'joined-first'] as const)(

@@ -50,6 +50,7 @@ export function PregameScreen() {
 
   if (room === null) return null;
   const isOwner = room.role === 'player' && session.authenticatedUser?.userID === room.data.owner;
+  const canTakeLeadership = room.role === 'player' && !isOwner;
   const roleSwitchPending = roomState.pendingRoleSwitch !== null;
   const canSwitchToSpectator = room.role === 'player' && room.data.players.length >= 2;
   const canJoinAsPlayer = room.role === 'spectator' && room.data.players.length < room.data.maxPlayers;
@@ -92,11 +93,13 @@ export function PregameScreen() {
                       {player.present ? 'Present' : 'Away'}
                     </Text>
                   </View>
-                  {isOwner && !player.you && (
+                  {((isOwner && !player.you) || (canTakeLeadership && player.you)) && (
                     <ActionButton
                       compact
                       disabled={roleSwitchPending || roomState.pendingLeaderName !== null}
-                      title={roomState.pendingLeaderName === player.name ? 'Transferring…' : 'Make leader'}
+                      title={roomState.pendingLeaderName === player.name
+                        ? 'Transferring…'
+                        : player.you ? 'Take leadership' : 'Make leader'}
                       onPress={() => lobbyRuntime.setTableLeader(player.name)}
                     />
                   )}
