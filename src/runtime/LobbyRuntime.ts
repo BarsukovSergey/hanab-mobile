@@ -726,8 +726,7 @@ export class LobbyRuntime {
       }));
       return true;
     }
-    if (!shared.amLeader || !this.isReadyCurrentRoom(room.tableID)) return false;
-    return this.sendEncoded(encodeReplayHypoActionFrame(room.tableID, JSON.stringify(parsed)));
+    return this.sendSharedHypotheticalOperation([parsed]);
   }
 
   hypotheticalPlay(order: number): boolean {
@@ -788,6 +787,9 @@ export class LobbyRuntime {
       room.clientState.playing,
     );
     if (actions === null) return false;
+    if (room.clientState.replay.shared !== null) {
+      return this.sendSharedHypotheticalOperation(actions);
+    }
     return actions.every((hypoAction) => this.sendHypotheticalAction(hypoAction));
   }
 
@@ -801,8 +803,66 @@ export class LobbyRuntime {
       this.store.dispatch(roomActions.hypotheticalBackReceived({ epoch: state.session.connectionEpoch, tableID: room.tableID }));
       return true;
     }
-    return shared.amLeader && this.isReadyCurrentRoom(room.tableID)
+    return state.room.pendingHypotheticalOperation === null
+      && shared.amLeader && this.isReadyCurrentRoom(room.tableID)
       && this.sendEncoded(encodeReplayHypoBackFrame(room.tableID));
+  }
+
+  private sendSharedHypotheticalOperation(
+    actions: readonly ActionIncludingHypothetical[],
+  ): boolean {
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      actions.length === 0
+      || room.kind !== 'live_game'
+      || room.clientState.replay.hypothetical === null
+      || room.clientState.replay.shared?.amLeader !== true
+      || state.room.pendingHypotheticalOperation !== null
+      || !this.isReadyCurrentRoom(room.tableID)
+    ) return false;
+
+    let parsedActions: ActionIncludingHypothetical[];
+    let frames: string[];
+    try {
+      parsedActions = actions.map((action) => (
+        hypoActionSchema.parse(action) as ActionIncludingHypothetical
+      ));
+      frames = parsedActions.map((action) => (
+        encodeReplayHypoActionFrame(room.tableID, JSON.stringify(action))
+      ));
+    } catch {
+      return false;
+    }
+
+    const finalAction = parsedActions.at(-1);
+    if (finalAction === undefined) return false;
+    const pending = {
+      connectionEpoch: state.session.connectionEpoch,
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      finalAction,
+    };
+    this.store.dispatch(roomActions.hypotheticalOperationRequested(pending));
+    const accepted = this.store.getState().room.pendingHypotheticalOperation;
+    if (
+      accepted === null
+      || accepted.connectionEpoch !== pending.connectionEpoch
+      || accepted.tableID !== pending.tableID
+      || accepted.gameLoadEpoch !== pending.gameLoadEpoch
+    ) return false;
+
+    let sentCount = 0;
+    for (const frame of frames) {
+      if (!this.sendEncoded(frame)) {
+        if (sentCount === 0) {
+          this.store.dispatch(roomActions.hypotheticalOperationPendingCleared(pending));
+        }
+        return false;
+      }
+      sentCount += 1;
+    }
+    return true;
   }
 
   toggleHypotheticalDrawnCards(): boolean {

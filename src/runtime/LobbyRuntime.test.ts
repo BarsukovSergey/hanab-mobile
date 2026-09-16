@@ -9,6 +9,7 @@ import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
+import type { ActionIncludingHypothetical } from '../game/client/types/actions';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
@@ -242,17 +243,18 @@ async function makeLiveRuntime(role: 'player' | 'spectator') {
 async function makeSharedReplayRuntime(
   leader = 'Ada',
   playerNames: readonly string[] = ['Ada', 'Bob'],
+  sharedReplay = true,
 ) {
   const ready = await makeReadyRuntime();
   ready.store.dispatch(lobbyActions.tableReceived({
     epoch: 1,
-    table: { ...runningTable, sharedReplay: true, joined: true },
+    table: { ...runningTable, sharedReplay, joined: sharedReplay },
   }));
   expect(ready.runtime.spectate(123)).toBe(true);
   ready.socket.emitMessage('tableStart {"tableID":123,"replay":true}');
   ready.socket.emitMessage(`init ${JSON.stringify(makeInit({
     replay: true,
-    sharedReplay: true,
+    sharedReplay,
     databaseID: 77,
     datetimeFinished: '2026-08-31T00:10:00Z',
     sharedReplayLeader: leader,
@@ -285,9 +287,22 @@ async function makeSharedReplayRuntime(
     + '{"name":"Bob","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',
   );
   expect(ready.store.getState().room.room).toMatchObject({
-    kind: 'live_game', sharedReplay: true,
+    kind: 'live_game', sharedReplay,
   });
   return ready;
+}
+
+function getSentHypotheticalActions(
+  frames: readonly string[],
+): ActionIncludingHypothetical[] {
+  return frames.map((frame) => {
+    const payload = JSON.parse(frame.slice(frame.indexOf(' ') + 1)) as { actionJSON: string };
+    return JSON.parse(payload.actionJSON) as ActionIncludingHypothetical;
+  });
+}
+
+function emitHypotheticalAction(socket: FakeSocket, action: ActionIncludingHypothetical): void {
+  socket.emitMessage(`hypoAction ${JSON.stringify(JSON.stringify(action))}`);
 }
 
 beforeEach(() => {
@@ -950,6 +965,102 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent.slice(sentBefore).every((frame) => frame.startsWith('replayAction '))).toBe(true);
   });
 
+  test('shared hypothetical operation stays pending through intermediate echoes and rejects another operation', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(true);
+    const frames = socket.sent.slice(sentBefore);
+    const actions = getSentHypotheticalActions(frames);
+    expect(actions).toHaveLength(2);
+    expect(store.getState().room.pendingHypotheticalOperation).toMatchObject({
+      connectionEpoch: 1,
+      tableID: 123,
+      finalAction: actions.at(-1),
+    });
+
+    expect(runtime.hypotheticalPlay(5)).toBe(false);
+    expect(runtime.sendHypotheticalAction(actions[0]!)).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toEqual(frames);
+
+    emitHypotheticalAction(socket, actions[0]!);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    expect(runtime.hypotheticalPlay(5)).toBe(false);
+    expect(runtime.backHypothetical()).toBe(false);
+
+    emitHypotheticalAction(socket, actions[1]!);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    expect(runtime.hypotheticalPlay(0)).toBe(true);
+  });
+
+  test('shared hypothetical first-frame failure clears pending and sends nothing', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const sentBefore = socket.sent.length;
+    socket.failOnSendNumber = sentBefore + 1;
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+  });
+
+  test('shared hypothetical partial send failure stays uncertain without retry until authoritative end', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const sentBefore = socket.sent.length;
+    socket.failOnSendNumber = sentBefore + 2;
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toHaveLength(1);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    expect(runtime.hypotheticalPlay(5)).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toHaveLength(1);
+
+    socket.failOnSendNumber = null;
+    expect(runtime.endHypothetical()).toBe(true);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    socket.emitMessage('hypoEnd {"TableID":123}');
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+  });
+
+  test('connection replacement clears a shared hypothetical operation without replay', async () => {
+    const { session, runtime, socket: first, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    first.emitMessage('hypoStart {"TableID":123}');
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(true);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+
+    first.emitClose();
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    expect(second.sent).toEqual([]);
+  });
+
+  test('solo hypothetical operations remain local and immediately composable', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Ada', ['Ada', 'Bob'], false);
+    const sentBefore = socket.sent.length;
+    expect(runtime.startHypothetical()).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    const actor = room.clientState.replay.hypothetical?.ongoing.turn.currentPlayerIndex;
+    if (actor === null || actor === undefined) throw new Error('Expected hypothetical actor');
+    expect(runtime.hypotheticalRankClue(actor === 0 ? 1 : 0, 1)).toBe(true);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    expect(runtime.backHypothetical()).toBe(true);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
   test('detached follower promoted to shared replay leader can start hypothetical', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
     expect(runtime.navigateReplaySegment(0)).toBe(true);
@@ -1541,6 +1652,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
@@ -1621,6 +1733,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: { kind: 'none' },
     });
   });
@@ -2297,6 +2410,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: { kind: 'none' },
     });
     second.emitOpen();
@@ -2343,6 +2457,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: { kind: 'none' },
     });
     second.emitOpen();

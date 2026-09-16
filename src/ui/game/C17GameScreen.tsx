@@ -103,6 +103,10 @@ export function C17GameScreen() {
   const actionHandIndex = hypotheticalActive ? hypotheticalActor : ourIndex;
   const ourHand = useMemo(() => actionHandIndex === null ? [] : game?.hands[actionHandIndex] ?? [], [actionHandIndex, game]);
   const canHypotheticalControl = hypotheticalActive && (clientState?.replay.shared === null || clientState?.replay.shared.amLeader === true);
+  const hypotheticalOperationPending = liveRoom !== null
+    && roomState.pendingHypotheticalOperation?.connectionEpoch === roomState.connectionEpoch
+    && roomState.pendingHypotheticalOperation.tableID === liveRoom.tableID
+    && roomState.pendingHypotheticalOperation.gameLoadEpoch === liveRoom.gameLoadEpoch;
   const clueTargets = useMemo(() => (isPlayingPlayer || canHypotheticalControl) ? clientState?.metadata.playerNames
     .map((_, index) => index)
     .filter((index) => index !== actionHandIndex) ?? [] : [], [actionHandIndex, canHypotheticalControl, clientState, isPlayingPlayer]);
@@ -189,7 +193,8 @@ export function C17GameScreen() {
     && !replay.active
     && !clientState.pause.active
     && roomState.pendingGameplayAction === null;
-  const hypotheticalEnabled = canHypotheticalControl && hypotheticalActor !== null;
+  const hypotheticalEnabled = canHypotheticalControl && hypotheticalActor !== null
+    && !hypotheticalOperationPending;
   const cardEnabled = (enabled || hypotheticalEnabled) && selectedCard !== null && ourHand.some((order) => order === selectedCard);
   const discardEnabled = cardEnabled
     && canDiscardForVariant(game.clueTokens, metadata.options.variantName);
@@ -377,6 +382,7 @@ export function C17GameScreen() {
       hypothetical={hypothetical}
       hypotheticalActor={hypotheticalActor}
       hypotheticalController={canHypotheticalControl}
+      hypotheticalOperationPending={hypotheticalOperationPending}
       globalEmpathy={interaction.globalEmpathy}
       historyAvailable={recentActions.length > 0}
       hyphenatedConventions={hyphenatedConventions}
@@ -500,6 +506,7 @@ function C17DenseWorkspace({
   hypothetical,
   hypotheticalActor,
   hypotheticalController,
+  hypotheticalOperationPending,
   globalEmpathy,
   historyAvailable,
   hyphenatedConventions,
@@ -582,6 +589,7 @@ function C17DenseWorkspace({
   hypothetical: HypotheticalState | null;
   hypotheticalActor: number | null;
   hypotheticalController: boolean;
+  hypotheticalOperationPending: boolean;
   globalEmpathy: boolean;
   historyAvailable: boolean;
   hyphenatedConventions: boolean;
@@ -952,7 +960,7 @@ function C17DenseWorkspace({
         {hypothetical !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HYPOTHETICAL · ACTOR {hypotheticalActor === null ? '—' : metadata.playerNames[hypotheticalActor] ?? `P${hypotheticalActor + 1}`}</Text>
           {hypotheticalController ? <View style={styles.actionButtons}>
-            <ActionButton compact disabled={hypothetical.states.length <= 1} title="Back" onPress={onBackHypothetical} />
+            <ActionButton compact disabled={hypotheticalOperationPending || hypothetical.states.length <= 1} title="Back" onPress={onBackHypothetical} />
             <ActionButton compact title="End Hypothetical" tone="primary" onPress={onEndHypothetical} />
             <ActionButton
               compact

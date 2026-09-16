@@ -131,6 +131,12 @@ export type RoomSliceState = {
     gameLoadEpoch: number;
     action: ClientGameplayAction;
   } | null;
+  pendingHypotheticalOperation: {
+    connectionEpoch: number;
+    tableID: number;
+    gameLoadEpoch: number;
+    finalAction: ActionIncludingHypothetical;
+  } | null;
   room: RoomState;
 };
 
@@ -152,8 +158,16 @@ const initialState: RoomSliceState = {
   pendingRestartHidePregame: null,
   rematchTransition: null,
   pendingGameplayAction: null,
+  pendingHypotheticalOperation: null,
   room: { kind: 'none' },
 };
+
+function hypotheticalActionsEqual(
+  first: ActionIncludingHypothetical,
+  second: ActionIncludingHypothetical,
+): boolean {
+  return JSON.stringify(first) === JSON.stringify(second);
+}
 
 function clearC4BState(state: RoomSliceState): void {
   state.pendingJoin = null;
@@ -674,6 +688,7 @@ export const roomSlice = createSlice({
       ) rematch.stagedGame = null;
       rematch.newTableID = action.payload.tableID;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
       if (oldReplayStillVisible) state.room = { kind: 'none' };
     },
@@ -693,6 +708,7 @@ export const roomSlice = createSlice({
       state.recoveryJoinedConfirmed = false;
       state.recoveryStagedGame = null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
     },
     commandPendingCleared(state, action: PayloadAction<{ epoch: number }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -761,6 +777,7 @@ export const roomSlice = createSlice({
       state.pendingUnattendTableID = null;
       state.pendingLeaveTableID = null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.room = { kind: 'none' };
     },
     leftReceived(
@@ -791,6 +808,7 @@ export const roomSlice = createSlice({
       ) return;
 
       state.pendingLeaveTableID = null;
+      state.pendingHypotheticalOperation = null;
       state.room = { kind: 'none' };
     },
     tableStartReceived(
@@ -862,6 +880,7 @@ export const roomSlice = createSlice({
       state.rematchTransition = null;
       clearC4BState(state);
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.room = {
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
@@ -895,6 +914,7 @@ export const roomSlice = createSlice({
       ) return;
       clearC4BState(state);
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.room = {
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
@@ -1315,6 +1335,7 @@ export const roomSlice = createSlice({
       state.room.clientState = castDraft(stateReducer(current, {
         type: 'hypoStart', showDrawnCards: payload.showDrawnCards, actions: payload.actions,
       }));
+      state.pendingHypotheticalOperation = null;
     },
     hypotheticalEnded(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
       const payload = action.payload;
@@ -1322,6 +1343,7 @@ export const roomSlice = createSlice({
         || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
       const current = original(state.room.clientState) ?? state.room.clientState;
       state.room.clientState = castDraft(stateReducer(current, { type: 'hypoEnd' }));
+      state.pendingHypotheticalOperation = null;
     },
     hypotheticalActionReceived(
       state,
@@ -1332,6 +1354,14 @@ export const roomSlice = createSlice({
         || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
       const current = original(state.room.clientState) ?? state.room.clientState;
       state.room.clientState = castDraft(stateReducer(current, { type: 'hypoAction', action: payload.action }));
+      const pending = state.pendingHypotheticalOperation;
+      if (
+        pending !== null
+        && pending.connectionEpoch === payload.epoch
+        && pending.tableID === payload.tableID
+        && pending.gameLoadEpoch === state.room.gameLoadEpoch
+        && hypotheticalActionsEqual(pending.finalAction, payload.action)
+      ) state.pendingHypotheticalOperation = null;
     },
     hypotheticalBackReceived(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
       const payload = action.payload;
@@ -1374,6 +1404,7 @@ export const roomSlice = createSlice({
       state.room.clientState = castDraft(payload.clientState);
       state.room.sharedReplay = payload.clientState.replay.shared !== null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
     },
     gameHistoryAccepted(
       state,
@@ -1433,6 +1464,44 @@ export const roomSlice = createSlice({
       ) return;
       state.pendingGameplayAction = null;
     },
+    hypotheticalOperationRequested(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        finalAction: ActionIncludingHypothetical;
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.pendingHypotheticalOperation !== null
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+        || state.room.clientState.replay.shared === null
+        || state.room.clientState.replay.hypothetical === null
+      ) return;
+      state.pendingHypotheticalOperation = castDraft(payload);
+    },
+    hypotheticalOperationPendingCleared(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+      }>,
+    ) {
+      const pending = state.pendingHypotheticalOperation;
+      if (
+        pending === null
+        || pending.connectionEpoch !== action.payload.connectionEpoch
+        || pending.tableID !== action.payload.tableID
+        || pending.gameLoadEpoch !== action.payload.gameLoadEpoch
+      ) return;
+      state.pendingHypotheticalOperation = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(lobbyActions.tableGone, (state, action) => {
@@ -1447,6 +1516,7 @@ export const roomSlice = createSlice({
         && state.room.tableID === rematch.oldTableID
       ) state.room = { kind: 'none' };
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
     });
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
@@ -1456,6 +1526,7 @@ export const roomSlice = createSlice({
       state.recoveryJoinedConfirmed = false;
       state.recoveryStagedGame = null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
       state.pendingRestartTableID = null;
       state.pendingRestartHidePregame = null;
@@ -1468,6 +1539,7 @@ export const roomSlice = createSlice({
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
+        state.pendingHypotheticalOperation = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
         state.pendingRestartHidePregame = null;
@@ -1481,6 +1553,7 @@ export const roomSlice = createSlice({
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
+        state.pendingHypotheticalOperation = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
         state.pendingRestartHidePregame = null;
