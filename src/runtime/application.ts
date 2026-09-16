@@ -15,6 +15,7 @@ const gameplayCommandGate = createRuntimeCommandGate(rawLobbyRuntime, [
   'pauseGame',
   'navigateReplaySegment',
   'followReplayLeader',
+  'setSharedReplayLeader',
   'quickRematch',
   'restartToPregame',
   'startHypothetical',
