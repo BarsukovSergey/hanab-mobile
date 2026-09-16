@@ -409,7 +409,7 @@ export function C17GameScreen() {
       onDiscard={() => {
         if (discardEnabled && selectedCard !== null) {
           const sent = hypotheticalActive ? lobbyRuntime.hypotheticalDiscard(selectedCard) : lobbyRuntime.discard(selectedCard);
-          if (sent) interactionDispatch({ type: 'disarm-gameplay' });
+          if (sent) interactionDispatch({ type: 'complete-card-action', order: selectedCard });
         }
       }}
       onEditNote={editNote}
@@ -420,7 +420,7 @@ export function C17GameScreen() {
       onPlay={() => {
         if (cardEnabled && selectedCard !== null) {
           const sent = hypotheticalActive ? lobbyRuntime.hypotheticalPlay(selectedCard) : lobbyRuntime.play(selectedCard);
-          if (sent) interactionDispatch({ type: 'disarm-gameplay' });
+          if (sent) interactionDispatch({ type: 'complete-card-action', order: selectedCard });
         }
       }}
       onPreviewClue={(clueType, value) => interactionDispatch({ type: 'preview-clue', clueType, value })}

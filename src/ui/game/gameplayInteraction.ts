@@ -27,6 +27,7 @@ export type GameplayInteractionAction =
   | { type: 'clear-empathy' }
   | { type: 'cancel-transient' }
   | { type: 'disarm-gameplay' }
+  | { type: 'complete-card-action'; order: number }
   | { type: 'reset-lifecycle-transients' }
   | {
     type: 'sync-hands';
@@ -136,6 +137,16 @@ export function gameplayInteractionReducer(
         cluePreview: null,
         empathyPlayer: null,
         persistentEmpathyPlayer: null,
+      };
+    case 'complete-card-action':
+      return {
+        ...state,
+        selectedCard: null,
+        clueTarget: null,
+        cluePreview: null,
+        empathyPlayer: null,
+        persistentEmpathyPlayer: null,
+        noteCard: state.noteCard === action.order ? null : state.noteCard,
       };
     case 'sync-hands': {
       const selectedCard = state.selectedCard !== null && action.ownOrders.includes(state.selectedCard)
