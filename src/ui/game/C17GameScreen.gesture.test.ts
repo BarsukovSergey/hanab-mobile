@@ -78,7 +78,7 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
   expect(screen).toContain('if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {');
   expect(screen).toContain('const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;');
-  expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.rowBetween}>');
+  expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>');
 });
 
 test('C17 gives Play and Discard separate eligibility at maximum clue tokens', () => {
