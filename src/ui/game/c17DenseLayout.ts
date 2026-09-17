@@ -72,6 +72,22 @@ export function hasC17AmbientRegionChanged(
 }
 
 /**
+ * A shell can finish measuring after a transiently constrained layout. Keep the largest
+ * accepted envelope for that shell so temporary chrome changes cannot shrink the Ledger.
+ */
+export function getC17AmbientEnvelope(
+  current: { height: number; width: number },
+  next: { height: number; width: number },
+  sameShell: boolean,
+): { height: number; width: number } {
+  if (!sameShell) return next;
+  return {
+    height: Math.max(current.height, next.height),
+    width: Math.max(current.width, next.width),
+  };
+}
+
+/**
  * C17 allocates cards from the measured card lanes and the stable hands rectangle captured for the
  * current window/text-scale class. Tool content is deliberately absent from this calculation.
  *

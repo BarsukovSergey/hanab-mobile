@@ -44,6 +44,7 @@ import { NoteEditor } from './NoteEditor';
 import {
   getC17CardLaneWidth,
   getC17DenseLayout,
+  getC17AmbientEnvelope,
   getC17HandsRegionHeight,
   getC17WorkbenchHeight,
   hasC17AmbientRegionChanged,
@@ -414,7 +415,6 @@ export function C17GameScreen() {
       notes={clientState.notes.ourNotes}
       replayNotes={clientState.notes.allNotes}
       onClearCluePreview={() => interactionDispatch({ type: 'clear-clue-preview' })}
-      onCloseNote={() => interactionDispatch({ type: 'open-note', order: null })}
       onConfirmClue={confirmClue}
       onDiscard={() => {
         if (discardEnabled && selectedCard !== null) {
@@ -539,7 +539,6 @@ function C17DenseWorkspace({
   notes,
   replayNotes,
   onClearCluePreview,
-  onCloseNote,
   onConfirmClue,
   onDiscard,
   onEditNote,
@@ -624,7 +623,6 @@ function C17DenseWorkspace({
   notes: readonly CardNote[];
   replayNotes: ReadonlyArray<ReadonlyArray<{ name: string; text: string }>>;
   onClearCluePreview: () => void;
-  onCloseNote: () => void;
   onConfirmClue: () => void;
   onDiscard: () => void;
   onEditNote: (order: number) => void;
@@ -670,7 +668,6 @@ function C17DenseWorkspace({
   const { theme } = useHanabTheme();
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
-  const [scrubberDragging, setScrubberDragging] = useState(false);
   const committedClue = getLastCluePresentationFromState(game);
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight);
@@ -700,14 +697,19 @@ function C17DenseWorkspace({
   const captureAmbientBody = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((currentMetrics) => {
       const sameShell = currentMetrics.shellKey === shellKey;
-      if (sameShell && !hasC17AmbientRegionChanged(
+      const envelope = getC17AmbientEnvelope(
         { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
         { height: next.height, width: next.width },
+        sameShell,
+      );
+      if (sameShell && !hasC17AmbientRegionChanged(
+        { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
+        envelope,
       )) return currentMetrics;
       return {
         shellKey,
-        ambientBodyHeight: next.height,
-        ambientBodyWidth: next.width,
+        ambientBodyHeight: envelope.height,
+        ambientBodyWidth: envelope.width,
       };
     });
   };
@@ -762,16 +764,21 @@ function C17DenseWorkspace({
     );
   const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedOwnCard !== null || noteCard !== null || pendingText !== null;
+  const showRewindScrubber = reviewActive;
+  const finishedReason = result?.reason;
+  const finishedStatus = finishedReason === null || finishedReason === undefined
+    ? 'FINAL'
+    : `FINAL · ${finishedReason}`;
   return <View style={styles.workspace}>
     <View style={styles.ledgerChrome}>
       <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.grow}>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
+          <Text numberOfLines={1} style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
             ? `SHARED REVIEW T${selectedTurn}`
             : hypothetical !== null
               ? 'HYPOTHETICAL'
             : finishedReplay
-            ? `REPLAY T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · END' : ''}`
+            ? finishedStatus
             : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
           <AuthoritativePulse enabled={livePulseEnabled} pulseKey={actorPulse}><Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text></AuthoritativePulse>
         </View>
@@ -969,7 +976,10 @@ function C17DenseWorkspace({
       shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
-      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled scrollEnabled={!scrubberDragging} style={styles.workbenchScroll}>
+      {showRewindScrubber && <View style={styles.workbenchScrubber}>
+        <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
+      </View>}
+      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
         {hypothetical !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HYPOTHETICAL · ACTOR {hypotheticalActor === null ? '—' : metadata.playerNames[hypotheticalActor] ?? `P${hypotheticalActor + 1}`}</Text>
           {hypotheticalController ? <View style={styles.actionButtons}>
@@ -1010,7 +1020,6 @@ function C17DenseWorkspace({
           </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Select a card from the hypothetical actor hand or a player to plan a clue.</Text> : null}
         </> : reviewActive && !finishedReplay && sharedReplay === null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
-          <C17RewindScrubber actionSegments={actionSegments} onDragStateChange={setScrubberDragging} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
@@ -1034,13 +1043,9 @@ function C17DenseWorkspace({
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay === null
             ? `Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`
             : `SHARED REPLAY · Leader: ${sharedReplay.leader}`}</Text>
-          {result !== null && <View style={[styles.result, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-            <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>FINAL SCORE · {result.score}</Text>
-            {result.reason !== null && <Text style={[styles.resultReason, { color: theme.colors.text }]}>{result.reason}</Text>}
-            {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
-              {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
-              {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
-            </View>}
+          {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
+            {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
+            {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
           </View>}
           {sharedReplay !== null && <View style={styles.noteInspect}>
             <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{sharedReplay.amLeader
@@ -1057,7 +1062,6 @@ function C17DenseWorkspace({
               onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
             />)}
           </View>}
-          <C17RewindScrubber actionSegments={actionSegments} onDragStateChange={setScrubberDragging} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
@@ -1093,26 +1097,20 @@ function C17DenseWorkspace({
             </View>
           </View>
 
-          {canPlayGameplay && selectedOwnCard !== null && <View style={styles.rowBetween}>
-            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
-            <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
-              <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
-            </View>
+          {canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>
+            <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
+            <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
+            <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />
           </View>}
 
           {noteCard !== null ? <View style={styles.noteInspect}>
-            <View style={styles.rowBetween}>
+            {noteCard !== selectedOwnCard && <View style={styles.rowBetween}>
               <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
-              <View style={styles.actionButtons}><ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} /><ActionButton compact title="Close" onPress={onCloseNote} /></View>
-            </View>
-            <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
-              {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
-            </Text>
+              <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
+            </View>}
+            {inspectedNote.trim().length > 0 && <Text numberOfLines={2} style={[styles.notePreview, { color: theme.colors.text }]}>{inspectedNote}</Text>}
             {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
-          </View> : selectedOwnCard === null
-            ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Tap a card to inspect its note.</Text>
-            : null}
+          </View> : null}
 
           {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
         </>}
@@ -1193,8 +1191,6 @@ const styles = StyleSheet.create({
   lastActionHeader: { minHeight: 32 },
   lastActionPressable: { alignItems: 'center', flexDirection: 'row', gap: 7, minHeight: 24 },
   lastActionText: { flex: 1, fontSize: 10, fontWeight: '700', minWidth: 0 },
-  result: { borderRadius: 8, borderWidth: 1, gap: 3, paddingHorizontal: 7, paddingVertical: 5 },
-  resultReason: { fontSize: 11, fontWeight: '700' },
   link: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   rowBetween: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
   actionButtons: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
@@ -1217,6 +1213,7 @@ const styles = StyleSheet.create({
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
   workbenchExpanded: { flex: 1 },
+  workbenchScrubber: { paddingHorizontal: 10, paddingTop: 7 },
   workbenchScroll: { flex: 1 },
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   idleWorkbench: { alignItems: 'flex-end', flex: 1, justifyContent: 'flex-start', marginTop: 5 },

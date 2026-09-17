@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   getC17CardLaneWidth,
   getC17DenseLayout,
+  getC17AmbientEnvelope,
   getC17HandsRegionHeight,
   getC17WorkbenchHeight,
   getRelativeOpponentIndices,
@@ -57,7 +58,7 @@ describe('C17 dense portrait layout', () => {
     expect(result.handsHeight).toBeLessThanOrEqual(315);
   });
 
-  test('recomputes same-width layouts when the ambient body grows', () => {
+  test('stabilizes the same-shell ambient envelope while accepting a new shell', () => {
     const workbenchHeight = 156;
     const constrained = layout({
       handsRegionHeight: getC17HandsRegionHeight(481, workbenchHeight),
@@ -68,10 +69,21 @@ describe('C17 dense portrait layout', () => {
       workbenchHeight,
     });
 
-    expect(hasC17AmbientRegionChanged(
+    expect(getC17AmbientEnvelope(
       { width: 300, height: 481 },
       { width: 300, height: 866 },
-    )).toBe(true);
+      true,
+    )).toEqual({ width: 300, height: 866 });
+    expect(getC17AmbientEnvelope(
+      { width: 300, height: 866 },
+      { width: 300, height: 481 },
+      true,
+    )).toEqual({ width: 300, height: 866 });
+    expect(getC17AmbientEnvelope(
+      { width: 300, height: 866 },
+      { width: 300, height: 481 },
+      false,
+    )).toEqual({ width: 300, height: 481 });
     expect(hasC17AmbientRegionChanged(
       { width: 300, height: 866 },
       { width: 300, height: 481 },
