@@ -58,6 +58,23 @@ describe('C17 dense portrait layout', () => {
     expect(result.handsHeight).toBeLessThanOrEqual(315);
   });
 
+  test('keeps constrained three-player hands in the Full Ledger down to the lower density floor', () => {
+    const result = layout({ opponentCount: 2, handsRegionHeight: 232 });
+
+    expect(result.mode).toBe('full-ledger');
+    expect(result.opponentCardHeight).toBeGreaterThanOrEqual(46);
+    expect(result.opponentCardHeight).toBeLessThan(76);
+    expect(result.ownCardHeight).toBe(result.opponentCardHeight);
+    expect(result.handsHeight).toBeLessThanOrEqual(232);
+  });
+
+  test('keeps the higher Full Ledger floor for constrained four-player hands', () => {
+    const result = layout({ opponentCount: 3, handsRegionHeight: 309 });
+
+    expect(result.mode).toBe('compact-overview');
+    expect(result.opponentCardHeight).toBe(24);
+  });
+
   test('stabilizes the same-shell ambient envelope while accepting a new shell', () => {
     const workbenchHeight = 156;
     const constrained = layout({

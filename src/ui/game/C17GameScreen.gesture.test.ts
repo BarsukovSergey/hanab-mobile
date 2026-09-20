@@ -46,6 +46,14 @@ test('C17 uses summaries only for compact opponents while retaining full own car
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
 });
 
+test('C17 note inspector keeps note controls and details without card-number labels', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('title="Edit note"');
+  expect(screen).toContain('CardKnowledgeDetails knowledge={inspectedKnowledge}');
+  expect(screen).not.toContain('>{getCardLabel(');
+});
+
 test('C17 pulses only the compact clue target row while keeping full-card clue pulses', () => {
   const screen = readC17Screen();
 

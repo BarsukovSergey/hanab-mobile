@@ -1031,7 +1031,6 @@ function C17DenseWorkspace({
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
           {noteCard !== null && <View style={styles.noteInspect}>
             <View style={styles.rowBetween}>
-              <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
               <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
             </View>
             <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
@@ -1071,7 +1070,6 @@ function C17DenseWorkspace({
           </View>
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
           {noteCard !== null && <View style={styles.noteInspect}>
-            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
             <Text style={[styles.notePreview, { color: inspectedReplayNotes.length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
               {inspectedReplayNotes.length > 0
                 ? inspectedReplayNotes.map((entry) => `${entry.name}: ${entry.text}`).join('\n')
@@ -1105,7 +1103,6 @@ function C17DenseWorkspace({
 
           {noteCard !== null ? <View style={styles.noteInspect}>
             {noteCard !== selectedOwnCard && <View style={styles.rowBetween}>
-              <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{getCardLabel(game, metadata.playerNames, noteCard)}</Text>
               <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
             </View>}
             {inspectedNote.trim().length > 0 && <Text numberOfLines={2} style={[styles.notePreview, { color: theme.colors.text }]}>{inspectedNote}</Text>}

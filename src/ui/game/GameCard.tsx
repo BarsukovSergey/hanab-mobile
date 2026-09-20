@@ -102,7 +102,6 @@ export function GameCard({
       styles.cardTouch,
       height === undefined ? null : styles.sizedCardTouch,
       { transform: [
-        ...(height === undefined ? [] : [{ translateX: -2 }]),
         ...(knowledge.borderColor === 'orange' ? [{ translateY: -cardTopHeadroom }] : []),
       ] },
       pressed && styles.pressed,
