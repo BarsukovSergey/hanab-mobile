@@ -21,6 +21,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Audit production dependency graph
+        run: npm audit --omit=dev --json || true
+      - name: Audit full dependency graph
+        run: npm audit --json || true
       - run: npm run typecheck
       - run: npm test
       - run: git diff --check HEAD^..HEAD
