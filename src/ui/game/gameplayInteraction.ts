@@ -19,6 +19,7 @@ export type GameplayInteractionAction =
   | { type: 'open-note'; order: number | null }
   | { type: 'hold-empathy'; playerIndex: number | null }
   | { type: 'cancel-transient' }
+  | { type: 'disarm-gameplay' }
   | { type: 'reset-lifecycle-transients' }
   | { type: 'sync-hands'; ownOrders: readonly number[]; clueTargets: readonly number[]; visibleOrders: readonly number[] };
 
@@ -81,6 +82,14 @@ export function gameplayInteractionReducer(
     case 'cancel-transient':
       return {
         ...state,
+        empathyPlayer: null,
+      };
+    case 'disarm-gameplay':
+      return {
+        ...state,
+        selectedCard: null,
+        clueTarget: null,
+        cluePreview: null,
         empathyPlayer: null,
       };
     case 'reset-lifecycle-transients':

@@ -59,15 +59,19 @@ export function GameCard({
     }}
     onPressIn={() => { longPressed.current = false; }}
     onPressOut={onPressOut}
-    style={({ pressed }) => [styles.cardTouch, pressed && styles.pressed]}
+    style={({ pressed }) => [
+      styles.cardTouch,
+      height === undefined ? null : styles.sizedCardTouch,
+      pressed && styles.pressed,
+    ]}
   >
     <View style={[
       styles.hiddenFrame,
-      height === undefined ? null : { height, width: undefined },
-      { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
-      selected && styles.selectedFrame,
+      height === undefined ? null : [styles.sizedHiddenFrame, { height, width: undefined }],
+      height === undefined ? { borderColor: selected ? theme.colors.accent : '#0d0d0d' } : null,
+      height === undefined && selected ? styles.selectedFrame : null,
     ]}>
-      <View style={styles.hiddenCard}>
+      <View style={[styles.hiddenCard, height === undefined ? null : styles.sizedHiddenCard]}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
         {knowledge.borderColor !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: knowledge.borderColor }]} />}
         {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
@@ -75,6 +79,11 @@ export function GameCard({
         {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
         {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
       </View>
+      {height !== undefined && <View pointerEvents="none" style={[
+        styles.sizedHiddenFrameOverlay,
+        { borderColor: selected ? theme.colors.accent : '#0d0d0d' },
+        selected && styles.sizedSelectedFrameOverlay,
+      ]} />}
     </View>
   </Pressable>;
 }
@@ -275,9 +284,14 @@ function NoteIndicator({ compact = false }: { compact?: boolean }) {
 
 const styles = StyleSheet.create({
   cardTouch: { alignItems: 'center' },
+  sizedCardTouch: { marginRight: -1, transform: [{ translateX: -2 }] },
   pressed: { opacity: 0.82 },
   hiddenFrame: { aspectRatio: 286 / 406, backgroundColor: '#0d0d0d', borderRadius: 8, borderWidth: 2, elevation: 2, shadowColor: '#000000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.28, shadowRadius: 2, width: 88 },
   selectedFrame: { borderWidth: 4 },
+  sizedHiddenFrame: { borderWidth: 0 },
+  sizedHiddenCard: { borderRadius: 7, margin: 0 },
+  sizedHiddenFrameOverlay: { bottom: 0, borderRadius: 7, borderWidth: 2, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 11 },
+  sizedSelectedFrameOverlay: { borderWidth: 4 },
   hiddenCard: { backgroundColor: '#747a76', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   empathyCard: { backgroundColor: '#747a76' },
   knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '10%', paddingHorizontal: '8%', paddingTop: '42%', position: 'absolute', right: 0, top: 0 },

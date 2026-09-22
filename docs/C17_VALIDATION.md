@@ -1,7 +1,7 @@
 # C17 Validation Plan
 
 Status: **active**
-Date: 2026-09-06
+Date: 2026-09-07
 
 This document tracks what C17 still has to prove on real devices. It does not restate game semantics. The current product contract is `docs/C17_UX_CONTRACT.md`. Detailed physical observations and defect history are preserved in `docs/C17_EVIDENCE.md`.
 
@@ -200,6 +200,25 @@ At minimum cover:
 - old action selection is not armed after return;
 - authoritative live game is unchanged by inspection.
 
+#### Current C17-2 deterministic result — PASS; physical A29 still pending
+
+As of the C17-2 code line ending at `eaf4a9f2887b937f90c58fcc65255db539e22692`, deterministic coverage establishes the non-visual A29 boundaries:
+
+- play/discard reconstruction uses authoritative adjacent states to recover the exact durable card order, revealed identity, and pre-action displayed slot;
+- clue reconstruction derives touched displayed slots from the authoritative pre-state hand mapping;
+- Score / Clues / Strikes / Deck deltas are derived from the same before/after pair;
+- human labels distinguish reviewed turn from current Live turn;
+- Before/After are pinned to one focused action instead of silently changing which action is being reviewed;
+- Recent retains at least one seating rotation;
+- entering/leaving review disarms gameplay action selection while preserving note-inspection identity;
+- gameplay runtime rejects Play/Discard/Clue sends during review;
+- incoming authoritative live actions update `ongoingGame` while the selected historical `visibleState` stays fixed;
+- one local return-to-Live action restores `visibleState` to the authoritative `ongoingGame`;
+- the C17 Ledger, discard viewer, hands, and resource HUD all read from the same selected `visibleState`, so historical presentation does not mix those surfaces with live state;
+- the review UI records the live segment at entry so `NEW` represents temporal progress after entering history rather than distance from the old action being inspected.
+
+The remaining C17-2 gate is deliberately physical/human rather than another broad regression pass: confirm that the labels, Before/After transition, Last Action detail, and Live return are immediately understandable at phone reading distance, including the look-away reconstruction probe and visible incoming-live indication.
+
 ## 6. Pregame/shell validation
 
 Validate the full route:
@@ -291,6 +310,8 @@ Record physical results here as C17 progresses.
 | 2026-09-06 | fixed compact C17-0 | same device class | Dense 6P compact | FAIL | Fit succeeded but opponent hands were over-shrunk and large vertical space was wasted. |
 | 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P | PASS | All hands, own hand, HUD/table, Last Action, and minimum Workbench fit cleanly. |
 | 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P + One Extra Card | PASS | Four-card opponent and local hands remain readable; no Android-nav clipping or wasted compact-space band. C17-0 density gate closed for this class. |
+| 2026-09-07 | `eaf4a9f2887b937f90c58fcc65255db539e22692` | deterministic tests / CI | C17-2 A29 non-visual boundaries | PASS | Exact old card/slot, Before/After focus, stale-send safety, live-while-reviewing preservation, one-action Live return, seating-rotation history, and temporal update counting covered. Physical readability/interaction pass remains. |
+| — | — | ordinary Android portrait / three-button nav | C17-2 A29 live-history UX | PENDING | Run one focused look-away/history pass; also observe the final own-card column alignment tweak. |
 | — | — | — | Trash visual candidate | PENDING | Start with semi-transparent/subdued treatment. |
 | — | — | — | Functional action animations | PENDING | Verify no blocking/backlog. |
 | — | — | — | Serious 5P session | PENDING | Release gate. |
