@@ -1,7 +1,9 @@
 # Hanab Mobile Backlog
 
-Status: **parking lot / non-authoritative**
+Status: **legacy parking lot / non-authoritative**
 Date: 2026-09-08
+
+> As of 2026-09-22, still-relevant post-beta product work is being consolidated into `docs/C17_BACKLOG.md`, while concrete defects belong in GitHub Issues. Do not add new work here. Existing entries are retained as historical context; several are duplicated or superseded by the current post-beta backlog.
 
 > Milestone/slice references below are historical planning labels. Current beta scope lives in `docs/ANDROID_BETA_RELEASE.md`; current C17 deferrals live in `docs/C17_BACKLOG.md`. GitHub issues track concrete defects selected for follow-up.
 
