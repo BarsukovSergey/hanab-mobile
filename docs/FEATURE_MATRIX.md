@@ -1,5 +1,7 @@
 # Hanab Mobile Feature Matrix
 
+> **Historical milestone tracker.** This matrix predates the distributed `1.0.0-beta.1` baseline and contains stale C16/C17 planning statuses. Do not use it as current release authority. For current beta scope use `README.md`, `docs/ANDROID_BETA_RELEASE.md`, `docs/C17_UX_CONTRACT.md`, and `docs/C17_BACKLOG.md`.
+
 This file is the persistent gap tracker between the mobile client and the functionality required for a useful Hanab Mobile 1.0.
 
 A milestone is not closed while one of its rows is accidentally unaccounted for: each capability must be implemented or explicitly deferred.

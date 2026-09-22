@@ -1,0 +1,41 @@
+# Documentation map
+
+This directory mixes current product/technical authority with historical implementation evidence. Use this page to avoid treating an old milestone note as current release guidance.
+
+## Start here
+
+- `../README.md` — project overview, local development, current Android beta scope.
+- `../TESTING.md` — tester-facing beta script and bug-report format.
+- `ANDROID_BETA_RELEASE.md` — current internal APK version, build command, acceptance checklist, and distributed build commit.
+
+## Current authority
+
+- `ARCHITECTURE.md` — technical boundaries: server authority, networking, reconnect safety, and upstream ownership.
+- `PROTOCOL.md` — mobile/server protocol notes.
+- `UPSTREAM.md` — pinned upstream ownership and reuse rules.
+- `C17_UX_CONTRACT.md` — current gameplay/product contract.
+- `C17_UX_DECISIONS.md` — ratified product decisions and explicit revisions.
+- `CARD_PRESENTATION_PARITY.md` — card-presentation semantic parity constraints.
+
+## Current validation and evidence
+
+- `C17_VALIDATION.md` — active beta acceptance scope and physical validation gates.
+- `C17_EVIDENCE.md` — preserved device observations and defect history; evidence, not authority.
+- `GAMEPLAY_SCENARIOS.md` — deterministic gameplay scenario harness and coverage model.
+
+## Deferred work
+
+- `C17_BACKLOG.md` — explicit post-beta C17/product deferrals.
+- `BACKLOG.md` — older non-authoritative parking lot. Treat milestone labels there as historical.
+- GitHub issues — concrete defects selected for follow-up, such as replay scrubber performance.
+
+## Historical snapshots
+
+These are useful for archaeology but must not override current authority:
+
+- `C17_HANDOFF.md` — archived continuation handoff from the old feature-branch phase.
+- `MOBILE_GAMEPLAY_REDESIGN.md` — superseded pre-C17 presentation proposal.
+- `FEATURE_MATRIX.md` — historical milestone matrix with stale pre-beta statuses.
+- `C1_RESULTS.md` through `C16_RESULTS.md` and related result files — milestone evidence captured during development.
+
+When documents conflict, prefer the current authority list above, then the current beta release scope.

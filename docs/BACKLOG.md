@@ -3,6 +3,8 @@
 Status: **parking lot / non-authoritative**
 Date: 2026-09-08
 
+> Milestone/slice references below are historical planning labels. Current beta scope lives in `docs/ANDROID_BETA_RELEASE.md`; current C17 deferrals live in `docs/C17_BACKLOG.md`. GitHub issues track concrete defects selected for follow-up.
+
 This file is for useful work that should **not interrupt the current implementation slice**.
 
 It is not product authority and does not replace:
