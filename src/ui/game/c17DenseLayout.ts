@@ -154,6 +154,26 @@ export function getRelativeOpponentIndices(playerCount: number, ourPlayerIndex: 
   return Array.from({ length: Math.max(0, playerCount - 1) }, (_, offset) => (ourPlayerIndex + offset + 1) % playerCount);
 }
 
+export function getC17HandRows(
+  playerCount: number,
+  seatingAnchorIndex: number,
+  actionHandIndex: number | null,
+): {
+  opponentIndices: readonly number[];
+  anchoredPlayerIndex: number;
+  actionHandIndex: number | null;
+  clueTargetIndices: readonly number[];
+} {
+  return {
+    opponentIndices: getRelativeOpponentIndices(playerCount, seatingAnchorIndex),
+    anchoredPlayerIndex: seatingAnchorIndex,
+    actionHandIndex,
+    clueTargetIndices: actionHandIndex === null
+      ? []
+      : Array.from({ length: playerCount }, (_, index) => index).filter((index) => index !== actionHandIndex),
+  };
+}
+
 function maxCardHeightThatFits(widthFit: number, handsRegionHeight: number, opponents: number): number {
   let low = 1;
   let high = Math.max(1, widthFit);

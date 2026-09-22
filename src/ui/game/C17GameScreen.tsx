@@ -48,9 +48,9 @@ import {
   getC17DenseLayout,
   getC17AmbientEnvelope,
   getC17HandsRegionHeight,
+  getC17HandRows,
   getC17WorkbenchHeight,
   hasC17AmbientRegionChanged,
-  getRelativeOpponentIndices,
 } from './c17DenseLayout';
 import {
   countC17TemporalStatesAfter,
@@ -104,18 +104,19 @@ export function C17GameScreen() {
   const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true
     && !isFinishedReplay && !isSharedReplay;
   const isSpectator = liveRoom?.role === 'spectator';
-  const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;
+  const seatingAnchorIndex = clientState?.metadata.ourPlayerIndex ?? null;
   const hypotheticalActor = hypothetical?.ongoing.turn.currentPlayerIndex ?? null;
-  const actionHandIndex = hypotheticalActive ? hypotheticalActor : ourIndex;
-  const ourHand = useMemo(() => actionHandIndex === null ? [] : game?.hands[actionHandIndex] ?? [], [actionHandIndex, game]);
+  const actionHandIndex = hypotheticalActive ? hypotheticalActor : seatingAnchorIndex;
+  const actionHand = useMemo(() => actionHandIndex === null ? [] : game?.hands[actionHandIndex] ?? [], [actionHandIndex, game]);
   const canHypotheticalControl = hypotheticalActive && (clientState?.replay.shared === null || clientState?.replay.shared.amLeader === true);
   const hypotheticalOperationPending = liveRoom !== null
     && roomState.pendingHypotheticalOperation?.connectionEpoch === roomState.connectionEpoch
     && roomState.pendingHypotheticalOperation.tableID === liveRoom.tableID
     && roomState.pendingHypotheticalOperation.gameLoadEpoch === liveRoom.gameLoadEpoch;
-  const clueTargets = useMemo(() => (isPlayingPlayer || canHypotheticalControl) ? clientState?.metadata.playerNames
-    .map((_, index) => index)
-    .filter((index) => index !== actionHandIndex) ?? [] : [], [actionHandIndex, canHypotheticalControl, clientState, isPlayingPlayer]);
+  const clueTargets = useMemo(() => (isPlayingPlayer || canHypotheticalControl)
+    && clientState !== null && seatingAnchorIndex !== null
+    ? getC17HandRows(clientState.metadata.playerNames.length, seatingAnchorIndex, actionHandIndex).clueTargetIndices
+    : [], [actionHandIndex, canHypotheticalControl, clientState, isPlayingPlayer, seatingAnchorIndex]);
   const empathyPlayers = useMemo(() => clientState?.metadata.playerNames
     .map((_, index) => index) ?? [], [clientState]);
   const [interaction, interactionDispatch] = useReducer(gameplayInteractionReducer, initialGameplayInteractionState);
@@ -137,12 +138,12 @@ export function C17GameScreen() {
   useEffect(() => {
     interactionDispatch({
       type: 'sync-hands',
-      ownOrders: ourHand,
+      ownOrders: actionHand,
       clueTargets,
       empathyPlayers,
       visibleOrders: liveNoteOrders,
     });
-  }, [clueTargets, empathyPlayers, liveNoteOrders, ourHand]);
+  }, [actionHand, clueTargets, empathyPlayers, liveNoteOrders]);
 
   const replayActive = clientState?.replay.active ?? false;
   useEffect(() => {
@@ -177,7 +178,7 @@ export function C17GameScreen() {
     if (noteCard === null) setNoteEditorOpen(false);
   }, [noteCard]);
 
-  if (liveRoom === null || clientState === null || game === null || ourIndex === null) return null;
+  if (liveRoom === null || clientState === null || game === null || seatingAnchorIndex === null) return null;
 
   const { metadata, replay, ongoingGame } = clientState;
   const liveClock = metadata.options.timed === true
@@ -192,7 +193,7 @@ export function C17GameScreen() {
   const latest = ongoingGame.turn.segment ?? 0;
   const selectedCard = isPlayingPlayer || canHypotheticalControl ? interaction.selectedCard : null;
   const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;
-  const isOurTurn = isPlayingPlayer && game.turn.currentPlayerIndex === ourIndex;
+  const isOurTurn = isPlayingPlayer && game.turn.currentPlayerIndex === seatingAnchorIndex;
   const enabled = isPlayingPlayer
     && sessionPhase === 'ready'
     && isOurTurn
@@ -201,7 +202,7 @@ export function C17GameScreen() {
     && roomState.pendingGameplayAction === null;
   const hypotheticalEnabled = canHypotheticalControl && hypotheticalActor !== null
     && !hypotheticalOperationPending;
-  const cardEnabled = (enabled || hypotheticalEnabled) && selectedCard !== null && ourHand.some((order) => order === selectedCard);
+  const cardEnabled = (enabled || hypotheticalEnabled) && selectedCard !== null && actionHand.some((order) => order === selectedCard);
   const discardEnabled = cardEnabled
     && canDiscardForVariant(game.clueTokens, metadata.options.variantName);
   const clueChoices = getGameplayClueChoicesForPlayer(metadata);
@@ -396,6 +397,7 @@ export function C17GameScreen() {
       game={game}
       hypothetical={hypothetical}
       hypotheticalActor={hypotheticalActor}
+      actionHandIndex={actionHandIndex}
       hypotheticalController={canHypotheticalControl}
       hypotheticalOperationPending={hypotheticalOperationPending}
       globalEmpathy={interaction.globalEmpathy}
@@ -457,7 +459,7 @@ export function C17GameScreen() {
       onEndHypothetical={() => { if (lobbyRuntime.endHypothetical()) interactionDispatch({ type: 'disarm-gameplay' }); }}
       onBackHypothetical={() => { if (lobbyRuntime.backHypothetical()) interactionDispatch({ type: 'disarm-gameplay' }); }}
       onToggleHypotheticalDrawn={() => lobbyRuntime.toggleHypotheticalDrawnCards()}
-      ourIndex={actionHandIndex ?? ourIndex}
+      seatingAnchorIndex={seatingAnchorIndex}
       pendingText={pendingText ?? null}
       canEnterClue={enabled || hypotheticalEnabled}
       recentActions={recentActions}
@@ -500,6 +502,7 @@ export function C17GameScreen() {
 
 function C17DenseWorkspace({
   actionSegments,
+  actionHandIndex,
   canPlayCard,
   canDiscardCard,
   canPlayGameplay,
@@ -566,7 +569,7 @@ function C17DenseWorkspace({
   onEndHypothetical,
   onBackHypothetical,
   onToggleHypotheticalDrawn,
-  ourIndex,
+  seatingAnchorIndex,
   pendingText,
   recentActions,
   result,
@@ -584,6 +587,7 @@ function C17DenseWorkspace({
   variantName,
 }: {
   actionSegments: readonly number[];
+  actionHandIndex: number | null;
   canPlayCard: boolean;
   canDiscardCard: boolean;
   canPlayGameplay: boolean;
@@ -650,7 +654,7 @@ function C17DenseWorkspace({
   onEndHypothetical: () => void;
   onBackHypothetical: () => void;
   onToggleHypotheticalDrawn: () => void;
-  ourIndex: number;
+  seatingAnchorIndex: number;
   pendingText: string | null;
   recentActions: readonly C17TemporalEntry[];
   result: { score: number; reason: string | null } | null;
@@ -671,7 +675,7 @@ function C17DenseWorkspace({
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
   const committedClue = getLastCluePresentationFromState(game);
-  const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
+  const opponents = getC17HandRows(metadata.playerNames.length, seatingAnchorIndex, actionHandIndex).opponentIndices;
   const usesSideLabels = opponents.length <= 2;
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight, opponents.length);
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
@@ -741,14 +745,16 @@ function C17DenseWorkspace({
       && liveTransition.touchedSlots.includes(position + 1) ? livePulseSegment : null
   );
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
-  const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
+  const anchoredHand = getDisplayedHandOrders(game.hands[seatingAnchorIndex]);
+  const displayedActionHand = actionHandIndex === null ? [] : getDisplayedHandOrders(game.hands[actionHandIndex]);
+  const anchoredIsActionHand = actionHandIndex === seatingAnchorIndex;
   const displayIdentity = (order: number) => hypothetical?.morphedIdentities[order] ?? cardIdentities[order];
   const hasExplicitBlankMorph = (order: number) => {
     const morph = hypothetical?.morphedIdentities[order];
     return morph?.suitIndex === null && morph.rank === null;
   };
   const startingHandHidden = !hypothetical?.showDrawnCards && hypothetical?.startingPlayerIndex !== null;
-  const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
+  const selectedActionCard = selectedCard !== null && displayedActionHand.some((order) => order === selectedCard) ? selectedCard : null;
   const inspectedNote = noteCard === null ? '' : notes[noteCard]?.text ?? '';
   const readOnlyReplay = finishedReplay || sharedReplay !== null;
   const inspectedReplayNotes = noteCard === null
@@ -758,14 +764,14 @@ function C17DenseWorkspace({
     ? (replayNotes[order]?.some((entry) => entry.text.trim().length > 0) ?? false)
     : (notes[order]?.text.trim().length ?? 0) > 0;
   const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
-    || selectedTarget !== null || selectedOwnCard !== null || noteCard !== null || pendingText !== null;
+    || selectedTarget !== null || selectedActionCard !== null || noteCard !== null || pendingText !== null;
   const compactOrdinaryWorkbench = usesSideLabels
     && hypothetical === null
     && !reviewActive
     && !finishedReplay
     && sharedReplay === null
     && selectedTarget === null
-    && (selectedOwnCard !== null || noteCard !== null);
+    && (selectedActionCard !== null || noteCard !== null);
   const compactCappedWorkbench = usesSideLabels && (compactOrdinaryWorkbench
     || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);
   const showRewindScrubber = reviewActive;
@@ -784,7 +790,7 @@ function C17DenseWorkspace({
             : finishedReplay
             ? finishedStatus
             : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
-          <AuthoritativePulse enabled={livePulseEnabled} pulseKey={actorPulse}><Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName}</Text></AuthoritativePulse>
+          <AuthoritativePulse enabled={livePulseEnabled} pulseKey={actorPulse}><Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName}</Text></AuthoritativePulse>
         </View>
         <HudStat label="Score" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.score, game.score)} value={game.score} />
         <HudStat label="Max" value={game.stats.maxScore} />
@@ -824,6 +830,7 @@ function C17DenseWorkspace({
       <View style={styles.opponents}>
         {opponents.map((index) => {
           const currentActor = current === index;
+          const isActionHand = actionHandIndex === index;
           const compact = layout.mode === 'compact-overview';
           const empathizing = globalEmpathy || empathyPlayer === index;
           const target = selectedTarget === index;
@@ -842,7 +849,7 @@ function C17DenseWorkspace({
                 longPressedOpponent.current = null;
                 return;
               }
-              if (canEnterClue) onSelectClueTarget(index);
+              if (canEnterClue && !isActionHand) onSelectClueTarget(index);
             }}
             onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
             style={[
@@ -875,6 +882,37 @@ function C17DenseWorkspace({
                 if (card === undefined) return null;
                 const cardNote = notes[order];
                 const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === index;
+                if (isActionHand) {
+                  const actionEmpathy = empathizing || forcedStartingEmpathy;
+                  const actionKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, actionEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
+                  const actionPresentation = getCardStatePresentation({
+                    game,
+                    state: card,
+                    note: cardNote,
+                    displaySuitIndex: actionKnowledge.displaySuitIndex,
+                    displayRank: actionKnowledge.displayRank,
+                    empathy: actionEmpathy,
+                    finished: finishedReplay,
+                    variantName,
+                    speedrun,
+                    hyphenatedConventions,
+                    hardVariant: metadata.hardVariant,
+                  });
+                  return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><GameCard
+                    cardTopHeadroom={layout.cardTopHeadroom}
+                    clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+                    hasNote={hasAvailableNote(order)}
+                    height={layout.opponentCardHeight}
+                    knowledge={actionKnowledge}
+                    onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
+                    onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
+                    onSelect={() => onSelectCard(order)}
+                    position={position}
+                    selected={selectedActionCard === order}
+                    statePresentation={actionPresentation}
+                    variantName={variantName}
+                  /></AuthoritativePulse>;
+                }
                 const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
                 const empathyKnowledge = empathizing || forcedStartingEmpathy
                   ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
@@ -922,29 +960,30 @@ function C17DenseWorkspace({
         })}
       </View>
 
-      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={sourcePulse(ourIndex)}><Pressable
+      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={sourcePulse(seatingAnchorIndex)}><Pressable
+        accessibilityLabel={`Player ${metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}`}`}
+        accessibilityRole="button"
         delayLongPress={350}
         disabled={globalEmpathy}
-        onLongPress={() => onHoldEmpathy(ourIndex)}
+        onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}
+        onPress={() => { if (canEnterClue && !anchoredIsActionHand) onSelectClueTarget(seatingAnchorIndex); }}
         onPressOut={() => onHoldEmpathy(null)}
         style={[styles.ownHand, usesSideLabels && styles.sideLabelRow, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       >
         <View style={[styles.ownTitleLane, usesSideLabels && styles.sideLabelLane]}>
-          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{hypothetical !== null
-            ? `ACTOR · ${metadata.playerNames[ourIndex] ?? `P${ourIndex + 1}`}`
-            : isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'}</Text>
+          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'}</Text>
           {liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
-            playerIndex={ourIndex}
+            playerIndex={seatingAnchorIndex}
           />}
         </View>
         <View style={[styles.ownCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
-          {ownHand.map((order, position) => {
+          {anchoredHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
-            const ownEmpathy = globalEmpathy || empathyPlayer === ourIndex
-              || (startingHandHidden && hypothetical?.startingPlayerIndex === ourIndex);
+            const ownEmpathy = globalEmpathy || empathyPlayer === seatingAnchorIndex
+              || (startingHandHidden && hypothetical?.startingPlayerIndex === seatingAnchorIndex);
             const cardNote = notes[order];
             const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, ownEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
             const statePresentation = getCardStatePresentation({
@@ -960,20 +999,60 @@ function C17DenseWorkspace({
               hyphenatedConventions,
               hardVariant: metadata.hardVariant,
             });
-            return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(ourIndex, position)}><GameCard
+            if (!anchoredIsActionHand) {
+              const anchoredEmpathizing = globalEmpathy || empathyPlayer === seatingAnchorIndex;
+              const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === seatingAnchorIndex;
+              const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
+              const empathyKnowledge = anchoredEmpathizing || forcedStartingEmpathy
+                ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
+                : null;
+              const activeKnowledge = empathyKnowledge ?? normalKnowledge;
+              const nonActionPresentation = getCardStatePresentation({
+                game,
+                state: card,
+                note: cardNote,
+                displaySuitIndex: activeKnowledge.displaySuitIndex,
+                displayRank: activeKnowledge.displayRank,
+                empathy: anchoredEmpathizing,
+                finished: finishedReplay,
+                variantName,
+                speedrun,
+                hyphenatedConventions,
+                hardVariant: metadata.hardVariant,
+              });
+              return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(seatingAnchorIndex, position)}><VisibleHanabiCard
+                cardTopHeadroom={layout.cardTopHeadroom}
+                clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+                empathyKnowledge={empathyKnowledge}
+                hasNote={hasAvailableNote(order)}
+                height={layout.ownCardHeight}
+                onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
+                onPress={() => onInspectNote(order)}
+                onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
+                position={position}
+                previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
+                  ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
+                rank={hypothetical === null ? card.rank : normalKnowledge.displayRank}
+                semanticBorder={normalKnowledge.borderColor}
+                statePresentation={nonActionPresentation}
+                suitIndex={hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex}
+                variantName={variantName}
+              /></AuthoritativePulse>;
+            }
+            return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(seatingAnchorIndex, position)}><GameCard
               hasNote={hasAvailableNote(order)}
               height={layout.ownCardHeight}
               knowledge={knowledge}
               clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
-              previewMarker={selectedTarget === ourIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
+              previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
                 ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
               cardTopHeadroom={layout.cardTopHeadroom}
               onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order)}
-              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(ourIndex)}
+              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               onSelect={() => onSelectCard(order)}
               position={position}
-              selected={selectedOwnCard === order}
+              selected={selectedActionCard === order}
               statePresentation={statePresentation}
               variantName={variantName}
             /></AuthoritativePulse>;
@@ -1026,8 +1105,8 @@ function C17DenseWorkspace({
             preview={cluePreview}
             previewState={cluePreviewState}
             targetName={targetName}
-          /> : canPlayGameplay && selectedOwnCard !== null ? <View style={styles.rowBetween}>
-            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Actor card {ownHand.findIndex((order) => order === selectedOwnCard) + 1}</Text>
+          /> : canPlayGameplay && selectedActionCard !== null ? <View style={styles.rowBetween}>
+            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>Actor card {displayedActionHand.findIndex((order) => order === selectedActionCard) + 1}</Text>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
               <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
@@ -1101,18 +1180,18 @@ function C17DenseWorkspace({
           previewState={cluePreviewState}
           targetName={targetName}
         /> : <>
-          {canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>
+          {canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>
             <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
             <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
-            {(noteCard === null || noteCard === selectedOwnCard) && <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />}
+            {(noteCard === null || noteCard === selectedActionCard) && <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedActionCard)} />}
           </View>}
 
-          {selectedOwnCard !== null && noteCard === null && (notes[selectedOwnCard]?.text.trim().length ?? 0) > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>
-            {notes[selectedOwnCard]?.text}
+          {selectedActionCard !== null && noteCard === null && (notes[selectedActionCard]?.text.trim().length ?? 0) > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>
+            {notes[selectedActionCard]?.text}
           </Text>}
 
           {noteCard !== null ? <View style={styles.noteInspect}>
-            {noteCard !== selectedOwnCard && <View style={styles.rowBetween}>
+            {noteCard !== selectedActionCard && <View style={styles.rowBetween}>
               <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
             </View>}
             {inspectedNote.trim().length > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>{inspectedNote}</Text>}
