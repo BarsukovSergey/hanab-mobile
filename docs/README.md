@@ -25,8 +25,8 @@ This directory mixes current product/technical authority with historical impleme
 
 ## Deferred work
 
-- `C17_BACKLOG.md` — explicit post-beta C17/product deferrals.
-- `BACKLOG.md` — older non-authoritative parking lot. Treat milestone labels there as historical.
+- `C17_BACKLOG.md` — explicit post-beta C17/product deferrals and the default home for newly deferred product work.
+- `BACKLOG.md` — legacy non-authoritative parking lot retained for history. Do not add new work there.
 - GitHub issues — concrete defects selected for follow-up, such as replay scrubber performance.
 
 ## Historical snapshots
