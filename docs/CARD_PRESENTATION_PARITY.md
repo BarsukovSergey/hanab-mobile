@@ -169,11 +169,11 @@ The selector now accepts an explicit `empathy` flag and passes it through to bot
 
 The UI should continue to receive presentation results from this boundary instead of reimplementing clue/note/knowledge rules in components.
 
-## Remaining UX work: empathy gesture
+## Current empathy gesture integration
 
-The presentation/selector boundary is empathy-capable, but the current game screen does not yet expose the intended press-and-hold opponent-hand gesture. That interaction belongs to the gameplay redesign described in `docs/archive/MOBILE_GAMEPLAY_REDESIGN.md`, where empathy must switch the whole hand in-place without a layout shift.
+The presentation/selector boundary is empathy-capable, and the C17 game screen now wires card long-press to transient per-hand empathy and clears that hold on release. Per-hand hold is disabled while global empathy is active. Keep the hand switch in-place without a layout shift.
 
-Do not reintroduce a hard-coded `empathy: false` inside the selector. Future UI work should supply the transient empathy state to this existing boundary.
+Do not reintroduce a hard-coded `empathy: false` inside the selector. The UI should continue to supply transient empathy state to this existing boundary.
 
 ## Rules for future changes
 
