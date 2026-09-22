@@ -8,6 +8,7 @@ export type ReadableChatMessage = Omit<ChatMessage, 'msg' | 'room'> & {
   msg: string;
   rawMsg: string;
   room: string;
+  localType?: 'info' | 'error';
 };
 
 export type ChatState = {
@@ -46,6 +47,33 @@ export const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
+    localMessageAdded(
+      state,
+      action: PayloadAction<{
+        epoch: number;
+        room: string;
+        msg: string;
+        type: 'info' | 'error';
+        datetime: string;
+      }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      const message = readable({
+        msg: action.payload.msg,
+        who: 'Hanab Mobile',
+        discord: false,
+        server: true,
+        datetime: action.payload.datetime,
+        room: action.payload.room,
+        recipient: '',
+      });
+      if (message === null) return;
+      message.localType = action.payload.type;
+      const messages = state.messagesByRoom[message.room] ?? [];
+      messages.push(message);
+      cap(messages);
+      state.messagesByRoom[message.room] = messages;
+    },
     messageReceived(
       state,
       action: PayloadAction<{ epoch: number; message: ChatMessage }>,

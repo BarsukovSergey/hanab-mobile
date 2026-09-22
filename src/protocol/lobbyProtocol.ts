@@ -323,6 +323,7 @@ export const welcomeSchema = z.object({
   username: z.string().min(1),
   totalGames: z.number().int().nonnegative(),
   playingAtTables: z.array(idSchema),
+  friends: z.array(z.string().min(1)).optional(),
   disconSpectatingTable: idSchema.optional(),
   disconShadowingSeat: z.number().int().optional(),
 });
@@ -389,6 +390,7 @@ const schemas = {
   boot: bootSchema,
   chat: chatMessageSchema,
   chatList: chatListSchema,
+  friends: z.object({ friends: z.array(z.string().min(1)) }).strict(),
   warning: z.object({ warning: z.string().min(1) }),
   error: z.object({ error: z.string().min(1) }),
 } as const;

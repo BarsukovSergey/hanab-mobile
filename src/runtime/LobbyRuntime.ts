@@ -1427,6 +1427,12 @@ export class LobbyRuntime {
           messages: event.data.list,
         }));
         break;
+      case 'friends':
+        this.store.dispatch(sessionActions.friendsReceived({
+          epoch,
+          friends: event.data.friends,
+        }));
+        break;
       case 'warning':
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
