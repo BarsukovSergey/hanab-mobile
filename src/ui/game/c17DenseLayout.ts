@@ -36,7 +36,6 @@ const DEFAULT_WORKBENCH_HEIGHT = 156;
 const HANDS_TOP_MARGIN = 5;
 const WORKBENCH_TOP_MARGIN = 5;
 const MIN_FULL_LEDGER_CARD_HEIGHT = 76;
-const MIN_FULL_LEDGER_CARD_HEIGHT_FOR_UP_TO_TWO_OPPONENTS = 46;
 const COMPACT_OPPONENT_SUMMARY_HEIGHT = 24;
 const COMPACT_OPPONENT_ROW_HEIGHT = 32;
 
@@ -92,9 +91,9 @@ export function getC17AmbientEnvelope(
  * C17 allocates cards from the measured card lanes and the stable hands rectangle captured for the
  * current window/text-scale class. Tool content is deliberately absent from this calculation.
  *
- * Full Ledger is therefore an outcome, not a breakpoint: if the resulting card face remains
- * readable it is used. Compact Overview is selected only when the available geometry would push
- * opponent cards below the readability floor.
+ * Full Ledger is therefore an outcome, not a breakpoint: up to two opponents retain fitted real
+ * card faces, while Compact Overview is selected only when three or more opponents would push
+ * cards below the readability floor.
  */
 export function getC17DenseLayout({
   opponentCardLaneWidth,
@@ -110,10 +109,7 @@ export function getC17DenseLayout({
   const ownWidthFit = cardHeightForWidth(ownCardLaneWidth, capacity, OWN_CARD_GAP);
   const widthFit = Math.max(1, Math.min(opponentWidthFit, ownWidthFit));
   const baseCardHeight = maxCardHeightThatFits(widthFit, handsRegionHeight, opponents);
-  const fullLedgerCardHeightFloor = opponents <= 2
-    ? MIN_FULL_LEDGER_CARD_HEIGHT_FOR_UP_TO_TWO_OPPONENTS
-    : MIN_FULL_LEDGER_CARD_HEIGHT;
-  if (baseCardHeight >= fullLedgerCardHeightFloor) {
+  if (opponents <= 2 || baseCardHeight >= MIN_FULL_LEDGER_CARD_HEIGHT) {
     const cardTopHeadroom = getCardTopHeadroom(baseCardHeight);
     const opponentRowHeight = baseCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
     const ownRowHeight = baseCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
