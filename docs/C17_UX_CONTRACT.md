@@ -49,20 +49,22 @@ C17 does not rewrite Hanabi.
 
 ## 4. Phone density and responsive strategy
 
-### Full Ledger
+### Beta.1 certified density
 
-Represent every hand simultaneously when the measured safe window and text scale make that readable. Exact dp allocations are implementation hypotheses, not product truth.
+The first distributed Android beta is accepted around **2P/3P phone gameplay**. In those layouts:
 
-### Compact Overview fallback
+- use real card faces for every visible hand;
+- cards and gameplay state have priority over decorative chrome and spacing;
+- preserve the stable local/observed anchor and Workbench relationship;
+- do not introduce per-hand horizontal scrolling or unreadably tiny cards.
 
-If Full Ledger falls below the readability floor for a phone/window/text-scale class, switch to Compact Overview:
+### 4P–6P post-beta work
 
-- all players remain spatially represented in stable order;
-- compact summaries replace unreadably tiny full cards;
-- the Workbench can show the selected hand/card at readable size;
-- do not solve density with clipping, unreadable shrink-to-fit, or per-hand sideways scrolling.
+4P–6P dense gameplay is outside the `1.0.0-beta.1` acceptance gate.
 
-Comparison pins are not C17 scope; they are backlog.
+The current Compact Overview / summary-icon implementation is a temporary fallback in the codebase, **not an accepted final product direction**. When 4P–6P work resumes, keep real card faces and recover space by reducing secondary chrome, gaps, and card size within readability bounds. Do not replace normal hands with tiny summary icons merely to make the layout fit.
+
+Historical 5P/6P density evidence remains useful engineering evidence, but it does not certify the current 4P–6P UX for beta.1.
 
 ### Landscape / tablet
 

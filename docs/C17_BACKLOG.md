@@ -1,6 +1,6 @@
-# C17 Post-release Backlog
+# C17 Post-beta Backlog
 
-Date: 2026-09-11
+Date: 2026-09-22
 
 These items were explicitly removed from the C17 release gate during product review. They must not silently re-enter C17 acceptance work unless separately reprioritized.
 
@@ -12,7 +12,7 @@ These items were explicitly removed from the C17 release gate during product rev
 - Dedicated one-tap `Clued`, `Unclued`, and `Blank` controls.
 - Deep Knowledge workspace beyond ordinary on-card knowledge/empathy.
 - Two-card / two-hand compare flows.
-- All comparison pins, including Compact Overview pinning.
+- All comparison pins.
 
 ## Clue planning
 
@@ -28,6 +28,7 @@ These items were explicitly removed from the C17 release gate during product rev
 
 ## Layout / presentation
 
+- **4P–6P dense gameplay redesign:** replace the current Compact Overview / summary-icon fallback with a real-card-face layout. Cards take priority over chrome; reduce secondary controls, gaps, and card size within readability bounds before considering alternate representations.
 - Dedicated two-column landscape composition.
 - Dedicated tablet / large-screen persistent side-pane composition and polish.
 - Richer / prettier / cinematic gameplay animations beyond the minimal functional C17 transitions.
@@ -43,7 +44,6 @@ These items were explicitly removed from the C17 release gate during product rev
 
 For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 
-- Compact Overview as a constrained-phone fallback, without pins.
 - Live Rewind/history.
 - Finished game and ordinary replay in the C17 workspace.
 - Shared review including follow/detach/leader semantics.

@@ -8,7 +8,7 @@ Build an Android-first React Native client for hanab.live that connects to the e
 
 For C17 gameplay and product presentation, the authoritative specification is `docs/C17_UX_CONTRACT.md`.
 
-- `docs/C17_UX_DECISIONS.md` records the ratified product decisions behind v1.1.
+- `docs/C17_UX_DECISIONS.md` records the ratified product decisions and later beta-scope revisions behind the current v1.2 baseline.
 - `docs/C17_VALIDATION.md` records unresolved on-device validation gates and physical results.
 - `docs/MOBILE_GAMEPLAY_REDESIGN.md` is historical/preliminary and is subordinate to the C17 contract where presentation or gesture decisions conflict.
 - C16 presentation decisions are also subordinate to the C17 contract where they conflict.

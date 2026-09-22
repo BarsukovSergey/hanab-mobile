@@ -9,9 +9,13 @@ This file records explicit product decisions made while reviewing C17 discrepanc
 
 **ACCEPT.** Keep a stable table/hand ledger plus reserved Workbench. Workbench mode changes do not move/resize hands or cards.
 
-## D02 — Dense phone layout / Compact Overview
+## D02 — Dense phone layout / 4P–6P scope
 
-**ACCEPT WITH FALLBACK.** Full Ledger is preferred when readable. Compact Overview remains a C17 safety fallback for constrained phone/window/text-scale classes. Comparison pins are backlog.
+**REVISED FOR BETA.1.** The first beta acceptance scope is 2P/3P. Those layouts keep real card faces and prioritize gameplay cards over secondary chrome.
+
+4P–6P dense gameplay is deferred until after the first beta. The current Compact Overview / summary-icon implementation is not accepted as the final 4P–6P UX. When this work resumes, preserve real card faces and reclaim space through card sizing, gaps, and chrome before considering any alternative representation.
+
+Comparison pins remain backlog.
 
 ## D03 — Landscape / tablet
 
