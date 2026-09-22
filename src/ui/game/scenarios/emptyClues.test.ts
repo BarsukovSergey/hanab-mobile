@@ -33,8 +33,8 @@ describe('Empty Clues acceptance', () => {
     expect(disabledChoices.allowEmptyClues).toBe(false);
     expect(enabledChoices.allowEmptyClues).toBe(true);
 
-    expect(isCluePreviewConfirmable(disabledPreview, disabledChoices.allowEmptyClues)).toBe(false);
-    expect(isCluePreviewConfirmable(enabledPreview, enabledChoices.allowEmptyClues)).toBe(true);
+    expect(isCluePreviewConfirmable(disabledPreview, disabledChoices.allowEmptyClues, 'No Variant')).toBe(false);
+    expect(isCluePreviewConfirmable(enabledPreview, enabledChoices.allowEmptyClues, 'No Variant')).toBe(true);
   });
 
   test('keeps both modifier states directly inspectable in the developer gallery fixtures', () => {

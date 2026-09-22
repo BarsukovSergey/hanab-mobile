@@ -11,6 +11,7 @@ const baseCard = {
   location: 0,
   suitIndex: 0,
   rank: 2,
+  numPositiveClues: 0,
   isKnownTrashFromEmpathy: false,
   inDoubleDiscard: false,
 } as unknown as CardState;
@@ -20,6 +21,8 @@ const baseNote = {
   needsFix: false,
   questionMark: false,
   exclamationMark: false,
+  blank: false,
+  chopMoved: false,
 } as CardNote;
 
 function gameWith(status: CardStatus): GameState {
@@ -29,68 +32,168 @@ function gameWith(status: CardStatus): GameState {
   return { cardStatus } as unknown as GameState;
 }
 
+function presentation({
+  status = CardStatus.NeedsToBePlayed,
+  state = baseCard,
+  note = baseNote,
+  displaySuitIndex = 0,
+  displayRank = 2,
+  empathy = false,
+  finished = false,
+  variantName = 'No Variant',
+  speedrun = false,
+  hyphenatedConventions = false,
+  hardVariant = false,
+}: {
+  status?: CardStatus;
+  state?: CardState;
+  note?: CardNote;
+  displaySuitIndex?: number | null;
+  displayRank?: number | null;
+  empathy?: boolean;
+  finished?: boolean;
+  variantName?: string;
+  speedrun?: boolean;
+  hyphenatedConventions?: boolean;
+  hardVariant?: boolean;
+} = {}) {
+  return getCardStatePresentation({
+    game: gameWith(status),
+    state,
+    note,
+    displaySuitIndex,
+    displayRank,
+    empathy,
+    finished,
+    variantName,
+    speedrun,
+    hyphenatedConventions,
+    hardVariant,
+  });
+}
+
 describe('getCardStatePresentation', () => {
-  test('keeps engine trash separate from personal KT', () => {
-    expect(getCardStatePresentation({
-      game: gameWith(CardStatus.Trash),
-      state: baseCard,
-      note: baseNote,
-      displaySuitIndex: 0,
-      displayRank: 2,
-      empathy: false,
-      finished: false,
-    })).toMatchObject({ engineTrash: true, critical: false, knownTrashNote: false });
-
-    expect(getCardStatePresentation({
-      game: gameWith(CardStatus.NeedsToBePlayed),
-      state: baseCard,
-      note: { ...baseNote, knownTrash: true },
-      displaySuitIndex: 0,
-      displayRank: 2,
-      empathy: false,
-      finished: false,
-    })).toMatchObject({ engineTrash: false, critical: false, knownTrashNote: true });
-  });
-
-  test('shows critical as its own authoritative status', () => {
-    expect(getCardStatePresentation({
-      game: gameWith(CardStatus.Critical),
-      state: baseCard,
-      note: baseNote,
-      displaySuitIndex: 0,
-      displayRank: 2,
-      empathy: false,
-      finished: false,
-    })).toMatchObject({ engineTrash: false, critical: true, knownTrashNote: false });
-  });
-
-  test('hides personal note markers in empathy but retains empathy-known trash', () => {
-    const state = { ...baseCard, isKnownTrashFromEmpathy: true } as CardState;
-    expect(getCardStatePresentation({
-      game: gameWith(CardStatus.NeedsToBePlayed),
-      state,
-      note: { ...baseNote, knownTrash: true, needsFix: true, questionMark: true },
-      displaySuitIndex: null,
-      displayRank: null,
-      empathy: true,
-      finished: false,
-    })).toMatchObject({
-      knownTrashNote: false,
-      knownTrashFromEmpathy: true,
-      needsFix: false,
-      questionMark: false,
+  test('fades an ordinary unclued engine-trash card', () => {
+    expect(presentation({ status: CardStatus.Trash })).toMatchObject({
+      engineTrash: true,
+      shouldFade: true,
     });
   });
 
-  test('does not infer engine trash or critical without a visible identity', () => {
-    expect(getCardStatePresentation({
-      game: gameWith(CardStatus.Trash),
-      state: baseCard,
-      note: baseNote,
+  test('does not fade a clued engine-trash card', () => {
+    expect(presentation({
+      status: CardStatus.Trash,
+      state: { ...baseCard, numPositiveClues: 1 } as CardState,
+    }).shouldFade).toBe(false);
+  });
+
+  test('does not fade a played or discarded engine-trash card', () => {
+    expect(presentation({
+      status: CardStatus.Trash,
+      state: { ...baseCard, location: 'playStack' } as CardState,
+    }).shouldFade).toBe(false);
+    expect(presentation({
+      status: CardStatus.Trash,
+      state: { ...baseCard, location: 'discard' } as CardState,
+    }).shouldFade).toBe(false);
+  });
+
+  test('does not fade blank or chop-moved engine-trash cards', () => {
+    expect(presentation({
+      status: CardStatus.Trash,
+      note: { ...baseNote, blank: true } as CardNote,
+    }).shouldFade).toBe(false);
+    expect(presentation({
+      status: CardStatus.Trash,
+      note: { ...baseNote, chopMoved: true } as CardNote,
+    }).shouldFade).toBe(false);
+  });
+
+  test('does not fade engine-trash cards in Throw It in a Hole or speedrun', () => {
+    expect(presentation({
+      status: CardStatus.Trash,
+      variantName: 'Throw It in a Hole (5 Suits)',
+    }).shouldFade).toBe(false);
+    expect(presentation({ status: CardStatus.Trash, speedrun: true }).shouldFade).toBe(false);
+  });
+
+  test('a visible zero-clue KT marker forces fade independently of engine status', () => {
+    expect(presentation({
+      note: { ...baseNote, knownTrash: true } as CardNote,
+    })).toMatchObject({
+      engineTrash: false,
+      knownTrashNote: true,
+      shouldFade: true,
+    });
+  });
+
+  test('does not apply the KT override when its marker is suppressed', () => {
+    expect(presentation({
+      note: { ...baseNote, knownTrash: true } as CardNote,
+      empathy: true,
+    })).toMatchObject({ knownTrashNote: false, shouldFade: false });
+  });
+
+  test('retains personal marker visibility rules', () => {
+    const note = {
+      ...baseNote,
+      knownTrash: true,
+      needsFix: true,
+      questionMark: true,
+      exclamationMark: true,
+    } as CardNote;
+    expect(presentation({ note })).toMatchObject({
+      knownTrashNote: true,
+      needsFix: true,
+      questionMark: true,
+      exclamationMark: true,
+    });
+    expect(presentation({ note, empathy: true })).toMatchObject({
+      knownTrashNote: false,
+      needsFix: false,
+      questionMark: false,
+      exclamationMark: false,
+    });
+  });
+
+  test('keeps critical and empathy-known-trash indicators independent from fade', () => {
+    expect(presentation({ status: CardStatus.Critical })).toMatchObject({
+      engineTrash: false,
+      critical: true,
+      shouldFade: false,
+    });
+    expect(presentation({
+      state: { ...baseCard, isKnownTrashFromEmpathy: true } as CardState,
       displaySuitIndex: null,
-      displayRank: 2,
-      empathy: false,
-      finished: false,
-    })).toMatchObject({ engineTrash: false, critical: false });
+      displayRank: null,
+      empathy: true,
+    })).toMatchObject({ knownTrashFromEmpathy: true, shouldFade: false });
+  });
+
+  test('does not infer engine trash or fade without a visible identity', () => {
+    expect(presentation({
+      status: CardStatus.Trash,
+      displaySuitIndex: null,
+    })).toMatchObject({ engineTrash: false, critical: false, shouldFade: false });
+  });
+
+  test('shows DDA only for non-hard hyphenated-convention variants', () => {
+    const state = { ...baseCard, inDoubleDiscard: true } as CardState;
+    expect(presentation({ state }).doubleDiscard).toBe(false);
+    expect(presentation({ state, hyphenatedConventions: true, hardVariant: true }).doubleDiscard).toBe(false);
+    expect(presentation({ state, hyphenatedConventions: true }).doubleDiscard).toBe(true);
+  });
+
+  test('retains Critical and empathy-known-trash DDA suppression', () => {
+    const options = { hyphenatedConventions: true };
+    expect(presentation({
+      ...options,
+      status: CardStatus.Critical,
+      state: { ...baseCard, inDoubleDiscard: true } as CardState,
+    }).doubleDiscard).toBe(false);
+    expect(presentation({
+      ...options,
+      state: { ...baseCard, inDoubleDiscard: true, isKnownTrashFromEmpathy: true } as CardState,
+    }).doubleDiscard).toBe(false);
   });
 });

@@ -8,6 +8,11 @@ import { UPSTREAM_COMMIT, UPSTREAM_REPOSITORY } from './upstreamPin.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CACHE_DIR = path.join(ROOT, '.cache', 'hanabi-live-card-assets');
 const OUTPUT_DIR = path.join(ROOT, 'assets', 'cards', 'upstream');
+const UI_OUTPUT_DIR = path.join(ROOT, 'assets', 'ui', 'upstream');
+const UI_ASSET_FILES = [
+  'critical.png', 'trashcan2.png', 'wastebasket.png', 'dda.png', 'wrench.png',
+  'question-mark2.png', 'exclamation-mark.png', 'note.png',
+];
 const RUNNER = path.join(ROOT, 'tools', 'card-assets', 'runUpstream.ts');
 const READY_MARKER = path.join(CACHE_DIR, '.git', 'hanab-mobile-card-assets-ready');
 const checkOnly = process.argv.includes('--check');
@@ -102,7 +107,9 @@ async function main() {
 
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'hanab-card-assets-'));
   const generatedDir = path.join(tempRoot, 'upstream');
+  const generatedUiDir = path.join(tempRoot, 'ui-upstream');
   await mkdir(generatedDir, { recursive: true });
+  await mkdir(generatedUiDir, { recursive: true });
 
   try {
     run(
@@ -110,9 +117,13 @@ async function main() {
       ['--no-install', 'tsx', RUNNER, CACHE_DIR, generatedDir, UPSTREAM_COMMIT],
       CACHE_DIR,
     );
+    for (const filename of UI_ASSET_FILES) {
+      await cp(path.join(CACHE_DIR, 'public', 'img', filename), path.join(generatedUiDir, filename));
+    }
 
     if (checkOnly) {
       await assertDirectoriesEqual(OUTPUT_DIR, generatedDir);
+      await assertDirectoriesEqual(UI_OUTPUT_DIR, generatedUiDir);
       console.log('Card assets match the pinned upstream renderer.');
       return;
     }
@@ -120,6 +131,9 @@ async function main() {
     await rm(OUTPUT_DIR, { recursive: true, force: true });
     await mkdir(path.dirname(OUTPUT_DIR), { recursive: true });
     await cp(generatedDir, OUTPUT_DIR, { recursive: true });
+    await rm(UI_OUTPUT_DIR, { recursive: true, force: true });
+    await mkdir(path.dirname(UI_OUTPUT_DIR), { recursive: true });
+    await cp(generatedUiDir, UI_OUTPUT_DIR, { recursive: true });
     console.log(`Generated card assets from ${UPSTREAM_COMMIT}.`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

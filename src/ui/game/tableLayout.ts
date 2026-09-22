@@ -7,6 +7,10 @@ export type CompactTableFireworksLayout = {
   readonly usedWidth: number;
 };
 
+export function getCompactTableFireworkCellWidth(stackWidth: number): number {
+  return stackWidth;
+}
+
 export function getCompactTableFireworksLayout(
   fireworksWidth: number,
   suitCount: number,

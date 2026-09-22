@@ -19,7 +19,7 @@ import type {
   Pause,
   Clock,
 } from '../protocol/gameProtocol';
-import type { NoteAction } from '../game/client/types/actions';
+import type { ActionIncludingHypothetical, NoteAction } from '../game/client/types/actions';
 import { lobbyActions } from './lobbySlice';
 import { sessionActions } from './sessionSlice';
 
@@ -80,6 +80,17 @@ type PendingCreate = {
   stagedGame: PregameGame | null;
 };
 
+type PendingRoleSwitch = {
+  tableID: number;
+  targetRole: 'player' | 'spectator';
+  leaveSent: boolean;
+  spectateSent: boolean;
+  rejected: boolean;
+  leftConfirmed: boolean;
+  joinedConfirmed: boolean;
+  stagedGame: PregameGame | null;
+};
+
 type RematchTransition = {
   oldTableID: number;
   originalPlayerNames: string[];
@@ -101,6 +112,7 @@ export type RoomSliceState = {
   recoveryStagedGame: PregameGame | null;
   pendingJoin: PendingJoin | null;
   pendingCreate: PendingCreate | null;
+  pendingRoleSwitch: PendingRoleSwitch | null;
   pendingLeaveTableID: number | null;
   pendingUnattendTableID: number | null;
   pendingStart: {
@@ -119,6 +131,12 @@ export type RoomSliceState = {
     gameLoadEpoch: number;
     action: ClientGameplayAction;
   } | null;
+  pendingHypotheticalOperation: {
+    connectionEpoch: number;
+    tableID: number;
+    gameLoadEpoch: number;
+    finalAction: ActionIncludingHypothetical;
+  } | null;
   room: RoomState;
 };
 
@@ -130,6 +148,7 @@ const initialState: RoomSliceState = {
   recoveryStagedGame: null,
   pendingJoin: null,
   pendingCreate: null,
+  pendingRoleSwitch: null,
   pendingLeaveTableID: null,
   pendingUnattendTableID: null,
   pendingStart: null,
@@ -139,16 +158,39 @@ const initialState: RoomSliceState = {
   pendingRestartHidePregame: null,
   rematchTransition: null,
   pendingGameplayAction: null,
+  pendingHypotheticalOperation: null,
   room: { kind: 'none' },
 };
+
+function hypotheticalActionsEqual(
+  first: ActionIncludingHypothetical,
+  second: ActionIncludingHypothetical,
+): boolean {
+  return JSON.stringify(first) === JSON.stringify(second);
+}
 
 function clearC4BState(state: RoomSliceState): void {
   state.pendingJoin = null;
   state.pendingCreate = null;
+  state.pendingRoleSwitch = null;
   state.pendingLeaveTableID = null;
   state.pendingStart = null;
   state.pendingUpdate = null;
   state.pendingLeaderName = null;
+}
+
+function completeRoleSwitchIfConfirmed(state: RoomSliceState): void {
+  const pending = state.pendingRoleSwitch;
+  if (
+    pending === null || !pending.joinedConfirmed || pending.stagedGame === null
+    || (pending.targetRole === 'spectator' && !pending.leftConfirmed)
+    || (pending.targetRole === 'player') !== pending.stagedGame.players.some((player) => player.you)
+    || state.room.kind !== 'pregame' || state.room.tableID !== pending.tableID
+  ) return;
+  state.room = {
+    kind: 'pregame', tableID: pending.tableID, role: pending.targetRole, data: pending.stagedGame,
+  };
+  state.pendingRoleSwitch = null;
 }
 
 export const roomSlice = createSlice({
@@ -242,12 +284,64 @@ export const roomSlice = createSlice({
         stagedGame: null,
       };
     },
+    roleSwitchRequested(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; targetRole: 'player' | 'spectator' }>,
+    ) {
+      if (
+        state.connectionEpoch !== action.payload.epoch
+        || state.room.kind !== 'pregame'
+        || state.room.tableID !== action.payload.tableID
+        || state.room.role === action.payload.targetRole
+        || state.pendingRoleSwitch !== null
+      ) return;
+      state.pendingRoleSwitch = {
+        tableID: action.payload.tableID,
+        targetRole: action.payload.targetRole,
+        leaveSent: false,
+        spectateSent: false,
+        rejected: false,
+        leftConfirmed: action.payload.targetRole === 'player',
+        joinedConfirmed: false,
+        stagedGame: null,
+      };
+    },
+    roleSwitchLeaveSent(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      if (
+        state.connectionEpoch === action.payload.epoch
+        && state.pendingRoleSwitch?.tableID === action.payload.tableID
+        && state.pendingRoleSwitch.targetRole === 'spectator'
+      ) state.pendingRoleSwitch.leaveSent = true;
+    },
+    roleSwitchSpectateSent(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      if (
+        state.connectionEpoch === action.payload.epoch
+        && state.pendingRoleSwitch?.tableID === action.payload.tableID
+        && state.pendingRoleSwitch.targetRole === 'spectator'
+      ) state.pendingRoleSwitch.spectateSent = true;
+    },
+    roleSwitchCancelled(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      if (
+        state.connectionEpoch === action.payload.epoch
+        && state.pendingRoleSwitch?.tableID === action.payload.tableID
+        && !state.pendingRoleSwitch.leaveSent
+      ) state.pendingRoleSwitch = null;
+    },
     joinedReceived(
       state,
       action: PayloadAction<{ epoch: number; joined: TableJoined }>,
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (state.room.kind === 'awaiting_game_bootstrap') return;
+      const pendingRoleSwitch = state.pendingRoleSwitch;
+      if (
+        state.room.kind === 'pregame'
+        && pendingRoleSwitch?.tableID === action.payload.joined.tableID
+      ) {
+        pendingRoleSwitch.joinedConfirmed = true;
+        completeRoleSwitchIfConfirmed(state);
+        return;
+      }
       if (state.room.kind !== 'none') return;
 
       const rematch = state.rematchTransition;
@@ -374,6 +468,15 @@ export const roomSlice = createSlice({
           const pendingUpdate = state.pendingUpdate;
           const previousOwner = state.room.data.owner;
           state.room.data = game;
+          const pendingRoleSwitch = state.pendingRoleSwitch;
+          if (
+            pendingRoleSwitch?.tableID === game.tableID
+            && (pendingRoleSwitch.targetRole === 'player' || pendingRoleSwitch.leftConfirmed)
+          ) {
+            pendingRoleSwitch.stagedGame = game;
+            completeRoleSwitchIfConfirmed(state);
+            if (state.room.kind !== 'pregame') return;
+          }
           if (
             pendingUpdate?.tableID === game.tableID
             && pendingUpdate.name === game.name
@@ -455,6 +558,7 @@ export const roomSlice = createSlice({
         || state.room.tableID !== tableID
         || state.room.data.owner !== ownerUserID
         || intendedPlayers.length < 2
+        || state.pendingRoleSwitch !== null
         || state.pendingStart !== null
         || state.pendingLeaveTableID !== null
       ) return;
@@ -482,6 +586,7 @@ export const roomSlice = createSlice({
         || state.room.role !== 'player'
         || state.room.tableID !== action.payload.tableID
         || state.room.data.owner !== action.payload.ownerUserID
+        || state.pendingRoleSwitch !== null
         || state.pendingUpdate !== null
       ) return;
       state.pendingUpdate = {
@@ -496,7 +601,7 @@ export const roomSlice = createSlice({
       action: PayloadAction<{
         epoch: number;
         tableID: number;
-        ownerUserID: number;
+        requesterUserID: number;
         name: string;
       }>,
     ) {
@@ -505,9 +610,15 @@ export const roomSlice = createSlice({
         || state.room.kind !== 'pregame'
         || state.room.role !== 'player'
         || state.room.tableID !== action.payload.tableID
-        || state.room.data.owner !== action.payload.ownerUserID
-        || !state.room.data.players.some((player) => player.name === action.payload.name)
+        || state.pendingRoleSwitch !== null
         || state.pendingLeaderName !== null
+      ) return;
+      const requesterIsOwner = state.room.data.owner === action.payload.requesterUserID;
+      const target = state.room.data.players.find((player) => player.name === action.payload.name);
+      if (
+        state.room.data.players[0]?.name === action.payload.name
+        || target === undefined
+        || (!requesterIsOwner && !target.you)
       ) return;
       state.pendingLeaderName = action.payload.name;
     },
@@ -582,6 +693,7 @@ export const roomSlice = createSlice({
       ) rematch.stagedGame = null;
       rematch.newTableID = action.payload.tableID;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
       if (oldReplayStillVisible) state.room = { kind: 'none' };
     },
@@ -601,6 +713,7 @@ export const roomSlice = createSlice({
       state.recoveryJoinedConfirmed = false;
       state.recoveryStagedGame = null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
     },
     commandPendingCleared(state, action: PayloadAction<{ epoch: number }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -610,6 +723,16 @@ export const roomSlice = createSlice({
       state.recoveryStagedGame = null;
       state.pendingJoin = null;
       state.pendingCreate = null;
+      const pendingRoleSwitch = state.pendingRoleSwitch;
+      if (pendingRoleSwitch?.targetRole === 'spectator' && pendingRoleSwitch.leaveSent) {
+        pendingRoleSwitch.rejected = true;
+        if (pendingRoleSwitch.leftConfirmed) {
+          state.pendingRoleSwitch = null;
+          state.room = { kind: 'none' };
+        }
+      } else {
+        state.pendingRoleSwitch = null;
+      }
       state.pendingLeaveTableID = null;
       state.pendingStart = null;
       state.pendingUnattendTableID = null;
@@ -627,6 +750,7 @@ export const roomSlice = createSlice({
       if (
         state.room.kind !== 'pregame'
         || state.room.tableID !== action.payload.tableID
+        || state.pendingRoleSwitch !== null
         || state.pendingLeaveTableID !== null
         || state.pendingStart !== null
       ) return;
@@ -658,6 +782,7 @@ export const roomSlice = createSlice({
       state.pendingUnattendTableID = null;
       state.pendingLeaveTableID = null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.room = { kind: 'none' };
     },
     leftReceived(
@@ -667,6 +792,20 @@ export const roomSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       if (state.room.kind === 'awaiting_game_bootstrap') return;
       const tableID = action.payload.left.TableID;
+      const pendingRoleSwitch = state.pendingRoleSwitch;
+      if (
+        state.room.kind === 'pregame'
+        && state.room.tableID === tableID
+        && pendingRoleSwitch?.tableID === tableID
+        && pendingRoleSwitch.targetRole === 'spectator'
+      ) {
+        pendingRoleSwitch.leftConfirmed = true;
+        if (pendingRoleSwitch.rejected || !pendingRoleSwitch.spectateSent) {
+          state.pendingRoleSwitch = null;
+          state.room = { kind: 'none' };
+        }
+        return;
+      }
       if (
         state.room.kind !== 'pregame'
         || state.room.tableID !== tableID
@@ -674,6 +813,7 @@ export const roomSlice = createSlice({
       ) return;
 
       state.pendingLeaveTableID = null;
+      state.pendingHypotheticalOperation = null;
       state.room = { kind: 'none' };
     },
     tableStartReceived(
@@ -745,6 +885,7 @@ export const roomSlice = createSlice({
       state.rematchTransition = null;
       clearC4BState(state);
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.room = {
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
@@ -778,6 +919,7 @@ export const roomSlice = createSlice({
       ) return;
       clearC4BState(state);
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.room = {
         kind: 'awaiting_game_bootstrap',
         tableID: tableStart.tableID,
@@ -1186,6 +1328,65 @@ export const roomSlice = createSlice({
       });
       state.room.clientState = castDraft(next);
     },
+    hypotheticalStarted(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; showDrawnCards: boolean; actions: readonly ActionIncludingHypothetical[] }>,
+    ) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || !state.room.clientState.replay.active
+        || state.room.clientState.replay.hypothetical !== null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'hypoStart', showDrawnCards: payload.showDrawnCards, actions: payload.actions,
+      }));
+      state.pendingHypotheticalOperation = null;
+    },
+    hypotheticalEnded(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, { type: 'hypoEnd' }));
+      state.pendingHypotheticalOperation = null;
+    },
+    hypotheticalActionReceived(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; action: ActionIncludingHypothetical }>,
+    ) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, { type: 'hypoAction', action: payload.action }));
+      const pending = state.pendingHypotheticalOperation;
+      if (
+        pending !== null
+        && pending.connectionEpoch === payload.epoch
+        && pending.tableID === payload.tableID
+        && pending.gameLoadEpoch === state.room.gameLoadEpoch
+        && hypotheticalActionsEqual(pending.finalAction, payload.action)
+      ) state.pendingHypotheticalOperation = null;
+    },
+    hypotheticalBackReceived(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, { type: 'hypoBack' }));
+    },
+    hypotheticalDrawnCardsChanged(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; showDrawnCards: boolean }>,
+    ) {
+      const payload = action.payload;
+      if (state.connectionEpoch !== payload.epoch || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID || state.room.clientState.replay.hypothetical === null) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'hypoShowDrawnCards', showDrawnCards: payload.showDrawnCards,
+      }));
+    },
     clientStateAccepted(
       state,
       action: PayloadAction<{
@@ -1208,6 +1409,7 @@ export const roomSlice = createSlice({
       state.room.clientState = castDraft(payload.clientState);
       state.room.sharedReplay = payload.clientState.replay.shared !== null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
     },
     gameHistoryAccepted(
       state,
@@ -1267,6 +1469,44 @@ export const roomSlice = createSlice({
       ) return;
       state.pendingGameplayAction = null;
     },
+    hypotheticalOperationRequested(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+        finalAction: ActionIncludingHypothetical;
+      }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.connectionEpoch
+        || state.pendingHypotheticalOperation !== null
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.gameLoadEpoch !== payload.gameLoadEpoch
+        || state.room.clientState.replay.shared === null
+        || state.room.clientState.replay.hypothetical === null
+      ) return;
+      state.pendingHypotheticalOperation = castDraft(payload);
+    },
+    hypotheticalOperationPendingCleared(
+      state,
+      action: PayloadAction<{
+        connectionEpoch: number;
+        tableID: number;
+        gameLoadEpoch: number;
+      }>,
+    ) {
+      const pending = state.pendingHypotheticalOperation;
+      if (
+        pending === null
+        || pending.connectionEpoch !== action.payload.connectionEpoch
+        || pending.tableID !== action.payload.tableID
+        || pending.gameLoadEpoch !== action.payload.gameLoadEpoch
+      ) return;
+      state.pendingHypotheticalOperation = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(lobbyActions.tableGone, (state, action) => {
@@ -1281,6 +1521,7 @@ export const roomSlice = createSlice({
         && state.room.tableID === rematch.oldTableID
       ) state.room = { kind: 'none' };
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
     });
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
@@ -1290,6 +1531,7 @@ export const roomSlice = createSlice({
       state.recoveryJoinedConfirmed = false;
       state.recoveryStagedGame = null;
       state.pendingGameplayAction = null;
+      state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
       state.pendingRestartTableID = null;
       state.pendingRestartHidePregame = null;
@@ -1302,11 +1544,13 @@ export const roomSlice = createSlice({
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
+        state.pendingHypotheticalOperation = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
         state.pendingRestartHidePregame = null;
         state.pendingUpdate = null;
         state.pendingLeaderName = null;
+        state.pendingRoleSwitch = null;
       }
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
@@ -1314,11 +1558,13 @@ export const roomSlice = createSlice({
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
+        state.pendingHypotheticalOperation = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
         state.pendingRestartHidePregame = null;
         state.pendingUpdate = null;
         state.pendingLeaderName = null;
+        state.pendingRoleSwitch = null;
       }
     });
     builder.addCase(sessionActions.signedOut, () => initialState);

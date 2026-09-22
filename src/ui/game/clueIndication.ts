@@ -49,6 +49,24 @@ export function getCommittedClueMarker(
   };
 }
 
+export function getPreviewClueMarker(
+  preview: { type: 'color' | 'rank'; value: number } | null,
+  numPositiveClues: number,
+  choices: GameplayClueChoices | null,
+): ClueCardMarker | null {
+  if (preview === null) return null;
+  const choice = preview.type === 'rank'
+    ? choices?.ranks.find((candidate) => candidate.value === preview.value)
+    : choices?.colors.find((candidate) => candidate.value === preview.value);
+  const fullLabel = choice?.label ?? (preview.type === 'rank' ? String(preview.value) : `C${preview.value + 1}`);
+  return {
+    kind: preview.type,
+    value: preview.value,
+    label: preview.type === 'rank' ? getRankBadgeLabel(fullLabel, preview.value) : fullLabel,
+    retouched: numPositiveClues >= 1,
+  };
+}
+
 function getRankBadgeLabel(label: string, value: number): string {
   if (label === 'Odd') return 'O';
   if (label === 'Even') return 'E';

@@ -29,6 +29,7 @@ import {
 } from './src/ui/designSystem';
 import { GameScreen } from './src/ui/game/GameScreen';
 import { LastClueNotice } from './src/ui/game/LastClueNotice';
+import { TerminationControls } from './src/ui/game/TerminationControls';
 import { isC17WorkspaceEligible } from './src/ui/game/c17Workspace';
 import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
@@ -211,14 +212,29 @@ function AppContent() {
 
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
+    const liveClientState = roomState.room.clientState;
     const liveConnectionProblem = session.phase === 'failed' || session.phase === 'closed';
-    const c17DensePortrait = isC17WorkspaceEligible({
-      isPlayer: roomState.room.role === 'player' && roomState.room.clientState.playing,
+    const pauseEligible = session.phase === 'ready'
+      && roomState.room.role === 'player'
+      && !roomState.room.sharedReplay
+      && !liveClientState.finished
+      && !liveClientState.replay.active
+      && liveClientState.ongoingGame.turn.currentPlayerIndex !== null
+      && liveClientState.metadata.options.timed;
+    const pauseLabel = liveClientState.pause.active
+      ? 'Unpause'
+      : liveClientState.ongoingGame.turn.currentPlayerIndex === liveClientState.metadata.ourPlayerIndex
+        ? 'Pause'
+        : liveClientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
+    const c17Workspace = isC17WorkspaceEligible({
+      isLiveParticipant: true,
       playerCount: roomState.room.clientState.metadata.playerNames.length,
-      portrait: width <= height,
+      portrait: true,
       finished: roomState.room.clientState.finished,
       replayActive: roomState.room.clientState.replay.active,
+      sharedReplay: roomState.room.sharedReplay,
     });
+    const gameRootScrollable = !c17Workspace || width > height || height < 700;
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -236,17 +252,6 @@ function AppContent() {
           </View>}
           <View style={[styles.headerActions, landscapePhone && styles.headerActionsLandscape]}>
             <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
-            <ActionButton
-              compact
-              disabled={roomState.pendingUnattendTableID !== null}
-              title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving…'}
-              onPress={() => {
-                setLiveSheet(null);
-                setReturnAfterUnattend(null);
-                setLocalScreen('lobby');
-                lobbyRuntime.unattendLiveGame(liveTableID);
-              }}
-            />
           </View>
         </View>
         {liveConnectionProblem && (
@@ -256,18 +261,22 @@ function AppContent() {
           </View>
         )}
         <SafeAreaView edges={['bottom']} style={styles.flex}>
-        {c17DensePortrait
-          ? <View style={[styles.gameWorkspace, { maxWidth: contentMaxWidth }]}>
-            <GameScreen />
-          </View>
-          : <ScrollView contentContainerStyle={[
+        <ScrollView
+          contentContainerStyle={[
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
+          c17Workspace && styles.gameContainerC17,
           { maxWidth: contentMaxWidth },
-        ]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-          <LastClueNotice />
-          <GameScreen />
-          </ScrollView>}
+          ]}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={gameRootScrollable}
+        >
+          {!c17Workspace && <LastClueNotice />}
+          <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
+            <GameScreen />
+          </View>
+        </ScrollView>
         </SafeAreaView>
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
           <View style={styles.sheetBackdrop}>
@@ -277,6 +286,25 @@ function AppContent() {
                   <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
                   <View style={styles.menuActions}>
                     <ActionButton title="Table chat" onPress={() => setLiveSheet('chat')} />
+                    <SectionHeading title="Players" detail={liveClientState.metadata.playerNames.join(', ')} />
+                    <SectionHeading
+                      title={`Spectators (${liveClientState.spectators.length})`}
+                      detail={liveClientState.spectators.length === 0
+                        ? 'No spectators'
+                        : liveClientState.spectators.map((spectator) => spectator.name).join(', ')}
+                    />
+                    <ActionButton
+                      disabled={roomState.pendingUnattendTableID !== null}
+                      title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
+                      onPress={() => {
+                        setLiveSheet(null);
+                        setReturnAfterUnattend(null);
+                        setLocalScreen('lobby');
+                        lobbyRuntime.unattendLiveGame(liveTableID);
+                      }}
+                    />
+                    {pauseEligible && <ActionButton title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />}
+                    <TerminationControls />
                     <ActionButton title="Settings" onPress={() => setLiveSheet('settings')} />
                     <ActionButton title="Sign out" tone="ghost" onPress={() => void signOut()} />
                   </View>
@@ -372,8 +400,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
+  gameContainerC17: { flex: 1 },
   gameContainerLandscape: { gap: 4, paddingBottom: 10, paddingHorizontal: 8, paddingTop: 4 },
   gameWorkspace: { alignSelf: 'center', flex: 1, paddingBottom: 10, paddingHorizontal: 10, paddingTop: 7, width: '100%' },
+  gameWorkspaceC17: { paddingHorizontal: 0 },
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },

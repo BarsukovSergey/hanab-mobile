@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { lobbyRuntime } from '../runtime/application';
+import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
 import { useAppSelector } from '../store/hooks';
 import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
-import { TerminationControls } from './game/TerminationControls';
 
 type Props = {
   room: string;
@@ -19,6 +19,10 @@ export function ChatPanel({ room, title }: Props) {
   const historyRef = useRef<ScrollView>(null);
   const ready = useAppSelector((state) => state.session.phase === 'ready');
   const messages = useAppSelector((state) => state.chat.messagesByRoom[room] ?? EMPTY_MESSAGES);
+  const pregameRoom = useAppSelector((state) => state.room.room.kind === 'pregame'
+    ? state.room.room : null);
+  const authenticatedUserID = useAppSelector((state) => state.session.authenticatedUser?.userID);
+  const pendingUpdate = useAppSelector((state) => state.room.pendingUpdate);
   const trimmed = draft.trim();
 
   const send = () => {
@@ -31,7 +35,6 @@ export function ChatPanel({ room, title }: Props) {
 
   return (
     <Panel>
-      <TerminationControls />
       <SectionHeading title={title} detail={ready ? 'Connected' : 'Chat reconnecting…'} />
       <ScrollView
         contentContainerStyle={styles.historyContent}
@@ -46,12 +49,34 @@ export function ChatPanel({ room, title }: Props) {
             ? ''
             : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const author = message.server ? 'Server' : message.who ?? 'Hanab';
+          const proposal = parseServerTableProposal({ server: message.server, msg: message.rawMsg });
+          const isOwnerInThisTable = pregameRoom !== null
+            && room === `table${pregameRoom.tableID}`
+            && authenticatedUserID === pregameRoom.data.owner;
+          const alreadyApplied = proposal !== null && pregameRoom !== null
+            && tableProposalMatches(proposal, pregameRoom.data);
+          const canApplyProposal = proposal !== null && isOwnerInThisTable
+            && pendingUpdate === null && !alreadyApplied;
           return (
-            <Text key={`${message.datetime}-${index}`} style={[styles.message, { color: theme.colors.text }]}>
-              <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
-                {time.length > 0 ? `${time} ` : ''}{author}: </Text>
-              {message.msg}
-            </Text>
+            <View key={`${message.datetime}-${index}`} style={styles.messageRow}>
+              <Text style={[styles.message, { color: theme.colors.text }]}>
+                <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
+                  {time.length > 0 ? `${time} ` : ''}{author}: </Text>
+                {message.msg}
+              </Text>
+              {proposal !== null && isOwnerInThisTable && (
+                <ActionButton
+                  compact
+                  disabled={!canApplyProposal}
+                  title={alreadyApplied ? 'Already applied' : 'Apply proposal'}
+                  onPress={() => {
+                    if (canApplyProposal) {
+                      lobbyRuntime.updateTable(proposal.name, proposal.maxPlayers, proposal.options);
+                    }
+                  }}
+                />
+              )}
+            </View>
           );
         })}
       </ScrollView>
@@ -76,6 +101,7 @@ export function ChatPanel({ room, title }: Props) {
 const styles = StyleSheet.create({
   history: { borderRadius: 10, maxHeight: 260, paddingHorizontal: 10 },
   historyContent: { gap: 7, paddingVertical: 10 },
+  messageRow: { gap: 6 },
   message: { fontSize: 14, lineHeight: 20 },
   meta: { fontWeight: '800' },
   input: { minHeight: 72, textAlignVertical: 'top' },

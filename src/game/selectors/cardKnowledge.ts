@@ -68,15 +68,16 @@ export function getCardKnowledgeViewModel(
   finished = false,
   empathy = false,
   cardIdentity: CardIdentity | undefined = undefined,
+  explicitBlankMorph = false,
 ): CardKnowledgeViewModel {
   const cardNote = note ?? EMPTY_NOTE;
   const identityRef = cardIdentity ?? EMPTY_IDENTITY;
-  const cacheKey = `${variantName}\u0000${finished ? 1 : 0}\u0000${empathy ? 1 : 0}\u0000${cardIdentity === undefined ? 0 : 1}`;
+  const cacheKey = `${variantName}\u0000${finished ? 1 : 0}\u0000${empathy ? 1 : 0}\u0000${cardIdentity === undefined ? 0 : 1}\u0000${explicitBlankMorph ? 1 : 0}`;
   const cached = getCachedKnowledge(card, cardNote, identityRef, cacheKey);
   if (cached !== undefined) return cached;
 
   const variant = getVariant(variantName);
-  const identity = getCardIdentityToShow({
+  const derivedIdentity = getCardIdentityToShow({
     cardIdentity: cardIdentity ?? { suitIndex: card.suitIndex, rank: card.rank },
     state: card,
     note: cardNote,
@@ -85,7 +86,14 @@ export function getCardKnowledgeViewModel(
     finished,
   });
   const border = getCardBorderPresentation(card, cardNote, finished);
-  const pips = getCardPipPresentation(variant, card, cardNote, empathy);
+  const derivedPips = getCardPipPresentation(variant, card, cardNote, empathy);
+  const identity = explicitBlankMorph ? EMPTY_IDENTITY : derivedIdentity;
+  const pips = explicitBlankMorph
+    ? {
+      suitPips: derivedPips.suitPips.map((pip) => ({ ...pip, state: PipState.Hidden, positive: false })),
+      rankPips: derivedPips.rankPips.map((pip) => ({ ...pip, state: PipState.Hidden, positive: false })),
+    }
+    : derivedPips;
   const clueSuitIndexes = new Set<number>(
     card.possibleCardsFromClues.map(([suitIndex]) => suitIndex),
   );

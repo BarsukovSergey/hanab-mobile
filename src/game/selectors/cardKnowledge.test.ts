@@ -164,6 +164,39 @@ describe('card knowledge view model', () => {
     });
   });
 
+  test('keeps an explicit blank hypothetical morph blank despite note or empathy knowledge', () => {
+    const card: CardState = {
+      ...freshCard(17),
+      suitIndex: 0,
+      rank: 3,
+      suitDetermined: true,
+      rankDetermined: true,
+    };
+    const note: CardNote = {
+      ...emptyNote,
+      possibilities: [[0, 3]],
+    };
+    const blankMorph = { suitIndex: null, rank: null };
+
+    expect(getCardKnowledgeViewModel(variant.name, card, note, false, false, blankMorph, true)).toMatchObject({
+      displaySuitIndex: null,
+      displayRank: null,
+    });
+    expect(getCardKnowledgeViewModel(variant.name, card, note, false, true, blankMorph, true)).toMatchObject({
+      displaySuitIndex: null,
+      displayRank: null,
+    });
+
+    const blank = getCardKnowledgeViewModel(variant.name, card, note, false, false, blankMorph, true);
+    expect(blank.suitPips.every((pip) => pip.state === 'hidden')).toBe(true);
+    expect(blank.rankPips.every((pip) => pip.state === 'hidden')).toBe(true);
+
+    expect(getCardKnowledgeViewModel(variant.name, card, note)).toMatchObject({
+      displaySuitIndex: 0,
+      displayRank: 3,
+    });
+  });
+
   test('marks eliminated possibilities instead of hiding clue-visible pips', () => {
     const card = freshCard(12);
     const firstSuit = variant.suits[0];

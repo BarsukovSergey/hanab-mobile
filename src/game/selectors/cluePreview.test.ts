@@ -55,14 +55,25 @@ describe('isCluePreviewConfirmable', () => {
   const touchedPreview = { ...emptyPreview, touchedOrders: [7] };
 
   test('matches the Empty Clues confirmation matrix', () => {
-    expect(isCluePreviewConfirmable(emptyPreview, false)).toBe(false);
-    expect(isCluePreviewConfirmable(touchedPreview, false)).toBe(true);
-    expect(isCluePreviewConfirmable(emptyPreview, true)).toBe(true);
-    expect(isCluePreviewConfirmable(touchedPreview, true)).toBe(true);
+    expect(isCluePreviewConfirmable(emptyPreview, false, 'No Variant')).toBe(false);
+    expect(isCluePreviewConfirmable(touchedPreview, false, 'No Variant')).toBe(true);
+    expect(isCluePreviewConfirmable(emptyPreview, true, 'No Variant')).toBe(true);
+    expect(isCluePreviewConfirmable(touchedPreview, true, 'No Variant')).toBe(true);
   });
 
   test('never confirms an invalid preview even when Empty Clues is enabled', () => {
-    expect(isCluePreviewConfirmable(null, false)).toBe(false);
-    expect(isCluePreviewConfirmable(null, true)).toBe(false);
+    expect(isCluePreviewConfirmable(null, false, 'No Variant')).toBe(false);
+    expect(isCluePreviewConfirmable(null, true, 'No Variant')).toBe(false);
+  });
+
+  test('matches Blind variant zero-touch clue legality', () => {
+    const rankPreview = { ...emptyPreview, type: 'rank' as const };
+
+    expect(isCluePreviewConfirmable(emptyPreview, false, 'Color Blind (5 Suits)')).toBe(true);
+    expect(isCluePreviewConfirmable(rankPreview, false, 'Color Blind (5 Suits)')).toBe(false);
+    expect(isCluePreviewConfirmable(rankPreview, false, 'Number Blind (5 Suits)')).toBe(true);
+    expect(isCluePreviewConfirmable(emptyPreview, false, 'Number Blind (5 Suits)')).toBe(false);
+    expect(isCluePreviewConfirmable(emptyPreview, false, 'Totally Blind (5 Suits)')).toBe(true);
+    expect(isCluePreviewConfirmable(rankPreview, false, 'Totally Blind (5 Suits)')).toBe(true);
   });
 });

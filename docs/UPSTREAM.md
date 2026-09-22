@@ -34,6 +34,16 @@ The mobile adaptation is intended to preserve the upstream selector behavior whi
 
 The semantic contract and mobile parity notes for this selector live in `docs/CARD_PRESENTATION_PARITY.md`.
 
+## Hypothetical replay core pin
+
+Hypothetical replay state, reducer semantics, and replay-action protocol are adapted from:
+
+- Repository: `Hanabi-Live/hanabi-live`
+- Commit: `8be709c48145ad56a1891307663ed3bec2cd4175`
+- Sources: `HypotheticalState.ts`, `replayReducer.ts`, `hypothetical.ts`, `ReplayActionType.ts`, and `server/src/command_replay_action.go`
+
+The mobile boundary retains only platform-independent state/reducer/protocol/runtime behavior; browser UI remains out of scope.
+
 ## Pinning rule
 
 When behavior needs to move forward:

@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { composeQuickNote, type QuickNoteToken } from '../../game/selectors/noteComposition';
 import { useAppSelector } from '../../store/hooks';
@@ -24,6 +25,7 @@ const QUICK_TOKENS: readonly { label: string; token: QuickNoteToken }[] = [
   { label: '?', token: '?' },
   { label: '!', token: '!' },
 ];
+const SHEET_CONTENT_BOTTOM_PADDING = 20;
 
 export function NoteEditor({
   title,
@@ -42,14 +44,15 @@ export function NoteEditor({
   startEditing?: boolean;
   onChange: (value: string) => void;
   onSave: (value: string) => void;
-  onClear: () => void;
   onClose: () => void;
 }) {
   const { theme } = useHanabTheme();
+  const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
-  const [dirty, setDirty] = useState(false);
   const lastSubmittedNote = useRef('');
+  const sessionOpen = useRef(false);
+  const sessionSavedValue = useRef(value);
   const gameContext = useAppSelector((state) => (
     state.room.room.kind === 'live_game'
       ? {
@@ -61,28 +64,24 @@ export function NoteEditor({
 
   useEffect(() => {
     if (!visible) {
+      sessionOpen.current = false;
       setEditing(false);
       return;
     }
+    if (sessionOpen.current) return;
+
+    sessionOpen.current = true;
     const shouldEdit = editable && startEditing;
-    const initial = shouldEdit ? beginNoteEdit(value) : value;
+    sessionSavedValue.current = value;
+    const initial = shouldEdit ? beginNoteEdit(sessionSavedValue.current) : sessionSavedValue.current;
     setDraft(initial);
     onChange(initial);
-    setDirty(false);
     setEditing(shouldEdit);
-  }, [editable, startEditing, visible]);
-
-  useEffect(() => {
-    if (!visible || dirty) return;
-    const next = editing ? beginNoteEdit(value) : value;
-    setDraft(next);
-    onChange(next);
-  }, [dirty, editing, onChange, value, visible]);
+  }, [editable, onChange, startEditing, value, visible]);
 
   const setDraftValue = (next: string) => {
     setDraft(next);
     onChange(next);
-    setDirty(true);
   };
   const submitValue = (nextValue: string) => {
     const normalized = normalizeSubmittedNote(nextValue);
@@ -103,16 +102,14 @@ export function NoteEditor({
     if (candidate !== draft) setDraftValue(candidate);
   };
   const startEdit = () => {
-    const next = beginNoteEdit(value);
+    const next = beginNoteEdit(sessionSavedValue.current);
     setDraft(next);
     onChange(next);
-    setDirty(false);
     setEditing(true);
   };
   const cancelAndClose = () => {
-    setDraft(value);
-    onChange(value);
-    setDirty(false);
+    setDraft(sessionSavedValue.current);
+    onChange(sessionSavedValue.current);
     setEditing(false);
     onClose();
   };
@@ -126,7 +123,7 @@ export function NoteEditor({
         <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
           <ScrollView
             bounces={false}
-            contentContainerStyle={styles.sheetContent}
+            contentContainerStyle={[styles.sheetContent, { paddingBottom: SHEET_CONTENT_BOTTOM_PADDING + insets.bottom }]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.header}>
@@ -199,7 +196,7 @@ const styles = StyleSheet.create({
   keyboardAvoider: { flex: 1 },
   backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.58)', flex: 1, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, maxHeight: '100%' },
-  sheetContent: { gap: 12, padding: 14, paddingBottom: 20 },
+  sheetContent: { gap: 12, padding: 14, paddingBottom: SHEET_CONTENT_BOTTOM_PADDING },
   header: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },

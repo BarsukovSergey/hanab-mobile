@@ -21,6 +21,41 @@ describe('gameplayInteractionReducer', () => {
     });
   });
 
+  test('successful card action clears the action-derived note inspection', () => {
+    const selected = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-card', order: 12 });
+    const completed = gameplayInteractionReducer(selected, { type: 'complete-card-action', order: 12 });
+
+    expect(completed).toMatchObject({
+      selectedCard: null,
+      clueTarget: null,
+      cluePreview: null,
+      empathyPlayer: null,
+      noteCard: null,
+      globalEmpathy: false,
+    });
+  });
+
+  test('successful card action preserves an unrelated note inspection', () => {
+    const state = {
+      ...initialGameplayInteractionState,
+      selectedCard: 12,
+      noteCard: 20,
+      clueTarget: 2,
+      cluePreview: { type: 'rank' as const, value: 3 },
+      empathyPlayer: 1,
+      globalEmpathy: true,
+    };
+
+    expect(gameplayInteractionReducer(state, { type: 'complete-card-action', order: 12 })).toMatchObject({
+      selectedCard: null,
+      clueTarget: null,
+      cluePreview: null,
+      empathyPlayer: null,
+      noteCard: 20,
+      globalEmpathy: true,
+    });
+  });
+
   test('opening notes replaces clue composer and clears the plan', () => {
     const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 2 });
     const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'rank', value: 3 });

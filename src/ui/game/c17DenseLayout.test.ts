@@ -1,16 +1,15 @@
 import { describe, expect, test } from '@jest/globals';
-import { getC17DenseLayout, getC17WorkbenchHeight, getRelativeOpponentIndices } from './c17DenseLayout';
+import {
+  getC17CardLaneWidth,
+  getC17DenseLayout,
+  getC17HandsRegionHeight,
+  getC17WorkbenchHeight,
+  getRelativeOpponentIndices,
+  hasC17AmbientRegionChanged,
+} from './c17DenseLayout';
 
 function layout(overrides: Partial<Parameters<typeof getC17DenseLayout>[0]> = {}) {
-  return getC17DenseLayout({
-    opponentCardLaneWidth: 300,
-    handsRegionHeight: 500,
-    ownCardLaneWidth: 300,
-    opponentCount: 5,
-    cardsPerHand: 4,
-    workbenchHeight: 156,
-    ...overrides,
-  });
+  return getC17DenseLayout({ opponentCardLaneWidth: 300, handsRegionHeight: 500, ownCardLaneWidth: 300, opponentCount: 5, cardsPerHand: 4, workbenchHeight: 156, ...overrides });
 }
 
 describe('C17 dense portrait layout', () => {
@@ -19,96 +18,92 @@ describe('C17 dense portrait layout', () => {
     expect(getRelativeOpponentIndices(6, 3)).toEqual([4, 5, 0, 1, 2]);
   });
 
-  test('uses one shared card height for opponents and YOUR HAND', () => {
-    const result = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 400 });
-
+  test('uses the Full Ledger when full cards meet the 76dp readability floor', () => {
+    const result = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 700 });
+    expect(result.mode).toBe('full-ledger');
+    expect(result.opponentCardHeight).toBeGreaterThanOrEqual(76);
     expect(result.ownCardHeight).toBe(result.opponentCardHeight);
+    expect(result.opponentRowHeight).toBe(result.opponentCardHeight + result.cardTopHeadroom + 22);
+    expect(result.handsHeight).toBeLessThanOrEqual(700);
   });
 
-  test('gives fewer opponent rows larger cards when height limits the stable hands rectangle', () => {
-    const sixPlayer = layout({ opponentCount: 5, handsRegionHeight: 400, opponentCardLaneWidth: 600, ownCardLaneWidth: 600 });
-    const threePlayer = layout({ opponentCount: 2, handsRegionHeight: 400, opponentCardLaneWidth: 600, ownCardLaneWidth: 600 });
-
-    expect(threePlayer.opponentCardHeight).toBeGreaterThan(sixPlayer.opponentCardHeight);
+  test('keeps Full Ledger width limiting and clued-card headroom', () => {
+    const narrow = layout({ opponentCardLaneWidth: 360, ownCardLaneWidth: 600, handsRegionHeight: 1400 });
+    const wide = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 600, handsRegionHeight: 1400 });
+    expect(narrow.mode).toBe('full-ledger');
+    expect(wide.mode).toBe('full-ledger');
+    expect(narrow.opponentCardHeight).toBeLessThan(wide.opponentCardHeight);
+    expect(narrow.ownCardHeight).toBe(narrow.opponentCardHeight);
+    expect(narrow.cardTopHeadroom).toBeGreaterThanOrEqual(3);
+    expect(narrow.cardTopHeadroom).toBeLessThanOrEqual(6);
   });
 
-  test('constrains the shared size by the opponent card lane', () => {
-    const narrowOpponent = layout({ opponentCardLaneWidth: 140, ownCardLaneWidth: 600, handsRegionHeight: 900 });
-    const wideOpponent = layout({ opponentCardLaneWidth: 360, ownCardLaneWidth: 600, handsRegionHeight: 900 });
-
-    expect(narrowOpponent.opponentCardHeight).toBeLessThan(wideOpponent.opponentCardHeight);
-    expect(narrowOpponent.ownCardHeight).toBe(narrowOpponent.opponentCardHeight);
-  });
-
-  test('constrains the shared size by the own card lane', () => {
-    const narrowOwn = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 140, handsRegionHeight: 900 });
-    const wideOwn = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 360, handsRegionHeight: 900 });
-
-    expect(narrowOwn.ownCardHeight).toBeLessThan(wideOwn.ownCardHeight);
-    expect(narrowOwn.ownCardHeight).toBe(narrowOwn.opponentCardHeight);
-  });
-
-  test('does not enlarge cards when width remains the limiting dimension', () => {
-    const ordinary = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 500 });
-    const tall = layout({ opponentCardLaneWidth: 180, ownCardLaneWidth: 180, handsRegionHeight: 900 });
-
-    expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
-  });
-
-  test('does not stretch a two-player hand stack into dead vertical space', () => {
-    const ordinary = layout({ opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 500 });
-    const tall = layout({ opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 900 });
-
-    expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
-    expect(tall.handsHeight).toBe(ordinary.handsHeight);
-    expect(tall.workbenchHeight).toBe(ordinary.workbenchHeight);
-  });
-
-  test('uses authoritative hand capacity after current hands shrink', () => {
-    const beforeAction = layout({ cardsPerHand: 5 });
-    const afterAction = layout({ cardsPerHand: 5 });
-
-    expect(afterAction).toEqual(beforeAction);
-  });
-
-  test('keeps One Extra Card capacity in the shared width calculation', () => {
-    const standard = layout({ cardsPerHand: 3, handsRegionHeight: 900 });
-    const oneExtraCard = layout({ cardsPerHand: 4, handsRegionHeight: 900 });
-
-    expect(oneExtraCard.opponentCardHeight).toBeLessThan(standard.opponentCardHeight);
+  test('keeps the authoritative hand capacity in the Full Ledger width calculation', () => {
+    const standard = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 600, opponentCount: 2, cardsPerHand: 3, handsRegionHeight: 900 });
+    const oneExtraCard = layout({ opponentCardLaneWidth: 600, ownCardLaneWidth: 600, opponentCount: 2, cardsPerHand: 4, handsRegionHeight: 900 });
+    expect(standard.mode).toBe('full-ledger');
+    expect(oneExtraCard.mode).toBe('full-ledger');
     expect(oneExtraCard.ownCardHeight).toBeLessThan(standard.ownCardHeight);
   });
 
-  test('keeps constrained six-player layouts on the readability threshold when they fit', () => {
-    const constrained = layout({
-      opponentCardLaneWidth: 300,
-      ownCardLaneWidth: 300,
-      handsRegionHeight: 341,
-      opponentCount: 5,
-      cardsPerHand: 4,
-    });
-
-    expect(constrained.mode).toBe('full-ledger');
-    expect(constrained.opponentCardHeight).toBeGreaterThanOrEqual(46);
+  test('uses Compact Overview with fixed opponent summaries and a readable own hand', () => {
+    const result = layout({ handsRegionHeight: 315, opponentCount: 5, cardsPerHand: 4 });
+    expect(result.mode).toBe('compact-overview');
+    expect(result.opponentCardHeight).toBe(24);
+    expect(result.opponentRowHeight).toBe(32);
+    expect(result.ownCardHeight).toBeGreaterThan(result.opponentCardHeight);
+    expect(result.ownCardHeight).toBeGreaterThanOrEqual(76);
+    expect(result.ownRowHeight).toBe(result.ownCardHeight + result.cardTopHeadroom + 22);
+    expect(result.handsHeight).toBeLessThanOrEqual(315);
   });
 
-  test('keeps the player metadata rail inside its row even when cards become compact', () => {
+  test('recomputes same-width layouts when the ambient body grows', () => {
+    const workbenchHeight = 156;
     const constrained = layout({
-      opponentCardLaneWidth: 300,
-      ownCardLaneWidth: 300,
-      handsRegionHeight: 315,
-      opponentCount: 5,
-      cardsPerHand: 4,
+      handsRegionHeight: getC17HandsRegionHeight(481, workbenchHeight),
+      workbenchHeight,
+    });
+    const expanded = layout({
+      handsRegionHeight: getC17HandsRegionHeight(866, workbenchHeight),
+      workbenchHeight,
     });
 
+    expect(hasC17AmbientRegionChanged(
+      { width: 300, height: 481 },
+      { width: 300, height: 866 },
+    )).toBe(true);
+    expect(hasC17AmbientRegionChanged(
+      { width: 300, height: 866 },
+      { width: 300, height: 481 },
+    )).toBe(true);
     expect(constrained.mode).toBe('compact-overview');
-    expect(constrained.opponentRowHeight).toBeGreaterThanOrEqual(54);
+    expect(expanded.mode).toBe('full-ledger');
+    expect(expanded.opponentCardHeight).toBeGreaterThanOrEqual(76);
   });
 
-  test('keeps shared cards and real row chrome inside the captured hands rectangle', () => {
-    const result = layout({ handsRegionHeight: 360 });
+  test('does not let the opponent lane shrink compact own cards', () => {
+    const ordinaryCompact = layout({ opponentCardLaneWidth: 300, ownCardLaneWidth: 300, handsRegionHeight: 315 });
+    const narrowOpponent = layout({ opponentCardLaneWidth: 140, ownCardLaneWidth: 300, handsRegionHeight: 315 });
+    expect(ordinaryCompact.mode).toBe('compact-overview');
+    expect(narrowOpponent.mode).toBe('compact-overview');
+    expect(narrowOpponent.ownCardHeight).toBe(ordinaryCompact.ownCardHeight);
+  });
 
-    expect(result.handsHeight).toBeLessThanOrEqual(360);
+  test('does not stretch ordinary roomy two-player and three-player hands into dead space', () => {
+    const twoPlayer = layout({ opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 500 });
+    const twoPlayerTall = layout({ opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 900 });
+    const threePlayer = layout({ opponentCount: 2, cardsPerHand: 5, handsRegionHeight: 900 });
+    expect(twoPlayer.mode).toBe('full-ledger');
+    expect(threePlayer.mode).toBe('full-ledger');
+    expect(twoPlayerTall.ownCardHeight).toBe(twoPlayer.ownCardHeight);
+    expect(twoPlayerTall.handsHeight).toBe(twoPlayer.handsHeight);
+  });
+
+  test('keeps ordinary portrait five-card hands readable', () => {
+    const cardLaneWidth = getC17CardLaneWidth(370);
+    const result = layout({ opponentCardLaneWidth: cardLaneWidth, ownCardLaneWidth: cardLaneWidth, opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 1000 });
+    expect(result.mode).toBe('full-ledger');
+    expect(result.ownCardHeight).toBeGreaterThanOrEqual(90);
   });
 
   test('selects a fixed Workbench height from the window class rather than tool content', () => {

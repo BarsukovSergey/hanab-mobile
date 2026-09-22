@@ -1,12 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { isCluePreviewConfirmable, type CluePreview } from '../../game/selectors/cluePreview';
 import type { GameplayClueChoices } from '../../game/selectors/gameplay';
+import { getClueColorFill } from '../../game/selectors/gameplay';
 import { ActionButton, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import type { GameplayCluePreviewState } from './gameplayInteraction';
 
 export function ClueComposer({
   targetName,
+  variantName = 'No Variant',
   choices,
   enabled,
   confirmEnabled,
@@ -17,6 +19,7 @@ export function ClueComposer({
   onConfirm,
 }: {
   targetName: string | null;
+  variantName?: string;
   choices: GameplayClueChoices | null;
   enabled: boolean;
   confirmEnabled?: boolean;
@@ -35,7 +38,7 @@ export function ClueComposer({
       ? choices?.colors.find((choice) => choice.value === previewState.value)?.label ?? `Color ${previewState.value}`
       : choices?.ranks.find((choice) => choice.value === previewState.value)?.label ?? String(previewState.value);
   const allowEmptyClues = choices?.allowEmptyClues ?? false;
-  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues);
+  const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues, variantName);
   const confirmAllowed = confirmEnabled ?? enabled;
 
   if (targetName === null) {
@@ -65,25 +68,26 @@ export function ClueComposer({
     <View style={styles.choiceGroups}>
       <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.colors.map((choice) => {
         const selected = previewState?.type === 'color' && previewState.value === choice.value;
-        return <ActionButton
-          compact
+        return <Pressable
+          accessibilityLabel={choice.label}
+          accessibilityRole="button"
           disabled={!enabled}
           key={`color-${choice.value}`}
-          title={choice.label}
-          tone={selected ? 'primary' : 'secondary'}
           onPress={() => onPreview('color', choice.value)}
-        />;
+          style={[styles.colorChoice, { borderColor: selected ? theme.colors.accent : '#111111' }, !enabled && styles.choiceDisabled]}
+        ><View style={[styles.colorSwatch, { backgroundColor: getClueColorFill(variantName, choice.value) ?? '#ffffff' }]} /></Pressable>;
       })}</View>
       <View style={[styles.choiceRow, landscapePhone && styles.choiceRowLandscape]}>{choices?.ranks.map((choice) => {
         const selected = previewState?.type === 'rank' && previewState.value === choice.value;
-        return <ActionButton
-          compact
+        const label = choice.label === 'Odd' ? 'O' : choice.label === 'Even' ? 'E' : choice.label;
+        return <Pressable
+          accessibilityLabel={choice.label}
+          accessibilityRole="button"
           disabled={!enabled}
           key={`rank-${choice.value}`}
-          title={choice.label}
-          tone={selected ? 'primary' : 'secondary'}
           onPress={() => onPreview('rank', choice.value)}
-        />;
+          style={[styles.rankChoice, { borderColor: selected ? theme.colors.accent : theme.colors.borderStrong }, !enabled && styles.choiceDisabled]}
+        ><Text style={[styles.rankChoiceText, { color: theme.colors.text }]}>{label}</Text></Pressable>;
       })}</View>
     </View>
 
@@ -112,6 +116,11 @@ const styles = StyleSheet.create({
   choiceGroups: { gap: 4 },
   choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   choiceRowLandscape: { gap: 3 },
+  colorChoice: { alignItems: 'center', backgroundColor: '#111111', borderRadius: 9, borderWidth: 2, height: 38, justifyContent: 'center', padding: 4, width: 38 },
+  colorSwatch: { borderRadius: 5, height: '100%', width: '100%' },
+  rankChoice: { alignItems: 'center', borderRadius: 8, borderWidth: 2, height: 38, justifyContent: 'center', minWidth: 38, paddingHorizontal: 7 },
+  rankChoiceText: { fontSize: 18, fontWeight: '900' },
+  choiceDisabled: { opacity: 0.42 },
   confirmSlot: { justifyContent: 'center', minHeight: 34 },
   confirmRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   previewCopy: { flex: 1, minWidth: 0 },
