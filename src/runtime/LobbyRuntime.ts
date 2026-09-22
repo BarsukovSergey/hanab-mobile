@@ -1417,6 +1417,8 @@ export class LobbyRuntime {
       case 'chat':
         this.store.dispatch(chatActions.messageReceived({
           epoch,
+          defaultRoom: this.currentChatRoom(),
+          authenticatedUsername: this.store.getState().session.authenticatedUser?.username,
           message: event.data,
         }));
         break;
@@ -1425,6 +1427,12 @@ export class LobbyRuntime {
           epoch,
           defaultRoom: this.currentHistoryRoom(),
           messages: event.data.list,
+        }));
+        break;
+      case 'friends':
+        this.store.dispatch(sessionActions.friendsReceived({
+          epoch,
+          friends: event.data.friends,
         }));
         break;
       case 'warning':

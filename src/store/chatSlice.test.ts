@@ -25,13 +25,17 @@ describe('chat state and plain-text conversion', () => {
   test('history replaces its room while incremental messages append', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
-    store.dispatch(chatActions.messageReceived({ epoch: 1, message: message('stale') }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'lobby', message: message('stale'),
+    }));
     store.dispatch(chatActions.historyReceived({
       epoch: 1,
       defaultRoom: 'lobby',
       messages: [message('one'), message('two')],
     }));
-    store.dispatch(chatActions.messageReceived({ epoch: 1, message: message('three') }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'lobby', message: message('three'),
+    }));
     expect(store.getState().chat.messagesByRoom.lobby?.map((entry) => entry.msg)).toEqual([
       'one', 'two', 'three',
     ]);
@@ -55,18 +59,97 @@ describe('chat state and plain-text conversion', () => {
     ]);
   });
 
+  test('routes blank-room private messages through the supplied current room', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    const privateMessage = { ...message('private'), room: '', recipient: 'Bob' };
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'table123', message: privateMessage,
+    }));
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      messages: [{ ...privateMessage, msg: 'history private' }],
+    }));
+
+    expect(store.getState().chat.messagesByRoom).toEqual({
+      table123: [expect.objectContaining({
+        msg: 'history private', room: 'table123', who: 'Ada', recipient: 'Bob',
+      })],
+    });
+  });
+
+  test('tracks only the latest incoming PM sender using the canonical payload name', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'bOb',
+      message: { ...message('incoming'), room: '', recipient: 'Bob' },
+    }));
+    expect(store.getState().chat.lastPM).toBe('Ada');
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'Bob',
+      message: {
+        ...message('outgoing'), who: 'Bob', room: '', recipient: 'Cy',
+      },
+    }));
+    expect(store.getState().chat.lastPM).toBe('Ada');
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'lobby',
+      authenticatedUsername: 'Bob',
+      message: {
+        ...message('newer incoming'), who: 'Cy', room: '', recipient: 'BOB',
+      },
+    }));
+    expect(store.getState().chat.lastPM).toBe('Cy');
+  });
+
+  test('keeps ordinary room routing and drops unsupported garbage rooms', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'table123', message: message('lobby', 'lobby'),
+    }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'lobby', message: message('table', 'table123'),
+    }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'lobby', message: message('garbage', 'somewhere'),
+    }));
+
+    expect(store.getState().chat.messagesByRoom.lobby?.map(({ msg }) => msg)).toEqual(['lobby']);
+    expect(store.getState().chat.messagesByRoom.table123?.map(({ msg }) => msg)).toEqual(['table']);
+    expect(store.getState().chat.messagesByRoom.somewhere).toBeUndefined();
+  });
+
   test('new epochs and explicit signout clear all rooms; stale traffic is ignored', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
-    store.dispatch(chatActions.messageReceived({ epoch: 1, message: message('lobby') }));
     store.dispatch(chatActions.messageReceived({
-      epoch: 1, message: message('table', 'table123'),
+      epoch: 1, defaultRoom: 'lobby', message: message('lobby'),
+    }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'table123', message: message('table', 'table123'),
     }));
     store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
-    store.dispatch(chatActions.messageReceived({ epoch: 1, message: message('late') }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'lobby', message: message('late'),
+    }));
     expect(store.getState().chat.messagesByRoom).toEqual({});
-    store.dispatch(chatActions.messageReceived({ epoch: 2, message: message('current') }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 2, defaultRoom: 'lobby', message: message('current'),
+    }));
     store.dispatch(sessionActions.signedOut());
-    expect(store.getState().chat).toEqual({ connectionEpoch: 0, messagesByRoom: {} });
+    expect(store.getState().chat).toEqual({
+      connectionEpoch: 0, lastPM: null, messagesByRoom: {},
+    });
   });
 });

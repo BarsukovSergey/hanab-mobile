@@ -84,6 +84,13 @@ describe('lobby protocol decoder', () => {
       .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
     expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, who: undefined })}`))
       .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
+
+    const privateMessage = { ...chat, room: '', recipient: 'Bob' };
+    expect(decodeServerFrame(`chat ${JSON.stringify(privateMessage)}`)).toEqual({
+      kind: 'event', event: { command: 'chat', data: privateMessage },
+    });
+    expect(decodeServerFrame(`chat ${JSON.stringify({ ...privateMessage, recipient: '' })}`))
+      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
   });
 
   test('strictly decodes notes and presence and encodes inactivity', () => {
