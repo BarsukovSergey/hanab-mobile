@@ -28,6 +28,10 @@ These items were explicitly removed from the C17 release gate during product rev
 
 ## Layout / presentation
 
+- **2P portrait space allocation:** reduce the large dead vertical band that can appear between the hand/table region and Workbench without destabilizing denser player-count layouts.
+- **Live HUD hierarchy / compact notation:** revisit the dense Score/Max/Clues/Strikes/Deck/Pace/Eff presentation, including compact score/max notation and whether some metrics belong closer to their table context. Preserve upstream semantics; do not invent mobile-only stats.
+- **Live-game header chrome:** reduce the visual prominence/cost of rarely used Lobby navigation during active play while keeping exit/navigation discoverable and safe.
+- **Card presentation preferences:** investigate exposing upstream-compatible card preferences such as colorblind mode and styled numbers. If added, generate/bundle the corresponding pinned renderer assets deliberately rather than approximating them in UI.
 - **4P–6P gameplay redesign / repair:** make ordinary 4P, 5P, and 6P gameplay usable again rather than treating the current Compact Overview / summary-icon fallback as accepted UX. Replace that fallback with a real-card-face layout. Cards take priority over chrome; reduce secondary controls, gaps, and card size within readability bounds before considering alternate representations. Revalidate 4P, 5P, and 6P physically after the redesign.
 - Dedicated two-column landscape composition.
 - Dedicated tablet / large-screen persistent side-pane composition and polish.
@@ -42,6 +46,18 @@ These items were explicitly removed from the C17 release gate during product rev
 - Rich/compact profiles beyond what is strictly required by existing gameplay/table identity.
 - Friends list / online-friends affordances.
 - Social feeds, recommendations, achievements, messaging redesign.
+
+## Replay / command parity
+
+- **`/copy` replay export:** implement the deliberately deferred replay-copy flow, including the required replay JSON/clipboard mechanics, without changing existing server-handled slash-command fallback behavior.
+- **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
+
+## Release / packaging / maintenance
+
+- **Beta upgrade continuity:** for the next tester build, bump the app version and Android `versionCode`, then verify installation over `1.0.0-beta.1` without uninstalling and confirm expected session/app data survives the upgrade.
+- **Play Store / AAB pipeline:** define store signing, AAB packaging, versioning, and release policy separately from the current standalone internal APK flow. Keep the heavy APK/AAB workflow manual unless deliberately changed.
+- **Dependency maintenance:** investigate current deprecation warnings and audit findings as a separate maintenance task. Do not apply blind force-upgrades during the beta freeze.
+- **Release housekeeping:** before a public/store release, explicitly verify final icon/splash/branding assets, About/licenses obligations, and the release checklist rather than inheriting historical C16/C17 assumptions.
 
 ## Non-backlog C17 capabilities
 
