@@ -80,6 +80,38 @@ describe('chat state and plain-text conversion', () => {
     });
   });
 
+  test('tracks only the latest incoming PM sender using the canonical payload name', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'bOb',
+      message: { ...message('incoming'), room: '', recipient: 'Bob' },
+    }));
+    expect(store.getState().chat.lastPM).toBe('Ada');
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'Bob',
+      message: {
+        ...message('outgoing'), who: 'Bob', room: '', recipient: 'Cy',
+      },
+    }));
+    expect(store.getState().chat.lastPM).toBe('Ada');
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'lobby',
+      authenticatedUsername: 'Bob',
+      message: {
+        ...message('newer incoming'), who: 'Cy', room: '', recipient: 'BOB',
+      },
+    }));
+    expect(store.getState().chat.lastPM).toBe('Cy');
+  });
+
   test('keeps ordinary room routing and drops unsupported garbage rooms', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
@@ -116,6 +148,8 @@ describe('chat state and plain-text conversion', () => {
       epoch: 2, defaultRoom: 'lobby', message: message('current'),
     }));
     store.dispatch(sessionActions.signedOut());
-    expect(store.getState().chat).toEqual({ connectionEpoch: 0, messagesByRoom: {} });
+    expect(store.getState().chat).toEqual({
+      connectionEpoch: 0, lastPM: null, messagesByRoom: {},
+    });
   });
 });

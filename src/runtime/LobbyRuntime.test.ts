@@ -25,6 +25,7 @@ import {
   LobbyRuntime,
 } from './LobbyRuntime';
 import { TerminationRuntime } from './terminationRuntime';
+import { SHRUG_TEXT, transformChatInput } from '../ui/chatInput';
 
 type ListenerMap = {
   open: Set<() => void>;
@@ -609,6 +610,31 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
+  test('reply without an incoming PM fails locally and keeps raw chat off the socket', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/r hello')).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().chat.messagesByRoom.lobby?.at(-1)).toMatchObject({
+      msg: 'No-one has sent you a private message yet, so you cannot reply.',
+      localType: 'info',
+    });
+  });
+
+  test('transformed shrug uses normal chat and never emits a literal slash command', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const transformed = transformChatInput('/shrug', store.getState().chat.lastPM);
+
+    expect(transformed).toBe(SHRUG_TEXT);
+    expect(chat.submit(transformed)).toBe(true);
+    expect(socket.sent).toEqual([
+      `chat ${JSON.stringify({ msg: SHRUG_TEXT, room: 'lobby' })}`,
+    ]);
+    expect(socket.sent.some((frame) => frame.includes('/shrug'))).toBe(false);
+  });
+
   test('sender sees one authoritative blank-room PM echo without an optimistic copy', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     socket.emitMessage(bobUserFrame);
@@ -647,6 +673,26 @@ describe('deterministic lobby runtime', () => {
         msg: 'hello', room: 'lobby', who: 'Ada', recipient: 'Bob',
       }),
     ]);
+    expect(store.getState().chat.lastPM).toBe('Ada');
+    expect(transformChatInput('/r ', store.getState().chat.lastPM)).toBe('/pm Ada ');
+
+    socket.emitMessage(userFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    expect(chat.submit('/pm Ada response')).toBe(true);
+    socket.emitMessage('chat {"msg":"response","who":"Bob","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:01:00Z","room":"",'
+      + '"recipient":"Ada"}');
+    expect(store.getState().chat.lastPM).toBe('Ada');
+
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+    runtime.disconnect();
+    await runtime.connect();
+    second.emitOpen();
+    second.emitMessage(
+      'welcome {"userID":2,"username":"Bob","totalGames":0,"playingAtTables":[]}',
+    );
+    expect(store.getState().chat.lastPM).toBeNull();
   });
 
   test('blank-room PM events and history use the current table room', async () => {

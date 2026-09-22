@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { chatRuntime, lobbyRuntime } from '../runtime/application';
 import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
 import { useAppSelector } from '../store/hooks';
+import { transformChatInput } from './chatInput';
 import { chatMessageMetadata } from './chatPresentation';
 import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
 
@@ -19,6 +20,7 @@ export function ChatPanel({ room, title }: Props) {
   const [draft, setDraft] = useState('');
   const historyRef = useRef<ScrollView>(null);
   const ready = useAppSelector((state) => state.session.phase === 'ready');
+  const lastPM = useAppSelector((state) => state.chat.lastPM);
   const messages = useAppSelector((state) => state.chat.messagesByRoom[room] ?? EMPTY_MESSAGES);
   const pregameRoom = useAppSelector((state) => state.room.room.kind === 'pregame'
     ? state.room.room : null);
@@ -88,7 +90,7 @@ export function ChatPanel({ room, title }: Props) {
         editable={ready}
         maxLength={300}
         multiline
-        onChangeText={setDraft}
+        onChangeText={(value) => setDraft(transformChatInput(value, lastPM))}
         onSubmitEditing={send}
         placeholder={ready ? 'Message' : 'Chat reconnecting…'}
         style={styles.input}

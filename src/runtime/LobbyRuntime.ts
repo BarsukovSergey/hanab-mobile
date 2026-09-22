@@ -1418,6 +1418,7 @@ export class LobbyRuntime {
         this.store.dispatch(chatActions.messageReceived({
           epoch,
           defaultRoom: this.currentChatRoom(),
+          authenticatedUsername: this.store.getState().session.authenticatedUser?.username,
           message: event.data,
         }));
         break;

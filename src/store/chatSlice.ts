@@ -13,6 +13,7 @@ export type ReadableChatMessage = Omit<ChatMessage, 'msg' | 'room'> & {
 
 export type ChatState = {
   connectionEpoch: number;
+  lastPM: string | null;
   messagesByRoom: Record<string, ReadableChatMessage[]>;
 };
 
@@ -20,6 +21,7 @@ const MAX_MESSAGES_PER_ROOM = 1000;
 
 const initialState: ChatState = {
   connectionEpoch: 0,
+  lastPM: null,
   messagesByRoom: {},
 };
 
@@ -79,11 +81,25 @@ export const chatSlice = createSlice({
     },
     messageReceived(
       state,
-      action: PayloadAction<{ epoch: number; defaultRoom: string; message: ChatMessage }>,
+      action: PayloadAction<{
+        epoch: number;
+        defaultRoom: string;
+        authenticatedUsername?: string;
+        message: ChatMessage;
+      }>,
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       const message = readable(action.payload.message, action.payload.defaultRoom);
       if (message === null) return;
+      if (
+        message.recipient.length > 0
+        && message.who.length > 0
+        && action.payload.authenticatedUsername !== undefined
+        && message.recipient.toLocaleLowerCase()
+          === action.payload.authenticatedUsername.toLocaleLowerCase()
+      ) {
+        state.lastPM = message.who;
+      }
       const messages = state.messagesByRoom[message.room] ?? [];
       messages.push(message);
       cap(messages);
@@ -116,6 +132,7 @@ export const chatSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
       state.connectionEpoch = action.payload.epoch;
+      state.lastPM = null;
       state.messagesByRoom = {};
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
