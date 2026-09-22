@@ -137,26 +137,35 @@ For an open table:
 
 - selecting a bot can immediately send PM body `/join`.
 
-For a password-protected table:
+For a password-protected table created through mobile, avoid asking for the same password twice.
+The create-table flow already owns the password as transient form state, so it can optionally collect
+one or more bot selections at the same time. After authoritative table creation/attendance is
+confirmed, send each selected bot a PM with `/join <password>`, then clear the create-form password
+and bot selections together. The password still never needs to enter persistent room/application
+state.
 
-- the Add bot sheet should request the table password at invite time;
-- selecting a bot then sends PM body `/join <password>`;
-- the entered password should remain transient UI input only and be cleared after the attempt.
+For an already-existing password-protected table, or a table the current user joined rather than
+created, the Add bot sheet should request the password at invite time. Selecting a bot then sends PM
+body `/join <password>`, and that transient password is cleared after the attempt.
 
-This also works when the current user joined someone else's password-protected table and therefore
-never had a creator-owned password value to retain.
+This keeps the common create-and-invite path one-pass while preserving the current no-password-
+retention boundary.
 
 ## Proposed mobile shape
 
 A later implementation can stay small:
 
 1. add a source-controlled `knownBots` registry with only verified exact usernames;
-2. show `Add bot` in pregame when there is room for another player;
-3. open a small bot picker showing known bots and their current online/offline state;
-4. disable bots already present at the table;
-5. require transient password input only when `room.data.passwordProtected` is true;
-6. send the existing authoritative PM through the chat/runtime boundary;
-7. surface normal PM/server failure feedback rather than synthesizing local success.
+2. add an optional bot picker to Create table so the creator can choose bots before submitting;
+3. after authoritative create/attendance confirmation, use the still-transient create-form password
+   to send selected bots `/join` or `/join <password>`, then clear that form state;
+4. also show `Add bot` in pregame when there is room for another player;
+5. open the same small bot picker showing known bots and their current online/offline state;
+6. disable bots already present at the table;
+7. when inviting from an already-existing protected table, request the password transiently because
+   mobile intentionally does not retain it in room state;
+8. send the existing authoritative PM through the chat/runtime boundary;
+9. surface normal PM/server failure feedback rather than synthesizing local success.
 
 No password persistence, bot-only socket protocol, or special table mutation path is needed.
 
