@@ -1,5 +1,7 @@
 # C17 Continuation Handoff
 
+> **ARCHIVED SNAPSHOT — 2026-09-06.** The branch/PR/repository-state instructions below are obsolete: PR #3 is historical and C17 has landed on `main`. Keep this file only as implementation-history context. Do not follow its merge, branch, Compact Overview, or "next slice" instructions as current guidance.
+
 Date: 2026-09-06
 Purpose: compact project continuation context for a fresh chat / agent session.
 

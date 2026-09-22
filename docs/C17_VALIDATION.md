@@ -1,23 +1,23 @@
 # C17 Validation Plan
 
-Status: **active**
-Date: 2026-09-11
+Status: **active for 1.0.0-beta.1**
+Date: 2026-09-22
 
 This document tracks what C17 must prove on real devices after the v1.2 product review. The authoritative product contract is `docs/C17_UX_CONTRACT.md`; explicit deferred items are in `docs/C17_BACKLOG.md`.
 
 ## 1. Dense phone workspace
 
-C17-0 adaptive density already passed for the tested ordinary Android portrait / three-button-navigation class, including 6P and 6P + One Extra Card. Keep that result closed unless another certified window/text-scale class fails.
+The current beta acceptance gate covers **2P/3P phone gameplay**.
 
-For every new constrained class:
+Validate:
 
-- all relevant hands must remain readable at normal device distance;
+- all visible hands use readable real card faces;
 - rank/suit, Black/Rainbow/six-suit identity, note/knowledge/trash/critical state, and selection remain distinguishable;
-- own/observed hand, HUD/table, Last Action, and minimum Workbench stay above system UI;
+- own/observed hand, HUD/table, Last Action, and Workbench stay above system UI;
 - no root live scroll and no per-hand horizontal scrolling;
-- if adaptive Full Ledger falls below readability, switch to Compact Overview rather than shrinking into unreadability.
+- card readability wins over decorative chrome and empty spacing.
 
-Compact Overview is a C17 fallback. Comparison pins are not part of its C17 acceptance.
+4P–6P dense gameplay is **not** a beta.1 gate. Historical adaptive 6P results remain evidence, but the current Compact Overview / summary-icon presentation is not accepted as the final 4P–6P product design. Do not send beta.1 testers through repeated 4P–6P acceptance work.
 
 ## 2. Direct actions
 
@@ -151,7 +151,7 @@ Validate live spectator on C17:
 - observed player from authoritative metadata is the seating anchor;
 - no Play/Discard/Clue send route exists;
 - notes/empathy/history/replay/shared-review surfaces respect authoritative spectator capability;
-- spectator state remains readable in 2P–6P target phone portrait classes.
+- spectator state remains readable in the 2P/3P beta target; 4P–6P density is post-beta work.
 
 ## 11. Pregame / shell / More
 
@@ -176,7 +176,7 @@ People/profile/friends/social features are backlog and are not C17 release crite
 
 ## 12. Android/window matrix
 
-At minimum cover:
+For beta.1 cover:
 
 - gesture navigation and three-button navigation;
 - ordinary target portrait phones;
@@ -185,7 +185,6 @@ At minimum cover:
 - normal/enlarged font scale;
 - keyboard open/closed + suggestion row;
 - 2P/3P extra-hand cases;
-- dense 5P/6P;
 - six-suit state;
 - spectator;
 - zero clues;
@@ -195,24 +194,25 @@ At minimum cover:
 - finished/replay/shared review/Hypothetical;
 - live Rewind.
 
-A bespoke landscape/tablet layout is backlog; functional safe adaptation is still required.
+A bespoke landscape/tablet layout is backlog; functional safe adaptation is still required. 4P–6P dense gameplay is post-beta and is not part of this matrix.
 
-## 13. Serious-play release gate
+## 13. Serious-play beta.1 gate
 
-Before C17 is complete:
+Before treating beta.1 as stable enough for broader internal testing:
 
-- complete at least one serious 5P session;
-- complete at least one serious 6P session;
-- include dense notes;
-- compare multiple clue candidates during real decisions;
-- consult discard while clue planning;
-- use temporary and global empathy in real reasoning;
+- complete ordinary 2P and 3P sessions;
+- include real notes and clue planning;
+- consult discard during a decision;
+- use empathy in real reasoning;
 - exercise live Rewind;
 - spectate a live game;
 - run a separate replay/shared-review/Hypothetical analysis session;
-- verify finished-game rematch/remake lifecycle where eligible.
+- verify finished-game rematch/remake lifecycle where eligible;
+- background/foreground once and verify no stale action is sent.
 
-Required outcomes: no root gameplay scroll in certified Full Ledger phone portrait, no per-hand sideways scrolling, no accidental commits, no note migration, no keyboard/system-navigation overlap, no lost note draft, and no Legacy fallback merely because the lifecycle entered spectator/finished/replay.
+Required outcomes: no accidental commits, no note migration, no keyboard/system-navigation overlap, no lost note draft, no stale live state after Rewind, and no lifecycle path that unexpectedly falls back to the wrong gameplay surface.
+
+4P–6P serious-play acceptance is deliberately deferred until its card-face layout is redesigned.
 
 ## 14. Existing evidence
 
@@ -226,4 +226,4 @@ Required outcomes: no root gameplay scroll in certified Full Ledger phone portra
 | 2026-09-08 | pre-linear C17-2 | Rewind discoverability | FAIL. |
 | 2026-09-08 | `dfbf9212b3ca8d37df4997cb2649d8d368844ec9` | Linear rewind implementation | PASS technical; physical acceptance pending. |
 
-New v1.2 interaction and lifecycle changes require fresh deterministic + physical acceptance; earlier evidence must not be treated as proof of superseded behaviors such as persistent per-player empathy or Before/After.
+Earlier evidence remains useful history but must not be treated as proof of superseded behaviors. In particular, historical 5P/6P fit results do not certify the current summary-icon UX or make 4P–6P part of the beta.1 gate.

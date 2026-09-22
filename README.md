@@ -74,12 +74,6 @@ npm test
 
 ## Project documentation
 
-Most files under `docs/` are development/product documents, not tester onboarding:
-
-- `docs/C17_UX_CONTRACT.md` — authoritative C17 product contract;
-- `docs/C17_UX_DECISIONS.md` — ratified UX decisions;
-- `docs/C17_VALIDATION.md` — developer/physical acceptance gates;
-- `docs/C17_EVIDENCE.md` — physical observations and defect history;
-- `docs/ARCHITECTURE.md` — architecture and authority boundaries.
-
-For ordinary external testing, start with [`TESTING.md`](./TESTING.md), not the internal C17 documents.
+- Testers: start with [`TESTING.md`](./TESTING.md).
+- Android beta build/release notes: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
+- Maintainers: [`docs/README.md`](./docs/README.md) is the documentation map and marks current authority versus historical snapshots.
