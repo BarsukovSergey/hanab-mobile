@@ -139,9 +139,10 @@ For an open table:
 
 For a password-protected table created through mobile, avoid asking for the same password twice.
 The create-table flow already owns the password as transient form state, so it can optionally collect
-one or more bot selections at the same time. After authoritative table creation/attendance is
-confirmed, send each selected bot a PM with `/join <password>`, then clear the create-form password
-and bot selections together. The password still never needs to enter persistent room/application
+**multiple bot selections** at the same time. The picker should allow selecting as many bots as can
+fit in the intended table, not assume a 2-player game. After authoritative table creation/attendance
+is confirmed, re-check the actual free player slots and send each still-eligible selected bot a PM
+with `/join <password>`, then clear the create-form password and bot selections together. The password still never needs to enter persistent room/application
 state.
 
 For an already-existing password-protected table, or a table the current user joined rather than
@@ -156,16 +157,22 @@ retention boundary.
 A later implementation can stay small:
 
 1. add a source-controlled `knownBots` registry with only verified exact usernames;
-2. add an optional bot picker to Create table so the creator can choose bots before submitting;
-3. after authoritative create/attendance confirmation, use the still-transient create-form password
-   to send selected bots `/join` or `/join <password>`, then clear that form state;
-4. also show `Add bot` in pregame when there is room for another player;
-5. open the same small bot picker showing known bots and their current online/offline state;
-6. disable bots already present at the table;
-7. when inviting from an already-existing protected table, request the password transiently because
+2. add an optional **multi-select** bot picker to Create table so the creator can choose several bots
+   before submitting;
+3. cap selection by the intended player capacity (creator + selected bots must fit) and, after
+   authoritative create/attendance confirmation, re-check actual free player slots before each
+   invite;
+4. use the still-transient create-form password to send every still-eligible selected bot `/join`
+   or `/join <password>`, then clear that form state;
+5. also show `Add bot` in pregame when there is room for another player;
+6. open the same multi-select bot picker showing known bots and their current online/offline state;
+7. disable bots already present at the table and prevent selecting more bots than currently free
+   player slots;
+8. when inviting from an already-existing protected table, request the password transiently because
    mobile intentionally does not retain it in room state;
-8. send the existing authoritative PM through the chat/runtime boundary;
-9. surface normal PM/server failure feedback rather than synthesizing local success.
+9. treat each bot invitation independently: one offline/failing bot must not suppress the remaining
+   selected invites, and no local success should be synthesized before authoritative feedback;
+10. send the existing authoritative PM through the chat/runtime boundary.
 
 No password persistence, bot-only socket protocol, or special table mutation path is needed.
 
@@ -173,7 +180,7 @@ No password persistence, bot-only socket protocol, or special table mutation pat
 
 For the command-to-UI backlog, the lowest-risk useful sequence is:
 
-1. Add bot;
+1. Add bot with multi-select create/pregame flow;
 2. contextual PM + player info + friend/unfriend;
 3. pregame kick + findvariant/missing;
 4. shared-replay Suggest current turn;
