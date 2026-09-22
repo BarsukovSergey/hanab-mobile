@@ -26,7 +26,8 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
   expect(opponentRow).toContain('onLongPress={globalEmpathy ? undefined : () => {');
   expect(opponentRow).toContain('onPressIn={() => { longPressedOpponent.current = null; }}');
-  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(2);
+  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(0);
+  expect(screen).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
   expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');
@@ -35,7 +36,7 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
 test('C17 uses summaries only for compact opponents while retaining full own cards', () => {
   const screen = readC17Screen();
 
-  expect(screen).toContain("import { CardKnowledgeDetails, CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';");
+  expect(screen).toContain("import { CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';");
   expect(screen).toContain('? <CompactHandCardSummary key={order} {...cardProps} />');
   expect(screen).toContain('<VisibleHanabiCard {...cardProps} cardTopHeadroom={layout.cardTopHeadroom} size="hand" />');
   expect(screen).not.toContain("size={compact ? 'mini' : 'hand'}");
@@ -107,11 +108,26 @@ test('C17 reserves the ordinary Workbench slot while keeping a selected-card tra
   const screen = readC17Screen();
 
   expect(screen).toContain('const compactOrdinaryWorkbench = usesSideLabels');
-  expect(screen).toContain('compactOrdinaryWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
   expect(screen).toContain('compactWorkbenchReserve');
   expect(screen).toContain('compactWorkbenchTray');
   expect(screen).toContain("compactWorkbenchTray: { alignSelf: 'stretch'");
   expect(screen).toContain("flex: 0, flexGrow: 0");
+});
+
+test('C17 caps every side-label stateful Workbench mode at the stable physical slot', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('const compactCappedWorkbench = usesSideLabels && (compactOrdinaryWorkbench');
+  expect(screen).toContain('|| hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);');
+  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('styles.workbenchScroll');
+  expect(screen).toContain('<C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />');
+  expect(screen).toContain('title="← Back"');
+  expect(screen).toContain('title="Forward →"');
+  expect(screen).toContain('title={`Exit · Live T${liveTurn}`}');
+  expect(screen).toContain('title="Start Hypothetical"');
+  expect(screen).toContain('getC17WorkbenchHeight(viewportHeight, opponents.length)');
 });
 
 test('C17 gives Play and Discard separate eligibility at maximum clue tokens', () => {

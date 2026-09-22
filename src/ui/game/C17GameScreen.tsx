@@ -39,7 +39,7 @@ import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
-import { CardKnowledgeDetails, CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';
+import { CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
 import {
   getC17CardLaneWidth,
@@ -757,17 +757,6 @@ function C17DenseWorkspace({
   const hasAvailableNote = (order: number) => readOnlyReplay
     ? (replayNotes[order]?.some((entry) => entry.text.trim().length > 0) ?? false)
     : (notes[order]?.text.trim().length ?? 0) > 0;
-  const inspectedCard = noteCard === null ? undefined : game.deck[noteCard];
-  const inspectedKnowledge = inspectedCard === undefined
-    ? null
-    : getCardKnowledgeViewModel(
-      variantName,
-      inspectedCard,
-      notes[noteCard ?? -1],
-      false,
-      false,
-      cardIdentities[noteCard ?? -1],
-    );
   const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedOwnCard !== null || noteCard !== null || pendingText !== null;
   const compactOrdinaryWorkbench = usesSideLabels
@@ -777,6 +766,8 @@ function C17DenseWorkspace({
     && sharedReplay === null
     && selectedTarget === null
     && (selectedOwnCard !== null || noteCard !== null);
+  const compactCappedWorkbench = usesSideLabels && (compactOrdinaryWorkbench
+    || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);
   const showRewindScrubber = reviewActive;
   const finishedReason = result?.reason;
   const finishedStatus = finishedReason === null || finishedReason === undefined
@@ -809,10 +800,11 @@ function C17DenseWorkspace({
       <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
         <View style={[styles.rowBetween, styles.lastActionHeader]}>
           <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
-          {!reviewActive && <View style={styles.actionButtons}>
-            <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />
+          <View style={styles.actionButtons}>
+            {!reviewActive &&
+              <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
             <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
-          </View>}
+          </View>
         </View>
         <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.lastActionPressable}>
           <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
@@ -992,8 +984,8 @@ function C17DenseWorkspace({
 
       {(!shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
-      compactOrdinaryWorkbench ? styles.compactWorkbenchReserve : { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
-      compactOrdinaryWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
+      compactOrdinaryWorkbench ? styles.compactWorkbenchReserve : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
+      compactCappedWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
       {showRewindScrubber && <View style={styles.workbenchScrubber}>
@@ -1049,7 +1041,6 @@ function C17DenseWorkspace({
               <ActionButton compact disabled={!canReviewForward} title="Forward →" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
             <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
-            <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
           </View>
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
           {noteCard !== null && <View style={styles.noteInspect}>
@@ -1059,38 +1050,30 @@ function C17DenseWorkspace({
             <Text numberOfLines={2} style={[styles.notePreview, { color: inspectedNote.trim().length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
               {inspectedNote.trim().length > 0 ? inspectedNote : 'No saved note'}
             </Text>
-            {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
           </View>}
         </> : finishedReplay || sharedReplay !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay === null
             ? `Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`
             : `SHARED REPLAY · Leader: ${sharedReplay.leader}`}</Text>
-          {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
-            {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
-            {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
-          </View>}
-          {sharedReplay !== null && <View style={styles.noteInspect}>
-            <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{sharedReplay.amLeader
-              ? 'You control the shared segment.'
-              : sharedReplay.useSharedSegments
-                ? `Following ${sharedReplay.leader} at shared segment ${sharedReplay.segment}.`
-                : `Viewing segment ${selectedActionSegment}; shared segment is ${sharedReplay.segment}.`}</Text>
-            {!sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
-            {!sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
-            {sharedReplay.amLeader && sharedReplayPassTargets.map((name) => <ActionButton
-              compact
-              key={name}
-              title={`Pass to ${name}`}
-              onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
-            />)}
-          </View>}
+          {sharedReplay !== null && <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Leader: {sharedReplay.leader}</Text>}
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
               <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
-            <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+            {sharedReplay !== null && !sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+            {sharedReplay !== null && !sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
           </View>
+          {sharedReplay?.amLeader && <View style={styles.actionButtons}>{sharedReplayPassTargets.map((name) => <ActionButton
+            compact
+            key={name}
+            title={`Pass to ${name}`}
+            onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
+          />)}</View>}
+          {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
+            {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
+            {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
+          </View>}
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
           {noteCard !== null && <View style={styles.noteInspect}>
             <Text style={[styles.notePreview, { color: inspectedReplayNotes.length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
@@ -1098,7 +1081,6 @@ function C17DenseWorkspace({
                 ? inspectedReplayNotes.map((entry) => `${entry.name}: ${entry.text}`).join('\n')
                 : 'No replay notes'}
             </Text>
-            {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
           </View>}
         </> : selectedTarget !== null ? <ClueComposer
           choices={clueChoices}

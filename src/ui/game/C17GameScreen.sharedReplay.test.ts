@@ -14,9 +14,10 @@ test('C17 shared replay presents authoritative leader and follow state without g
   expect(screen).toContain('selectedSegment: replay.segment,');
   expect(screen).toContain('sharedReplay={replay.shared}');
   expect(screen).toContain('`SHARED REPLAY · Leader: ${sharedReplay.leader}`');
-  expect(screen).toContain("? 'You control the shared segment.'");
-  expect(screen).toContain('`Following ${sharedReplay.leader} at shared segment ${sharedReplay.segment}.`');
-  expect(screen).toContain('`Viewing segment ${selectedActionSegment}; shared segment is ${sharedReplay.segment}.`');
+  expect(screen).toContain('>Leader: {sharedReplay.leader}</Text>');
+  expect(screen).not.toContain('You control the shared segment.');
+  expect(screen).not.toContain('Following ${sharedReplay.leader} at shared segment');
+  expect(screen).not.toContain('Viewing segment ${selectedActionSegment}; shared segment is');
   expect(screen).toContain('!sharedReplay.amLeader && !sharedReplay.useSharedSegments');
   expect(screen).toContain('title="Follow leader"');
   expect(screen).toContain('onPress={() => lobbyRuntime.followReplayLeader()}');
@@ -26,6 +27,9 @@ test('C17 shared replay presents authoritative leader and follow state without g
   expect(screen).toContain('{sharedReplay !== null && <View style={styles.actionButtons}>');
   expect(screen).toContain('title="Take leadership"');
   expect(screen).toContain('title={`Pass to ${name}`}');
+  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('sharedReplay?.amLeader && <View style={styles.actionButtons}>');
+  expect(screen).not.toContain('CardKnowledgeDetails');
 });
 
 test('C17 shared replay preserves existing leader-only restart eligibility', () => {

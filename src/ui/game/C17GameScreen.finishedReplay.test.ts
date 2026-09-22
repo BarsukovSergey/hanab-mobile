@@ -30,6 +30,9 @@ test('C17 finished replay is an authoritative read-only timeline with available 
   expect(screen).not.toContain('FINAL SCORE');
   expect(screen).toContain('const showRewindScrubber = reviewActive;');
   expect(screen).toContain('<View style={styles.workbenchScrubber}>');
+  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('|| hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);');
+  expect(screen).not.toContain('CardKnowledgeDetails');
   expect(screen).not.toContain('scrollEnabled={!scrubberDragging}');
   expect(screen).not.toContain('onDragStateChange={setScrubberDragging}');
   expect(screen).toContain('title="Edit note" onPress={() => onEditNote(selectedOwnCard)}');
