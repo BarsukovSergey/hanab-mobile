@@ -22,6 +22,7 @@ This directory mixes current product/technical authority with historical impleme
 
 - `C17_VALIDATION.md` — active beta acceptance scope and physical validation gates.
 - `C17_EVIDENCE.md` — preserved device observations and defect history; evidence, not authority.
+- `DEPENDENCY_AUDIT.md` — current npm/deprecation findings and the safe maintenance order.
 - `GAMEPLAY_SCENARIOS.md` — deterministic gameplay scenario harness and coverage model.
 
 ## Deferred work
