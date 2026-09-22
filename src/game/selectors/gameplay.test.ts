@@ -1,10 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  getClueColorFill,
   getDisplayedClueTokens,
+  getDisplayedLiveFutureEfficiency,
   getGameTableSuits,
   getGameplayClueChoices,
+  getGameplayClueChoicesForPlayerIndex,
   hasClueTokenForVariant,
+  canDiscardForVariant,
   getDisplayedClockTime,
 } from './gameplay';
 
@@ -23,6 +27,26 @@ describe('getGameTableSuits', () => {
       { value: 1, label: 'Odd' }, { value: 2, label: 'Even' },
     ]);
     expect(getGameplayClueChoices('No Variant', 'Quacker').colors[0]?.label).toBe('Quack');
+  });
+
+  it('carries the Empty Clues modifier through clue presentation data', () => {
+    expect(getGameplayClueChoices('No Variant').allowEmptyClues).toBe(false);
+    expect(getGameplayClueChoices('No Variant', '', true).allowEmptyClues).toBe(true);
+  });
+
+  it('uses the actual clue giver character when presenting an authoritative clue', () => {
+    const metadata = {
+      options: { variantName: 'No Variant', emptyClues: false },
+      ourPlayerIndex: 0,
+      characterAssignments: [null, 34],
+    } as unknown as Parameters<typeof getGameplayClueChoicesForPlayerIndex>[0];
+    expect(getGameplayClueChoicesForPlayerIndex(metadata, 1).colors[0]?.label).toBe('Quack');
+    expect(getGameplayClueChoicesForPlayerIndex(metadata, 0).colors[0]?.label).toBe('Red');
+  });
+
+  it('exposes exact variant clue fills without leaking upstream imports into UI', () => {
+    expect(getClueColorFill('No Variant', 0)).toBe('#e60000');
+    expect(getClueColorFill('No Variant', 99)).toBeNull();
   });
 
   it('maps authoritative play and discard orders to visible suit labels', () => {
@@ -60,5 +84,47 @@ describe('getGameTableSuits', () => {
     expect(hasClueTokenForVariant(2, variantName)).toBe(true);
     expect(getDisplayedClueTokens(1, variantName)).toBe(0.5);
     expect(getDisplayedClueTokens(2, variantName)).toBe(1);
+  });
+
+  it('permits discards only below the upstream maximum clue-token threshold', () => {
+    expect(canDiscardForVariant(7, 'No Variant')).toBe(true);
+    expect(canDiscardForVariant(8, 'No Variant')).toBe(false);
+    expect(canDiscardForVariant(15, 'Clue Starved (5 Suits)')).toBe(true);
+    expect(canDiscardForVariant(16, 'Clue Starved (5 Suits)')).toBe(false);
+  });
+
+  it('matches pinned web live FRE semantics, including note and manual adjustments', () => {
+    const game = {
+      stats: {
+        maxScore: 25,
+        cardsGotten: 3,
+        cardsGottenByNotes: 2,
+        cluesStillUsableNotRounded: 20.9,
+      },
+    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+
+    expect(getDisplayedLiveFutureEfficiency(game, 1)).toBeCloseTo(19 / 20);
+  });
+
+  it('hides live FRE when no finite future efficiency exists', () => {
+    const unavailable = {
+      stats: {
+        maxScore: 25,
+        cardsGotten: 3,
+        cardsGottenByNotes: 0,
+        cluesStillUsableNotRounded: null,
+      },
+    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+    const noClues = {
+      stats: {
+        maxScore: 25,
+        cardsGotten: 3,
+        cardsGottenByNotes: 0,
+        cluesStillUsableNotRounded: 0,
+      },
+    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+
+    expect(getDisplayedLiveFutureEfficiency(unavailable, 0)).toBeNull();
+    expect(getDisplayedLiveFutureEfficiency(noClues, 0)).toBeNull();
   });
 });

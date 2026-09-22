@@ -23,6 +23,7 @@ export function PregameScreen() {
   const roomState = useAppSelector((state) => state.room);
   const room = roomState.room.kind === 'pregame' ? roomState.room : null;
   const [editName, setEditName] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState(5);
   const [editOptions, setEditOptions] = useState<MobileTableOptions>({
     variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
@@ -49,6 +50,10 @@ export function PregameScreen() {
 
   if (room === null) return null;
   const isOwner = room.role === 'player' && session.authenticatedUser?.userID === room.data.owner;
+  const canTakeLeadership = room.role === 'player' && !isOwner;
+  const roleSwitchPending = roomState.pendingRoleSwitch !== null;
+  const canSwitchToSpectator = room.role === 'player' && room.data.players.length >= 2;
+  const canJoinAsPlayer = room.role === 'spectator' && room.data.players.length < room.data.maxPlayers;
 
   return (
     <View style={styles.root}>
@@ -64,7 +69,7 @@ export function PregameScreen() {
         </View>
         <ActionButton
           compact
-          disabled={roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
+          disabled={roleSwitchPending || roomState.pendingLeaveTableID !== null || roomState.pendingStart !== null}
           title={roomState.pendingLeaveTableID === null ? 'Leave' : 'Leaving…'}
           onPress={() => lobbyRuntime.leave(room.tableID)}
         />
@@ -88,11 +93,13 @@ export function PregameScreen() {
                       {player.present ? 'Present' : 'Away'}
                     </Text>
                   </View>
-                  {isOwner && !player.you && (
+                  {((isOwner && !player.you) || (canTakeLeadership && player.you)) && (
                     <ActionButton
                       compact
-                      disabled={roomState.pendingLeaderName !== null}
-                      title={roomState.pendingLeaderName === player.name ? 'Transferring…' : 'Make leader'}
+                      disabled={roleSwitchPending || roomState.pendingLeaderName !== null}
+                      title={roomState.pendingLeaderName === player.name
+                        ? 'Transferring…'
+                        : player.you ? 'Take leadership' : 'Make leader'}
                       onPress={() => lobbyRuntime.setTableLeader(player.name)}
                     />
                   )}
@@ -102,19 +109,52 @@ export function PregameScreen() {
             {isOwner && (
               <ActionButton
                 disabled={room.data.players.length < 2
-                  || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
+                  || roleSwitchPending || roomState.pendingStart !== null || roomState.pendingLeaveTableID !== null}
                 title={roomState.pendingStart === null ? 'Start game' : 'Starting…'}
                 tone="primary"
                 onPress={() => lobbyRuntime.startGame()}
               />
             )}
+            <View style={styles.roleSwitch}>
+              {room.role === 'player' ? (
+                <ActionButton
+                  disabled={!canSwitchToSpectator || roleSwitchPending}
+                  title={roleSwitchPending ? 'Switching…' : 'Switch to spectator'}
+                  onPress={() => lobbyRuntime.switchToSpectator()}
+                />
+              ) : (
+                <>
+                  {room.data.passwordProtected && (
+                    <Field
+                      onChangeText={setJoinPassword}
+                      placeholder="Table password"
+                      secureTextEntry
+                      value={joinPassword}
+                    />
+                  )}
+                  <ActionButton
+                    disabled={!canJoinAsPlayer || roleSwitchPending
+                      || (room.data.passwordProtected && joinPassword.length === 0)}
+                    title={roleSwitchPending ? 'Joining…' : 'Join as player'}
+                    tone="primary"
+                    onPress={() => {
+                      if (lobbyRuntime.joinAsPlayer(joinPassword)) setJoinPassword('');
+                    }}
+                  />
+                </>
+              )}
+            </View>
           </Panel>
           <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />
         </View>
 
-        {isOwner && (
-          <Panel style={styles.column}>
-            <SectionHeading title="Table settings" detail="Changes are applied authoritatively to the room." />
+        <Panel style={styles.column}>
+            <SectionHeading
+              title="Table settings"
+              detail={isOwner
+                ? 'Changes are applied authoritatively to the room.'
+                : 'Changes are sent to the table owner as a proposal.'}
+            />
             <Field maxLength={45} onChangeText={setEditName} placeholder="Table name" value={editName} />
             <View style={styles.stepperRow}>
               <View style={styles.stepperCopy}>
@@ -130,13 +170,14 @@ export function PregameScreen() {
             </View>
             <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
             <ActionButton
-              disabled={roomState.pendingUpdate !== null || editName.trim().length === 0}
-              title={roomState.pendingUpdate === null ? 'Apply changes' : 'Applying…'}
+              disabled={roleSwitchPending || (isOwner && roomState.pendingUpdate !== null) || editName.trim().length === 0}
+              title={isOwner
+                ? (roomState.pendingUpdate === null ? 'Apply changes' : 'Applying…')
+                : 'Propose changes'}
               tone="primary"
               onPress={() => lobbyRuntime.updateTable(editName, editMaxPlayers, editOptions)}
             />
-          </Panel>
-        )}
+        </Panel>
       </View>
     </View>
   );
@@ -153,6 +194,7 @@ const styles = StyleSheet.create({
   columnsWide: { alignItems: 'flex-start', flexDirection: 'row' },
   column: { flex: 1, gap: 16, minWidth: 0 },
   players: { gap: 8 },
+  roleSwitch: { gap: 10 },
   playerRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingTop: 9 },
   playerCopy: { flex: 1, gap: 2 },
   playerName: { fontSize: 15, fontWeight: '800' },

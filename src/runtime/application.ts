@@ -1,8 +1,35 @@
 import { HanabNetworkSession } from '../network/NetworkSession';
 import { store } from '../store/store';
+import { ChatRuntime } from './ChatRuntime';
 import { LobbyRuntime } from './LobbyRuntime';
+import { createRuntimeCommandGate } from './runtimeCommandGate';
 import { TerminationRuntime } from './terminationRuntime';
 
 export const networkSession = new HanabNetworkSession();
-export const lobbyRuntime = new LobbyRuntime(networkSession, store);
-export const terminationRuntime = new TerminationRuntime(lobbyRuntime, store);
+const rawLobbyRuntime = new LobbyRuntime(networkSession, store);
+const gameplayCommandGate = createRuntimeCommandGate(rawLobbyRuntime, [
+  'play',
+  'discard',
+  'colorClue',
+  'rankClue',
+  'editNote',
+  'pauseGame',
+  'navigateReplaySegment',
+  'followReplayLeader',
+  'setSharedReplayLeader',
+  'quickRematch',
+  'restartToPregame',
+  'startHypothetical',
+  'endHypothetical',
+  'backHypothetical',
+  'toggleHypotheticalDrawnCards',
+  'hypotheticalPlay',
+  'hypotheticalDiscard',
+  'hypotheticalColorClue',
+  'hypotheticalRankClue',
+]);
+
+export const lobbyRuntime = gameplayCommandGate.runtime;
+export const suppressGameplayRuntimeCommands = () => gameplayCommandGate.suppress();
+export const terminationRuntime = new TerminationRuntime(rawLobbyRuntime, store);
+export const chatRuntime = new ChatRuntime(lobbyRuntime, terminationRuntime, store);

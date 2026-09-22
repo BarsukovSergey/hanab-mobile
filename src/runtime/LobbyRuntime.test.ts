@@ -9,10 +9,12 @@ import type { LobbyTable } from '../protocol/lobbyProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
+import type { ActionIncludingHypothetical } from '../game/client/types/actions';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
 import { createAppStore, userSelectors } from '../store/store';
+import { ChatRuntime, getVariantFromArgs } from './ChatRuntime';
 import {
   isJoinEligible,
   isPregameSpectateEligible,
@@ -22,6 +24,8 @@ import {
   isSpectateEligible,
   LobbyRuntime,
 } from './LobbyRuntime';
+import { TerminationRuntime } from './terminationRuntime';
+import { SHRUG_TEXT, transformChatInput } from '../ui/chatInput';
 
 type ListenerMap = {
   open: Set<() => void>;
@@ -33,6 +37,7 @@ type ListenerMap = {
 class FakeSocket implements NetworkSocket {
   readyState = 0;
   failSend = false;
+  failOnSendNumber: number | null = null;
   readonly sent: string[] = [];
   readonly closeCalls: Array<{ code?: number; reason?: string }> = [];
   private readonly listeners: ListenerMap = {
@@ -56,7 +61,7 @@ class FakeSocket implements NetworkSocket {
   }
 
   send(data: string): void {
-    if (this.failSend) throw new Error('send failed');
+    if (this.failSend || this.failOnSendNumber === this.sent.length + 1) throw new Error('send failed');
     this.sent.push(data);
   }
   close(code?: number, reason?: string): void {
@@ -113,6 +118,7 @@ function deferred<T>() {
 
 const welcomeFrame = 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}';
 const userFrame = 'user {"userID":1,"name":"Ada","status":0,"hyphenated":false,"inactive":false}';
+const bobUserFrame = 'user {"userID":2,"name":"Bob","status":0,"hyphenated":false,"inactive":false}';
 const tableOptions = {
   variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
   speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
@@ -241,17 +247,18 @@ async function makeLiveRuntime(role: 'player' | 'spectator') {
 async function makeSharedReplayRuntime(
   leader = 'Ada',
   playerNames: readonly string[] = ['Ada', 'Bob'],
+  sharedReplay = true,
 ) {
   const ready = await makeReadyRuntime();
   ready.store.dispatch(lobbyActions.tableReceived({
     epoch: 1,
-    table: { ...runningTable, sharedReplay: true, joined: true },
+    table: { ...runningTable, sharedReplay, joined: sharedReplay },
   }));
   expect(ready.runtime.spectate(123)).toBe(true);
   ready.socket.emitMessage('tableStart {"tableID":123,"replay":true}');
   ready.socket.emitMessage(`init ${JSON.stringify(makeInit({
     replay: true,
-    sharedReplay: true,
+    sharedReplay,
     databaseID: 77,
     datetimeFinished: '2026-08-31T00:10:00Z',
     sharedReplayLeader: leader,
@@ -284,9 +291,22 @@ async function makeSharedReplayRuntime(
     + '{"name":"Bob","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',
   );
   expect(ready.store.getState().room.room).toMatchObject({
-    kind: 'live_game', sharedReplay: true,
+    kind: 'live_game', sharedReplay,
   });
   return ready;
+}
+
+function getSentHypotheticalActions(
+  frames: readonly string[],
+): ActionIncludingHypothetical[] {
+  return frames.map((frame) => {
+    const payload = JSON.parse(frame.slice(frame.indexOf(' ') + 1)) as { actionJSON: string };
+    return JSON.parse(payload.actionJSON) as ActionIncludingHypothetical;
+  });
+}
+
+function emitHypotheticalAction(socket: FakeSocket, action: ActionIncludingHypothetical): void {
+  socket.emitMessage(`hypoAction ${JSON.stringify(JSON.stringify(action))}`);
 }
 
 beforeEach(() => {
@@ -334,6 +354,33 @@ describe('deterministic lobby runtime', () => {
       expect(runtime.editNote(order, 'x'.repeat(301))).toBe(false);
     },
   );
+
+  test('edits a historical card while locally rewinding after it has left the live hand', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"discard","playerIndex":1,"order":5,"suitIndex":0,"rank":1,"failed":false}}',
+    );
+
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.replay.active).toBe(true);
+    expect(room.clientState.visibleState?.hands[1]).toContain(5);
+    expect(room.clientState.ongoingGame.hands[1]).not.toContain(5);
+
+    expect(runtime.editNote(5, 'rewind note')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('note {"tableID":123,"order":5,"note":"rewind note"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.notes.ourNotes[5]?.text).toBe('rewind note');
+  });
 
   test('accepts current note/presence events and ignores wrong table or cardinality', async () => {
     const { socket, store } = await makeLiveRuntime('spectator');
@@ -464,6 +511,379 @@ describe('deterministic lobby runtime', () => {
       'tableJoin {"tableID":123}',
       'chat {"msg":"table hello","room":"table123"}',
     ]);
+  });
+
+  test('chat submission preserves normal and server-side slash-command frames', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    for (const message of [
+      'hello', '/help', '/random 1 5', '/replay 123', '/findvariant', '/whatever', '/copy', '/',
+    ]) {
+      expect(chat.submit(message)).toBe(true);
+    }
+
+    expect(socket.sent).toEqual([
+      'chat {"msg":"hello","room":"lobby"}',
+      'chat {"msg":"/help","room":"lobby"}',
+      'chat {"msg":"/random 1 5","room":"lobby"}',
+      'chat {"msg":"/replay 123","room":"lobby"}',
+      'chat {"msg":"/findvariant","room":"lobby"}',
+      'chat {"msg":"/whatever","room":"lobby"}',
+      'chat {"msg":"/copy","room":"lobby"}',
+      'chat {"msg":"/","room":"lobby"}',
+    ]);
+  });
+
+  test('termination slash commands use the termination runtime without raw-chat fallback', async () => {
+    const { socket, store, runtime } = await makeLiveRuntime('player');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = socket.sent.length;
+
+    expect(chat.submit('/TeRmInAtE')).toBe(true);
+    expect(chat.submit('/vote')).toBe(true);
+
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'tableTerminate {"tableID":123}',
+      'tableVoteForTermination {"tableID":123}',
+    ]);
+  });
+
+  test('ineligible termination slash command fails without raw-chat fallback', async () => {
+    const { socket, store, runtime } = await makeLiveRuntime('spectator');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = [...socket.sent];
+
+    expect(chat.submit('/terminate')).toBe(false);
+    expect(socket.sent).toEqual(sentBefore);
+  });
+
+  test.each(['/setleader Bob', '/changelead Bob'])(
+    'leadership slash command %s resolves canonical player name through setTableLeader',
+    async (command) => {
+      const { socket, store, runtime } = await makeReadyRuntime();
+      expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+      socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+      socket.emitMessage('joined {"tableID":321}');
+      const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+      const mixedCaseCommand = command === '/setleader Bob' ? '/SeTlEaDeR bOb' : command;
+      expect(chat.submit(mixedCaseCommand)).toBe(true);
+      expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":321,"name":"Bob"}');
+      expect(store.getState().room.pendingLeaderName).toBe('Bob');
+    },
+  );
+
+  test('invalid leadership slash commands fail without raw-chat fallback', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = [...socket.sent];
+
+    expect(chat.submit('/setleader')).toBe(false);
+    expect(chat.submit('/setowner Missing')).toBe(false);
+    expect(chat.submit('/changeowner Ada')).toBe(false);
+    expect(socket.sent).toEqual(sentBefore);
+  });
+
+  test('PM commands resolve online names canonically and reject invalid recipients locally', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/pm bob hello there')).toBe(true);
+    expect(chat.submit('/w BOB alias works')).toBe(true);
+    const sentBeforeFailures = [...socket.sent];
+    expect(chat.submit('/pm')).toBe(false);
+    expect(chat.submit('/pm Cy hello')).toBe(false);
+
+    expect(socket.sent).toEqual([
+      'chatPM {"msg":"hello there","recipient":"Bob","room":"lobby"}',
+      'chatPM {"msg":"alias works","recipient":"Bob","room":"lobby"}',
+    ]);
+    expect(socket.sent).toEqual(sentBeforeFailures);
+    expect(store.getState().chat.messagesByRoom.lobby?.map((message) => message.msg)).toEqual([
+      'The format of a private message is: /w Alice hello',
+      'User "Cy" is not currently online.',
+    ]);
+  });
+
+  test('reply without an incoming PM fails locally and keeps raw chat off the socket', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/r hello')).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().chat.messagesByRoom.lobby?.at(-1)).toMatchObject({
+      msg: 'No-one has sent you a private message yet, so you cannot reply.',
+      localType: 'info',
+    });
+  });
+
+  test('transformed shrug uses normal chat and never emits a literal slash command', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const transformed = transformChatInput('/shrug', store.getState().chat.lastPM);
+
+    expect(transformed).toBe(SHRUG_TEXT);
+    expect(chat.submit(transformed)).toBe(true);
+    expect(socket.sent).toEqual([
+      `chat ${JSON.stringify({ msg: SHRUG_TEXT, room: 'lobby' })}`,
+    ]);
+    expect(socket.sent.some((frame) => frame.includes('/shrug'))).toBe(false);
+  });
+
+  test('sender sees one authoritative blank-room PM echo without an optimistic copy', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/pm Bob hello')).toBe(true);
+    expect(store.getState().chat.messagesByRoom.lobby).toBeUndefined();
+    socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"",'
+      + '"recipient":"Bob"}');
+
+    expect(store.getState().chat.messagesByRoom.lobby).toEqual([
+      expect.objectContaining({
+        msg: 'hello', room: 'lobby', who: 'Ada', recipient: 'Bob',
+      }),
+    ]);
+  });
+
+  test('recipient receives a blank-room PM in the currently active lobby', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(
+      'welcome {"userID":2,"username":"Bob","totalGames":0,"playingAtTables":[]}',
+    );
+    socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"",'
+      + '"recipient":"Bob"}');
+
+    expect(store.getState().chat.messagesByRoom.lobby).toEqual([
+      expect.objectContaining({
+        msg: 'hello', room: 'lobby', who: 'Ada', recipient: 'Bob',
+      }),
+    ]);
+    expect(store.getState().chat.lastPM).toBe('Ada');
+    expect(transformChatInput('/r ', store.getState().chat.lastPM)).toBe('/pm Ada ');
+
+    socket.emitMessage(userFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    expect(chat.submit('/pm Ada response')).toBe(true);
+    socket.emitMessage('chat {"msg":"response","who":"Bob","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:01:00Z","room":"",'
+      + '"recipient":"Ada"}');
+    expect(store.getState().chat.lastPM).toBe('Ada');
+
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+    runtime.disconnect();
+    await runtime.connect();
+    second.emitOpen();
+    second.emitMessage(
+      'welcome {"userID":2,"username":"Bob","totalGames":0,"playingAtTables":[]}',
+    );
+    expect(store.getState().chat.lastPM).toBeNull();
+  });
+
+  test('blank-room PM events and history use the current table room', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    const privateMessage = {
+      msg: 'live private', who: 'Ada', discord: false, server: false,
+      datetime: '2026-09-01T10:00:00Z', room: '', recipient: 'Bob',
+    };
+    socket.emitMessage(`chat ${JSON.stringify(privateMessage)}`);
+    expect(store.getState().chat.messagesByRoom.table123).toEqual([
+      expect.objectContaining({ ...privateMessage, room: 'table123', rawMsg: 'live private' }),
+    ]);
+    expect(store.getState().chat.messagesByRoom.lobby).toBeUndefined();
+
+    socket.emitMessage(`chatList ${JSON.stringify({
+      list: [{ ...privateMessage, msg: 'history private' }], unread: 0,
+    })}`);
+    expect(store.getState().chat.messagesByRoom.table123).toEqual([
+      expect.objectContaining({
+        msg: 'history private', room: 'table123', who: 'Ada', recipient: 'Bob',
+      }),
+    ]);
+    expect(store.getState().chat.messagesByRoom.lobby).toBeUndefined();
+  });
+
+  test('welcome and friends events retain only the latest authoritative friends list', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,'
+      + '"playingAtTables":[],"friends":["Bob","Cy"]}',
+    );
+    expect(store.getState().session.friends).toEqual(['Bob', 'Cy']);
+
+    socket.emitMessage('friends {"friends":["Dee"]}');
+    expect(store.getState().session.friends).toEqual(['Dee']);
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().session.friends).toEqual([]);
+  });
+
+  test('friend mutations use exact frames and friend-list aliases are local-only', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.friendsReceived({ epoch: 1, friends: ['Bob', 'Cy'] }));
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/friend Bob')).toBe(true);
+    expect(chat.submit('/addfriend Cy')).toBe(true);
+    expect(chat.submit('/unfriend Bob')).toBe(true);
+    const sentBeforeList = [...socket.sent];
+    expect(chat.submit('/friends')).toBe(true);
+    expect(chat.submit('/f')).toBe(true);
+
+    expect(socket.sent).toEqual([
+      'chatFriend {"name":"Bob"}',
+      'chatFriend {"name":"Cy"}',
+      'chatUnfriend {"name":"Bob"}',
+    ]);
+    expect(socket.sent).toEqual(sentBeforeList);
+    expect(store.getState().chat.messagesByRoom.lobby?.at(-1)?.msg)
+      .toBe('Current friends: Bob, Cy');
+  });
+
+  test('link commands and aliases use exact upstream frames', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/link Bob')).toBe(true);
+    expect(chat.submit('/unlink Bob')).toBe(true);
+    expect(chat.submit('/linked')).toBe(true);
+    expect(chat.submit('/links')).toBe(true);
+    expect(socket.sent).toEqual([
+      'chatLink {"name":"Bob"}',
+      'chatUnlink {"name":"Bob"}',
+      'chatLinked {}',
+      'chatLinked {}',
+    ]);
+  });
+
+  test('variant normalization and aliases prefix-match only supported variants', async () => {
+    expect(getVariantFromArgs(['black', '', '&', 'rainbow', '(', '6', 'suits', ')']))
+      .toBe('Black & Rainbow (6 Suits)');
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = socket.sent.length;
+
+    expect(chat.submit('/sv no var')).toBe(true);
+    expect(chat.submit('/cv no variant')).toBe(true);
+    expect(chat.submit('/setvariant definitely missing')).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'tableSetVariant {"tableID":321,"options":{"variantName":"No Variant"}}',
+      'tableSetVariant {"tableID":321,"options":{"variantName":"No Variant"}}',
+    ]);
+    expect(store.getState().chat.messagesByRoom.table321?.at(-1)?.msg)
+      .toBe('The variant of "definitely missing" is not valid.');
+  });
+
+  test('suggest validates locally and emits the exact valid frame', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = socket.sent.length;
+
+    expect(chat.submit('/suggest 12')).toBe(true);
+    expect(chat.submit('/suggest nope')).toBe(false);
+    expect(chat.submit('/suggest')).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toEqual(['tableSuggest {"tableID":321,"segment":12}']);
+  });
+
+  test('tag commands and alias emit exact upstream frames', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = socket.sent.length;
+
+    expect(chat.submit('/tag finesse')).toBe(true);
+    expect(chat.submit('/tagdelete finesse')).toBe(true);
+    expect(chat.submit('/untag bluff')).toBe(true);
+    expect(chat.submit('/tagsearch layered finesse')).toBe(true);
+    expect(chat.submit('/tagsdeleteall')).toBe(true);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'tag {"tableID":321,"msg":"finesse"}',
+      'tagDelete {"tableID":321,"msg":"finesse"}',
+      'tagDelete {"tableID":321,"msg":"bluff"}',
+      'tagSearch {"msg":"layered finesse","room":"table321"}',
+      'tagsDeleteAll {"tableID":321}',
+    ]);
+  });
+
+  test('player-info aliases send explicit names, self, and loaded-game players', async () => {
+    const ready = await makeReadyRuntime();
+    const chat = new ChatRuntime(
+      ready.runtime,
+      new TerminationRuntime(ready.runtime, ready.store),
+      ready.store,
+    );
+    expect(chat.submit('/p Bob Cy')).toBe(true);
+    expect(chat.submit('/stats')).toBe(true);
+    expect(ready.socket.sent).toEqual([
+      'chatPlayerInfo {"name":"Bob"}',
+      'chatPlayerInfo {"name":"Cy"}',
+      'chatPlayerInfo {"name":"Ada"}',
+    ]);
+
+    const live = await makeLiveRuntime('player');
+    const liveChat = new ChatRuntime(
+      live.runtime,
+      new TerminationRuntime(live.runtime, live.store),
+      live.store,
+    );
+    const sentBefore = live.socket.sent.length;
+    expect(liveChat.submit('/games')).toBe(true);
+    expect(live.socket.sent.slice(sentBefore)).toEqual([
+      'chatPlayerInfo {"name":"Ada"}',
+      'chatPlayerInfo {"name":"Bob"}',
+    ]);
+  });
+
+  test('version is local-only and renders the mobile client version', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(
+      runtime,
+      new TerminationRuntime(runtime, store),
+      store,
+      () => new Date('2026-09-22T10:00:00Z'),
+    );
+
+    expect(chat.submit('/version')).toBe(true);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().chat.messagesByRoom.lobby?.at(-1)).toMatchObject({
+      msg: 'You are running version 1.0.0 of the client.',
+      datetime: '2026-09-22T10:00:00.000Z',
+      server: true,
+      localType: 'info',
+    });
   });
 
   test('chat frames and history route by room and reset on connection replacement', async () => {
@@ -689,6 +1109,25 @@ describe('deterministic lobby runtime', () => {
     );
   });
 
+  test('live runtime rejects zero-touch clues before creating pending gameplay state', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"discard","playerIndex":1,'
+      + '"order":9,"suitIndex":4,"rank":5,"failed":false}}',
+    );
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected live game');
+    expect(room.clientState.ongoingGame.hands[1]).not.toContain(9);
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.rankClue(1, 5)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+
+    expect(runtime.rankClue(1, 1)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('action {"tableID":123,"type":3,"target":1,"value":1}');
+  });
+
   test('reattend uses the existing player recovery path and attendance guard', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     store.dispatch(lobbyActions.tableReceived({
@@ -783,6 +1222,281 @@ describe('deterministic lobby runtime', () => {
     expect(room.clientState.replay.segment).toBe(0);
     expect(room.clientState.replay.shared?.useSharedSegments).toBe(true);
     expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('shared replay follower takes leadership only after the authoritative echo', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+
+    expect(runtime.setSharedReplayLeader('Ada')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":123,"name":"Ada"}');
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({ leader: 'Bob', amLeader: false });
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({ leader: 'Ada', amLeader: true });
+  });
+
+  test('shared replay leader can pass only to an active spectator', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+
+    expect(runtime.setSharedReplayLeader('Cy')).toBe(false);
+    expect(runtime.setSharedReplayLeader('Ada')).toBe(false);
+    expect(runtime.setSharedReplayLeader('Bob')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":123,"name":"Bob"}');
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({ leader: 'Ada', amLeader: true });
+  });
+
+  test('hypothetical shared leader waits for authoritative action events and followers cannot send', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    expect(socket.sent.at(-1)).toBe('replayAction {"tableID":123,"type":3}');
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).toBeNull();
+    socket.emitMessage('hypoStart {"TableID":123}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    const touchedOrder = room.clientState.replay.hypothetical?.ongoing.hands[0]?.[0];
+    if (touchedOrder === undefined) throw new Error('Expected a touched card in the hypothetical state');
+    const hypotheticalClue = {
+      type: 'clue' as const, clue: { type: 1 as const, value: 1 as const }, giver: 1 as const, list: [touchedOrder], target: 0 as const,
+      ignoreNegative: false,
+    };
+    expect(runtime.sendHypotheticalAction(hypotheticalClue)).toBe(true);
+    expect(socket.sent.at(-1)).toContain('"type":5');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical?.ongoing.turn.turnNum).toBe(1);
+    socket.emitMessage('hypoAction "{\\"type\\":\\"clue\\",\\"clue\\":{\\"type\\":1,\\"value\\":1},\\"giver\\":1,\\"list\\":[0],\\"target\\":0,\\"ignoreNegative\\":false}"');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical?.ongoing.clueTokens).toBe(6);
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Bob"}');
+    const sent = socket.sent.length;
+    expect(runtime.backHypothetical()).toBe(false);
+    expect(runtime.endHypothetical()).toBe(false);
+    expect(socket.sent).toHaveLength(sent);
+  });
+
+  test('hypothetical runtime rejects discard at maximum clue tokens', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+
+    const roomBefore = store.getState().room.room;
+    if (roomBefore.kind !== 'live_game') throw new Error('Expected shared replay');
+    const hypotheticalBefore = roomBefore.clientState.replay.hypothetical;
+    if (hypotheticalBefore === null) throw new Error('Expected hypothetical state');
+    expect(hypotheticalBefore.ongoing.clueTokens).toBe(8);
+    const order = hypotheticalBefore.ongoing.hands[0]?.[0];
+    if (order === undefined) throw new Error('Expected actionable hypothetical card');
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalDiscard(order)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    const roomAfter = store.getState().room.room;
+    if (roomAfter.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(roomAfter.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+  });
+
+  test('hypothetical runtime rejects clues with zero clue tokens', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+
+    for (let turn = 0; turn < 8; turn += 1) {
+      const giver = turn % 2;
+      const target = giver === 0 ? 1 : 0;
+      const order = target === 0 ? 0 : 5;
+      socket.emitMessage(
+        `hypoAction ${JSON.stringify(
+          `{"type":"clue","clue":{"type":1,"value":1},"giver":${giver},`
+          + `"list":[${order}],"target":${target},"ignoreNegative":false}`,
+        )}`,
+      );
+      socket.emitMessage(
+        `hypoAction ${JSON.stringify(
+          `{"type":"turn","num":${turn + 1},"currentPlayerIndex":${target}}`,
+        )}`,
+      );
+    }
+
+    const roomBefore = store.getState().room.room;
+    if (roomBefore.kind !== 'live_game') throw new Error('Expected shared replay');
+    const hypotheticalBefore = roomBefore.clientState.replay.hypothetical;
+    if (hypotheticalBefore === null) throw new Error('Expected hypothetical state');
+    expect(hypotheticalBefore.ongoing.clueTokens).toBe(0);
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalRankClue(1, 1)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    const roomAfter = store.getState().room.room;
+    if (roomAfter.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(roomAfter.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+  });
+
+  test('hypothetical runtime rejects zero-touch clues before generating actions', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    const hypotheticalBefore = room.clientState.replay.hypothetical;
+    if (hypotheticalBefore === null) throw new Error('Expected hypothetical state');
+    const actionsBefore = hypotheticalBefore.actions;
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalRankClue(0, 2)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).toBe(hypotheticalBefore);
+    expect(room.clientState.replay.hypothetical?.actions).toBe(actionsBefore);
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(true);
+    expect(socket.sent.slice(sentBefore)).toHaveLength(2);
+    expect(socket.sent.slice(sentBefore).every((frame) => frame.startsWith('replayAction '))).toBe(true);
+  });
+
+  test('shared hypothetical operation stays pending through intermediate echoes and rejects another operation', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const sentBefore = socket.sent.length;
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(true);
+    const frames = socket.sent.slice(sentBefore);
+    const actions = getSentHypotheticalActions(frames);
+    expect(actions).toHaveLength(2);
+    expect(store.getState().room.pendingHypotheticalOperation).toMatchObject({
+      connectionEpoch: 1,
+      tableID: 123,
+      finalAction: actions.at(-1),
+    });
+
+    expect(runtime.hypotheticalPlay(5)).toBe(false);
+    expect(runtime.sendHypotheticalAction(actions[0]!)).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toEqual(frames);
+
+    emitHypotheticalAction(socket, actions[0]!);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    expect(runtime.hypotheticalPlay(5)).toBe(false);
+    expect(runtime.backHypothetical()).toBe(false);
+
+    emitHypotheticalAction(socket, actions[1]!);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    expect(runtime.hypotheticalPlay(0)).toBe(true);
+  });
+
+  test('shared hypothetical first-frame failure clears pending and sends nothing', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const sentBefore = socket.sent.length;
+    socket.failOnSendNumber = sentBefore + 1;
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+  });
+
+  test('shared hypothetical partial send failure stays uncertain without retry until authoritative end', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const sentBefore = socket.sent.length;
+    socket.failOnSendNumber = sentBefore + 2;
+
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toHaveLength(1);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    expect(runtime.hypotheticalPlay(5)).toBe(false);
+    expect(socket.sent.slice(sentBefore)).toHaveLength(1);
+
+    socket.failOnSendNumber = null;
+    expect(runtime.endHypothetical()).toBe(true);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    socket.emitMessage('hypoEnd {"TableID":123}');
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+  });
+
+  test('connection replacement clears a shared hypothetical operation without replay', async () => {
+    const { session, runtime, socket: first, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    first.emitMessage('hypoStart {"TableID":123}');
+    expect(runtime.hypotheticalRankClue(0, 1)).toBe(true);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+
+    first.emitClose();
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    expect(second.sent).toEqual([]);
+  });
+
+  test('solo hypothetical operations remain local and immediately composable', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Ada', ['Ada', 'Bob'], false);
+    const sentBefore = socket.sent.length;
+    expect(runtime.startHypothetical()).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    const actor = room.clientState.replay.hypothetical?.ongoing.turn.currentPlayerIndex;
+    if (actor === null || actor === undefined) throw new Error('Expected hypothetical actor');
+    expect(runtime.hypotheticalRankClue(actor === 0 ? 1 : 0, 1)).toBe(true);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+    expect(runtime.backHypothetical()).toBe(true);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('detached follower promoted to shared replay leader can start hypothetical', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+    expect(runtime.navigateReplaySegment(0)).toBe(true);
+
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({
+      useSharedSegments: false, amLeader: false,
+    });
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.shared).toMatchObject({
+      amLeader: true, useSharedSegments: false,
+    });
+
+    const sentBefore = socket.sent.length;
+    expect(runtime.startHypothetical()).toBe(true);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'replayAction {"tableID":123,"type":3}',
+    ]);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).toBeNull();
+
+    socket.emitMessage('hypoStart {"TableID":123}');
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical).not.toBeNull();
+    expect(room.clientState.replay.shared?.useSharedSegments).toBe(true);
+    expect(room.clientState.replay.segment).toBe(room.clientState.replay.shared?.segment);
   });
 
   test('leader and spectator events are table-scoped and drive rematch eligibility', async () => {
@@ -1332,6 +2046,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -1341,6 +2056,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
@@ -1411,6 +2127,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -1420,6 +2137,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: { kind: 'none' },
     });
   });
@@ -1521,6 +2239,156 @@ describe('deterministic lobby runtime', () => {
     },
   );
 
+  test('pregame player-to-spectator sends leave then spectate, stays present through left, and confirms from game plus joined', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    expect(runtime.switchToSpectator()).toBe(true);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'tableLeave {"tableID":123}',
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    socket.emitMessage('left {"TableID":123}');
+    expect(store.getState().room.room.kind).toBe('pregame');
+    socket.emitMessage(createdPregameFrame(['Bob'], 123).replace('"you":true', '"you":false'));
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+  });
+
+  test('player-to-spectator retains the leave transition when local spectate send fails and authoritative left exits pregame', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    socket.failOnSendNumber = 3;
+
+    expect(runtime.switchToSpectator()).toBe(false);
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}', 'tableLeave {"tableID":123}']);
+    expect(store.getState().room.pendingRoleSwitch).toMatchObject({
+      targetRole: 'spectator', leaveSent: true, spectateSent: false,
+    });
+    socket.emitMessage('left {"TableID":123}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+  });
+
+  test.each(['warning', 'error'] as const)(
+    'player-to-spectator %s before or after left safely exits the stale player room',
+    async (rejection) => {
+      for (const order of ['before-left', 'after-left'] as const) {
+        const { runtime, socket, store } = await makeReadyRuntime();
+        addJoinableTable(store);
+        expect(runtime.join(123)).toBe(true);
+        socket.emitMessage(pregameFrame());
+        socket.emitMessage('joined {"tableID":123}');
+        expect(runtime.switchToSpectator()).toBe(true);
+        const rejected = `${rejection} ${JSON.stringify({ [rejection]: 'Rejected' })}`;
+        if (order === 'before-left') {
+          socket.emitMessage(rejected);
+          expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+          expect(store.getState().room.pendingRoleSwitch).toMatchObject({ rejected: true });
+          socket.emitMessage('left {"TableID":123}');
+        } else {
+          socket.emitMessage('left {"TableID":123}');
+          expect(store.getState().room.room.kind).toBe('pregame');
+          socket.emitMessage(rejected);
+        }
+        expect(store.getState().room.room).toEqual({ kind: 'none' });
+        expect(store.getState().room.pendingRoleSwitch).toBeNull();
+      }
+    },
+  );
+
+  test('pregame spectator-to-player requires and passes password, then confirms only after game plus joined', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    const spectatorRoom = store.getState().room.room;
+    if (spectatorRoom.kind !== 'pregame') throw new Error('Expected pregame spectator room');
+    store.dispatch(roomActions.gameReceived({
+      epoch: 1,
+      game: { ...spectatorRoom.data, passwordProtected: true },
+    }));
+
+    expect(runtime.joinAsPlayer()).toBe(false);
+    expect(runtime.joinAsPlayer('open sesame')).toBe(true);
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+      'tableJoin {"tableID":123,"password":"open sesame"}',
+    ]);
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    expect(JSON.stringify(store.getState())).not.toContain('open sesame');
+  });
+
+  test.each(['warning', 'error'] as const)('spectator-to-player %s clears only its intent and remains spectator', async (rejection) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.joinAsPlayer()).toBe(true);
+    socket.emitMessage(`${rejection} ${JSON.stringify({ [rejection]: 'Rejected' })}`);
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+  });
+
+  test('pregame mutations do not send while a role switch is pending', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob'], 123));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.switchToSpectator()).toBe(true);
+
+    expect(runtime.leave(123)).toBe(false);
+    expect(runtime.startGame()).toBe(false);
+    expect(runtime.updateTable('Changed', 3, {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+      allOrNothing: false,
+    })).toBe(false);
+    expect(runtime.setTableLeader('Bob')).toBe(false);
+    expect(socket.sent).toEqual([
+      'tableJoin {"tableID":123}',
+      'tableLeave {"tableID":123}',
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+  });
+
+  test.each(['warning', 'error'] as const)('pregame role switching rejects a full spectator seat and a solo player, and %s clears its pending intent', async (rejection) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Bob'], 123, 'Pregame table', tableOptions, 1)
+      .replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.joinAsPlayer()).toBe(false);
+    store.dispatch(roomActions.roleSwitchRequested({ epoch: 1, tableID: 123, targetRole: 'player' }));
+    socket.emitMessage(`${rejection} ${JSON.stringify({ [rejection]: 'Rejected' })}`);
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+    expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'spectator' });
+
+    const playerReady = await makeReadyRuntime();
+    addJoinableTable(playerReady.store);
+    expect(playerReady.runtime.join(123)).toBe(true);
+    playerReady.socket.emitMessage(createdPregameFrame(['Ada'], 123));
+    playerReady.socket.emitMessage('joined {"tableID":123}');
+    expect(playerReady.runtime.switchToSpectator()).toBe(false);
+  });
+
   test('create validates v1 input, sends the exact frame once, and is not optimistic', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
 
@@ -1585,6 +2453,31 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.room).toMatchObject({ data: { name: 'Changed' } });
   });
 
+  test('a non-owner pregame attendee sends a proposal without local update state', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    const before = store.getState().room.room;
+    const changes = {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: true, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+      allOrNothing: false,
+    };
+
+    expect(runtime.updateTable('Suggested', 4, changes)).toBe(true);
+    expect(socket.sent.at(-1)).toBe(
+      'tableUpdate {"tableID":123,"name":"Suggested","options":{'
+      + '"variantName":"No Variant","timed":false,"timeBase":0,"timePerTurn":0,'
+      + '"speedrun":false,"cardCycle":true,"deckPlays":false,"emptyClues":false,'
+      + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
+      + '"detrimentalCharacters":false},"maxPlayers":4}',
+    );
+    expect(store.getState().room.pendingUpdate).toBeNull();
+    expect(store.getState().room.room).toEqual(before);
+  });
+
   test('owner leader transfer waits for the authoritative reordered game snapshot', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     runtime.createTable('Mobile table', 5, 'No Variant');
@@ -1600,6 +2493,31 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.room).toMatchObject({
       data: { owner: 2, players: [{ name: 'Bob' }, { name: 'Ada' }] },
     });
+  });
+
+  test('non-owner player can take pregame leadership, but a spectator cannot', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    expect(runtime.setTableLeader('Ada')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":123,"name":"Ada"}');
+    expect(store.getState().room.pendingLeaderName).toBe('Ada');
+    expect(runtime.setTableLeader('Bob')).toBe(false);
+
+    socket.emitMessage(pregameFrame());
+    expect(store.getState().room.pendingLeaderName).toBe('Ada');
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob'], 123, 'Pregame table'));
+    expect(store.getState().room.pendingLeaderName).toBeNull();
+
+    const spectator = await makeReadyRuntime();
+    addJoinableTable(spectator.store);
+    expect(spectator.runtime.spectate(123)).toBe(true);
+    spectator.socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    spectator.socket.emitMessage('joined {"tableID":123}');
+    expect(spectator.runtime.setTableLeader('Ada')).toBe(false);
   });
 
   test.each(['game-first', 'joined-first'] as const)(
@@ -1911,6 +2829,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -1920,6 +2839,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: { kind: 'none' },
     });
     second.emitOpen();
@@ -1956,6 +2876,7 @@ describe('deterministic lobby runtime', () => {
       recoveryStagedGame: null,
       pendingJoin: null,
       pendingCreate: null,
+      pendingRoleSwitch: null,
       pendingLeaveTableID: null,
       pendingUnattendTableID: null,
       pendingUpdate: null,
@@ -1965,6 +2886,7 @@ describe('deterministic lobby runtime', () => {
       rematchTransition: null,
       pendingStart: null,
       pendingGameplayAction: null,
+      pendingHypotheticalOperation: null,
       room: { kind: 'none' },
     });
     second.emitOpen();

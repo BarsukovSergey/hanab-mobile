@@ -1,9 +1,11 @@
-import { assertNotNull } from 'complete-common';
+import { assertDefined, assertNotNull } from 'complete-common';
 import type { Draft } from 'immer';
 import { produce } from 'immer';
+import { castDraft, original } from 'immer';
 
 import type { ReplayState } from '../types/ReplayState';
-import type { ReplayAction } from '../types/actions';
+import type { ActionIncludingHypothetical, ReplayAction } from '../types/actions';
+import { gameReducer } from '../../upstream/reducers/gameReducer';
 import type { GameMetadata } from '../../upstream/interfaces/GameMetadata';
 
 export const replayReducer = produce(replayReducerFunction, {} as ReplayState);
@@ -11,6 +13,7 @@ export const replayReducer = produce(replayReducerFunction, {} as ReplayState);
 function replayReducerFunction(
   state: Draft<ReplayState>,
   action: ReplayAction,
+  finished: boolean,
   metadata: GameMetadata,
 ) {
   // Validate current state
@@ -100,5 +103,84 @@ function replayReducerFunction(
       state.shared.amLeader = action.name === metadata.ourUsername;
       break;
     }
+
+    case 'hypoStart': {
+      if (state.hypothetical !== null) throw new Error('A "hypoStart" action was dispatched with a non-null hypothetical state.');
+      if (state.shared !== null) {
+        state.segment = state.shared.segment;
+        state.shared.useSharedSegments = true;
+      }
+      const ongoing = state.states[state.segment];
+      assertDefined(ongoing, `Failed to get the game state for segment: ${state.segment}`);
+      state.hypothetical = {
+        ongoing,
+        states: [ongoing],
+        showDrawnCards: action.showDrawnCards,
+        drawnCardsInHypothetical: [],
+        morphedIdentities: [],
+        startingPlayerIndex: ongoing.turn.currentPlayerIndex,
+        actions: [],
+        stateActionLengths: [0],
+      };
+      for (const hypoAction of action.actions) hypoReduce(state, hypoAction, finished, metadata);
+      break;
+    }
+
+    case 'hypoEnd':
+      assertNotNull(state.hypothetical, 'A "hypoEnd" action was dispatched with a null hypothetical state.');
+      state.hypothetical = null;
+      break;
+
+    case 'hypoBack': {
+      assertNotNull(state.hypothetical, 'A "hypoBack" action was dispatched with a null hypothetical state.');
+      state.hypothetical.states.pop();
+      state.hypothetical.stateActionLengths.pop();
+      const retainedActionLength = state.hypothetical.stateActionLengths.at(-1);
+      if (retainedActionLength !== undefined) state.hypothetical.actions.splice(retainedActionLength);
+      const lastState = state.hypothetical.states.at(-1);
+      if (lastState !== undefined) state.hypothetical.ongoing = lastState;
+      break;
+    }
+
+    case 'hypoShowDrawnCards': {
+      assertNotNull(state.hypothetical, 'A "hypoShowDrawnCards" action was dispatched with a null hypothetical state.');
+      state.hypothetical.showDrawnCards = action.showDrawnCards;
+      const drawn = original(state.hypothetical.drawnCardsInHypothetical);
+      if (drawn !== undefined) for (const order of drawn) {
+        if (action.showDrawnCards) delete state.hypothetical.morphedIdentities[order];
+        else state.hypothetical.morphedIdentities[order] = { suitIndex: null, rank: null };
+      }
+      break;
+    }
+
+    case 'hypoAction':
+      hypoReduce(state, action.action, finished, metadata);
+      break;
+  }
+}
+
+function hypoReduce(state: Draft<ReplayState>, action: ActionIncludingHypothetical, finished: boolean, metadata: GameMetadata) {
+  assertNotNull(state.hypothetical, `A "${action.type}" action was dispatched with a null hypothetical state.`);
+  if (action.type === 'morph') {
+    state.hypothetical.morphedIdentities[action.order] = {
+      suitIndex: action.suitIndex === -1 ? null : action.suitIndex,
+      rank: action.rank === -1 ? null : action.rank,
+    };
+  } else if (action.type === 'unmorph') delete state.hypothetical.morphedIdentities[action.order];
+  if (action.type === 'draw') {
+    state.hypothetical.drawnCardsInHypothetical.push(action.order);
+    if (!state.hypothetical.showDrawnCards) state.hypothetical.morphedIdentities[action.order] = { suitIndex: null, rank: null };
+  }
+  if (action.type === 'morph' || action.type === 'unmorph') return;
+  state.hypothetical.actions.push(castDraft(action));
+  const reduceAction = action.type === 'clue' && !state.hypothetical.showDrawnCards && state.hypothetical.startingPlayerIndex === action.target
+    ? { ...action, ignoreNegative: true }
+    : action;
+  const oldSegment = state.hypothetical.ongoing.turn.segment;
+  const next = gameReducer(state.hypothetical.ongoing, reduceAction as never, true, false, finished, true, metadata);
+  state.hypothetical.ongoing = castDraft(next);
+  if (oldSegment !== next.turn.segment) {
+    state.hypothetical.states.push(castDraft(next));
+    state.hypothetical.stateActionLengths.push(state.hypothetical.actions.length);
   }
 }

@@ -7,6 +7,11 @@ import {
   encodeHistoryGetFrame,
   encodeReplayCreateFrame,
   encodeReplayActionFrame,
+  encodeReplayHypoActionFrame,
+  encodeReplayHypoBackFrame,
+  encodeReplayHypoEndFrame,
+  encodeReplayHypoStartFrame,
+  encodeReplayHypoToggleRevealedFrame,
   encodeTableRestartFrame,
   encodeTableSetLeaderFrame,
   encodeTableUpdateFrame,
@@ -78,6 +83,13 @@ describe('lobby protocol decoder', () => {
     expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, recipient: undefined })}`))
       .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
     expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, who: undefined })}`))
+      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
+
+    const privateMessage = { ...chat, room: '', recipient: 'Bob' };
+    expect(decodeServerFrame(`chat ${JSON.stringify(privateMessage)}`)).toEqual({
+      kind: 'event', event: { command: 'chat', data: privateMessage },
+    });
+    expect(decodeServerFrame(`chat ${JSON.stringify({ ...privateMessage, recipient: '' })}`))
       .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
   });
 
@@ -412,5 +424,30 @@ describe('lobby protocol decoder', () => {
     expect(encodeTableRestartFrame(123)).toBe(
       'tableRestart {"tableID":123,"hidePregame":true}',
     );
+  });
+
+  test('encodes and decodes the pinned hypothetical replay protocol exactly', () => {
+    expect(encodeReplayHypoStartFrame(123)).toBe('replayAction {"tableID":123,"type":3}');
+    expect(encodeReplayHypoEndFrame(123)).toBe('replayAction {"tableID":123,"type":4}');
+    expect(encodeReplayHypoActionFrame(123, '{"type":"turn","num":1,"currentPlayerIndex":1}')).toBe(
+      'replayAction {"tableID":123,"type":5,"actionJSON":"{\\"type\\":\\"turn\\",\\"num\\":1,\\"currentPlayerIndex\\":1}"}',
+    );
+    expect(encodeReplayHypoBackFrame(123)).toBe('replayAction {"tableID":123,"type":6}');
+    expect(encodeReplayHypoToggleRevealedFrame(123)).toBe('replayAction {"tableID":123,"type":7}');
+    expect(decodeServerFrame('hypoStart {"TableID":123}')).toMatchObject({ kind: 'event' });
+    expect(decodeServerFrame('hypoStart {"tableID":123}')).toMatchObject({ kind: 'malformed' });
+    expect(decodeServerFrame('hypoEnd {"TableID":123}')).toMatchObject({ kind: 'event' });
+    expect(decodeServerFrame('hypoAction "{\\"type\\":\\"turn\\",\\"num\\":1,\\"currentPlayerIndex\\":1}"')).toMatchObject({
+      kind: 'event', event: { command: 'hypoAction', data: { type: 'turn', num: 1 } },
+    });
+    expect(decodeServerFrame('hypoAction "{\\"type\\":\\"strike\\",\\"num\\":4,\\"turn\\":4,\\"order\\":0}"')).toMatchObject({
+      kind: 'event', event: { command: 'hypoAction', data: { num: 4 } },
+    });
+    expect(decodeServerFrame(`hypoAction ${JSON.stringify('{')}`)).toMatchObject({
+      kind: 'malformed', issue: 'malformed-json',
+    });
+    expect(decodeServerFrame(`hypoAction ${JSON.stringify('{"type":"turn","num":1,"currentPlayerIndex":1,"extra":true}')}`)).toMatchObject({
+      kind: 'malformed', issue: 'invalid-payload',
+    });
   });
 });

@@ -49,6 +49,7 @@ export type SessionState = {
   connectionEpoch: number;
   phase: ConnectionPhase;
   authenticatedUser: AuthenticatedUser | null;
+  friends: string[];
   resumeHints: ResumeHints | null;
   error: string | null;
   protocolIssueCount: number;
@@ -67,6 +68,7 @@ const initialState: SessionState = {
   connectionEpoch: 0,
   phase: 'idle',
   authenticatedUser: null,
+  friends: [],
   resumeHints: null,
   error: null,
   protocolIssueCount: 0,
@@ -87,6 +89,7 @@ export const sessionSlice = createSlice({
       state.connectionEpoch = action.payload.epoch;
       state.phase = 'connecting';
       state.authenticatedUser = null;
+      state.friends = [];
       state.resumeHints = null;
       state.error = null;
       state.protocolIssueCount = 0;
@@ -108,12 +111,17 @@ export const sessionSlice = createSlice({
         userID: welcome.userID,
         username: welcome.username,
       };
+      state.friends = [...(welcome.friends ?? [])];
       state.resumeHints = {
         playingAtTables: welcome.playingAtTables,
         disconSpectatingTable: welcome.disconSpectatingTable,
         disconShadowingSeat: welcome.disconShadowingSeat,
       };
       state.error = null;
+    },
+    friendsReceived(state, action: PayloadAction<{ epoch: number; friends: string[] }>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      state.friends = [...action.payload.friends];
     },
     connectionFailed(state, action: PayloadAction<{ epoch: number; error: string }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;

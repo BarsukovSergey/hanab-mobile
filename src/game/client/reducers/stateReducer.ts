@@ -109,6 +109,10 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
         state.replay.segment = penultimateSegment;
       }
 
+      // A finished game transitions to its authoritative shared replay, so any local hypothetical
+      // branch from the ongoing game is no longer valid.
+      state.replay.hypothetical = null;
+
       // Initialize the shared replay.
       state.replay.shared = {
         segment: penultimateSegment,
@@ -213,8 +217,13 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
     case 'replaySegment':
     case 'replaySharedSegment':
     case 'replayUseSharedSegments':
-    case 'replayLeader': {
-      state.replay = castDraft(replayReducer(state.replay, action, state.metadata));
+    case 'replayLeader':
+    case 'hypoStart':
+    case 'hypoEnd':
+    case 'hypoBack':
+    case 'hypoShowDrawnCards':
+    case 'hypoAction': {
+      state.replay = castDraft(replayReducer(state.replay, action, state.finished, state.metadata));
       break;
     }
 
@@ -330,6 +339,7 @@ function visualStateToShow(
   }
 
   if (state.replay.active) {
+    if (state.replay.hypothetical !== null) return state.replay.hypothetical.ongoing;
     const currentReplayState = state.replay.states[state.replay.segment];
     assertDefined(
       currentReplayState,

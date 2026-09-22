@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { cardOrder, colorIndex, playerIndex, rank, rankClueNumber, suitIndex } from '../game/bootstrap/upstreamSchemas';
+
 import {
   cardIdentitiesSchema,
   finishOngoingGameSchema,
@@ -36,9 +38,17 @@ export const chatMessageSchema = z.object({
   discord: z.boolean(),
   server: z.boolean(),
   datetime: z.string().min(1),
-  room: z.string().min(1).optional(),
+  room: z.string().optional(),
   recipient: z.string(),
-}).strict().readonly();
+}).strict().superRefine((message, context) => {
+  if (message.room === '' && message.recipient.length === 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recipient'],
+      message: 'blank-room chat must have a recipient',
+    });
+  }
+}).readonly();
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
@@ -155,11 +165,34 @@ export type TableSpectateCommand = z.infer<typeof tableSpectateCommandSchema>;
 export const tableReattendCommandSchema = tableIDCommandSchema;
 export type TableReattendCommand = z.infer<typeof tableReattendCommandSchema>;
 
-export const replayActionCommandSchema = z.object({
-  tableID: idSchema,
-  type: z.literal(0),
-  segment: z.number().int().nonnegative(),
+const replayActionBaseSchema = z.object({ tableID: idSchema });
+export const replaySegmentActionCommandSchema = replayActionBaseSchema.extend({
+  type: z.literal(0), segment: z.number().int().nonnegative(),
 }).strict();
+export const replayHypoStartCommandSchema = replayActionBaseSchema.extend({ type: z.literal(3) }).strict();
+export const replayHypoEndCommandSchema = replayActionBaseSchema.extend({ type: z.literal(4) }).strict();
+export const replayHypoActionCommandSchema = replayActionBaseSchema.extend({
+  type: z.literal(5), actionJSON: z.string().min(1),
+}).strict();
+export const replayHypoBackCommandSchema = replayActionBaseSchema.extend({ type: z.literal(6) }).strict();
+export const replayHypoToggleRevealedCommandSchema = replayActionBaseSchema.extend({ type: z.literal(7) }).strict();
+
+const unknownSuitSchema = z.union([suitIndex, z.literal(-1)]);
+const unknownRankSchema = z.union([rank, z.literal(-1)]);
+const hypotheticalActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('play'), playerIndex, order: cardOrder, suitIndex: unknownSuitSchema, rank: unknownRankSchema }).strict(),
+  z.object({ type: z.literal('discard'), playerIndex, order: cardOrder, suitIndex: unknownSuitSchema, rank: unknownRankSchema, failed: z.boolean() }).strict(),
+  z.object({ type: z.literal('draw'), playerIndex, order: cardOrder, suitIndex: unknownSuitSchema, rank: unknownRankSchema }).strict(),
+  z.object({ type: z.literal('clue'), clue: z.discriminatedUnion('type', [
+    z.object({ type: z.literal(0), value: colorIndex }).strict(),
+    z.object({ type: z.literal(1), value: rankClueNumber }).strict(),
+  ]), giver: playerIndex, list: z.array(cardOrder).readonly(), target: playerIndex, ignoreNegative: z.boolean() }).strict(),
+  z.object({ type: z.literal('strike'), num: z.number().int().positive(), order: cardOrder, turn: z.number().int().nonnegative() }).strict(),
+  z.object({ type: z.literal('turn'), num: z.number().int().nonnegative(), currentPlayerIndex: playerIndex }).strict(),
+  z.object({ type: z.literal('morph'), order: cardOrder, suitIndex: unknownSuitSchema, rank: unknownRankSchema }).strict(),
+  z.object({ type: z.literal('unmorph'), order: cardOrder }).strict(),
+]);
+export type HypotheticalAction = z.infer<typeof hypotheticalActionSchema>;
 
 export const tableRestartCommandSchema = z.object({
   tableID: idSchema,
@@ -298,6 +331,7 @@ export const welcomeSchema = z.object({
   username: z.string().min(1),
   totalGames: z.number().int().nonnegative(),
   playingAtTables: z.array(idSchema),
+  friends: z.array(z.string().min(1)).optional(),
   disconSpectatingTable: idSchema.optional(),
   disconShadowingSeat: z.number().int().optional(),
 });
@@ -307,6 +341,17 @@ export type Welcome = z.infer<typeof welcomeSchema>;
 export const historyGetCommandSchema = z.object({
   offset: z.number().int().nonnegative(),
   amount: z.literal(10),
+}).strict();
+
+// These three Go message structs intentionally lack json tags, so encoding/json emits `TableID`.
+const hypoTableEventSchema = z.object({ TableID: idSchema }).strict();
+export const hypotheticalSchema = z.object({
+  showDrawnCards: z.boolean(),
+  actions: z.array(z.string().min(1)).readonly(),
+}).strict();
+export const hypoActionSchema = hypotheticalActionSchema;
+export const hypoShowDrawnCardsSchema = z.object({
+  tableID: idSchema, showDrawnCards: z.boolean(),
 }).strict();
 
 export const replayCreateCommandSchema = z.object({
@@ -343,10 +388,17 @@ const schemas = {
   finishOngoingGame: finishOngoingGameSchema,
   replaySegment: replaySegmentSchema,
   replayLeader: replayLeaderSchema,
+  hypothetical: hypotheticalSchema,
+  hypoStart: hypoTableEventSchema,
+  hypoEnd: hypoTableEventSchema,
+  hypoBack: hypoTableEventSchema,
+  hypoAction: hypoActionSchema,
+  hypoShowDrawnCards: hypoShowDrawnCardsSchema,
   spectators: spectatorsSchema,
   boot: bootSchema,
   chat: chatMessageSchema,
   chatList: chatListSchema,
+  friends: z.object({ friends: z.array(z.string().min(1)) }).strict(),
   warning: z.object({ warning: z.string().min(1) }),
   error: z.object({ error: z.string().min(1) }),
 } as const;
@@ -397,6 +449,17 @@ export function decodeServerFrame(frame: string): DecodeResult {
     return { kind: 'malformed', command, issue: 'malformed-json' };
   }
 
+  if (command === 'hypoAction') {
+    if (typeof payload !== 'string') {
+      return { kind: 'malformed', command, issue: 'invalid-payload' };
+    }
+    try {
+      payload = JSON.parse(payload) as unknown;
+    } catch {
+      return { kind: 'malformed', command, issue: 'malformed-json' };
+    }
+  }
+
   const result = schemas[command].safeParse(payload);
   if (!result.success) {
     return { kind: 'malformed', command, issue: 'invalid-payload' };
@@ -429,8 +492,24 @@ export function encodeTableReattendFrame(tableID: number): string {
 }
 
 export function encodeReplayActionFrame(tableID: number, segment: number): string {
-  const payload = replayActionCommandSchema.parse({ tableID, type: 0, segment });
+  const payload = replaySegmentActionCommandSchema.parse({ tableID, type: 0, segment });
   return encodeClientFrame('replayAction', payload);
+}
+
+export function encodeReplayHypoStartFrame(tableID: number): string {
+  return encodeClientFrame('replayAction', replayHypoStartCommandSchema.parse({ tableID, type: 3 }));
+}
+export function encodeReplayHypoEndFrame(tableID: number): string {
+  return encodeClientFrame('replayAction', replayHypoEndCommandSchema.parse({ tableID, type: 4 }));
+}
+export function encodeReplayHypoActionFrame(tableID: number, actionJSON: string): string {
+  return encodeClientFrame('replayAction', replayHypoActionCommandSchema.parse({ tableID, type: 5, actionJSON }));
+}
+export function encodeReplayHypoBackFrame(tableID: number): string {
+  return encodeClientFrame('replayAction', replayHypoBackCommandSchema.parse({ tableID, type: 6 }));
+}
+export function encodeReplayHypoToggleRevealedFrame(tableID: number): string {
+  return encodeClientFrame('replayAction', replayHypoToggleRevealedCommandSchema.parse({ tableID, type: 7 }));
 }
 
 export function encodeTableRestartFrame(tableID: number, hidePregame = true): string {

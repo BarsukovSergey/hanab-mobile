@@ -1,0 +1,119 @@
+import { ClueType } from '../upstream/enums/ClueType';
+import { getVariant } from '../upstream/gameData';
+import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
+import type { CardNote } from '../upstream/interfaces/CardNote';
+import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
+import type { GameState } from '../upstream/interfaces/GameState';
+import type { MsgClue } from '../upstream/types/MsgClue';
+import { newColorClue, newRankClue } from '../upstream/types/Clue';
+import { colorIndex } from '../upstream/types/ColorIndex';
+import type { CardOrder } from '../upstream/types/CardOrder';
+import type { PlayerIndex } from '../upstream/types/PlayerIndex';
+import { getNextPlayableRanks } from '../upstream/rules/playStacks';
+import { getHypotheticalCardRepresentation } from './hypotheticalCardRepresentation';
+import { getHypotheticalTouchedOrders } from './hypotheticalClueTouch';
+import type { ActionIncludingHypothetical } from './types/actions';
+
+/** Platform-independent port of upstream sendHypotheticalAction's input. */
+export type HypotheticalClientAction =
+  | { readonly type: 'play' | 'discard'; readonly order: number }
+  | { readonly type: 'colorClue' | 'rankClue'; readonly target: number; readonly value: number };
+
+/**
+ * Expands one deliberate hypothetical UI action into the authoritative replay-action sequence.
+ * It deliberately does not dispatch or send: LobbyRuntime owns that boundary.
+ */
+export function getHypotheticalActions(
+  action: HypotheticalClientAction,
+  game: GameState,
+  metadata: GameMetadata,
+  cardIdentities: readonly CardIdentity[],
+  morphedIdentities: readonly CardIdentity[],
+  notes: readonly CardNote[],
+  playing: boolean,
+): readonly ActionIncludingHypothetical[] | null {
+  const actor = game.turn.currentPlayerIndex;
+  if (actor === null) return null;
+  const variant = getVariant(metadata.options.variantName);
+
+  if (action.type === 'play' || action.type === 'discard') {
+    const order = action.order as CardOrder;
+    if (!(game.hands[actor] ?? []).includes(order)) return null;
+    const card = game.deck[order];
+    const cardIdentity = cardIdentities[order];
+    const note = notes[order];
+    if (card === undefined || cardIdentity === undefined || note === undefined) return null;
+    const { identity } = getHypotheticalCardRepresentation(
+      card, cardIdentity, note, morphedIdentities[order], playing,
+    );
+    if (identity.suitIndex === null || identity.rank === null) return null;
+    const { suitIndex, rank } = identity;
+    const suit = variant.suits[suitIndex];
+    let actualType: 'play' | 'discard' = action.type;
+    if (suit?.inverted) actualType = actualType === 'play' ? 'discard' : 'play';
+    let failed = false;
+    if (actualType === 'play') {
+      const direction = game.playStackDirections[suitIndex];
+      if (direction === undefined) return null;
+      const nextRanks = getNextPlayableRanks(
+        suitIndex,
+        game.playStacks[suitIndex] ?? [],
+        direction,
+        game.playStackStarts,
+        variant,
+        game.deck,
+      );
+      if (!nextRanks.includes(rank)) {
+        actualType = 'discard';
+        failed = true;
+      }
+    }
+    const actions: ActionIncludingHypothetical[] = [actualType === 'play'
+      ? { type: 'play', playerIndex: actor, order, suitIndex, rank }
+      : { type: 'discard', playerIndex: actor, order, suitIndex, rank, failed }];
+    if (failed) actions.push({
+      type: 'strike', num: game.strikes.length + 1, turn: game.turn.segment ?? 0, order,
+    });
+    if (game.deck.length < cardIdentities.length) {
+      const order = game.deck.length as CardOrder;
+      const drawn = cardIdentities[order];
+      actions.push({ type: 'draw', playerIndex: actor, order, suitIndex: drawn?.suitIndex ?? -1, rank: drawn?.rank ?? -1 });
+    }
+    actions.push(nextTurn(game, metadata.options.numPlayers));
+    return actions;
+  }
+
+  const clueAction = action as Extract<HypotheticalClientAction, { readonly target: number }>;
+  if (!Number.isInteger(clueAction.target) || clueAction.target === actor || game.hands[clueAction.target] === undefined) return null;
+  const clueAndMessage = action.type === 'colorClue'
+    ? (() => {
+      const parsedColorIndex = colorIndex.safeParse(clueAction.value);
+      if (!parsedColorIndex.success) return null;
+      const color = variant.clueColors[parsedColorIndex.data];
+      return color === undefined ? null : {
+        clue: newColorClue(color),
+        message: { type: ClueType.Color, value: parsedColorIndex.data } satisfies MsgClue,
+      };
+    })()
+    : (() => {
+      const rank = variant.clueRanks.find((candidate) => candidate === clueAction.value);
+      return rank === undefined ? null : {
+        clue: newRankClue(rank),
+        message: { type: ClueType.Rank, value: rank } satisfies MsgClue,
+      };
+    })();
+  if (clueAndMessage === null) return null;
+  const list = getHypotheticalTouchedOrders(game, variant, clueAction.target, clueAndMessage.clue, {
+    cardIdentities,
+    morphedIdentities,
+    notes,
+    playing,
+  });
+  return [{ type: 'clue', clue: clueAndMessage.message, giver: actor, list, target: clueAction.target as PlayerIndex, ignoreNegative: false }, nextTurn(game, metadata.options.numPlayers)];
+}
+
+function nextTurn(game: GameState, numPlayers: number): ActionIncludingHypothetical {
+  const actor = game.turn.currentPlayerIndex;
+  // actor is non-null at each caller; preserve upstream's simple hypothetical next-player behavior.
+  return { type: 'turn', num: game.turn.turnNum + 1, currentPlayerIndex: ((actor! + 1) % numPlayers) as PlayerIndex };
+}
