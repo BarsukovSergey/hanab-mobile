@@ -5,6 +5,7 @@ import {
   getCardPipPresentation,
 } from '../client/cardPresentation';
 import { getVariant } from '../upstream/gameData';
+import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
 import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { CardState } from '../upstream/interfaces/CardState';
 
@@ -54,17 +55,29 @@ const EMPTY_NOTE: CardNote = {
   text: '',
 };
 
+const EMPTY_IDENTITY: CardIdentity = { suitIndex: null, rank: null };
+const knowledgeCache = new WeakMap<
+  CardState,
+  WeakMap<CardNote, WeakMap<CardIdentity, Map<string, CardKnowledgeViewModel>>>
+>();
+
 export function getCardKnowledgeViewModel(
   variantName: string,
   card: CardState,
   note: CardNote | undefined = undefined,
   finished = false,
   empathy = false,
+  cardIdentity: CardIdentity | undefined = undefined,
 ): CardKnowledgeViewModel {
-  const variant = getVariant(variantName);
   const cardNote = note ?? EMPTY_NOTE;
+  const identityRef = cardIdentity ?? EMPTY_IDENTITY;
+  const cacheKey = `${variantName}\u0000${finished ? 1 : 0}\u0000${empathy ? 1 : 0}\u0000${cardIdentity === undefined ? 0 : 1}`;
+  const cached = getCachedKnowledge(card, cardNote, identityRef, cacheKey);
+  if (cached !== undefined) return cached;
+
+  const variant = getVariant(variantName);
   const identity = getCardIdentityToShow({
-    cardIdentity: { suitIndex: card.suitIndex, rank: card.rank },
+    cardIdentity: cardIdentity ?? { suitIndex: card.suitIndex, rank: card.rank },
     state: card,
     note: cardNote,
     empathy,
@@ -85,7 +98,7 @@ export function getCardKnowledgeViewModel(
   ));
   const positiveRanks: readonly number[] = [...card.positiveRankClues];
 
-  return {
+  const result: CardKnowledgeViewModel = {
     order: card.order,
     hasClueApplied: card.hasClueApplied,
     displaySuitIndex: identity.suitIndex,
@@ -111,6 +124,42 @@ export function getCardKnowledgeViewModel(
     suitDetermined: card.suitDetermined,
     rankDetermined: card.rankDetermined,
   };
+  setCachedKnowledge(card, cardNote, identityRef, cacheKey, result);
+  return result;
+}
+
+function getCachedKnowledge(
+  card: CardState,
+  note: CardNote,
+  identity: CardIdentity,
+  cacheKey: string,
+): CardKnowledgeViewModel | undefined {
+  return knowledgeCache.get(card)?.get(note)?.get(identity)?.get(cacheKey);
+}
+
+function setCachedKnowledge(
+  card: CardState,
+  note: CardNote,
+  identity: CardIdentity,
+  cacheKey: string,
+  result: CardKnowledgeViewModel,
+): void {
+  let byNote = knowledgeCache.get(card);
+  if (byNote === undefined) {
+    byNote = new WeakMap();
+    knowledgeCache.set(card, byNote);
+  }
+  let byIdentity = byNote.get(note);
+  if (byIdentity === undefined) {
+    byIdentity = new WeakMap();
+    byNote.set(note, byIdentity);
+  }
+  let byMode = byIdentity.get(identity);
+  if (byMode === undefined) {
+    byMode = new Map();
+    byIdentity.set(identity, byMode);
+  }
+  byMode.set(cacheKey, result);
 }
 
 function pipStateName(state: PipState): KnowledgePipState {

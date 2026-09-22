@@ -2,7 +2,6 @@ import { describe, expect, test } from '@jest/globals';
 
 import {
   gameplayInteractionReducer,
-  initialGameplayInteractionState,
 } from '../gameplayInteraction';
 import { getGameplayLayout } from '../gameplayLayout';
 import { getGameplayScenarios } from './gameplayScenarios';
@@ -47,19 +46,26 @@ describe('gameplay rotation lifecycle', () => {
     expect(room.clientState.ongoingGame).toBe(game);
   });
 
-  test('drops UI-only interactions at an orientation or background lifecycle boundary', () => {
+  test('preserves durable reasoning context while clearing hold empathy at lifecycle boundaries', () => {
     const active = {
       selectedCard: 3,
       clueTarget: 1,
       cluePreview: { type: 'rank' as const, value: 2 },
       empathyPlayer: 1,
+      persistentEmpathyPlayer: 1,
+      globalEmpathy: false,
       noteCard: 5,
+    };
+    const expected = {
+      ...active,
+      empathyPlayer: null,
+      persistentEmpathyPlayer: null,
     };
 
     const afterRotation = gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' });
-    expect(afterRotation).toEqual(initialGameplayInteractionState);
+    expect(afterRotation).toEqual(expected);
 
     const afterBackground = gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' });
-    expect(afterBackground).toEqual(initialGameplayInteractionState);
+    expect(afterBackground).toEqual(expected);
   });
 });

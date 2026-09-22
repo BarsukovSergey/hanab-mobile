@@ -1,319 +1,229 @@
 # C17 Validation Plan
 
 Status: **active**
-Date: 2026-09-07
+Date: 2026-09-11
 
-This document tracks what C17 still has to prove on real devices. It does not restate game semantics. The current product contract is `docs/C17_UX_CONTRACT.md`. Detailed physical observations and defect history are preserved in `docs/C17_EVIDENCE.md`.
+This document tracks what C17 must prove on real devices after the v1.2 product review. The authoritative product contract is `docs/C17_UX_CONTRACT.md`; explicit deferred items are in `docs/C17_BACKLOG.md`.
 
-## 1. Immediate gate: dense 6P workspace prototype
+## 1. Dense phone workspace
 
-Before broad C17 implementation, build a production-path prototype using the real gameplay view path, real upstream card faces, deterministic fixture state, and correct Android safe-area handling.
+C17-0 adaptive density already passed for the tested ordinary Android portrait / three-button-navigation class, including 6P and 6P + One Extra Card. Keep that result closed unless another certified window/text-scale class fails.
 
-### Required prototype state
+For every new constrained class:
 
-- phone portrait;
-- measured usable safe window, including a small/typical phone class;
-- 6 players;
-- worst-case supported hand capacity, including One Extra Card where applicable;
-- six-suit-capable table state;
-- deterministic relative seating;
-- current actor / YOUR TURN treatment;
-- score and achievable maximum;
-- clue count;
-- strikes;
-- deck count;
-- pace;
-- FRE when meaningful;
-- stack state;
-- compact discard summary;
-- last-action anchor;
-- all opponent hands / summaries;
-- own hand;
-- reserved Workbench placeholder;
-- no root gameplay scroll;
-- no per-hand horizontal scrolling.
+- all relevant hands must remain readable at normal device distance;
+- rank/suit, Black/Rainbow/six-suit identity, note/knowledge/trash/critical state, and selection remain distinguishable;
+- own/observed hand, HUD/table, Last Action, and minimum Workbench stay above system UI;
+- no root live scroll and no per-hand horizontal scrolling;
+- if adaptive Full Ledger falls below readability, switch to Compact Overview rather than shrinking into unreadability.
 
-### What must be decided
+Compact Overview is a C17 fallback. Comparison pins are not part of its C17 acceptance.
 
-Do not evaluate whether boxes fit. Evaluate whether a serious player can actually read them.
-
-Full Ledger passes for a window/text-scale class only if:
-
-- every relevant hand can be read at normal device distance without squinting;
-- rank/suit identity remains quick to scan;
-- Black/Rainbow/six-suit identity remains distinguishable in light and dark theme;
-- note/knowledge/critical/trash signals remain distinguishable without badge clutter;
-- selected-card targets remain safe to tap;
-- comparing two visible hands does not require traversal or mental reconstruction;
-- a serious player would accept the density for a full game.
-
-If this fails, switch that window/text-scale class to Compact Overview + focused/pinned comparison. Do not shrink below readability just to preserve the Full Ledger label.
-
-### Current C17-0 physical result — PASS for the tested ordinary Android portrait class
-
-The first ordinary Android portrait Full Ledger attempt failed the physical gate: the opponent rows/HUD were individually readable, but the local hand was clipped/covered by three-button navigation and the reserved Workbench fell below the usable viewport. The same failure was visible in 6P + One Extra Card with four-card hands.
-
-The immediate fixed-size Compact attempt then fit above system navigation but wasted substantial vertical space because it hard-capped opponent cards around 34 dp and still reserved a fixed Workbench band. That allocation policy also failed.
-
-The corrected adaptive allocation now:
-
-1. subtracts fixed app/table/system chrome;
-2. reserves only the minimum actionable Workbench band;
-3. reserves the stable local-hand band;
-4. divides the remaining height across all opponent rows;
-5. caps by width and reasonable maximum card size;
-6. classifies as Full Ledger when the resulting card size remains above the readability floor;
-7. uses true Compact Overview only when the computed card size falls below that floor.
-
-Physical Android portrait follow-up on the same three-button-navigation device class passed in both ordinary 6P and 6P + One Extra Card. In the four-card-hand case:
-
-- all five opponent hands were simultaneously visible and readable;
-- all four cards in each opponent hand remained comfortably distinguishable;
-- the local four-card hand was fully visible above Android navigation;
-- HUD, fireworks/discard, Last Action, local hand, and minimum Workbench all fit without root scrolling;
-- no required region was clipped by system navigation;
-- the fixed-Compact empty-space failure disappeared;
-- the adaptive result remained a useful Full Ledger rather than forcing an unnecessarily tiny Compact Overview.
-
-Therefore C17-0 density validation is **closed for this tested ordinary portrait/window/text-scale class**. Do not reopen it for subjective dp tuning unless a later acceptance case or another window/text-scale class fails. Compact Overview remains required as the fallback for genuinely constrained classes where the adaptive result falls below the readability floor.
-
-## 2. Trash/useless visual validation
-
-First candidate: semi-transparent/subdued card treatment familiar from the web presentation.
-
-Pass if:
-
-- trash is immediately obvious in a hand at table-reading distance;
-- rank/suit identity is still clear;
-- it does not look like an untappable/disabled card;
-- it is not confused with personal KT, critical, selection, or empathy state;
-- it works in light/dark themes and for Black/Rainbow.
-
-If it fails, compare a subdued backdrop/pattern or another low-emphasis treatment. The semantic requirement is frozen; the exact visual treatment is not.
-
-## 3. Functional animation validation
-
-C17 uses short, non-blocking informational motion.
+## 2. Direct actions
 
 Validate:
 
-- play/discard departure/destination emphasis;
-- clue-touch emphasis;
-- actor transition;
-- resource delta pulse;
-- last-action transition;
-- reduced-motion behavior.
-
-Pass if:
-
-- authoritative state is already correct while animation runs;
-- the player can inspect the new state immediately;
-- no gameplay action is delayed by animation;
-- essential meaning remains when animation is disabled;
-- repeated actions do not create a backlog of queued animations.
-
-Target duration for small emphasis is roughly 120-180 ms; treat this as a tuning range, not a sacred release number.
-
-## 4. Core physical-device matrix
-
-At minimum cover:
-
-- Android gesture navigation;
-- Android three-button navigation;
-- portrait;
-- both landscape directions where system-bar/cutout geometry differs;
-- light/dark theme;
-- normal and enlarged font scale;
-- keyboard open/closed;
-- keyboard suggestion row;
-- 2P/3P normal and six-card extra-hand cases;
-- dense 5P;
-- dense 6P;
-- six-suit state;
-- spectator state;
-- zero clues;
-- clue capacity restriction;
-- DDA where authoritative fixture supports it;
-- final round/end transition;
-- finished/replay/shared replay;
-- live in-game history.
-
-## 5. Interaction acceptance
-
-### Direct actions
-
-- tap own card selects by identity;
-- Play/Discard are explicit second actions;
-- unavailable action explains why;
-- double tap cannot send twice;
+- tap own card selects by durable card `order`;
+- Play/Discard require a second explicit tap;
+- unavailable actions remain visible but disabled;
+- no reason text is required for a disabled action;
+- a recognized long press or double tap cannot accidentally send Play/Discard;
 - rotation/background cannot turn a stale press into a send;
-- uncertain transport does not queue/retry the gameplay command.
+- reconnect/uncertain transport never queues or retries a gameplay command.
 
-### Notes
+## 3. Notes
 
-- card tap reads without keyboard;
-- edit explicitly opens the IME;
-- quick tokens preserve previous active note meaning;
-- Save/Done is explicit;
-- Android Back hides IME first;
-- draft/card identity survives rotation;
-- card departure ends edit eligibility;
-- draft never migrates to replacement slot/card;
-- remote conflict never silently overwrites dirty draft.
+Validate the complete edit transaction:
 
-### Clues
+- single tap reads without IME;
+- double tap opens Edit + IME;
+- a non-empty saved note enters as `saved note | `;
+- editing existing text does not leave a spurious trailing pipe;
+- F / CM / PTD / KT / Needs Fix / `?` / `!` quick controls modify only the draft;
+- Turn insertion uses current authoritative turn text semantics;
+- Repeat replaces the draft with the previous entered note;
+- Save commits and exits;
+- Clear clears the draft only; Save empty deletes;
+- Android Back cancels the unsaved draft and exits;
+- rotation/background preserves open editor + draft; exact cursor restoration is not required;
+- if the card leaves its hand while dirty, the editor remains bound to the same card `order` and Save still targets that order;
+- a replacement card in the old slot is never selected implicitly;
+- live Rewind can edit the current personal note for a historically visible card by `order`, including cards no longer in current live hands;
+- finished/dedicated replay remains read-only where upstream disallows editing;
+- parsed impossible own-hand identity hypotheses show an advisory warning but Save remains possible;
+- no merge/revision/conflict UI is invented.
 
-- palette remains available while comparing candidates;
-- three candidate changes need no cancel/restart;
-- retarget is one action;
-- note/discard/recent inspection preserves the clue plan;
-- Empty Clues ON/OFF follows authoritative metadata;
+Backlog note controls (identity picker, Previous/Next/Save-and-next, read-mode instant tags, dedicated Clued/Unclued/Blank buttons) are not release criteria.
+
+## 4. Clue composer
+
+Validate:
+
+- off-turn short tap on another player does not enter clue mode;
+- on our turn, short tap enters clue mode;
+- on our turn with zero clue tokens, composer can open but candidate/Give controls are disabled;
+- there is no duplicate per-player Clue button;
+- entering Clue turns global empathy off;
+- palette stays visible after choosing a candidate;
+- touched target cards are highlighted in place;
+- textual touched-slot list is not required;
+- changing target preserves the current candidate and recomputes touched cards/legality against authoritative state;
+- candidate stays selected when invalid; Give is disabled without invented reason/config text;
 - only explicit Give sends;
-- state change disarms stale commit.
+- opening a non-replacing overlay such as discard inspection can preserve the plan;
+- replacing ClueComposer with Notes/History/another Workbench task clears target/candidate/preview;
+- rotation/background preserves the plan only if ClueComposer remains current;
+- no hidden clue-plan restoration exists.
 
-### Empathy
+## 5. Empathy / knowledge
 
-- persistent per-hand empathy works without hold;
-- global empathy toggle works and is clearly labeled;
-- row order/geometry does not change;
-- notes remain separate from clue knowledge;
-- rotation/background preserves valid perspective;
-- one action returns to normal identities.
+Validate:
 
-### Live temporal awareness
+- long-press anywhere on an opponent row/hand, including a card, shows transient empathy until release;
+- long-press own hand provides the same temporary perspective;
+- a recognized long press consumes the short tap and never opens Clue/selection on release;
+- global `All empathy` is the only persistent empathy mode;
+- no persistent per-player empathy or separate `Normal` button exists;
+- while global empathy is on, per-hand hold is a no-op;
+- temporary empathy clears on release/background/rotation/interruption;
+- global empathy persists through ordinary background/rotation;
+- empathy works on the selected historical state in Rewind and remains read-only there;
+- temporary empathy can be used while ClueComposer remains visible without clearing the clue plan;
+- row/card geometry does not move when perspective changes.
 
-- current actor and last action are independently understandable;
-- after look-away, the player can identify who acted and what changed;
-- duplicate-looking cards can be reconstructed to exact old slot/card identity;
-- Recent does not auto-scroll away from an inspected older event.
+## 6. Trash / card-state presentation
 
-### A29 live history
+Validate against the pinned web behavior, not merely a visual preference:
 
-- enter from active game;
-- select prior turn/action;
-- `Reviewing Tn` is clearly distinct from `Live Tm`;
-- prior counters/table state are not mixed with live counters;
-- no Play/Discard/Clue send route is available while reviewing;
-- notes/knowledge/discard can be inspected;
-- new-live-action count/urgency is visible without forced exit;
-- one Live action returns to current state;
-- old action selection is not armed after return;
-- authoritative live game is unchanged by inspection.
+- explicit known-trash + zero positive clues can force fade;
+- normal engine-trash fade excludes clued/played/discarded cards and the same Blank/CM/Throw-It-in-a-Hole/speedrun cases as web;
+- known-trash-from-empathy uses the appropriate mini-trash indicator behavior;
+- DDA/trash indicator exclusions match web;
+- faded cards remain legible and do not look disabled;
+- Black/Rainbow and light/dark themes remain unambiguous.
 
-#### Current C17-2 deterministic result — PASS; physical A29 still pending
+## 7. Functional animation
 
-As of the C17-2 code line ending at `eaf4a9f2887b937f90c58fcc65255db539e22692`, deterministic coverage establishes the non-visual A29 boundaries:
+C17 includes only short non-blocking informational transitions. Validate play/discard emphasis, clue-touch emphasis, actor transition, resource delta, last-action update, and reduced-motion behavior.
 
-- play/discard reconstruction uses authoritative adjacent states to recover the exact durable card order, revealed identity, and pre-action displayed slot;
-- clue reconstruction derives touched displayed slots from the authoritative pre-state hand mapping;
-- Score / Clues / Strikes / Deck deltas are derived from the same before/after pair;
-- human labels distinguish reviewed turn from current Live turn;
-- Before/After are pinned to one focused action instead of silently changing which action is being reviewed;
-- Recent retains at least one seating rotation;
-- entering/leaving review disarms gameplay action selection while preserving note-inspection identity;
-- gameplay runtime rejects Play/Discard/Clue sends during review;
-- incoming authoritative live actions update `ongoingGame` while the selected historical `visibleState` stays fixed;
-- one local return-to-Live action restores `visibleState` to the authoritative `ongoingGame`;
-- the C17 Ledger, discard viewer, hands, and resource HUD all read from the same selected `visibleState`, so historical presentation does not mix those surfaces with live state;
-- the review UI records the live segment at entry so `NEW` represents temporal progress after entering history rather than distance from the old action being inspected.
+Pass if authoritative state is already correct while motion runs, inspection/input is not blocked, essential meaning survives reduced motion, and repeated actions do not queue a visual backlog. Richer animation is not a C17 gate.
 
-The remaining C17-2 gate is deliberately physical/human rather than another broad regression pass: confirm that the labels, Before/After transition, Last Action detail, and Live return are immediately understandable at phone reading distance, including the look-away reconstruction probe and visible incoming-live indication.
+## 8. Live Rewind / temporal awareness
 
-## 6. Pregame/shell validation
+Validate unprompted:
 
-Validate the full route:
+- enter Rewind from live game;
+- Last Action / Recent can jump to a selected authoritative action;
+- Back/Forward step one action;
+- long-press Back jumps to start;
+- long-press Forward jumps to end;
+- scrubber snaps to authoritative actions;
+- no separate Before/After control or second temporal axis appears;
+- table/resources/hands are all from the selected historical state;
+- no gameplay send route is available while rewound;
+- notes/discard/empathy/knowledge remain inspectable;
+- new live actions update `N NEW` without forcing an exit or moving the selected history position;
+- Live returns to current authoritative state in one action;
+- no old action remains armed after return.
 
-`Home/Lobby -> create/inspect -> join/spectate -> options -> start -> live -> result/review -> remake/return`
+## 9. Finished / replay / shared review / Hypothetical
+
+Run a dedicated review session and verify that the target phone-portrait path stays in the C17 workspace rather than falling back to LegacyGameScreen.
+
+Validate:
+
+- compact authoritative result/reason;
+- same Ledger geometry and table semantics as live/review;
+- timeline + Back/Forward + long-press edge jumps;
+- finished/replay actions are read-only except explicitly supported replay/table controls;
+- Quick rematch / Remake appear only under authoritative eligibility;
+- shared follower can detach by local timeline inspection without silently broadcasting;
+- Follow leader restores synchronization;
+- leader behavior/transfer uses authoritative capability;
+- active Hypothetical is clearly labeled and never looks like recorded history;
+- Hypothetical uses upstream/server semantics only.
+
+## 10. Spectator
+
+Validate live spectator on C17:
+
+- same Ledger/Workbench spatial model;
+- observed player from authoritative metadata is the seating anchor;
+- no Play/Discard/Clue send route exists;
+- notes/empathy/history/replay/shared-review surfaces respect authoritative spectator capability;
+- spectator state remains readable in 2P–6P target phone portrait classes.
+
+## 11. Pregame / shell / More
+
+Validate:
+
+`Lobby -> create/inspect -> join/spectate -> switch role -> options -> start -> C17 live/review -> result/replay -> remake/return`
 
 Required checks:
 
-- pregames, spectatable games, and reviews are meaningfully grouped;
-- Create Table creates only on explicit final Create;
-- spectators are visible in pregame;
-- Join as player / Switch to spectator is explicit when eligible;
-- owner/start eligibility is clear;
-- no fake Ready protocol;
-- Settings opens immediately from the room;
-- Lobby navigation is distinct from releasing attendance;
-- chat input/Send remains above IME;
-- Enter sends once;
-- chat draft survives rotation/options inspection;
-- minimal People/profile/friends surface uses existing capability only.
+- Create sends only on final explicit Create;
+- role, owner, players, spectators and options are clear;
+- Join as player / Switch to spectator works in-room when authoritative capability permits;
+- owner Start eligibility is clear;
+- no fake Ready or invented role/proposal protocol;
+- non-owner option proposal uses the existing authoritative `tableUpdate` behavior;
+- pregame chat remains keyboard-safe;
+- the existing `More` is the single secondary-action overflow;
+- no duplicate Table/ellipsis control exists;
+- eligible chat, participants/spectators, attendance/Leave, Pause/Unpause, settings, VTK/admin and Sign out are discoverable through More as authoritative capability permits.
 
-### Propose Variant capability gate
+People/profile/friends/social features are backlog and are not C17 release criteria.
 
-Before UI implementation, inspect web/upstream/server transport:
+## 12. Android/window matrix
 
-1. Is there a structured proposal operation?
-2. What payload and eligibility does it use?
-3. How is proposal state represented to other users/owner?
-4. What does the owner do to accept/apply it?
+At minimum cover:
 
-Only after this is known should the mobile UX be finalized. Do not silently replace a structured capability with plain chat.
+- gesture navigation and three-button navigation;
+- ordinary target portrait phones;
+- rotation into both landscape directions without broken/occluded gameplay;
+- light/dark theme;
+- normal/enlarged font scale;
+- keyboard open/closed + suggestion row;
+- 2P/3P extra-hand cases;
+- dense 5P/6P;
+- six-suit state;
+- spectator;
+- zero clues;
+- clue-capacity restrictions;
+- DDA where authoritative fixtures support it;
+- final round/end transition;
+- finished/replay/shared review/Hypothetical;
+- live Rewind.
 
-## 7. Replay validation
+A bespoke landscape/tablet layout is backlog; functional safe adaptation is still required.
 
-Run a dedicated review session, separate from live-game acceptance.
+## 13. Serious-play release gate
 
-Required flow:
+Before C17 is complete:
 
-- enter from finished game/history/shared review;
-- understand actual recorded result/reason;
-- select a turn;
-- scrub timeline;
-- use Previous/Next;
-- distinguish Start / Last turn / Final state;
-- inspect selected event and Before/After;
-- compare two hands;
-- inspect empathy/knowledge for selected time;
-- inspect saved notes with correct “may include later information” provenance;
-- open/close full event search without losing selected time;
-- detach/re-follow shared leader where applicable;
-- transfer leadership where supported;
-- correctly label active Hypothetical mode;
-- Quick rematch / Remake where eligibility permits.
-
-## 8. Serious-play release gate
-
-Before C17 is considered complete:
-
-- complete at least one serious 5P session on target phone composition;
+- complete at least one serious 5P session;
 - complete at least one serious 6P session;
 - include dense notes;
-- compare at least three clue candidates in real decisions;
-- consult discard during clue planning;
-- use empathy during real reasoning;
-- exercise live history;
-- perform look-away reconstruction probes;
-- perform a separate replay analysis session.
+- compare multiple clue candidates during real decisions;
+- consult discard while clue planning;
+- use temporary and global empathy in real reasoning;
+- exercise live Rewind;
+- spectate a live game;
+- run a separate replay/shared-review/Hypothetical analysis session;
+- verify finished-game rematch/remake lifecycle where eligible.
 
-Required outcomes:
+Required outcomes: no root gameplay scroll in certified Full Ledger phone portrait, no per-hand sideways scrolling, no accidental commits, no note migration, no keyboard/system-navigation overlap, no lost note draft, and no Legacy fallback merely because the lifecycle entered spectator/finished/replay.
 
-- no root gameplay scrolling in certified Full Ledger states;
-- no per-hand sideways scrollers;
-- no accidental gameplay commits;
-- no note migration;
-- no keyboard/system navigation overlap with required controls;
-- no lost reasoning draft across documented lifecycle changes;
-- no need to repeatedly reopen information only because the UI removed the context;
-- the experienced player would willingly play a full serious game using the final composition.
+## 14. Existing evidence
 
-Astra's >=90% correct actor/action/original-slot/key-delta within five seconds can be used as a diagnostic look-away target. Small samples are not statistical proof; investigate every wrong slot/target answer.
+| Date | Build/commit | Scenario | Result |
+|---|---|---|---|
+| 2026-09-06 | pre-adaptive C17-0 | Dense 6P Full Ledger | FAIL — local hand/Workbench clipped by three-button nav. |
+| 2026-09-06 | fixed compact C17-0 | Dense 6P compact | FAIL — fit but unnecessary over-shrink/wasted space. |
+| 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | Adaptive 6P | PASS for tested class. |
+| 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | Adaptive 6P + One Extra Card | PASS for tested class. |
+| 2026-09-07 | `eaf4a9f2887b937f90c58fcc65255db539e22692` | Temporal foundation | PASS technical. |
+| 2026-09-08 | pre-linear C17-2 | Rewind discoverability | FAIL. |
+| 2026-09-08 | `dfbf9212b3ca8d37df4997cb2649d8d368844ec9` | Linear rewind implementation | PASS technical; physical acceptance pending. |
 
-## 9. Validation log
-
-Record physical results here as C17 progresses.
-
-| Date | Build/commit | Device / safe window | Scenario | Result | Notes / decision |
-|---|---|---|---|---|---|
-| 2026-09-06 | pre-adaptive C17-0 | ordinary Android portrait / three-button nav | Dense 6P Full Ledger | FAIL | Bottom/local hand and Workbench clipped by system navigation. |
-| 2026-09-06 | fixed compact C17-0 | same device class | Dense 6P compact | FAIL | Fit succeeded but opponent hands were over-shrunk and large vertical space was wasted. |
-| 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P | PASS | All hands, own hand, HUD/table, Last Action, and minimum Workbench fit cleanly. |
-| 2026-09-06 | `b07bfff7569fa0cae1178ce4950cb2d3857aae1f` | same device class | Adaptive 6P + One Extra Card | PASS | Four-card opponent and local hands remain readable; no Android-nav clipping or wasted compact-space band. C17-0 density gate closed for this class. |
-| 2026-09-07 | `eaf4a9f2887b937f90c58fcc65255db539e22692` | deterministic tests / CI | C17-2 A29 non-visual boundaries | PASS | Exact old card/slot, Before/After focus, stale-send safety, live-while-reviewing preservation, one-action Live return, seating-rotation history, and temporal update counting covered. Physical readability/interaction pass remains. |
-| — | — | ordinary Android portrait / three-button nav | C17-2 A29 live-history UX | PENDING | Run one focused look-away/history pass; also observe the final own-card column alignment tweak. |
-| — | — | — | Trash visual candidate | PENDING | Start with semi-transparent/subdued treatment. |
-| — | — | — | Functional action animations | PENDING | Verify no blocking/backlog. |
-| — | — | — | Serious 5P session | PENDING | Release gate. |
-| — | — | — | Serious 6P session | PENDING | Release gate. |
-| — | — | — | Replay analysis session | PENDING | Separate release gate. |
+New v1.2 interaction and lifecycle changes require fresh deterministic + physical acceptance; earlier evidence must not be treated as proof of superseded behaviors such as persistent per-player empathy or Before/After.

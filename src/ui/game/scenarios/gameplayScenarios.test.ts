@@ -118,7 +118,7 @@ describe('gameplay scenario harness', () => {
     ).borderColor).toBe('orange');
   });
 
-  test('captures opponent note save, turn persistence, and live-editor cleanup after the card leaves hand', () => {
+  test('captures opponent note save, turn persistence, and durable editor order after the card leaves hand', () => {
     const noteFlow = new Map(getNoteFlowScenarios().map((scenario) => [scenario.id, scenario]));
     const source = liveScenario(noteFlow, 'note-edit-source');
     const saved = liveScenario(noteFlow, 'note-saved');
@@ -153,10 +153,10 @@ describe('gameplay scenario harness', () => {
       clueTargets: [1, 2],
       visibleOrders: getLiveNoteOrders(leftHand.clientState.ongoingGame),
     });
-    expect(synchronized.noteCard).toBeNull();
+    expect(synchronized.noteCard).toBe(order);
   });
 
-  test('keeps empathy momentary while rendering the upstream owner-perspective knowledge in stable geometry', () => {
+  test('keeps hold empathy while rendering upstream owner-perspective knowledge in stable geometry', () => {
     const clueFlow = new Map(getClueFlowScenarios().map((scenario) => [scenario.id, scenario]));
     const committed = liveScenario(clueFlow, 'clue-committed');
     const game = committed.clientState.ongoingGame;
@@ -179,22 +179,26 @@ describe('gameplay scenario harness', () => {
       ourPlayerIndex: committed.clientState.metadata.ourPlayerIndex,
     };
     const beforeHold = getGameplayLayout(layoutInput);
-    const held = gameplayInteractionReducer(initialGameplayInteractionState, {
+    const enabled = gameplayInteractionReducer(initialGameplayInteractionState, {
       type: 'hold-empathy',
       playerIndex: 1,
     });
-    expect(held.empathyPlayer).toBe(1);
+    expect(enabled.empathyPlayer).toBe(1);
     expect(getGameplayLayout(layoutInput)).toEqual(beforeHold);
 
-    const released = gameplayInteractionReducer(held, { type: 'hold-empathy', playerIndex: null });
-    expect(released.empathyPlayer).toBeNull();
-    const synchronized = gameplayInteractionReducer(held, {
+    const synchronized = gameplayInteractionReducer(enabled, {
       type: 'sync-hands',
       ownOrders: game.hands[0] ?? [],
       clueTargets: [1, 2],
       visibleOrders: getLiveNoteOrders(game),
     });
-    expect(synchronized.empathyPlayer).toBeNull();
+    expect(synchronized.empathyPlayer).toBe(1);
+
+    const disabled = gameplayInteractionReducer(synchronized, {
+      type: 'hold-empathy',
+      playerIndex: null,
+    });
+    expect(disabled.empathyPlayer).toBeNull();
   });
 
   test('runs canonical viewport targets through the production layout calculation', () => {
@@ -240,7 +244,7 @@ describe('gameplay scenario harness', () => {
     const room = scenario.store.getState().room.room;
     if (room.kind !== 'live_game') throw new Error('Expected live six-player scenario.');
     const game = room.clientState.visibleState;
-    if (game === null) throw new Error('Expected visible six-player game.');
+    if (game === null) throw new Error('Missing visible six-player game.');
 
     expect(room.clientState.metadata.playerNames).toHaveLength(6);
     expect(game.hands).toHaveLength(6);

@@ -5,6 +5,7 @@ import type { GameState } from '../../game/bootstrap/types';
 import { getDiscardSummary } from '../../game/selectors/discardSummary';
 import { getGameTableSuits } from '../../game/selectors/gameplay';
 import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
+import { useAppSelector } from '../../store/hooks';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { VisibleHanabiCard } from './GameCard';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
@@ -26,10 +27,15 @@ export function CompactTable({
 }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
+  const cardIdentities = useAppSelector((state) => (
+    state.room.room.kind === 'live_game'
+      ? state.room.room.clientState.cardIdentities
+      : undefined
+  ));
   const landscapePhone = dense || (width > height && height < 700);
   const suits = getGameTableSuits(variantName, game);
   const suitVisuals = getCardSuitVisuals(variantName);
-  const discard = getDiscardSummary(variantName, game);
+  const discard = getDiscardSummary(variantName, game, cardIdentities);
   const [fireworksWidth, setFireworksWidth] = useState(310);
   const fireworksLayout = getCompactTableFireworksLayout(
     fireworksWidth,

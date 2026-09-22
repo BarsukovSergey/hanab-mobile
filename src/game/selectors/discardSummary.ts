@@ -1,4 +1,5 @@
 import { getVariant } from '../upstream/gameData';
+import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
 import type { GameState } from '../upstream/interfaces/GameState';
 
 export type DiscardRankCount = {
@@ -22,6 +23,7 @@ export type DiscardSummary = {
 export function getDiscardSummary(
   variantName: string,
   game: Pick<GameState, 'discardStacks' | 'deck'>,
+  cardIdentities?: readonly CardIdentity[],
 ): DiscardSummary {
   const variant = getVariant(variantName);
   let total = 0;
@@ -33,11 +35,13 @@ export function getDiscardSummary(
     let unknownCount = 0;
     for (const order of orders) {
       const card = game.deck[order];
-      if (card === undefined || card.rank === null) {
+      const identity = cardIdentities?.[order];
+      const rank = identity?.rank ?? card?.rank ?? null;
+      if (rank === null) {
         unknownCount += 1;
         continue;
       }
-      counts.set(card.rank, (counts.get(card.rank) ?? 0) + 1);
+      counts.set(rank, (counts.get(rank) ?? 0) + 1);
     }
 
     const suitTotal = orders.length;

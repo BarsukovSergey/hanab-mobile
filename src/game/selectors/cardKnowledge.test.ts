@@ -133,6 +133,37 @@ describe('card knowledge view model', () => {
     expect(knowledge.borderColor).toBe('aqua');
   });
 
+  test('does not promote a single best-knowledge possibility into card identity', () => {
+    const card = freshCard(15);
+    const deduced: CardState = {
+      ...card,
+      suitIndex: null,
+      rank: null,
+      possibleCards: [[0, 3]],
+    };
+
+    expect(getCardKnowledgeViewModel(variant.name, deduced)).toMatchObject({
+      displaySuitIndex: null,
+      displayRank: null,
+    });
+  });
+
+  test('shows an identity learned outside the selected historical card state', () => {
+    const historical = freshCard(16);
+
+    expect(getCardKnowledgeViewModel(
+      variant.name,
+      historical,
+      undefined,
+      false,
+      false,
+      { suitIndex: 0, rank: 3 },
+    )).toMatchObject({
+      displaySuitIndex: 0,
+      displayRank: 3,
+    });
+  });
+
   test('marks eliminated possibilities instead of hiding clue-visible pips', () => {
     const card = freshCard(12);
     const firstSuit = variant.suits[0];

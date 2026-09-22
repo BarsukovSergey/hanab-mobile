@@ -11,13 +11,7 @@ describe('gameplayInteractionReducer', () => {
     expect(state).toMatchObject({ selectedCard: 12, noteCard: 12 });
   });
 
-  test('keeps clue targeting independent from an already selected card', () => {
-    const selected = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-card', order: 12 });
-    const targeted = gameplayInteractionReducer(selected, { type: 'select-clue-target', playerIndex: 2 });
-    expect(targeted).toMatchObject({ selectedCard: 12, noteCard: 12, clueTarget: 2 });
-  });
-
-  test('clears stale clue mode when a card action takes over', () => {
+  test('card action takes over from clue planning', () => {
     const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 2 });
     const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'rank', value: 3 });
     expect(gameplayInteractionReducer(previewed, { type: 'select-card', order: 12 })).toMatchObject({
@@ -25,6 +19,11 @@ describe('gameplayInteractionReducer', () => {
       clueTarget: null,
       cluePreview: null,
     });
+  });
+
+  test('opening notes replaces clue composer and clears the plan', () => {
+    const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 2 });
+    const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'rank', value: 3 });
     expect(gameplayInteractionReducer(previewed, { type: 'open-note', order: 20 })).toMatchObject({
       noteCard: 20,
       clueTarget: null,
@@ -32,81 +31,75 @@ describe('gameplayInteractionReducer', () => {
     });
   });
 
-  test('clears clue preview when the clue target changes', () => {
+  test('retargeting preserves the clue candidate for authoritative recomputation', () => {
     const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 1 });
     const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'color', value: 0 });
-    expect(previewed.cluePreview).toEqual({ type: 'color', value: 0 });
     const retargeted = gameplayInteractionReducer(previewed, { type: 'select-clue-target', playerIndex: 2 });
-    expect(retargeted.cluePreview).toBeNull();
-  });
-
-  test('models empathy as momentary player state', () => {
-    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
-    expect(held.empathyPlayer).toBe(1);
-    const released = gameplayInteractionReducer(held, { type: 'hold-empathy', playerIndex: null });
-    expect(released.empathyPlayer).toBeNull();
-  });
-
-  test('clears empathy when another interaction takes over', () => {
-    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
-    expect(gameplayInteractionReducer(held, { type: 'open-note', order: 20 }).empathyPlayer).toBeNull();
-    expect(gameplayInteractionReducer(held, { type: 'select-clue-target', playerIndex: 2 }).empathyPlayer).toBeNull();
-    expect(gameplayInteractionReducer(held, { type: 'select-card', order: 12 }).empathyPlayer).toBeNull();
-    expect(gameplayInteractionReducer(held, { type: 'cancel-transient' }).empathyPlayer).toBeNull();
-  });
-
-  test('cancels empathy on every authoritative hand sync even when the player remains valid', () => {
-    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 1 });
-    const synced = gameplayInteractionReducer(held, {
-      type: 'sync-hands',
-      ownOrders: [10, 11, 12],
-      clueTargets: [1, 2],
-      visibleOrders: [10, 11, 12, 20, 21],
-    });
-    expect(synced.empathyPlayer).toBeNull();
-  });
-
-  test('disarms gameplay actions for temporal boundaries without discarding note inspection', () => {
-    const active = {
-      selectedCard: 11,
+    expect(retargeted).toMatchObject({
       clueTarget: 2,
-      cluePreview: { type: 'color' as const, value: 0 },
-      empathyPlayer: 1,
-      noteCard: 20,
-    };
-    expect(gameplayInteractionReducer(active, { type: 'disarm-gameplay' })).toEqual({
-      selectedCard: null,
+      cluePreview: { type: 'color', value: 0 },
+    });
+  });
+
+  test('closing clue planning clears target and preview', () => {
+    const targeted = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'select-clue-target', playerIndex: 2 });
+    const previewed = gameplayInteractionReducer(targeted, { type: 'preview-clue', clueType: 'rank', value: 3 });
+    expect(gameplayInteractionReducer(previewed, { type: 'clear-clue-preview' })).toMatchObject({
       clueTarget: null,
       cluePreview: null,
-      empathyPlayer: null,
-      noteCard: 20,
     });
   });
 
-  test('drops every UI-only interaction across orientation/background lifecycle boundaries', () => {
-    const active = {
-      selectedCard: 11,
-      clueTarget: 2,
-      cluePreview: { type: 'color' as const, value: 0 },
-      empathyPlayer: 1,
-      noteCard: 20,
-    };
-    expect(gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' }))
-      .toEqual(initialGameplayInteractionState);
+  test('entering clue mode disables global empathy', () => {
+    const global = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-global-empathy' });
+    expect(global.globalEmpathy).toBe(true);
+    expect(gameplayInteractionReducer(global, { type: 'select-clue-target', playerIndex: 2 }))
+      .toMatchObject({ clueTarget: 2, globalEmpathy: false, empathyPlayer: null });
   });
 
-  test('drops stale interaction references without silently selecting replacements', () => {
+  test('per-hand empathy is temporary hold-only', () => {
+    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 2 });
+    expect(held.empathyPlayer).toBe(2);
+    expect(held.persistentEmpathyPlayer).toBeNull();
+    expect(gameplayInteractionReducer(held, { type: 'hold-empathy', playerIndex: null }).empathyPlayer).toBeNull();
+  });
+
+  test('persistent per-player toggle is disabled', () => {
+    expect(gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-empathy-player', playerIndex: 2 }))
+      .toMatchObject({ empathyPlayer: null, persistentEmpathyPlayer: null, globalEmpathy: false });
+  });
+
+  test('per-hand hold is a no-op while global empathy is on', () => {
+    const global = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-global-empathy' });
+    expect(gameplayInteractionReducer(global, { type: 'hold-empathy', playerIndex: 2 }))
+      .toMatchObject({ globalEmpathy: true, empathyPlayer: null, persistentEmpathyPlayer: null });
+  });
+
+  test('lifecycle interruption clears temporary empathy but keeps global empathy', () => {
+    const global = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-global-empathy' });
+    const resetGlobal = gameplayInteractionReducer(global, { type: 'reset-lifecycle-transients' });
+    expect(resetGlobal).toMatchObject({ globalEmpathy: true, empathyPlayer: null });
+
+    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 2 });
+    expect(gameplayInteractionReducer(held, { type: 'reset-lifecycle-transients' }))
+      .toMatchObject({ globalEmpathy: false, empathyPlayer: null });
+  });
+
+  test('sync drops stale card/clue/empathy references without retargeting note order', () => {
     const stale = {
       selectedCard: 99,
       clueTarget: 4,
       cluePreview: { type: 'rank' as const, value: 3 },
       empathyPlayer: 4,
+      persistentEmpathyPlayer: null,
+      globalEmpathy: false,
       noteCard: 88,
     };
     const synced = gameplayInteractionReducer(stale, {
       type: 'sync-hands',
       ownOrders: [10, 11, 12],
       clueTargets: [1, 2],
+      empathyPlayers: [0, 1, 2],
       visibleOrders: [10, 11, 12, 20, 21],
     });
 
@@ -115,26 +108,28 @@ describe('gameplayInteractionReducer', () => {
       clueTarget: null,
       cluePreview: null,
       empathyPlayer: null,
-      noteCard: null,
+      persistentEmpathyPlayer: null,
+      globalEmpathy: false,
+      noteCard: 88,
     });
   });
 
-  test('preserves durable still-valid selections while clearing momentary empathy through authoritative updates', () => {
+  test('preserves valid clue candidate and durable note order through authoritative sync', () => {
     const selected = {
       selectedCard: 11,
       clueTarget: 2,
       cluePreview: { type: 'color' as const, value: 0 },
-      empathyPlayer: 1,
+      empathyPlayer: null,
+      persistentEmpathyPlayer: null,
+      globalEmpathy: false,
       noteCard: 20,
     };
     expect(gameplayInteractionReducer(selected, {
       type: 'sync-hands',
       ownOrders: [10, 11, 12],
       clueTargets: [1, 2],
-      visibleOrders: [10, 11, 12, 20, 21],
-    })).toEqual({
-      ...selected,
-      empathyPlayer: null,
-    });
+      empathyPlayers: [0, 1, 2],
+      visibleOrders: [10, 11, 12],
+    })).toEqual(selected);
   });
 });

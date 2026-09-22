@@ -2,6 +2,7 @@ import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getGameTableSuits } from '../../game/selectors/gameplay';
+import { useAppSelector } from '../../store/hooks';
 import { ActionButton, useHanabTheme } from '../designSystem';
 import { VisibleHanabiCard } from './GameCard';
 
@@ -17,6 +18,11 @@ export function DiscardViewer({
   onClose: () => void;
 }) {
   const { theme } = useHanabTheme();
+  const cardIdentities = useAppSelector((state) => (
+    state.room.room.kind === 'live_game'
+      ? state.room.room.clientState.cardIdentities
+      : undefined
+  ));
   const suits = getGameTableSuits(variantName, game);
   const total = game.discardStacks.reduce((sum, stack) => sum + stack.length, 0);
 
@@ -39,11 +45,12 @@ export function DiscardViewer({
               <View style={styles.cards}>{orders.map((order) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
+                const authoritativeIdentity = cardIdentities?.[order];
                 return <VisibleHanabiCard
                   key={order}
-                  rank={card.rank}
+                  rank={authoritativeIdentity?.rank ?? card.rank}
                   size="mini"
-                  suitIndex={card.suitIndex}
+                  suitIndex={authoritativeIdentity?.suitIndex ?? card.suitIndex}
                   variantName={variantName}
                 />;
               })}</View>

@@ -23,6 +23,8 @@ import { getPossibilitiesFromKeywords } from './noteIdentity';
 
 export const notesReducer = produce(notesReducerFunction, {} as NotesState);
 
+const emptyNotes = new Map<string, CardNote>();
+
 function notesReducerFunction(
   notes: Draft<NotesState>,
   action: NoteAction,
@@ -94,6 +96,43 @@ function getNoteKeywords(note: string): readonly string[] {
 
 function hasKeyword(patterns: readonly string[], keywords: readonly string[]): boolean {
   return keywords.some((keyword) => patterns.includes(keyword));
+}
+
+function getEmptyNote(variant: Variant): CardNote {
+  const cached = emptyNotes.get(variant.name);
+  if (cached !== undefined) return cached;
+  const note = parseNote(variant, '');
+  emptyNotes.set(variant.name, note);
+  return note;
+}
+
+/**
+ * Mirrors upstream noteEqual: compare parser meaning while ignoring the original text string.
+ * The upstream client uses fast-deep-equal; this local comparison avoids adding a UI-only dependency.
+ */
+export function noteEqual(note1: CardNote, note2: CardNote): boolean {
+  if (note1.possibilities.length !== note2.possibilities.length) return false;
+  for (const [index, possibility1] of note1.possibilities.entries()) {
+    const possibility2 = note2.possibilities[index];
+    if (possibility2 === undefined
+      || possibility1[0] !== possibility2[0]
+      || possibility1[1] !== possibility2[1]) return false;
+  }
+  return note1.knownTrash === note2.knownTrash
+    && note1.needsFix === note2.needsFix
+    && note1.questionMark === note2.questionMark
+    && note1.exclamationMark === note2.exclamationMark
+    && note1.chopMoved === note2.chopMoved
+    && note1.finessed === note2.finessed
+    && note1.discardPermission === note2.discardPermission
+    && note1.blank === note2.blank
+    && note1.unclued === note2.unclued
+    && note1.clued === note2.clued;
+}
+
+/** Mirrors upstream noteHasMeaning. */
+export function noteHasMeaning(variant: Variant, note: CardNote): boolean {
+  return !noteEqual(note, getEmptyNote(variant));
 }
 
 export function parseNote(variant: Variant, text: string): CardNote {

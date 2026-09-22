@@ -2,12 +2,17 @@ import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
+import type { CardStatePresentation } from '../../game/selectors/cardStatePresentation';
 import { getCardSuitVisuals, type CardSuitVisual } from '../../game/selectors/cardVisuals';
 import { getClueColorFill } from '../../game/selectors/gameplay';
 import { useHanabTheme } from '../designSystem';
 import type { ClueCardMarker } from './clueIndication';
+import { getWebRankPipLayout, getWebSuitPipLayout } from './knowledgeOverlayLayout';
 import { UpstreamCardFace } from './UpstreamCardFace';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
+import { WebCardMarker } from './WebCardMarker';
+
+const DOUBLE_TAP_WINDOW_MS = 500;
 
 type GameCardProps = {
   position: number;
@@ -17,13 +22,34 @@ type GameCardProps = {
   clueMarker?: ClueCardMarker | null;
   hasNote?: boolean;
   height?: number;
+  statePresentation?: CardStatePresentation | null;
   onSelect: () => void;
+  onDoublePress?: () => void;
   onLongPress?: () => void;
+  onPressIn?: () => void;
   onPressOut?: () => void;
   variantName: string;
 };
 
 type VisibleCardSize = 'hand' | 'table' | 'mini';
+
+function useImmediateDoubleTap(onPress?: () => void, onDoublePress?: () => void) {
+  const lastTapAt = useRef(0);
+  return () => {
+    const now = Date.now();
+    if (
+      onDoublePress !== undefined
+      && lastTapAt.current > 0
+      && now - lastTapAt.current <= DOUBLE_TAP_WINDOW_MS
+    ) {
+      lastTapAt.current = 0;
+      onDoublePress();
+      return;
+    }
+    lastTapAt.current = now;
+    onPress?.();
+  };
+}
 
 export function GameCard({
   position,
@@ -33,19 +59,24 @@ export function GameCard({
   clueMarker = null,
   hasNote = false,
   height,
+  statePresentation = null,
   onSelect,
+  onDoublePress,
   onLongPress,
+  onPressIn,
   onPressOut,
   variantName,
 }: GameCardProps) {
   const { theme } = useHanabTheme();
   const longPressed = useRef(false);
+  const handlePress = useImmediateDoubleTap(onSelect, onDoublePress);
+  const compactIndicator = height !== undefined && height < 80;
 
   return <Pressable
     accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
     accessibilityState={{ selected }}
-    delayLongPress={350}
+    delayLongPress={onLongPress === undefined ? undefined : 350}
     onLongPress={onLongPress === undefined ? undefined : () => {
       longPressed.current = true;
       onLongPress();
@@ -55,9 +86,12 @@ export function GameCard({
         longPressed.current = false;
         return;
       }
-      onSelect();
+      handlePress();
     }}
-    onPressIn={() => { longPressed.current = false; }}
+    onPressIn={() => {
+      longPressed.current = false;
+      onPressIn?.();
+    }}
     onPressOut={onPressOut}
     style={({ pressed }) => [
       styles.cardTouch,
@@ -71,13 +105,22 @@ export function GameCard({
       height === undefined ? { borderColor: selected ? theme.colors.accent : '#0d0d0d' } : null,
       height === undefined && selected ? styles.selectedFrame : null,
     ]}>
-      <View style={[styles.hiddenCard, height === undefined ? null : styles.sizedHiddenCard]}>
+      <View style={[
+        styles.hiddenCard,
+        height === undefined ? null : styles.sizedHiddenCard,
+        statePresentation?.engineTrash && styles.engineTrashCard,
+      ]}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
-        {knowledge.borderColor !== null && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: knowledge.borderColor }]} />}
+        {knowledge.borderColor !== null && <SemanticBorder color={knowledge.borderColor} height={height} />}
         {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
         {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
-        {hasNote && <NoteIndicator compact={height !== undefined && height < 80} />}
+        <CardStateIndicators
+          clued={knowledge.borderColor === 'orange'}
+          knownRank={knowledge.displayRank !== null}
+          presentation={statePresentation}
+        />
+        {hasNote && <NoteIndicator compact={compactIndicator} />}
       </View>
       {height !== undefined && <View pointerEvents="none" style={[
         styles.sizedHiddenFrameOverlay,
@@ -99,8 +142,11 @@ export function VisibleHanabiCard({
   hasNote = false,
   semanticBorder = null,
   empathyKnowledge = null,
+  statePresentation = null,
   onPress,
+  onDoublePress,
   onLongPress,
+  onPressIn,
   onPressOut,
   size = 'hand',
   height,
@@ -115,14 +161,18 @@ export function VisibleHanabiCard({
   hasNote?: boolean;
   semanticBorder?: string | null;
   empathyKnowledge?: CardKnowledgeViewModel | null;
+  statePresentation?: CardStatePresentation | null;
   onPress?: () => void;
+  onDoublePress?: () => void;
   onLongPress?: () => void;
+  onPressIn?: () => void;
   onPressOut?: () => void;
   size?: VisibleCardSize;
   height?: number;
 }) {
   const { theme } = useHanabTheme();
   const longPressed = useRef(false);
+  const handlePress = useImmediateDoubleTap(onPress, onDoublePress);
   const empathyActive = empathyKnowledge !== null;
   const faceSuitIndex = empathyActive ? empathyKnowledge.displaySuitIndex : suitIndex;
   const faceRank = empathyActive ? empathyKnowledge.displayRank : rank;
@@ -137,37 +187,52 @@ export function VisibleHanabiCard({
     sizeStyles,
     height === undefined ? null : { height },
     empathyActive && styles.empathyCard,
+    statePresentation?.engineTrash && styles.engineTrashCard,
     {
       borderColor: selected ? theme.colors.accent : 'transparent',
       borderWidth: selected ? 5 : 0,
     },
   ]}>
     <UpstreamCardFace rank={faceRank} suitIndex={faceSuitIndex} variantName={variantName} />
-    {activeSemanticBorder !== null && size === 'hand' && <View pointerEvents="none" style={[styles.semanticInset, { borderColor: activeSemanticBorder }]} />}
+    {activeSemanticBorder !== null && size === 'hand' && <SemanticBorder color={activeSemanticBorder} height={height} />}
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
     {highlighted && <View pointerEvents="none" style={[styles.previewInset, { borderColor: theme.colors.warning }]} />}
     {clueMarker !== null && <CommittedClueMarker marker={clueMarker} variantName={variantName} />}
+    <CardStateIndicators
+      clued={activeSemanticBorder === 'orange'}
+      knownRank={faceRank !== null}
+      presentation={statePresentation}
+    />
     {hasNote && <NoteIndicator compact={compactIndicator} />}
   </View>;
 
-  if (onPress === undefined && onLongPress === undefined && onPressOut === undefined) return content;
+  if (
+    onPress === undefined
+    && onDoublePress === undefined
+    && onLongPress === undefined
+    && onPressIn === undefined
+    && onPressOut === undefined
+  ) return content;
   return <Pressable
     accessibilityLabel={`${position === undefined ? '' : `Card ${position + 1}, `}${suit?.name ?? 'Unknown'} ${faceRank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
     accessibilityState={{ selected }}
-    delayLongPress={350}
+    delayLongPress={onLongPress === undefined ? undefined : 350}
     onLongPress={onLongPress === undefined ? undefined : () => {
       longPressed.current = true;
       onLongPress();
     }}
-    onPress={onPress === undefined ? undefined : () => {
+    onPress={() => {
       if (longPressed.current) {
         longPressed.current = false;
         return;
       }
-      onPress();
+      handlePress();
     }}
-    onPressIn={() => { longPressed.current = false; }}
+    onPressIn={() => {
+      longPressed.current = false;
+      onPressIn?.();
+    }}
     onPressOut={onPressOut}
     style={({ pressed }) => pressed && styles.pressed}
   >{content}</Pressable>;
@@ -182,40 +247,61 @@ export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: Ca
   </View>;
 }
 
+function SemanticBorder({ color, height }: { color: string; height?: number }) {
+  const scale = (height ?? 112) / 406;
+  const outsideWidth = Math.max(3, Math.round(20 * scale));
+  const insideWidth = Math.max(2, Math.round(12 * scale));
+  const radius = Math.max(4, Math.round(6 * scale));
+
+  return <View pointerEvents="none" style={styles.semanticBorderLayer}>
+    <View style={[styles.semanticBorderStroke, { borderColor: '#0d0d0d', borderRadius: radius, borderWidth: outsideWidth }]} />
+    <View style={[styles.semanticBorderStroke, { borderColor: color, borderRadius: radius, borderWidth: insideWidth }]} />
+  </View>;
+}
+
 function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge: CardKnowledgeViewModel; variantName: string; height?: number }) {
   const suits = getCardSuitVisuals(variantName);
-  const scale = Math.max(0.58, Math.min(1, (height ?? 112) / 112));
-  const pipSize = Math.max(11, Math.round(16 * scale));
-  const pipBox = Math.max(13, pipSize + 1);
-  const rankFontSize = Math.max(8, Math.round(10 * scale));
-  const rankBox = Math.max(10, Math.round(12 * scale));
-  const visibleSuits = knowledge.suitPips.filter((pipState) => pipState.state !== 'hidden');
-  const visibleRanks = knowledge.rankPips.filter((pipState) => pipState.state !== 'hidden');
+  const visibleSuits = knowledge.displaySuitIndex === null
+    ? knowledge.suitPips.filter((pipState) => pipState.state !== 'hidden')
+    : [];
+  const visibleRanks = knowledge.displayRank === null
+    ? knowledge.rankPips.filter((pipState) => pipState.state !== 'hidden')
+    : [];
 
   return <View pointerEvents="none" style={styles.knowledgeOverlay}>
-    {visibleSuits.length > 0 && <View style={[styles.knowledgeStrip, styles.suitStrip]}>
-      {visibleSuits.map((pipState) => {
-        const suit = suits[pipState.suitIndex];
-        if (suit === undefined || !hasUpstreamSvgPip(suit.pip)) return null;
-        return <View key={`suit-${pipState.suitIndex}`} style={[styles.knowledgeToken, { height: pipBox, width: pipBox }]}>
-          {pipState.positive && <View style={[styles.positiveSuitHalo, { borderRadius: pipBox / 2, height: pipBox, width: pipBox }]} />}
-          <UpstreamPip
-            duplicatePip={suit.duplicatePip}
-            fillColors={suit.fillColors}
-            pip={suit.pip}
-            size={pipSize}
-            suitName={suit.name}
-          />
-          {pipState.state === 'eliminated' && <EliminationX size={pipBox} />}
-        </View>;
-      })}
-    </View>}
-    {visibleRanks.length > 0 && <View style={[styles.knowledgeStrip, styles.rankStrip]}>
-      {visibleRanks.map((pipState) => <View key={`rank-${pipState.rank}`} style={[styles.rankToken, { height: rankBox, width: rankBox }]}>
-        <Text style={[styles.hiddenRankText, { fontSize: rankFontSize, lineHeight: rankFontSize + 1 }, pipState.positive && styles.positiveRankText]}>{pipState.rank}</Text>
-        {pipState.state === 'eliminated' && <EliminationX size={Math.max(9, Math.round(rankBox * 0.85))} />}
-      </View>)}
-    </View>}
+    {visibleSuits.map((pipState) => {
+      const suit = suits[pipState.suitIndex];
+      if (suit === undefined || !hasUpstreamSvgPip(suit.pip)) return null;
+      const layout = getWebSuitPipLayout(height, pipState.suitIndex, suits.length);
+      return <View
+        key={`suit-${pipState.suitIndex}`}
+        style={[styles.knowledgeToken, { height: layout.size, left: layout.left, top: layout.top, width: layout.size }]}
+      >
+        {pipState.positive && <View style={[styles.positiveSuitHalo, { borderRadius: layout.size / 2, height: layout.size, width: layout.size }]} />}
+        <UpstreamPip
+          duplicatePip={suit.duplicatePip}
+          fillColors={suit.fillColors}
+          pip={suit.pip}
+          size={layout.size}
+          suitName={suit.name}
+        />
+        {pipState.state === 'eliminated' && <EliminationX size={layout.size} />}
+      </View>;
+    })}
+    {visibleRanks.map((pipState) => {
+      const layout = getWebRankPipLayout(height, pipState.rank, knowledge.rankPips.length);
+      return <View
+        key={`rank-${pipState.rank}`}
+        style={[styles.rankToken, { height: layout.boxSize, left: layout.left, top: layout.top, width: layout.boxSize }]}
+      >
+        <Text style={[
+          styles.hiddenRankText,
+          { fontSize: layout.fontSize, lineHeight: layout.fontSize + 1 },
+          pipState.positive && styles.positiveRankText,
+        ]}>{pipState.rank}</Text>
+        {pipState.state === 'eliminated' && <EliminationX size={layout.boxSize} />}
+      </View>;
+    })}
   </View>;
 }
 
@@ -276,9 +362,45 @@ function KnowledgeRankLegend({ knowledge }: { knowledge: CardKnowledgeViewModel 
   ))}</View>;
 }
 
+function CardStateIndicators({ presentation, knownRank, clued }: {
+  presentation: CardStatePresentation | null;
+  knownRank: boolean;
+  clued: boolean;
+}) {
+  if (presentation === null) return null;
+
+  const showDoubleDiscard = presentation.doubleDiscard && !clued && !presentation.knownTrashNote;
+  const showEmpathyTrash = presentation.knownTrashFromEmpathy && !presentation.knownTrashNote;
+  const cornerStyle = knownRank ? styles.webMarkerSmallBottom : styles.webMarkerSmallTop;
+
+  return <View pointerEvents="none" style={styles.webMarkerLayer}>
+    {presentation.knownTrashNote && <View style={styles.webMarkerTrash}>
+      <WebCardMarker kind="trash" />
+    </View>}
+    {presentation.questionMark && <View style={styles.webMarkerQuestion}>
+      <WebCardMarker kind="question" />
+    </View>}
+    {presentation.exclamationMark && <View style={styles.webMarkerQuestion}>
+      <WebCardMarker kind="exclamation" />
+    </View>}
+    {presentation.needsFix && <View style={styles.webMarkerFix}>
+      <WebCardMarker kind="fix" />
+    </View>}
+    {presentation.critical && <View style={styles.webMarkerCritical}>
+      <WebCardMarker kind="critical" />
+    </View>}
+    {showEmpathyTrash && <View style={cornerStyle}>
+      <WebCardMarker kind="trash-mini" />
+    </View>}
+    {showDoubleDiscard && <View style={cornerStyle}>
+      <WebCardMarker kind="dda" />
+    </View>}
+  </View>;
+}
+
 function NoteIndicator({ compact = false }: { compact?: boolean }) {
-  return <View style={[styles.noteIndicator, compact && styles.noteIndicatorCompact]}>
-    <Text style={[styles.noteIndicatorText, compact && styles.noteIndicatorTextCompact]}>✎</Text>
+  return <View pointerEvents="none" style={[styles.noteIndicator, compact && styles.noteIndicatorCompact]}>
+    <WebCardMarker kind="note" />
   </View>;
 }
 
@@ -294,15 +416,15 @@ const styles = StyleSheet.create({
   sizedSelectedFrameOverlay: { borderWidth: 4 },
   hiddenCard: { backgroundColor: '#747a76', borderRadius: 5, flex: 1, margin: 1, overflow: 'hidden' },
   empathyCard: { backgroundColor: '#747a76' },
-  knowledgeOverlay: { bottom: 0, justifyContent: 'space-between', left: 0, paddingBottom: '10%', paddingHorizontal: '8%', paddingTop: '42%', position: 'absolute', right: 0, top: 0 },
-  knowledgeStrip: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  suitStrip: { gap: 1 },
-  rankStrip: { gap: 0 },
-  knowledgeToken: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  rankToken: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  engineTrashCard: { opacity: 0.6 },
+  semanticBorderLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 3 },
+  semanticBorderStroke: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  knowledgeOverlay: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  knowledgeToken: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  rankToken: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
   hiddenRankText: { color: '#f7f7f3', fontFamily: 'Arial', fontWeight: '900', textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
   positiveRankText: { color: 'orange' },
-  positiveSuitHalo: { backgroundColor: 'rgba(238, 188, 29, 0.16)', borderColor: 'rgba(13, 13, 13, 0.55)', borderWidth: 1, left: 0, position: 'absolute', top: 0 },
+  positiveSuitHalo: { backgroundColor: 'rgba(238, 188, 29, 0.30)', borderColor: 'rgba(13, 13, 13, 0.70)', borderWidth: 1, left: 0, position: 'absolute', top: 0 },
   eliminationStroke: { backgroundColor: '#111111', left: 0, position: 'absolute' },
   eliminationSlash: { transform: [{ rotate: '45deg' }] },
   eliminationBackslash: { transform: [{ rotate: '-45deg' }] },
@@ -314,17 +436,21 @@ const styles = StyleSheet.create({
   visibleHand: { height: 112 },
   visibleTable: { height: 86 },
   visibleMini: { borderRadius: 5, height: 56 },
-  semanticInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 3 },
   previewInset: { bottom: 0, borderRadius: 5, borderWidth: 3, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 7 },
   clueMarker: { alignItems: 'center', left: 3, position: 'absolute', top: 1, zIndex: 9 },
   clueArrow: { fontSize: 14, fontWeight: '900', lineHeight: 13, textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
   clueCircle: { alignItems: 'center', borderColor: '#111111', borderRadius: 7, borderWidth: 1, height: 14, justifyContent: 'center', width: 14 },
   rankClueCircle: { backgroundColor: '#111111', borderColor: '#ffffff' },
   rankClueText: { color: '#ffffff', fontSize: 8, fontWeight: '900', lineHeight: 9, maxWidth: 11 },
-  noteIndicator: { alignItems: 'center', backgroundColor: '#d8d5ef', borderColor: '#0d0d0d', borderRadius: 3, borderWidth: 1, height: 16, justifyContent: 'center', position: 'absolute', right: 4, top: 4, transform: [{ rotate: '-8deg' }], width: 16, zIndex: 10 },
-  noteIndicatorCompact: { height: 11, right: 2, top: 2, width: 11 },
-  noteIndicatorText: { color: '#0d0d0d', fontSize: 11, fontWeight: '900', lineHeight: 12 },
-  noteIndicatorTextCompact: { fontSize: 7, lineHeight: 8 },
+  webMarkerLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
+  webMarkerTrash: { height: '60%', left: '15%', position: 'absolute', top: '20%', width: '70%' },
+  webMarkerQuestion: { aspectRatio: 1, left: '15%', position: 'absolute', top: '20%', width: '80%' },
+  webMarkerFix: { aspectRatio: 1, left: '10%', position: 'absolute', top: '33%', width: '80%' },
+  webMarkerCritical: { aspectRatio: 1, bottom: '4%', left: '6%', position: 'absolute', width: '20%' },
+  webMarkerSmallTop: { aspectRatio: 1, left: '5%', position: 'absolute', top: '5%', width: '20%' },
+  webMarkerSmallBottom: { aspectRatio: 1, bottom: '4%', left: '6%', position: 'absolute', width: '20%' },
+  noteIndicator: { aspectRatio: 1, position: 'absolute', right: '2%', top: '3%', width: '20%', zIndex: 10 },
+  noteIndicatorCompact: { right: '2%', top: '3%', width: '21%' },
   details: { gap: 5 },
   detailMuted: { fontSize: 11, fontStyle: 'italic' },
 });

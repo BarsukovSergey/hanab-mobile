@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { getC17DenseLayout, getRelativeOpponentIndices } from './c17DenseLayout';
+import { getC17DenseLayout, getC17WorkbenchHeight, getRelativeOpponentIndices } from './c17DenseLayout';
 
 function layout(overrides: Partial<Parameters<typeof getC17DenseLayout>[0]> = {}) {
   return getC17DenseLayout({
@@ -8,6 +8,7 @@ function layout(overrides: Partial<Parameters<typeof getC17DenseLayout>[0]> = {}
     ownCardLaneWidth: 300,
     opponentCount: 5,
     cardsPerHand: 4,
+    workbenchHeight: 156,
     ...overrides,
   });
 }
@@ -24,7 +25,7 @@ describe('C17 dense portrait layout', () => {
     expect(result.ownCardHeight).toBe(result.opponentCardHeight);
   });
 
-  test('gives fewer opponent rows larger cards when height limits the hands region', () => {
+  test('gives fewer opponent rows larger cards when height limits the stable hands rectangle', () => {
     const sixPlayer = layout({ opponentCount: 5, handsRegionHeight: 400, opponentCardLaneWidth: 600, ownCardLaneWidth: 600 });
     const threePlayer = layout({ opponentCount: 2, handsRegionHeight: 400, opponentCardLaneWidth: 600, ownCardLaneWidth: 600 });
 
@@ -54,6 +55,15 @@ describe('C17 dense portrait layout', () => {
     expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
   });
 
+  test('does not stretch a two-player hand stack into dead vertical space', () => {
+    const ordinary = layout({ opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 500 });
+    const tall = layout({ opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 900 });
+
+    expect(tall.opponentCardHeight).toBe(ordinary.opponentCardHeight);
+    expect(tall.handsHeight).toBe(ordinary.handsHeight);
+    expect(tall.workbenchHeight).toBe(ordinary.workbenchHeight);
+  });
+
   test('uses authoritative hand capacity after current hands shrink', () => {
     const beforeAction = layout({ cardsPerHand: 5 });
     const afterAction = layout({ cardsPerHand: 5 });
@@ -69,11 +79,11 @@ describe('C17 dense portrait layout', () => {
     expect(oneExtraCard.ownCardHeight).toBeLessThan(standard.ownCardHeight);
   });
 
-  test('keeps constrained six-player layouts on the existing readability threshold when they fit', () => {
+  test('keeps constrained six-player layouts on the readability threshold when they fit', () => {
     const constrained = layout({
       opponentCardLaneWidth: 300,
       ownCardLaneWidth: 300,
-      handsRegionHeight: 315,
+      handsRegionHeight: 341,
       opponentCount: 5,
       cardsPerHand: 4,
     });
@@ -82,9 +92,28 @@ describe('C17 dense portrait layout', () => {
     expect(constrained.opponentCardHeight).toBeGreaterThanOrEqual(46);
   });
 
-  test('keeps shared cards and real row chrome inside the measured hands region', () => {
+  test('keeps the player metadata rail inside its row even when cards become compact', () => {
+    const constrained = layout({
+      opponentCardLaneWidth: 300,
+      ownCardLaneWidth: 300,
+      handsRegionHeight: 315,
+      opponentCount: 5,
+      cardsPerHand: 4,
+    });
+
+    expect(constrained.mode).toBe('compact-overview');
+    expect(constrained.opponentRowHeight).toBeGreaterThanOrEqual(54);
+  });
+
+  test('keeps shared cards and real row chrome inside the captured hands rectangle', () => {
     const result = layout({ handsRegionHeight: 360 });
 
     expect(result.handsHeight).toBeLessThanOrEqual(360);
+  });
+
+  test('selects a fixed Workbench height from the window class rather than tool content', () => {
+    expect(getC17WorkbenchHeight(915)).toBe(176);
+    expect(getC17WorkbenchHeight(640)).toBe(156);
+    expect(getC17WorkbenchHeight(600)).toBe(140);
   });
 });
