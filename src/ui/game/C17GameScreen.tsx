@@ -770,6 +770,13 @@ function C17DenseWorkspace({
     );
   const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedOwnCard !== null || noteCard !== null || pendingText !== null;
+  const compactOrdinaryWorkbench = usesSideLabels
+    && hypothetical === null
+    && !reviewActive
+    && !finishedReplay
+    && sharedReplay === null
+    && selectedTarget === null
+    && (selectedOwnCard !== null || noteCard !== null);
   const showRewindScrubber = reviewActive;
   const finishedReason = result?.reason;
   const finishedStatus = finishedReason === null || finishedReason === undefined
@@ -851,7 +858,9 @@ function C17DenseWorkspace({
               compact && styles.compactOpponentRow,
               !compact && usesSideLabels && styles.sideLabelRow,
               { height: layout.opponentRowHeight },
-              currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent },
+              currentActor && (usesSideLabels
+                ? { backgroundColor: theme.colors.surfaceMuted }
+                : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }),
               target && { borderColor: theme.colors.accent },
             ]}
           >
@@ -983,14 +992,17 @@ function C17DenseWorkspace({
 
       {(!shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
-      { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
-      shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
+      compactOrdinaryWorkbench ? styles.compactWorkbenchReserve : { minHeight: layout.workbenchHeight, backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
+      compactOrdinaryWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
       {showRewindScrubber && <View style={styles.workbenchScrubber}>
         <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
       </View>}
-      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={styles.workbenchScroll}>
+      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={[
+        styles.workbenchScroll,
+        compactOrdinaryWorkbench && [styles.compactWorkbenchTray, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }],
+      ]}>
         {hypothetical !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HYPOTHETICAL · ACTOR {hypotheticalActor === null ? '—' : metadata.playerNames[hypotheticalActor] ?? `P${hypotheticalActor + 1}`}</Text>
           {hypotheticalController ? <View style={styles.actionButtons}>
@@ -1221,9 +1233,11 @@ const styles = StyleSheet.create({
   clock: { flexShrink: 0, fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 14 },
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
+  compactWorkbenchReserve: { backgroundColor: 'transparent', borderWidth: 0, flexGrow: 0, flexShrink: 0, overflow: 'visible' },
   workbenchExpanded: { flex: 1 },
   workbenchScrubber: { paddingHorizontal: 10, paddingTop: 7 },
   workbenchScroll: { flex: 1 },
+  compactWorkbenchTray: { alignSelf: 'stretch', borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, flex: 0, flexGrow: 0, flexShrink: 1, maxHeight: '100%' },
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   idleWorkbench: { alignItems: 'flex-end', flex: 1, justifyContent: 'flex-start', marginTop: 5 },
   workbenchText: { fontSize: 12, lineHeight: 16 },

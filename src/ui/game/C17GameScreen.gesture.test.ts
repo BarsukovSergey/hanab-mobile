@@ -90,15 +90,28 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>');
 });
 
-test('C17 uses ordinary side labels and keeps global empathy beside Last Action', () => {
+test('C17 uses ordinary side labels without confusing the current actor with a clue target', () => {
   const screen = readC17Screen();
   const lastAction = screen.slice(screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]}>'), screen.indexOf('</View></AuthoritativePulse>', screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]>')));
 
   expect(screen).toContain('const usesSideLabels = opponents.length <= 2;');
   expect(screen).toContain("{playerName}{!usesSideLabels && currentActor ? ' · TURN' : ''}");
   expect(screen).toContain('currentActorDot');
+  expect(screen).toContain("currentActor && (usesSideLabels\n                ? { backgroundColor: theme.colors.surfaceMuted }\n                : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent })");
+  expect(screen).toContain('target && { borderColor: theme.colors.accent }');
   expect(lastAction).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
   expect(lastAction).toContain('title="Rewind"');
+});
+
+test('C17 reserves the ordinary Workbench slot while keeping a selected-card tray content-sized', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('const compactOrdinaryWorkbench = usesSideLabels');
+  expect(screen).toContain('compactOrdinaryWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('compactWorkbenchReserve');
+  expect(screen).toContain('compactWorkbenchTray');
+  expect(screen).toContain("compactWorkbenchTray: { alignSelf: 'stretch'");
+  expect(screen).toContain("flex: 0, flexGrow: 0");
 });
 
 test('C17 gives Play and Discard separate eligibility at maximum clue tokens', () => {
