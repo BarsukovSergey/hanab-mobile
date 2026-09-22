@@ -14,13 +14,13 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   const screen = readC17Screen();
 
   expect(screen).toContain('delayLongPress={350}');
-  expect(screen).toContain('onLongPress={() => onHoldEmpathy(ourIndex)}');
+  expect(screen).toContain('onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}');
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
   expect(screen).toContain('styles.opponentCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
   expect(screen).toContain('styles.ownCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
-  expect(screen).toContain('if (canEnterClue) onSelectClueTarget(index);');
+  expect(screen).toContain('if (canEnterClue && !isActionHand) onSelectClueTarget(index);');
   const opponentStart = screen.indexOf('accessibilityLabel={`Player ${playerName}`}');
   const opponentRow = screen.slice(opponentStart, opponentStart + 1000);
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
@@ -58,10 +58,10 @@ test('C17 ordinary note inspector keeps note controls without card-number labels
 
 test('C17 ordinary note actions never duplicate selected and inspected card editors', () => {
   const screen = readC17Screen();
-  const ordinaryWorkbench = screen.slice(screen.indexOf('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>'));
+  const ordinaryWorkbench = screen.slice(screen.indexOf('{canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>'));
 
-  expect(ordinaryWorkbench).toContain('{(noteCard === null || noteCard === selectedOwnCard) && <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />}');
-  expect(ordinaryWorkbench).toContain('{noteCard !== selectedOwnCard && <View style={styles.rowBetween}>');
+  expect(ordinaryWorkbench).toContain('{(noteCard === null || noteCard === selectedActionCard) && <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedActionCard)} />}');
+  expect(ordinaryWorkbench).toContain('{noteCard !== selectedActionCard && <View style={styles.rowBetween}>');
   expect(ordinaryWorkbench).toContain('<ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />');
   expect(ordinaryWorkbench).toContain('<ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />');
   expect(ordinaryWorkbench).toContain('<ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />');
@@ -91,15 +91,15 @@ test('C17 keeps spectator interaction observational while retaining the workspac
 
   expect(screen).toContain("const isPlayingPlayer = liveRoom?.role === 'player' && clientState?.playing === true");
   expect(screen).toContain('&& !isFinishedReplay && !isSharedReplay;');
-  expect(screen).toContain('const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;');
+  expect(screen).toContain('const seatingAnchorIndex = clientState?.metadata.ourPlayerIndex ?? null;');
   expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
   expect(screen).toContain('empathyPlayers,');
   expect(screen).toContain("isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'");
-  expect(screen).toContain("canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName");
+  expect(screen).toContain("canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName");
   expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
   expect(screen).toContain('if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {');
   expect(screen).toContain('const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;');
-  expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>');
+  expect(screen).toContain('{canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>');
 });
 
 test('C17 uses ordinary side labels without confusing the current actor with a clue target', () => {
@@ -193,7 +193,7 @@ test('C17 renders authoritative live clocks only for an eligible timed live game
   expect(eligibility).toContain('liveRoom.clock !== null');
   expect(screen).toContain('clockPaused={clientState.pause.active}');
   expect(screen).toContain('<C17LiveClockText\n                  clock={liveClock}\n                  paused={clockPaused}\n                  playerIndex={index}');
-  expect(screen).toContain('<C17LiveClockText\n            clock={liveClock}\n            paused={clockPaused}\n            playerIndex={ourIndex}');
+  expect(screen).toContain('<C17LiveClockText\n            clock={liveClock}\n            paused={clockPaused}\n            playerIndex={seatingAnchorIndex}');
   expect(clockComponent).toContain('getDisplayedClockString(clock, playerIndex, paused, now)');
   expect(clockComponent).toContain('if (paused) return undefined;');
   expect(clockComponent).toContain('setInterval(() => setNow(Date.now()), 1000)');
