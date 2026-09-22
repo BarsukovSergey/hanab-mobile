@@ -46,14 +46,21 @@ These items were explicitly removed from the C17 release gate during product rev
 - Rich/compact profiles beyond what is strictly required by existing gameplay/table identity.
 - Friends list / online-friends affordances.
 - Social feeds, recommendations, achievements, messaging redesign.
+- **Chat typing/read-state polish:** optional typing indicators and/or unread/read-state affordances if the authoritative server/client capability is worth exposing on mobile.
+- **Push notifications:** research mobile notifications for genuinely useful events (for example turn/table/social events) only after verifying server/background-delivery capability and notification permission UX.
+- **Discord/account linking:** optional account-integration parity; no implementation until the upstream purpose, transport, and mobile value are verified.
 
 ## Replay / command parity
 
+- **Seed comparison / other scores:** investigate a history/replay view for other games played on the same seed, using authoritative history/server data rather than client-side score guessing. Treat this as an optional history enhancement.
+- **Advanced shared-replay parity:** research the remaining useful web power-user features such as replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. The mobile state already retains upstream `sharedReplayEffMod`; do not rebuild that semantic state separately in UI.
+- **Game/replay tags workflow:** the protocol/runtime can already carry game-history `tags` data and raw tag commands, but there is no first-class mobile workflow. Research whether tag search/add/delete deserves native UI. This is distinct from note quick tags.
 - **`/copy` replay export:** implement the deliberately deferred replay-copy flow, including the required replay JSON/clipboard mechanics, without changing existing server-handled slash-command fallback behavior.
 - **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
 
 ## Release / packaging / maintenance
 
+- **Remembered-password policy:** do **not** add password persistence by default. The current platform-owned authenticated session already survives normal relaunches without exposing cookies or credentials to app code. Revisit only if real session-persistence evidence creates a user problem; if ever implemented, require explicit opt-in and platform secure storage (Android Keystore / iOS Keychain).
 - **Beta upgrade continuity:** for the next tester build, bump the app version and Android `versionCode`, then verify installation over `1.0.0-beta.1` without uninstalling and confirm expected session/app data survives the upgrade.
 - **Play Store / AAB pipeline:** define store signing, AAB packaging, versioning, and release policy separately from the current standalone internal APK flow. Keep the heavy APK/AAB workflow manual unless deliberately changed.
 - **Dependency maintenance:** investigate current deprecation warnings and audit findings as a separate maintenance task. Do not apply blind force-upgrades during the beta freeze.
