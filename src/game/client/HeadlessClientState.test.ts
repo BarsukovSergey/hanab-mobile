@@ -10,6 +10,54 @@ import { createAppStore } from '../../store/store';
 import { GameBootstrapCoordinator } from '../bootstrap/GameBootstrapCoordinator';
 import { stateReducer } from './reducers/stateReducer';
 import { cardOrder } from '../upstream/types/CardOrder';
+import type { State } from './types/State';
+
+function makeLoadedClientState(): State {
+  const store = createAppStore();
+  store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+  store.dispatch(sessionActions.welcomeReceived({
+    epoch: 1,
+    welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] },
+  }));
+  store.dispatch(roomActions.joinRequested({ epoch: 1, tableID: 123 }));
+  store.dispatch(roomActions.tableStartReceived({
+    epoch: 1,
+    tableStart: { tableID: 123, replay: false },
+  }));
+
+  const coordinator = new GameBootstrapCoordinator(store, () => true);
+  coordinator.startFromAuthoritativeRoom(1);
+  coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit()));
+  coordinator.receiveHistory(1, 1, gameActionListSchema.parse({
+    tableID: 123,
+    list: [
+      ...Array.from({ length: 5 }, (_, order) => ({
+        type: 'draw', playerIndex: 0, order, suitIndex: -1, rank: -1,
+      })),
+      ...Array.from({ length: 5 }, (_, index) => ({
+        type: 'draw',
+        playerIndex: 1,
+        order: index + 5,
+        suitIndex: index,
+        rank: index + 1,
+      })),
+      { type: 'turn', num: 0, currentPlayerIndex: 0 },
+      {
+        type: 'clue',
+        clue: { type: 1, value: 1 },
+        giver: 0,
+        list: [5],
+        target: 1,
+        turn: 0,
+      },
+      { type: 'turn', num: 1, currentPlayerIndex: 1 },
+    ],
+  }));
+
+  const room = store.getState().room.room;
+  if (room.kind !== 'live_game') throw new Error('Expected live game');
+  return room.clientState;
+}
 
 describe('pinned upstream headless client state', () => {
   test('bootstrap history owns upstream replay states and visible state', () => {
@@ -159,5 +207,54 @@ describe('pinned upstream headless client state', () => {
     expect(modified.notes.efficiencyModifier).toBe(2);
     expect(modified.ongoingGame).not.toBe(edited.ongoingGame);
     expect(modified.replay.actions).toHaveLength(replayLength);
+  });
+
+  test('finishing an active hypothetical enters the shared replay and preserves in-game replay position', () => {
+    const loaded = makeLoadedClientState();
+    const replaying = stateReducer(loaded, { type: 'replayEnter', segment: 1 });
+    const hypothetical = stateReducer(replaying, {
+      type: 'hypoStart', showDrawnCards: false, actions: [],
+    });
+    expect(hypothetical.replay.hypothetical).not.toBeNull();
+
+    const finished = stateReducer(hypothetical, {
+      type: 'finishOngoingGame',
+      databaseID: 456,
+      sharedReplayLeader: 'Bob',
+      datetimeFinished: '2026-09-22T12:00:00Z',
+    });
+
+    expect(finished.finished).toBe(true);
+    expect(finished.replay.hypothetical).toBeNull();
+    expect(finished.replay.segment).toBe(1);
+    expect(finished.replay.shared).toEqual({
+      segment: 0,
+      useSharedSegments: false,
+      leader: 'Bob',
+      amLeader: false,
+    });
+    expect(finished.visibleState).toBe(finished.replay.states[1]);
+  });
+
+  test('finishing normally enters and follows the shared replay at the penultimate segment', () => {
+    const loaded = makeLoadedClientState();
+
+    const finished = stateReducer(loaded, {
+      type: 'finishOngoingGame',
+      databaseID: 456,
+      sharedReplayLeader: 'Ada',
+      datetimeFinished: '2026-09-22T12:00:00Z',
+    });
+
+    expect(finished.finished).toBe(true);
+    expect(finished.replay.hypothetical).toBeNull();
+    expect(finished.replay.active).toBe(true);
+    expect(finished.replay.segment).toBe(0);
+    expect(finished.replay.shared).toEqual({
+      segment: 0,
+      useSharedSegments: true,
+      leader: 'Ada',
+      amLeader: true,
+    });
   });
 });
