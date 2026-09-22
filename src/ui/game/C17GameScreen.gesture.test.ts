@@ -56,6 +56,17 @@ test('C17 ordinary note inspector keeps note controls without card-number labels
   expect(screen).not.toContain('>{getCardLabel(');
 });
 
+test('C17 ordinary note actions never duplicate selected and inspected card editors', () => {
+  const screen = readC17Screen();
+  const ordinaryWorkbench = screen.slice(screen.indexOf('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>'));
+
+  expect(ordinaryWorkbench).toContain('{(noteCard === null || noteCard === selectedOwnCard) && <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />}');
+  expect(ordinaryWorkbench).toContain('{noteCard !== selectedOwnCard && <View style={styles.rowBetween}>');
+  expect(ordinaryWorkbench).toContain('<ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />');
+  expect(ordinaryWorkbench).toContain('<ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />');
+  expect(ordinaryWorkbench).toContain('<ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />');
+});
+
 test('C17 pulses only the compact clue target row while keeping full-card clue pulses', () => {
   const screen = readC17Screen();
 

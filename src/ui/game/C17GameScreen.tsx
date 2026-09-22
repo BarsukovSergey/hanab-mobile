@@ -1052,29 +1052,37 @@ function C17DenseWorkspace({
             </Text>
           </View>}
         </> : finishedReplay || sharedReplay !== null ? <>
-          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay === null
-            ? `Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`
-            : `SHARED REPLAY · Leader: ${sharedReplay.leader}`}</Text>
-          {sharedReplay !== null && <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Leader: {sharedReplay.leader}</Text>}
-          <View style={styles.rowBetween}>
+          {sharedReplay === null ? <>
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{`Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`}</Text>
+            <View style={styles.rowBetween}>
+              <View style={styles.actionButtons}>
+                <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
+                <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
+              </View>
+            </View>
+            {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
+              {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
+              {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
+            </View>}
+            {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
+          </> : <>
+            <Text numberOfLines={1} style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Leader: {sharedReplay.leader}</Text>
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
               <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
+              {!sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+              {!sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
+              {sharedReplay.amLeader && sharedReplayPassTargets.map((name) => <ActionButton
+                compact
+                key={name}
+                title={`Pass to ${name}`}
+                onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
+              />)}
+              {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
+              {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
+              {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
             </View>
-            {sharedReplay !== null && !sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
-            {sharedReplay !== null && !sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
-          </View>
-          {sharedReplay?.amLeader && <View style={styles.actionButtons}>{sharedReplayPassTargets.map((name) => <ActionButton
-            compact
-            key={name}
-            title={`Pass to ${name}`}
-            onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
-          />)}</View>}
-          {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
-            {canQuickRematch && <ActionButton compact title="Quick rematch" tone="primary" onPress={onQuickRematch} />}
-            {canRemake && <ActionButton compact title="Remake table" onPress={onRemake} />}
-          </View>}
-          {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
+          </>}
           {noteCard !== null && <View style={styles.noteInspect}>
             <Text style={[styles.notePreview, { color: inspectedReplayNotes.length > 0 ? theme.colors.text : theme.colors.textMuted }]}>
               {inspectedReplayNotes.length > 0
@@ -1096,7 +1104,7 @@ function C17DenseWorkspace({
           {canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>
             <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
             <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
-            <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />
+            {(noteCard === null || noteCard === selectedOwnCard) && <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />}
           </View>}
 
           {selectedOwnCard !== null && noteCard === null && (notes[selectedOwnCard]?.text.trim().length ?? 0) > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>
