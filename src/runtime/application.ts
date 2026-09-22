@@ -1,5 +1,6 @@
 import { HanabNetworkSession } from '../network/NetworkSession';
 import { store } from '../store/store';
+import { ChatRuntime } from './ChatRuntime';
 import { LobbyRuntime } from './LobbyRuntime';
 import { createRuntimeCommandGate } from './runtimeCommandGate';
 import { TerminationRuntime } from './terminationRuntime';
@@ -31,3 +32,4 @@ const gameplayCommandGate = createRuntimeCommandGate(rawLobbyRuntime, [
 export const lobbyRuntime = gameplayCommandGate.runtime;
 export const suppressGameplayRuntimeCommands = () => gameplayCommandGate.suppress();
 export const terminationRuntime = new TerminationRuntime(rawLobbyRuntime, store);
+export const chatRuntime = new ChatRuntime(lobbyRuntime, terminationRuntime, store);

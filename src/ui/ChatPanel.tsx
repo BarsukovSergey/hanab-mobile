@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { lobbyRuntime } from '../runtime/application';
+import { chatRuntime, lobbyRuntime } from '../runtime/application';
 import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
 import { useAppSelector } from '../store/hooks';
 import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
@@ -26,7 +26,7 @@ export function ChatPanel({ room, title }: Props) {
   const trimmed = draft.trim();
 
   const send = () => {
-    if (lobbyRuntime.sendChat(draft)) setDraft('');
+    if (chatRuntime.submit(draft)) setDraft('');
   };
 
   useEffect(() => {

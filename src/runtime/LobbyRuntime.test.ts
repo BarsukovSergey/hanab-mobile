@@ -14,6 +14,7 @@ import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { sessionActions } from '../store/sessionSlice';
 import { createAppStore, userSelectors } from '../store/store';
+import { ChatRuntime } from './ChatRuntime';
 import {
   isJoinEligible,
   isPregameSpectateEligible,
@@ -23,6 +24,7 @@ import {
   isSpectateEligible,
   LobbyRuntime,
 } from './LobbyRuntime';
+import { TerminationRuntime } from './terminationRuntime';
 
 type ListenerMap = {
   open: Set<() => void>;
@@ -507,6 +509,76 @@ describe('deterministic lobby runtime', () => {
       'tableJoin {"tableID":123}',
       'chat {"msg":"table hello","room":"table123"}',
     ]);
+  });
+
+  test('chat submission preserves normal and server-side slash-command frames', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    for (const message of ['hello', '/help', '/random 1 5', '/whatever', '/']) {
+      expect(chat.submit(message)).toBe(true);
+    }
+
+    expect(socket.sent).toEqual([
+      'chat {"msg":"hello","room":"lobby"}',
+      'chat {"msg":"/help","room":"lobby"}',
+      'chat {"msg":"/random 1 5","room":"lobby"}',
+      'chat {"msg":"/whatever","room":"lobby"}',
+      'chat {"msg":"/","room":"lobby"}',
+    ]);
+  });
+
+  test('termination slash commands use the termination runtime without raw-chat fallback', async () => {
+    const { socket, store, runtime } = await makeLiveRuntime('player');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = socket.sent.length;
+
+    expect(chat.submit('/TeRmInAtE')).toBe(true);
+    expect(chat.submit('/vote')).toBe(true);
+
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'tableTerminate {"tableID":123}',
+      'tableVoteForTermination {"tableID":123}',
+    ]);
+  });
+
+  test('ineligible termination slash command fails without raw-chat fallback', async () => {
+    const { socket, store, runtime } = await makeLiveRuntime('spectator');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = [...socket.sent];
+
+    expect(chat.submit('/terminate')).toBe(false);
+    expect(socket.sent).toEqual(sentBefore);
+  });
+
+  test.each(['/setleader Bob', '/changelead Bob'])(
+    'leadership slash command %s resolves canonical player name through setTableLeader',
+    async (command) => {
+      const { socket, store, runtime } = await makeReadyRuntime();
+      expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+      socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+      socket.emitMessage('joined {"tableID":321}');
+      const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+      const mixedCaseCommand = command === '/setleader Bob' ? '/SeTlEaDeR bOb' : command;
+      expect(chat.submit(mixedCaseCommand)).toBe(true);
+      expect(socket.sent.at(-1)).toBe('tableSetLeader {"tableID":321,"name":"Bob"}');
+      expect(store.getState().room.pendingLeaderName).toBe('Bob');
+    },
+  );
+
+  test('invalid leadership slash commands fail without raw-chat fallback', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob']));
+    socket.emitMessage('joined {"tableID":321}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sentBefore = [...socket.sent];
+
+    expect(chat.submit('/setleader')).toBe(false);
+    expect(chat.submit('/setowner Missing')).toBe(false);
+    expect(chat.submit('/changeowner Ada')).toBe(false);
+    expect(socket.sent).toEqual(sentBefore);
   });
 
   test('chat frames and history route by room and reset on connection replacement', async () => {
