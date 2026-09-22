@@ -18,15 +18,15 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
-  expect(screen).toContain('styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }');
-  expect(screen).toContain('styles.ownCards, { marginTop: 2 + layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.opponentCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.ownCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
   expect(screen).toContain('if (canEnterClue) onSelectClueTarget(index);');
   const opponentStart = screen.indexOf('accessibilityLabel={`Player ${playerName}`}');
   const opponentRow = screen.slice(opponentStart, opponentStart + 1000);
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
   expect(opponentRow).toContain('onLongPress={globalEmpathy ? undefined : () => {');
   expect(opponentRow).toContain('onPressIn={() => { longPressedOpponent.current = null; }}');
-  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(4);
+  expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(2);
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
   expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');
@@ -46,11 +46,12 @@ test('C17 uses summaries only for compact opponents while retaining full own car
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
 });
 
-test('C17 note inspector keeps note controls and details without card-number labels', () => {
+test('C17 ordinary note inspector keeps note controls without card-number labels or knowledge details', () => {
   const screen = readC17Screen();
+  const ordinaryWorkbench = screen.slice(screen.indexOf('</> : selectedTarget !== null ? <ClueComposer'));
 
   expect(screen).toContain('title="Edit note"');
-  expect(screen).toContain('CardKnowledgeDetails knowledge={inspectedKnowledge}');
+  expect(ordinaryWorkbench).not.toContain('CardKnowledgeDetails knowledge={inspectedKnowledge}');
   expect(screen).not.toContain('>{getCardLabel(');
 });
 
@@ -81,12 +82,23 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain('const ourIndex = clientState?.metadata.ourPlayerIndex ?? null;');
   expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
   expect(screen).toContain('empathyPlayers,');
-  expect(screen).toContain("isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'");
+  expect(screen).toContain("isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'");
   expect(screen).toContain("canPlayGameplay && current === ourIndex ? 'YOUR TURN' : currentName");
   expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
   expect(screen).toContain('if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {');
   expect(screen).toContain('const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;');
   expect(screen).toContain('{canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>');
+});
+
+test('C17 uses ordinary side labels and keeps global empathy beside Last Action', () => {
+  const screen = readC17Screen();
+  const lastAction = screen.slice(screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]}>'), screen.indexOf('</View></AuthoritativePulse>', screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]>')));
+
+  expect(screen).toContain('const usesSideLabels = opponents.length <= 2;');
+  expect(screen).toContain("{playerName}{!usesSideLabels && currentActor ? ' · TURN' : ''}");
+  expect(screen).toContain('currentActorDot');
+  expect(lastAction).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
+  expect(lastAction).toContain('title="Rewind"');
 });
 
 test('C17 gives Play and Discard separate eligibility at maximum clue tokens', () => {

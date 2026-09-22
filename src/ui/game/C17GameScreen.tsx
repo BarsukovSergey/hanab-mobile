@@ -43,6 +43,8 @@ import { CardKnowledgeDetails, CompactHandCardSummary, GameCard, VisibleHanabiCa
 import { NoteEditor } from './NoteEditor';
 import {
   getC17CardLaneWidth,
+  C17_SIDE_LABEL_LANE_WIDTH,
+  C17_SIDE_LABEL_ROW_GAP,
   getC17DenseLayout,
   getC17AmbientEnvelope,
   getC17HandsRegionHeight,
@@ -670,7 +672,8 @@ function C17DenseWorkspace({
   const [recentOpen, setRecentOpen] = useState(false);
   const committedClue = getLastCluePresentationFromState(game);
   const opponents = getRelativeOpponentIndices(metadata.playerNames.length, ourIndex);
-  const workbenchHeight = getC17WorkbenchHeight(viewportHeight);
+  const usesSideLabels = opponents.length <= 2;
+  const workbenchHeight = getC17WorkbenchHeight(viewportHeight, opponents.length);
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
     shellKey: '',
@@ -685,7 +688,10 @@ function C17DenseWorkspace({
     && layoutMetrics.ambientBodyHeight > 0
     && layoutMetrics.ambientBodyWidth > 0;
   const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
-  const cardLaneWidth = getC17CardLaneWidth(layoutMetrics.ambientBodyWidth);
+  const cardLaneWidth = getC17CardLaneWidth(
+    layoutMetrics.ambientBodyWidth,
+    usesSideLabels ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
+  );
   const layout = getC17DenseLayout({
     opponentCardLaneWidth: cardLaneWidth,
     handsRegionHeight,
@@ -796,7 +802,10 @@ function C17DenseWorkspace({
       <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
         <View style={[styles.rowBetween, styles.lastActionHeader]}>
           <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
-          {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
+          {!reviewActive && <View style={styles.actionButtons}>
+            <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />
+            <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+          </View>}
         </View>
         <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.lastActionPressable}>
           <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
@@ -840,15 +849,17 @@ function C17DenseWorkspace({
             style={[
               styles.opponentRow,
               compact && styles.compactOpponentRow,
+              !compact && usesSideLabels && styles.sideLabelRow,
               { height: layout.opponentRowHeight },
               currentActor && { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent },
               target && { borderColor: theme.colors.accent },
             ]}
           >
-            <View style={compact ? styles.compactOpponentNameLane : styles.opponentMeta}>
-              <View style={styles.namePeekArea}>
+            <View style={compact ? styles.compactOpponentNameLane : usesSideLabels ? styles.sideLabelLane : styles.opponentMeta}>
+              <View style={[styles.namePeekArea, usesSideLabels && styles.sideLabelPeekArea]}>
+                {usesSideLabels && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
                 <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
-                  {playerName}{currentActor ? ' · TURN' : ''}
+                  {playerName}{!usesSideLabels && currentActor ? ' · TURN' : ''}
                 </Text>
                 {liveClock !== null && <C17LiveClockText
                   clock={liveClock}
@@ -857,7 +868,7 @@ function C17DenseWorkspace({
                 />}
               </View>
             </View>
-            <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
+            <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
               {getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
@@ -915,19 +926,19 @@ function C17DenseWorkspace({
         disabled={globalEmpathy}
         onLongPress={() => onHoldEmpathy(ourIndex)}
         onPressOut={() => onHoldEmpathy(null)}
-        style={[styles.ownHand, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+        style={[styles.ownHand, usesSideLabels && styles.sideLabelRow, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       >
-        <View style={styles.ownTitleLane}>
+        <View style={[styles.ownTitleLane, usesSideLabels && styles.sideLabelLane]}>
           <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{hypothetical !== null
             ? `ACTOR · ${metadata.playerNames[ourIndex] ?? `P${ourIndex + 1}`}`
-            : isSpectator ? 'OBSERVED HAND' : 'YOUR HAND'}</Text>
+            : isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'}</Text>
           {liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
             playerIndex={ourIndex}
           />}
         </View>
-        <View style={[styles.ownCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
+        <View style={[styles.ownCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
           {ownHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
@@ -1088,31 +1099,27 @@ function C17DenseWorkspace({
           previewState={cluePreviewState}
           targetName={targetName}
         /> : <>
-          <View style={styles.rowBetween}>
-            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>DECISION WORKBENCH</Text>
-            <View style={styles.actionButtons}>
-              <ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
-            </View>
-          </View>
-
           {canPlayGameplay && selectedOwnCard !== null && <View style={styles.actionButtons}>
             <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
             <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
             <ActionButton compact title="Edit note" onPress={() => onEditNote(selectedOwnCard)} />
           </View>}
 
+          {selectedOwnCard !== null && noteCard === null && (notes[selectedOwnCard]?.text.trim().length ?? 0) > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>
+            {notes[selectedOwnCard]?.text}
+          </Text>}
+
           {noteCard !== null ? <View style={styles.noteInspect}>
             {noteCard !== selectedOwnCard && <View style={styles.rowBetween}>
               <ActionButton compact title="Edit note" onPress={() => onEditNote(noteCard)} />
             </View>}
-            {inspectedNote.trim().length > 0 && <Text numberOfLines={2} style={[styles.notePreview, { color: theme.colors.text }]}>{inspectedNote}</Text>}
-            {inspectedKnowledge !== null && <CardKnowledgeDetails knowledge={inspectedKnowledge} variantName={variantName} />}
+            {inspectedNote.trim().length > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>{inspectedNote}</Text>}
           </View> : null}
 
           {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
         </>}
       </ScrollView>
-    </View> : <View style={styles.idleWorkbench}><ActionButton compact title={globalEmpathy ? 'All empathy ✓' : 'All empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} /></View>}
+    </View> : <View style={styles.idleWorkbench} />}
     </View>
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
@@ -1197,15 +1204,20 @@ const styles = StyleSheet.create({
   opponents: { gap: 2 },
   opponentRow: { borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   compactOpponentRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  sideLabelRow: { alignItems: 'center', flexDirection: 'row-reverse', gap: C17_SIDE_LABEL_ROW_GAP },
   opponentMeta: { height: 14, justifyContent: 'center', minWidth: 0 },
   compactOpponentNameLane: { flexShrink: 1, justifyContent: 'center', maxWidth: '36%', minWidth: 0 },
+  sideLabelLane: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, gap: 3, justifyContent: 'center', minWidth: 0, width: C17_SIDE_LABEL_LANE_WIDTH },
   namePeekArea: { alignItems: 'center', borderRadius: 6, flexDirection: 'row', gap: 3, height: 14, justifyContent: 'center', minWidth: 0 },
-  opponentName: { flexShrink: 1, fontSize: 10, fontWeight: '900', lineHeight: 14, minWidth: 0 },
+  sideLabelPeekArea: { width: '100%' },
+  opponentName: { flex: 1, fontSize: 10, fontWeight: '900', lineHeight: 14, minWidth: 0 },
+  currentActorDot: { borderRadius: 3, height: 6, width: 6 },
   opponentCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
+  sideLabelCards: { flex: 1 },
   compactOpponentCards: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 2, minWidth: 0 },
   ownHand: { borderRadius: 10, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   ownTitleLane: { alignItems: 'center', flexDirection: 'row', gap: 3, height: 14, minWidth: 0 },
-  ownTitle: { flexShrink: 1, fontSize: 10, fontWeight: '900', lineHeight: 14, minWidth: 0 },
+  ownTitle: { flex: 1, fontSize: 10, fontWeight: '900', lineHeight: 14, minWidth: 0 },
   clock: { flexShrink: 0, fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 14 },
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },

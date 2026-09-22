@@ -62,9 +62,17 @@ describe('C17 dense portrait layout', () => {
     const result = layout({ opponentCount: 2, handsRegionHeight: 214 });
 
     expect(result.mode).toBe('full-ledger');
-    expect(result.opponentCardHeight).toBeLessThan(46);
+    expect(result.opponentCardHeight).toBeLessThan(76);
     expect(result.ownCardHeight).toBe(result.opponentCardHeight);
     expect(result.handsHeight).toBeLessThanOrEqual(214);
+  });
+
+  test('returns the removed metadata row height to ordinary two-player and three-player card faces', () => {
+    const ordinary = layout({ opponentCount: 2, handsRegionHeight: 214 });
+
+    expect(ordinary.opponentRowHeight).toBe(ordinary.opponentCardHeight + ordinary.cardTopHeadroom + 6);
+    expect(ordinary.ownRowHeight).toBe(ordinary.ownCardHeight + ordinary.cardTopHeadroom + 6);
+    expect(ordinary.handsHeight).toBeLessThanOrEqual(214);
   });
 
   test('keeps the higher Full Ledger floor for constrained four-player hands', () => {
@@ -134,7 +142,13 @@ describe('C17 dense portrait layout', () => {
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(90);
   });
 
-  test('selects a fixed Workbench height from the window class rather than tool content', () => {
+  test('reserves a stable compact Workbench for ordinary two-player and three-player games', () => {
+    expect(getC17WorkbenchHeight(915, 1)).toBe(136);
+    expect(getC17WorkbenchHeight(600, 2)).toBe(136);
+  });
+
+  test('preserves four-player and larger Workbench sizing from the window class', () => {
+    expect(getC17WorkbenchHeight(915, 3)).toBe(176);
     expect(getC17WorkbenchHeight(915)).toBe(176);
     expect(getC17WorkbenchHeight(640)).toBe(156);
     expect(getC17WorkbenchHeight(600)).toBe(140);
