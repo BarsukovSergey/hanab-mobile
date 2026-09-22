@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { chatRuntime, lobbyRuntime } from '../runtime/application';
 import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
 import { useAppSelector } from '../store/hooks';
+import { chatMessageMetadata } from './chatPresentation';
 import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
 
 type Props = {
@@ -22,6 +23,9 @@ export function ChatPanel({ room, title }: Props) {
   const pregameRoom = useAppSelector((state) => state.room.room.kind === 'pregame'
     ? state.room.room : null);
   const authenticatedUserID = useAppSelector((state) => state.session.authenticatedUser?.userID);
+  const authenticatedUsername = useAppSelector(
+    (state) => state.session.authenticatedUser?.username,
+  );
   const pendingUpdate = useAppSelector((state) => state.room.pendingUpdate);
   const trimmed = draft.trim();
 
@@ -48,7 +52,7 @@ export function ChatPanel({ room, title }: Props) {
           const time = Number.isNaN(date.getTime())
             ? ''
             : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const author = message.server ? 'Server' : message.who ?? 'Hanab';
+          const metadata = chatMessageMetadata(message, authenticatedUsername);
           const proposal = parseServerTableProposal({ server: message.server, msg: message.rawMsg });
           const isOwnerInThisTable = pregameRoom !== null
             && room === `table${pregameRoom.tableID}`
@@ -61,7 +65,7 @@ export function ChatPanel({ room, title }: Props) {
             <View key={`${message.datetime}-${index}`} style={styles.messageRow}>
               <Text style={[styles.message, { color: theme.colors.text }]}>
                 <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
-                  {time.length > 0 ? `${time} ` : ''}{author}: </Text>
+                  {time.length > 0 ? `${time} ` : ''}{metadata} </Text>
                 {message.msg}
               </Text>
               {proposal !== null && isOwnerInThisTable && (

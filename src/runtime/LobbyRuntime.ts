@@ -1417,6 +1417,7 @@ export class LobbyRuntime {
       case 'chat':
         this.store.dispatch(chatActions.messageReceived({
           epoch,
+          defaultRoom: this.currentChatRoom(),
           message: event.data,
         }));
         break;

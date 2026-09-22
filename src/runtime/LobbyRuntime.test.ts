@@ -609,6 +609,74 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
+  test('sender sees one authoritative blank-room PM echo without an optimistic copy', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/pm Bob hello')).toBe(true);
+    expect(store.getState().chat.messagesByRoom.lobby).toBeUndefined();
+    socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"",'
+      + '"recipient":"Bob"}');
+
+    expect(store.getState().chat.messagesByRoom.lobby).toEqual([
+      expect.objectContaining({
+        msg: 'hello', room: 'lobby', who: 'Ada', recipient: 'Bob',
+      }),
+    ]);
+  });
+
+  test('recipient receives a blank-room PM in the currently active lobby', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage(
+      'welcome {"userID":2,"username":"Bob","totalGames":0,"playingAtTables":[]}',
+    );
+    socket.emitMessage('chat {"msg":"hello","who":"Ada","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"",'
+      + '"recipient":"Bob"}');
+
+    expect(store.getState().chat.messagesByRoom.lobby).toEqual([
+      expect.objectContaining({
+        msg: 'hello', room: 'lobby', who: 'Ada', recipient: 'Bob',
+      }),
+    ]);
+  });
+
+  test('blank-room PM events and history use the current table room', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+
+    const privateMessage = {
+      msg: 'live private', who: 'Ada', discord: false, server: false,
+      datetime: '2026-09-01T10:00:00Z', room: '', recipient: 'Bob',
+    };
+    socket.emitMessage(`chat ${JSON.stringify(privateMessage)}`);
+    expect(store.getState().chat.messagesByRoom.table123).toEqual([
+      expect.objectContaining({ ...privateMessage, room: 'table123', rawMsg: 'live private' }),
+    ]);
+    expect(store.getState().chat.messagesByRoom.lobby).toBeUndefined();
+
+    socket.emitMessage(`chatList ${JSON.stringify({
+      list: [{ ...privateMessage, msg: 'history private' }], unread: 0,
+    })}`);
+    expect(store.getState().chat.messagesByRoom.table123).toEqual([
+      expect.objectContaining({
+        msg: 'history private', room: 'table123', who: 'Ada', recipient: 'Bob',
+      }),
+    ]);
+    expect(store.getState().chat.messagesByRoom.lobby).toBeUndefined();
+  });
+
   test('welcome and friends events retain only the latest authoritative friends list', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();

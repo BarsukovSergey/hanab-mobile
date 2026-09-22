@@ -38,9 +38,17 @@ export const chatMessageSchema = z.object({
   discord: z.boolean(),
   server: z.boolean(),
   datetime: z.string().min(1),
-  room: z.string().min(1).optional(),
+  room: z.string().optional(),
   recipient: z.string(),
-}).strict().readonly();
+}).strict().superRefine((message, context) => {
+  if (message.room === '' && message.recipient.length === 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recipient'],
+      message: 'blank-room chat must have a recipient',
+    });
+  }
+}).readonly();
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 

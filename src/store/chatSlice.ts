@@ -24,14 +24,17 @@ const initialState: ChatState = {
 };
 
 function isSupportedRoom(room: string | undefined): room is string {
-  return room === 'lobby' || (room?.match(/^table\d+$/) !== null && room !== undefined);
+  return room === 'lobby' || (room !== undefined && /^table\d+$/.test(room));
 }
 
-function readable(message: ChatMessage): ReadableChatMessage | null {
-  if (!isSupportedRoom(message.room)) return null;
+function readable(message: ChatMessage, defaultRoom?: string): ReadableChatMessage | null {
+  const isPrivateMessage = message.recipient.length > 0
+    && (message.room === '' || message.room === undefined);
+  const room = isPrivateMessage ? defaultRoom : message.room;
+  if (!isSupportedRoom(room)) return null;
   return {
     ...message,
-    room: message.room,
+    room,
     rawMsg: message.msg,
     msg: chatMarkupToPlainText(message.msg),
   };
@@ -76,10 +79,10 @@ export const chatSlice = createSlice({
     },
     messageReceived(
       state,
-      action: PayloadAction<{ epoch: number; message: ChatMessage }>,
+      action: PayloadAction<{ epoch: number; defaultRoom: string; message: ChatMessage }>,
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
-      const message = readable(action.payload.message);
+      const message = readable(action.payload.message, action.payload.defaultRoom);
       if (message === null) return;
       const messages = state.messagesByRoom[message.room] ?? [];
       messages.push(message);
@@ -97,7 +100,7 @@ export const chatSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       const grouped: Record<string, ReadableChatMessage[]> = {};
       for (const raw of action.payload.messages) {
-        const message = readable(raw);
+        const message = readable(raw, action.payload.defaultRoom);
         if (message === null) continue;
         (grouped[message.room] ??= []).push(message);
       }
