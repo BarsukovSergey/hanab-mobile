@@ -41,10 +41,11 @@ copyFileSync(builtApk, outputApk);
 console.log(`Android beta APK: ${path.relative(root, outputApk)}`);
 
 function run(command, args, cwd) {
+  const needsShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
   const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
-    shell: false,
+    shell: needsShell,
   });
 
   if (result.error) throw result.error;
