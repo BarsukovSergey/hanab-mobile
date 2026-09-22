@@ -6,6 +6,8 @@ Distributed beta build commit: `d297ad71153095f18fba3101f760e306ed69e214`
 
 The APK built from that commit is the frozen beta.1 test artifact. Documentation-only changes after that commit do not redefine the distributed binary; code/build changes intended for testers should ship as the next beta version.
 
+During the active tester window, classify incoming reports and prepare any later tester build using [`BETA_FEEDBACK_AND_NEXT_RELEASE.md`](./BETA_FEEDBACK_AND_NEXT_RELEASE.md).
+
 ## Scope
 
 The first beta acceptance target is Android **2P/3P** gameplay and lifecycle coverage.

@@ -61,7 +61,7 @@ These items were explicitly removed from the C17 release gate during product rev
 ## Release / packaging / maintenance
 
 - **Remembered-password policy:** do **not** add password persistence by default. The current platform-owned authenticated session already survives normal relaunches without exposing cookies or credentials to app code. Revisit only if real session-persistence evidence creates a user problem; if ever implemented, require explicit opt-in and platform secure storage (Android Keystore / iOS Keychain).
-- **Beta upgrade continuity:** for the next tester build, bump the app version and Android `versionCode`, then verify installation over `1.0.0-beta.1` without uninstalling and confirm expected session/app data survives the upgrade.
+- **Beta upgrade continuity:** use `docs/BETA_FEEDBACK_AND_NEXT_RELEASE.md` for the next tester build. Bump the app version and Android `versionCode`, keep the Android build manual-only, verify installation over `1.0.0-beta.1` without uninstalling, and record exact candidate SHA/artifact hash plus expected session/app continuity.
 - **Play Store / AAB pipeline:** define store signing, AAB packaging, versioning, and release policy separately from the current standalone internal APK flow. Keep the heavy APK/AAB workflow manual unless deliberately changed.
 - **Dependency maintenance:** investigate current deprecation warnings and audit findings as a separate maintenance task. Do not apply blind force-upgrades during the beta freeze.
 - **Release housekeeping:** before a public/store release, explicitly verify final icon/splash/branding assets, About/licenses obligations, and the release checklist rather than inheriting historical C16/C17 assumptions.

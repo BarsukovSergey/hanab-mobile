@@ -7,6 +7,7 @@ This directory mixes current product/technical authority with historical impleme
 - `../README.md` — project overview, local development, current Android beta scope.
 - `../TESTING.md` — tester-facing beta script and bug-report format.
 - `ANDROID_BETA_RELEASE.md` — current internal APK version, build command, acceptance checklist, and distributed build commit.
+- `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the tester window plus the next tester-build/version/upgrade checklist.
 
 ## Current authority
 
