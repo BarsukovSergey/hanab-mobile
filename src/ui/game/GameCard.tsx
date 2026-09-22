@@ -102,7 +102,6 @@ export function GameCard({
       styles.cardTouch,
       height === undefined ? null : styles.sizedCardTouch,
       { transform: [
-        ...(height === undefined ? [] : [{ translateX: -2 }]),
         ...(knowledge.borderColor === 'orange' ? [{ translateY: -cardTopHeadroom }] : []),
       ] },
       pressed && styles.pressed,
@@ -341,9 +340,10 @@ export function CompactHandCardSummary({
 }
 
 export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: CardKnowledgeViewModel; variantName: string }) {
-  const { theme } = useHanabTheme();
+  const hasVisibleKnowledge = knowledge.suitPips.some((pipState) => pipState.state !== 'hidden')
+    || knowledge.rankPips.some((pipState) => pipState.state !== 'hidden');
+  if (!hasVisibleKnowledge) return null;
   return <View style={styles.details}>
-    {!knowledge.hasClueApplied && <Text style={[styles.detailMuted, { color: theme.colors.textMuted }]}>No clue information</Text>}
     <KnowledgeSuitLegend knowledge={knowledge} variantName={variantName} />
     <KnowledgeRankLegend knowledge={knowledge} />
   </View>;
@@ -578,5 +578,4 @@ const styles = StyleSheet.create({
   noteIndicator: { aspectRatio: 1, position: 'absolute', right: '2%', top: '3%', width: '20%', zIndex: 10 },
   noteIndicatorCompact: { right: '2%', top: '3%', width: '21%' },
   details: { gap: 5 },
-  detailMuted: { fontSize: 11, fontStyle: 'italic' },
 });

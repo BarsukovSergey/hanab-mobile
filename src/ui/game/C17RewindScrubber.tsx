@@ -86,6 +86,7 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
       accessibilityRole="adjustable"
       accessibilityValue={{ min: 0, max: timelineSegments.length - 1, now: previewIndex }}
       onLayout={({ nativeEvent: { layout } }) => setTrackWidth(layout.width)}
+      onMoveShouldSetResponderCapture={() => true}
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(event) => {
         dragging.current = true;
@@ -100,6 +101,7 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
         scrubToX(event.nativeEvent.locationX, true);
         dragging.current = false;
       }}
+      onStartShouldSetResponderCapture={() => true}
       onStartShouldSetResponder={() => true}
       style={styles.touchTrack}
     >

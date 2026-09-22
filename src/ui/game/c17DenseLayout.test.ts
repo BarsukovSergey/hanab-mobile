@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   getC17CardLaneWidth,
   getC17DenseLayout,
+  getC17AmbientEnvelope,
   getC17HandsRegionHeight,
   getC17WorkbenchHeight,
   getRelativeOpponentIndices,
@@ -57,7 +58,31 @@ describe('C17 dense portrait layout', () => {
     expect(result.handsHeight).toBeLessThanOrEqual(315);
   });
 
-  test('recomputes same-width layouts when the ambient body grows', () => {
+  test('keeps constrained three-player hands in the Full Ledger below the former readability floor', () => {
+    const result = layout({ opponentCount: 2, handsRegionHeight: 214 });
+
+    expect(result.mode).toBe('full-ledger');
+    expect(result.opponentCardHeight).toBeLessThan(76);
+    expect(result.ownCardHeight).toBe(result.opponentCardHeight);
+    expect(result.handsHeight).toBeLessThanOrEqual(214);
+  });
+
+  test('returns the removed metadata row height to ordinary two-player and three-player card faces', () => {
+    const ordinary = layout({ opponentCount: 2, handsRegionHeight: 214 });
+
+    expect(ordinary.opponentRowHeight).toBe(ordinary.opponentCardHeight + ordinary.cardTopHeadroom + 6);
+    expect(ordinary.ownRowHeight).toBe(ordinary.ownCardHeight + ordinary.cardTopHeadroom + 6);
+    expect(ordinary.handsHeight).toBeLessThanOrEqual(214);
+  });
+
+  test('keeps the higher Full Ledger floor for constrained four-player hands', () => {
+    const result = layout({ opponentCount: 3, handsRegionHeight: 309 });
+
+    expect(result.mode).toBe('compact-overview');
+    expect(result.opponentCardHeight).toBe(24);
+  });
+
+  test('stabilizes the same-shell ambient envelope while accepting a new shell', () => {
     const workbenchHeight = 156;
     const constrained = layout({
       handsRegionHeight: getC17HandsRegionHeight(481, workbenchHeight),
@@ -68,10 +93,21 @@ describe('C17 dense portrait layout', () => {
       workbenchHeight,
     });
 
-    expect(hasC17AmbientRegionChanged(
+    expect(getC17AmbientEnvelope(
       { width: 300, height: 481 },
       { width: 300, height: 866 },
-    )).toBe(true);
+      true,
+    )).toEqual({ width: 300, height: 866 });
+    expect(getC17AmbientEnvelope(
+      { width: 300, height: 866 },
+      { width: 300, height: 481 },
+      true,
+    )).toEqual({ width: 300, height: 866 });
+    expect(getC17AmbientEnvelope(
+      { width: 300, height: 866 },
+      { width: 300, height: 481 },
+      false,
+    )).toEqual({ width: 300, height: 481 });
     expect(hasC17AmbientRegionChanged(
       { width: 300, height: 866 },
       { width: 300, height: 481 },
@@ -106,7 +142,13 @@ describe('C17 dense portrait layout', () => {
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(90);
   });
 
-  test('selects a fixed Workbench height from the window class rather than tool content', () => {
+  test('reserves a stable compact Workbench for ordinary two-player and three-player games', () => {
+    expect(getC17WorkbenchHeight(915, 1)).toBe(136);
+    expect(getC17WorkbenchHeight(600, 2)).toBe(136);
+  });
+
+  test('preserves four-player and larger Workbench sizing from the window class', () => {
+    expect(getC17WorkbenchHeight(915, 3)).toBe(176);
     expect(getC17WorkbenchHeight(915)).toBe(176);
     expect(getC17WorkbenchHeight(640)).toBe(156);
     expect(getC17WorkbenchHeight(600)).toBe(140);

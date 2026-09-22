@@ -98,7 +98,7 @@ export function NoteEditor({
   };
   const applyQuickToken = (token: QuickNoteToken) => {
     if (gameContext === null) return;
-    const candidate = composeQuickNote(gameContext.variantName, draft, token);
+    const candidate = composeQuickNote(gameContext.variantName, normalizeSubmittedNote(draft), token);
     if (candidate !== draft) setDraftValue(candidate);
   };
   const startEdit = () => {

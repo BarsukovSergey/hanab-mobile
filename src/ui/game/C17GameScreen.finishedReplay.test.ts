@@ -26,4 +26,17 @@ test('C17 finished replay is an authoritative read-only timeline with available 
   expect(screen).toContain('isRestartToPregameEligible(clientState, roomState.pendingRestartTableID)');
   expect(screen).toContain('onQuickRematch={() => lobbyRuntime.quickRematch()}');
   expect(screen).toContain('onRemake={() => lobbyRuntime.restartToPregame()}');
+  expect(screen).toContain("const finishedStatus = finishedReason === null || finishedReason === undefined");
+  expect(screen).not.toContain('FINAL SCORE');
+  expect(screen).toContain('const showRewindScrubber = reviewActive;');
+  expect(screen).toContain('<View style={styles.workbenchScrubber}>');
+  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('|| hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);');
+  expect(screen).not.toContain('CardKnowledgeDetails');
+  expect(screen).not.toContain('scrollEnabled={!scrubberDragging}');
+  expect(screen).not.toContain('onDragStateChange={setScrubberDragging}');
+  expect(screen).toContain('title="Edit note" onPress={() => onEditNote(selectedOwnCard)}');
+  expect(screen).not.toContain('Tap a card to inspect its note.');
+  const ledgerChrome = screen.slice(screen.indexOf('<View style={styles.ledgerChrome}>'), screen.indexOf('<View onLayout={captureAmbientBody} style={styles.workspaceBody}>'));
+  expect(ledgerChrome).not.toContain('FINAL SCORE');
 });

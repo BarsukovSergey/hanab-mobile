@@ -109,6 +109,10 @@ function stateReducerFunction(state: Draft<State>, action: Action) {
         state.replay.segment = penultimateSegment;
       }
 
+      // A finished game transitions to its authoritative shared replay, so any local hypothetical
+      // branch from the ongoing game is no longer valid.
+      state.replay.hypothetical = null;
+
       // Initialize the shared replay.
       state.replay.shared = {
         segment: penultimateSegment,

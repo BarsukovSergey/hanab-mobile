@@ -32,6 +32,9 @@ const HAND_ROW_CHROME = HAND_ROW_VERTICAL_PADDING * 2
   + HAND_ROW_METADATA_HEIGHT
   + HAND_ROW_METADATA_GAP
   + HAND_ROW_BORDER_WIDTH * 2;
+const SIDE_LABEL_ROW_CHROME = HAND_ROW_VERTICAL_PADDING * 2 + HAND_ROW_BORDER_WIDTH * 2;
+export const C17_SIDE_LABEL_LANE_WIDTH = 62;
+export const C17_SIDE_LABEL_ROW_GAP = 4;
 const DEFAULT_WORKBENCH_HEIGHT = 156;
 const HANDS_TOP_MARGIN = 5;
 const WORKBENCH_TOP_MARGIN = 5;
@@ -44,16 +47,17 @@ const COMPACT_OPPONENT_ROW_HEIGHT = 32;
  * never from whichever tool happens to be open inside it. Overflowing tool content scrolls inside
  * the Workbench instead of stealing height from the Table Ledger.
  */
-export function getC17WorkbenchHeight(viewportHeight: number): number {
+export function getC17WorkbenchHeight(viewportHeight: number, opponentCount?: number): number {
+  if (opponentCount !== undefined && opponentCount <= 2) return 136;
   if (viewportHeight >= 780) return 176;
   if (viewportHeight >= 640) return 156;
   return 140;
 }
 
-export function getC17CardLaneWidth(rowWidth: number): number {
+export function getC17CardLaneWidth(rowWidth: number, sideLabelLaneWidth = 0): number {
   const horizontalPadding = 4;
   const borderWidth = 1;
-  return Math.max(1, rowWidth - horizontalPadding * 2 - borderWidth * 2);
+  return Math.max(1, rowWidth - horizontalPadding * 2 - borderWidth * 2 - sideLabelLaneWidth);
 }
 
 /**
@@ -72,12 +76,28 @@ export function hasC17AmbientRegionChanged(
 }
 
 /**
+ * A shell can finish measuring after a transiently constrained layout. Keep the largest
+ * accepted envelope for that shell so temporary chrome changes cannot shrink the Ledger.
+ */
+export function getC17AmbientEnvelope(
+  current: { height: number; width: number },
+  next: { height: number; width: number },
+  sameShell: boolean,
+): { height: number; width: number } {
+  if (!sameShell) return next;
+  return {
+    height: Math.max(current.height, next.height),
+    width: Math.max(current.width, next.width),
+  };
+}
+
+/**
  * C17 allocates cards from the measured card lanes and the stable hands rectangle captured for the
  * current window/text-scale class. Tool content is deliberately absent from this calculation.
  *
- * Full Ledger is therefore an outcome, not a breakpoint: if the resulting card face remains
- * readable it is used. Compact Overview is selected only when the available geometry would push
- * opponent cards below the readability floor.
+ * Full Ledger is therefore an outcome, not a breakpoint: up to two opponents retain fitted real
+ * card faces, while Compact Overview is selected only when three or more opponents would push
+ * cards below the readability floor.
  */
 export function getC17DenseLayout({
   opponentCardLaneWidth,
@@ -89,15 +109,17 @@ export function getC17DenseLayout({
 }: Input): C17DenseLayout {
   const opponents = Math.max(1, opponentCount);
   const capacity = Math.max(1, cardsPerHand);
+  const usesSideLabels = opponents <= 2;
   const opponentWidthFit = cardHeightForWidth(opponentCardLaneWidth, capacity, OPPONENT_CARD_GAP);
   const ownWidthFit = cardHeightForWidth(ownCardLaneWidth, capacity, OWN_CARD_GAP);
   const widthFit = Math.max(1, Math.min(opponentWidthFit, ownWidthFit));
   const baseCardHeight = maxCardHeightThatFits(widthFit, handsRegionHeight, opponents);
-  if (baseCardHeight >= MIN_FULL_LEDGER_CARD_HEIGHT) {
+  if (opponents <= 2 || baseCardHeight >= MIN_FULL_LEDGER_CARD_HEIGHT) {
     const cardTopHeadroom = getCardTopHeadroom(baseCardHeight);
-    const opponentRowHeight = baseCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-    const ownRowHeight = baseCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-    const handsHeight = getHandsHeight(baseCardHeight, opponents);
+    const rowChrome = usesSideLabels ? SIDE_LABEL_ROW_CHROME : HAND_ROW_CHROME;
+    const opponentRowHeight = baseCardHeight + cardTopHeadroom + rowChrome;
+    const ownRowHeight = baseCardHeight + cardTopHeadroom + rowChrome;
+    const handsHeight = getHandsHeight(baseCardHeight, opponents, rowChrome);
 
     return {
       mode: 'full-ledger',
@@ -139,7 +161,7 @@ function maxCardHeightThatFits(widthFit: number, handsRegionHeight: number, oppo
 
   while (low <= high) {
     const candidate = Math.floor((low + high) / 2);
-    if (getHandsHeight(candidate, opponents) <= handsRegionHeight) {
+    if (getHandsHeight(candidate, opponents, opponents <= 2 ? SIDE_LABEL_ROW_CHROME : HAND_ROW_CHROME) <= handsRegionHeight) {
       best = candidate;
       low = candidate + 1;
     } else {
@@ -150,10 +172,10 @@ function maxCardHeightThatFits(widthFit: number, handsRegionHeight: number, oppo
   return best;
 }
 
-function getHandsHeight(cardHeight: number, opponents: number): number {
+function getHandsHeight(cardHeight: number, opponents: number, rowChrome: number): number {
   const cardTopHeadroom = getCardTopHeadroom(cardHeight);
-  const opponentRowHeight = cardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-  const ownRowHeight = cardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  const opponentRowHeight = cardHeight + cardTopHeadroom + rowChrome;
+  const ownRowHeight = cardHeight + cardTopHeadroom + rowChrome;
   return opponents * opponentRowHeight
     + ownRowHeight
     + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
