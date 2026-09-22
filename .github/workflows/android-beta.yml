@@ -1,15 +1,6 @@
 name: Android Beta APK
 
 on:
-  push:
-    branches:
-      - release/android-beta-packaging
-    paths:
-      - app.json
-      - package.json
-      - package-lock.json
-      - tools/build-android-beta.mjs
-      - .github/workflows/android-beta.yml
   workflow_dispatch:
 
 permissions:
