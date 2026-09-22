@@ -33,9 +33,9 @@ This directory mixes current product/technical authority with historical impleme
 
 These are useful for archaeology but must not override current authority:
 
-- `C17_HANDOFF.md` — archived continuation handoff from the old feature-branch phase.
-- `MOBILE_GAMEPLAY_REDESIGN.md` — superseded pre-C17 presentation proposal.
-- `FEATURE_MATRIX.md` — historical milestone matrix with stale pre-beta statuses.
-- `C1_RESULTS.md` through `C16_RESULTS.md` and related result files — milestone evidence captured during development.
+- `archive/C17_HANDOFF.md` — continuation handoff from the old feature-branch phase.
+- `archive/MOBILE_GAMEPLAY_REDESIGN.md` — superseded pre-C17 presentation proposal.
+- `archive/FEATURE_MATRIX.md` — historical milestone matrix with stale pre-beta statuses.
+- `archive/C1_RESULTS.md` through `archive/C16_RESULTS.md` and related result files — milestone evidence captured during development.
 
 When documents conflict, prefer the current authority list above, then the current beta release scope.

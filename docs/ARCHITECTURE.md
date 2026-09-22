@@ -10,7 +10,7 @@ For C17 gameplay and product presentation, the authoritative specification is `d
 
 - `docs/C17_UX_DECISIONS.md` records the ratified product decisions and later beta-scope revisions behind the current v1.2 baseline.
 - `docs/C17_VALIDATION.md` records unresolved on-device validation gates and physical results.
-- `docs/MOBILE_GAMEPLAY_REDESIGN.md` is historical/preliminary and is subordinate to the C17 contract where presentation or gesture decisions conflict.
+- `docs/archive/MOBILE_GAMEPLAY_REDESIGN.md` is historical/preliminary and is subordinate to the C17 contract where presentation or gesture decisions conflict.
 - C16 presentation decisions are also subordinate to the C17 contract where they conflict.
 
 This does **not** supersede the technical boundaries below: server authority, pinned upstream game semantics, reconnect/epoch safety, no gameplay-command replay across reconnect, and the dependency boundaries remain architectural requirements.
@@ -52,12 +52,12 @@ Not planned until proven necessary:
 10. Create / Start table
 11. Chat / polish / Android build cleanup
 
-See `docs/C1_RESULTS.md` for the physical-device evidence behind the C1 decision,
-`docs/C4A_RESULTS.md` for the physical Android running-table spectate proof, and
-`docs/C4B_RESULTS.md` for the physical Android join/pregame/leave proof. See
-`docs/C5_RESULTS.md` for the physical Android player and spectator game-bootstrap proof, and
-`docs/C6_RESULTS.md` for the physical Android read-only live spectator proof. See
-`docs/C7_RESULTS.md` for the physical Android active gameplay-actions proof.
+See `docs/archive/C1_RESULTS.md` for the physical-device evidence behind the C1 decision,
+`docs/archive/C4A_RESULTS.md` for the physical Android running-table spectate proof, and
+`docs/archive/C4B_RESULTS.md` for the physical Android join/pregame/leave proof. See
+`docs/archive/C5_RESULTS.md` for the physical Android player and spectator game-bootstrap proof, and
+`docs/archive/C6_RESULTS.md` for the physical Android read-only live spectator proof. See
+`docs/archive/C7_RESULTS.md` for the physical Android active gameplay-actions proof.
 
 ## C1 Android evidence
 

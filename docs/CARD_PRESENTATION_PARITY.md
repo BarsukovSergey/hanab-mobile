@@ -171,7 +171,7 @@ The UI should continue to receive presentation results from this boundary instea
 
 ## Remaining UX work: empathy gesture
 
-The presentation/selector boundary is empathy-capable, but the current game screen does not yet expose the intended press-and-hold opponent-hand gesture. That interaction belongs to the gameplay redesign described in `docs/MOBILE_GAMEPLAY_REDESIGN.md`, where empathy must switch the whole hand in-place without a layout shift.
+The presentation/selector boundary is empathy-capable, but the current game screen does not yet expose the intended press-and-hold opponent-hand gesture. That interaction belongs to the gameplay redesign described in `docs/archive/MOBILE_GAMEPLAY_REDESIGN.md`, where empathy must switch the whole hand in-place without a layout shift.
 
 Do not reintroduce a hard-coded `empathy: false` inside the selector. Future UI work should supply the transient empathy state to this existing boundary.
 
