@@ -28,13 +28,16 @@ These items were explicitly removed from the C17 release gate during product rev
 
 ## Layout / presentation
 
-- **4P–6P dense gameplay redesign:** replace the current Compact Overview / summary-icon fallback with a real-card-face layout. Cards take priority over chrome; reduce secondary controls, gaps, and card size within readability bounds before considering alternate representations.
+- **4P–6P gameplay redesign / repair:** make ordinary 4P, 5P, and 6P gameplay usable again rather than treating the current Compact Overview / summary-icon fallback as accepted UX. Replace that fallback with a real-card-face layout. Cards take priority over chrome; reduce secondary controls, gaps, and card size within readability bounds before considering alternate representations. Revalidate 4P, 5P, and 6P physically after the redesign.
 - Dedicated two-column landscape composition.
 - Dedicated tablet / large-screen persistent side-pane composition and polish.
 - Richer / prettier / cinematic gameplay animations beyond the minimal functional C17 transitions.
 
 ## Product shell / social
 
+- **Lobby table sections and create-table placement:** split lobby discovery into visually distinct sections ordered as Pregame tables -> create-your-own-table surface -> Running tables -> Shared replays. Pregame and shared replay entries must no longer be presented as one combined section. When the user returns to the lobby while already in an active game, hide the create-table surface because starting a second table is not the relevant action. Consider web-like color treatment or another clear visual distinction between table/replay types, but choose the exact styling during implementation.
+- **Native controls for useful slash-command actions:** research which existing web/slash-command capabilities deserve first-class mobile buttons or menus instead of requiring command typing. The existing leader-control UI (equivalent to `/setleader`) is the precedent. Preserve slash-command support as the underlying parity/fallback path; only surface commands whose semantics and permissions can be represented clearly and safely in native UI.
+- **Simple bot invite UI:** add an `Add bot` affordance that opens a maintained list of known bots, lets the user choose one, and then performs the existing server-side invitation flow by privately messaging that bot with `/join <password>`. Before implementation, verify the authoritative bot roster/discovery mechanism, PM target identity, table-password source, and failure states; do not create a separate bot-join protocol in mobile.
 - People surface.
 - Rich/compact profiles beyond what is strictly required by existing gameplay/table identity.
 - Friends list / online-friends affordances.
