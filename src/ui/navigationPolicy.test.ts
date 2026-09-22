@@ -15,6 +15,10 @@ describe('C16A Android Back policy', () => {
     expect(getBackAction({ ...base, localScreen: 'history' })).toBe('go_to_lobby');
   });
 
+  test('Settings returns locally to Lobby', () => {
+    expect(getBackAction({ ...base, localScreen: 'settings' })).toBe('go_to_lobby');
+  });
+
   test('Lobby allows system Back', () => {
     expect(getBackAction(base)).toBe('system');
   });

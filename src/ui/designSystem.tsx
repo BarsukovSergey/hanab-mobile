@@ -1,5 +1,4 @@
 import {
-  Appearance,
   Pressable,
   StyleSheet,
   Text,
@@ -48,6 +47,9 @@ type ThemeContextValue = {
   setPreference: (preference: ThemePreference) => void;
 };
 
+const COMPACT_HIT_SLOP = { top: 6, bottom: 6, left: 2, right: 2 } as const;
+const SWITCHER_HIT_SLOP = { top: 6, bottom: 6, left: 0, right: 0 } as const;
+
 const LIGHT: HanabTheme = {
   scheme: 'light',
   dark: false,
@@ -78,7 +80,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function HanabThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
-  const [preference, setPreferenceState] = useState<ThemePreference>('system');
+  const [preference, setPreference] = useState<ThemePreference>('system');
   const scheme: ThemeScheme = preference === 'system'
     ? systemScheme === 'dark' ? 'dark' : 'light'
     : preference;
@@ -86,10 +88,7 @@ export function HanabThemeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ThemeContextValue>(() => ({
     theme,
     preference,
-    setPreference: (next) => {
-      setPreferenceState(next);
-      Appearance.setColorScheme(next === 'system' ? 'unspecified' : next);
-    },
+    setPreference,
   }), [preference, theme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -115,7 +114,7 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
     <View style={[styles.switcherTrack, { backgroundColor: theme.colors.surfaceMuted }]}>
       {labels.map(([value, label]) => {
         const selected = preference === value;
-        return <Pressable accessibilityRole="button" accessibilityState={{ selected }} key={value}
+        return <Pressable accessibilityRole="button" accessibilityState={{ selected }} hitSlop={SWITCHER_HIT_SLOP} key={value}
           onPress={() => setPreference(value)} style={({ pressed }) => [styles.switcherOption,
             selected && { backgroundColor: theme.colors.surfaceRaised }, pressed && { opacity: 0.72 }]}>
           <Text style={{ color: selected ? theme.colors.text : theme.colors.textMuted, fontSize: 12, fontWeight: selected ? '700' : '500' }}>{label}</Text>
@@ -151,7 +150,7 @@ export function ActionButton({ title, onPress, disabled = false, tone = 'seconda
       : tone === 'ghost'
         ? { bg: 'transparent', pressed: theme.colors.overlay, text: theme.colors.textMuted, border: 'transparent' }
         : { bg: theme.colors.surfaceRaised, pressed: theme.colors.surfaceMuted, text: theme.colors.text, border: theme.colors.borderStrong };
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [
+  return <Pressable accessibilityRole="button" disabled={disabled} hitSlop={compact ? COMPACT_HIT_SLOP : undefined} onPress={onPress} style={({ pressed }) => [
     styles.button, compact && styles.buttonCompact,
     { backgroundColor: pressed ? palette.pressed : palette.bg, borderColor: palette.border }, disabled && styles.disabled, style,
   ]}><Text numberOfLines={1} style={[styles.buttonText, compact && styles.buttonTextCompact, { color: palette.text }]}>{title}</Text></Pressable>;
@@ -187,8 +186,8 @@ const styles = StyleSheet.create({
   sectionHeading: { gap: 2 }, sectionTitle: { fontSize: 19, fontWeight: '800', letterSpacing: 0.2 },
   sectionDetail: { fontSize: 13, lineHeight: 18 },
   button: { alignItems: 'center', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14, paddingVertical: 10 },
-  buttonCompact: { minHeight: 36, paddingHorizontal: 10, paddingVertical: 7 }, buttonText: { fontSize: 15, fontWeight: '700' },
-  buttonTextCompact: { fontSize: 13 }, disabled: { opacity: 0.45 },
+  buttonCompact: { borderRadius: 8, minHeight: 32, paddingHorizontal: 8, paddingVertical: 5 }, buttonText: { fontSize: 15, fontWeight: '700' },
+  buttonTextCompact: { fontSize: 12 }, disabled: { opacity: 0.45 },
   input: { borderRadius: 10, borderWidth: 1, fontSize: 15, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
   empty: { fontSize: 14, fontStyle: 'italic', lineHeight: 20 }, pill: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
   pillText: { fontSize: 12, fontWeight: '700' }, notice: { borderLeftWidth: 3, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },

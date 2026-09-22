@@ -1,0 +1,150 @@
+export const HANABI_CARD_ASPECT_RATIO = 286 / 406;
+
+type GameplayLayoutInput = {
+  viewportWidth: number;
+  viewportHeight: number;
+  handSizes: readonly number[];
+  ourPlayerIndex: number | null;
+};
+
+export type GameplayLayout = {
+  orientation: 'portrait' | 'landscape';
+  contentWidth: number;
+  ownLaneWidth: number;
+  opponentLaneWidth: number;
+  cardGap: number;
+  ownCardHeight: number;
+  opponentCardHeight: number;
+  opponentColumns: 1 | 2;
+  opponentRowGap: number;
+  estimatedHandsHeight: number;
+  needsSharedVerticalScroll: boolean;
+};
+
+const PHONE_HORIZONTAL_CHROME = 32;
+const LANDSCAPE_HORIZONTAL_CHROME = 64;
+const TABLET_MAX_CONTENT_WIDTH = 1120;
+const OWN_MAX_HEIGHT = 112;
+const OPPONENT_MAX_HEIGHT = 76;
+const OWN_MIN_HEIGHT = 68;
+const OPPONENT_MIN_HEIGHT = 46;
+const LANDSCAPE_GUTTER = 8;
+const LANDSCAPE_OPPONENT_COLUMN_GAP = 7;
+const OWN_HAND_HORIZONTAL_PADDING = 18;
+const OPPONENT_HAND_HORIZONTAL_PADDING = 14;
+const LANDSCAPE_OWN_FRACTION = 1.35 / 2.35;
+const LANDSCAPE_READABLE_OPPONENT_HEIGHT = 42;
+
+export function getGameplayLayout({
+  viewportWidth,
+  viewportHeight,
+  handSizes,
+  ourPlayerIndex,
+}: GameplayLayoutInput): GameplayLayout {
+  const width = Math.max(240, viewportWidth);
+  const height = Math.max(320, viewportHeight);
+  const orientation = width > height ? 'landscape' : 'portrait';
+  const landscapePhone = orientation === 'landscape' && height < 700;
+  const cardGap = width < 360 ? 4 : landscapePhone ? 4 : width < 700 ? 6 : 7;
+  const opponentRowGap = landscapePhone ? 5 : width < 360 ? 5 : 7;
+  const horizontalChrome = landscapePhone ? LANDSCAPE_HORIZONTAL_CHROME : PHONE_HORIZONTAL_CHROME;
+  const contentWidth = Math.min(TABLET_MAX_CONTENT_WIDTH, Math.max(220, width - horizontalChrome));
+  const landscapeUsableWidth = Math.max(1, contentWidth - LANDSCAPE_GUTTER);
+  // Keep this ratio in lockstep with GameScreen's 1.35:1 landscape flex split.
+  const ownLaneWidth = orientation === 'landscape'
+    ? landscapeUsableWidth * LANDSCAPE_OWN_FRACTION
+    : contentWidth;
+  const opponentLaneWidth = orientation === 'landscape'
+    ? landscapeUsableWidth - ownLaneWidth
+    : contentWidth;
+
+  const ownHandSize = ourPlayerIndex === null ? 0 : handSizes[ourPlayerIndex] ?? 0;
+  const opponentHandSizes = handSizes.filter((_, index) => index !== ourPlayerIndex);
+  const maxOpponentHandSize = Math.max(1, ...opponentHandSizes);
+  const canUseTwoColumns = orientation === 'landscape'
+    && opponentHandSizes.length >= 3
+    && fitsReadableTwoColumnOpponentHand(opponentLaneWidth, maxOpponentHandSize, cardGap);
+  const opponentColumns: 1 | 2 = canUseTwoColumns ? 2 : 1;
+  const opponentColumnWidth = opponentColumns === 2
+    ? (opponentLaneWidth - LANDSCAPE_OPPONENT_COLUMN_GAP) / 2
+    : opponentLaneWidth;
+
+  const ownMaxHeight = landscapePhone ? 88 : OWN_MAX_HEIGHT;
+  const opponentMaxHeight = landscapePhone ? 60 : OPPONENT_MAX_HEIGHT;
+  const ownMinHeight = landscapePhone ? 58 : OWN_MIN_HEIGHT;
+  const opponentMinHeight = landscapePhone ? LANDSCAPE_READABLE_OPPONENT_HEIGHT : OPPONENT_MIN_HEIGHT;
+  const ownHandWidth = Math.max(1, ownLaneWidth - OWN_HAND_HORIZONTAL_PADDING);
+  const opponentHandWidth = Math.max(1, opponentColumnWidth - OPPONENT_HAND_HORIZONTAL_PADDING);
+
+  const ownCardHeight = ownHandSize === 0
+    ? 0
+    : fitCardHeight(ownHandWidth, ownHandSize, cardGap, ownMinHeight, ownMaxHeight);
+  const opponentCardHeight = fitCardHeight(
+    opponentHandWidth,
+    maxOpponentHandSize,
+    cardGap,
+    opponentMinHeight,
+    Math.min(opponentMaxHeight, ownCardHeight > 0 ? ownCardHeight * 0.7 : opponentMaxHeight),
+  );
+
+  const opponentRows = Math.ceil(opponentHandSizes.length / opponentColumns);
+  const ownSectionHeight = ownCardHeight === 0 ? 0 : ownCardHeight + (landscapePhone ? 24 : 32);
+  const opponentSectionHeight = opponentRows === 0
+    ? 0
+    : opponentRows * (opponentCardHeight + (landscapePhone ? 22 : 30)) + Math.max(0, opponentRows - 1) * opponentRowGap;
+  const estimatedHandsHeight = Math.round(
+    orientation === 'landscape'
+      ? Math.max(ownSectionHeight, opponentSectionHeight)
+      : ownSectionHeight + opponentSectionHeight,
+  );
+  const handsBudget = height * (orientation === 'portrait' ? 0.58 : 0.7);
+
+  return {
+    orientation,
+    contentWidth: round1(contentWidth),
+    ownLaneWidth: round1(ownLaneWidth),
+    opponentLaneWidth: round1(opponentLaneWidth),
+    cardGap,
+    ownCardHeight: round1(ownCardHeight),
+    opponentCardHeight: round1(opponentCardHeight),
+    opponentColumns,
+    opponentRowGap,
+    estimatedHandsHeight,
+    needsSharedVerticalScroll: estimatedHandsHeight > handsBudget,
+  };
+}
+
+export function getHandRowWidth(cardHeight: number, cardCount: number, gap: number): number {
+  if (cardCount <= 0 || cardHeight <= 0) return 0;
+  return cardCount * cardHeight * HANABI_CARD_ASPECT_RATIO + Math.max(0, cardCount - 1) * gap;
+}
+
+function fitsReadableTwoColumnOpponentHand(
+  opponentLaneWidth: number,
+  cardCount: number,
+  gap: number,
+): boolean {
+  const columnWidth = (opponentLaneWidth - LANDSCAPE_OPPONENT_COLUMN_GAP) / 2;
+  const innerWidth = Math.max(1, columnWidth - OPPONENT_HAND_HORIZONTAL_PADDING);
+  return getHandRowWidth(LANDSCAPE_READABLE_OPPONENT_HEIGHT, cardCount, gap) <= innerWidth;
+}
+
+function fitCardHeight(
+  availableWidth: number,
+  cardCount: number,
+  gap: number,
+  minHeight: number,
+  maxHeight: number,
+): number {
+  if (cardCount <= 0) return 0;
+  const gapWidth = Math.max(0, cardCount - 1) * gap;
+  const widthPerCard = Math.max(1, (availableWidth - gapWidth) / cardCount);
+  const heightFromWidth = widthPerCard / HANABI_CARD_ASPECT_RATIO;
+  // Never overflow in order to honor a visual minimum. The caller can use the density signal to
+  // fall back to shared vertical scrolling when the viewport genuinely cannot fit readable cards.
+  return Math.min(maxHeight, heightFromWidth);
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}

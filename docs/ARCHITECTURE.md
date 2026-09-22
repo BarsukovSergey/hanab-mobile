@@ -4,6 +4,17 @@
 
 Build an Android-first React Native client for hanab.live that connects to the existing production service and can play in the same tables as browser users. iOS should remain supportable from the same codebase.
 
+## C17 product/UI authority
+
+For C17 gameplay and product presentation, the authoritative specification is `docs/C17_UX_CONTRACT.md`.
+
+- `docs/C17_UX_DECISIONS.md` records the ratified product decisions behind v1.1.
+- `docs/C17_VALIDATION.md` records unresolved on-device validation gates and physical results.
+- `docs/MOBILE_GAMEPLAY_REDESIGN.md` is historical/preliminary and is subordinate to the C17 contract where presentation or gesture decisions conflict.
+- C16 presentation decisions are also subordinate to the C17 contract where they conflict.
+
+This does **not** supersede the technical boundaries below: server authority, pinned upstream game semantics, reconnect/epoch safety, no gameplay-command replay across reconnect, and the dependency boundaries remain architectural requirements.
+
 ## Stack
 
 Planned MVP stack:
@@ -253,7 +264,7 @@ Loading states have watchdogs; do not allow indefinite `waitingInit` / `waitingH
 
 Reconnect is authoritative resynchronization, not continuation of trusted stale client state.
 
-Physical Android C1 evidence showed that the old WebSocket may close while the app is backgrounded, while the underlying authenticated HTTP session remains reusable. A fresh socket after foreground authenticated successfully without re-login.
+Physical Android C1 evidence showed that the old WebSocket may close while the app was backgrounded, while the underlying authenticated HTTP session remains reusable. A fresh socket after foreground authenticated successfully without re-login.
 
 Therefore later lifecycle handling must treat background/foreground as a possible connection-boundary transition. The exact reconnect policy remains deferred to the reconnect milestone, but it must use the documented epoch/single-flight/disposal rules and must never replay gameplay commands.
 
