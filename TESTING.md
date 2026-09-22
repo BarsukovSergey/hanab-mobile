@@ -1,6 +1,6 @@
 # Hanab Mobile — Testing Guide
 
-This page is for people testing a development build of Hanab Mobile.
+This page is for people testing the **Hanab Mobile 1.0.0-beta.1 Android build**.
 
 You do not need to understand the C17 design documents or the implementation. Test it like a normal player. **If you need instructions to discover an ordinary gameplay control, report that as a problem.**
 
@@ -85,11 +85,15 @@ During normal play and rewind, briefly check:
 - no hand requires horizontal scrolling;
 - required gameplay controls remain comfortably tappable.
 
-## What is still under active development
+## Beta scope and known limitations
 
-C17 is not a finished release. Notes, clue planning, knowledge/empathy, result/replay, shell/lifecycle polish and some animations are still being developed in later slices.
+This beta is accepted around **2P/3P** gameplay, replay/review, Hypothetical and spectator flows.
 
-Still report crashes, broken navigation, accidental sends, lost state, clipped UI, unreadable cards, or anything that makes ordinary play confusing. Do not assume a confusing behavior is intentional just because the build is unfinished.
+**4P–6P dense gameplay is not certified for this beta.** The current Compact Overview / summary-icon layout is known unfinished work and should not be treated as the intended final experience.
+
+Also known and non-blocking for this beta: rapid replay scrubber movement can still show visible jank. `/copy` is intentionally deferred.
+
+Still report crashes, broken navigation, accidental sends, lost state, clipped UI, unreadable cards, or anything that makes ordinary 2P/3P play confusing.
 
 ## How to report a problem
 

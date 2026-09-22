@@ -2,7 +2,7 @@
 
 Mobile Hanabi client focused on serious live play on phones.
 
-The current development line is **C17**, a gameplay UX redesign built around a dense table view plus a reserved decision workspace. The branch is still under active development and should be treated as a test build, not a finished release.
+The current Android test build is **1.0.0-beta.1**. C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
 
 ## For testers
 
@@ -12,14 +12,16 @@ Please test the app as a player, not as someone trying to guess how the UI was i
 
 ## Current test focus
 
-The main C17 areas being validated are:
+The first Android beta is certified around **2P/3P** gameplay and review flows:
 
-- dense 5P/6P live gameplay;
 - card selection and explicit Play/Discard actions;
-- Last Action / Recent actions;
-- live rewind/history without leaving the active game;
-- notes, clue planning, knowledge/empathy and discard inspection as those slices land;
+- notes, clue planning, knowledge/empathy and discard inspection;
+- Last Action / Recent and live rewind;
+- finished/shared replay and Hypothetical;
+- spectator and lifecycle behavior;
 - Android safe-area, rotation, keyboard and reconnect behavior.
+
+**4P–6P dense layout is not part of this beta acceptance scope.** Its current Compact Overview / summary-icon presentation is known unfinished work.
 
 See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug-report format.
 
@@ -49,11 +51,19 @@ Build/run Android locally:
 npm run android
 ```
 
-Release variant:
+Install a release variant on a connected Android device:
 
 ```bash
 npm run android:release
 ```
+
+Build the standalone internal beta APK:
+
+```bash
+npm run android:beta-apk
+```
+
+The APK is written to `dist/Hanab-Mobile-1.0.0-beta.1.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
 
 Validation used in CI:
 

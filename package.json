@@ -1,6 +1,6 @@
 {
   "name": "hanab-mobile",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.1",
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",
@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "cards:generate": "node tools/card-assets/generate.mjs",
-    "cards:check": "node tools/card-assets/generate.mjs --check"
+    "cards:check": "node tools/card-assets/generate.mjs --check",
+    "android:beta-apk": "node tools/build-android-beta.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
