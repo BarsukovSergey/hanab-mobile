@@ -104,22 +104,20 @@ The protocol surface is already broad:
 
 - upstream exposes **42** direct client→server WebSocket commands; mobile has **34 full**, **2
   partial**, and **6 missing** command families;
-- current Go server emits **53** relevant server→client event names; mobile recognizes **40** and
-  safely ignores **13** currently unsupported event families.
+- current Go server emits **53** relevant server→client event names; mobile recognizes **41** and
+  safely ignores **12** currently unsupported event families.
 
 The deeper audit found three concrete semantic/interoperability defects that should not be confused
-with general feature backlog:
+with general feature backlog. Two have since been resolved:
 
-- **pregame spectator cleanup drift** after upstream #3129 — #26;
-- **dynamic shared-replay efficiency modifier updates are ignored** — #29;
-- **Pace/FRE presentation context differs from upstream** — #30.
+- **pregame spectator cleanup drift** after upstream #3129 — resolved in #26;
+- **dynamic shared-replay efficiency modifier synchronization** — resolved receive-side in #29;
+- **Pace/FRE presentation context differs from upstream** — still open in #30.
 
 ## Highest-value findings
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
-| Pregame spectator removed when table disappears | Drift | XS–S | High | Current server now sends an unsolicited `left` when the last player leaves; mobile ignores it unless a local leave/role-switch is pending. |
-| Shared replay efficiency-modifier updates | Interop drift | S | Medium | Initial value is consumed, but later `replayEfficiencyMod` broadcasts are ignored; follower FRE can go stale (#29). |
 | Pace/FRE context semantics | Partial | S | Medium | Underlying stats are present, but final-round/AON/review/shared-modifier presentation differs from web (#30). |
 | 4P–6P dense real-card layout | Partial | L | High | Core state works, but ordinary 4P–6P falls into the temporary Compact Overview path. |
 | Spectator shadowing / player perspective | Wire-only | S–M | High | The protocol already carries `shadowingPlayerIndex`; mobile always requests `-1` and exposes no perspective selector. |
@@ -485,7 +483,7 @@ is mainly a contextual UI/runtime action rather than new game logic.
 | Shared arrows/annotations | **Missing** | M–L | Medium |
 | Local arrows | **Missing** | M | Low–Medium |
 | Shared replay sounds | Missing | M | Low |
-| Efficiency-modifier initial state | **Partial / current update event missing** | S | Medium | Initial `sharedReplayEffMod` works, but later `replayEfficiencyMod` broadcasts are ignored; tracked in #29. |
+| Efficiency-modifier synchronization | **Adopted (#29 receive-side)** | S | Medium | Initial `sharedReplayEffMod` and authoritative follower-side `replayEfficiencyMod` updates use the existing `setEffMod` semantic. User-facing modifier controls remain future work. |
 | Explicit shared replay creation | Missing | S–M | Medium |
 
 ## Hypothetical
@@ -694,19 +692,16 @@ Current upstream events missing from the mobile server-event schema include:
 | `suggestion` | ignored | Partial shared-review interoperability | S–M | Medium |
 | `replayIndicator` | ignored | Missing shared arrows/annotations | M–L | Medium |
 | `replaySound` | ignored | Missing shared-replay sound parity | M | Low |
-| `replayEfficiencyMod` | **ignored despite displayed efficiency state** | **Interop drift / correctness** | S | **Medium** |
 
 ### Important event-level findings
 
 #### Dynamic shared-replay efficiency modifier
 
-Mobile correctly consumes the initial `sharedReplayEffMod` from `init` and reduces it through
-`setEffMod`. Current upstream later broadcasts leader changes through `replayEfficiencyMod`.
-Because mobile does not know this event, a mobile follower can keep displaying stale efficiency/FRE
-after a web leader changes the modifier.
-
-Tracked as GitHub issue #29. The receive-side fix should reuse the existing `setEffMod` semantic;
-a mobile control for originating modifier changes is a separate product feature.
+Mobile consumes the initial `sharedReplayEffMod` from `init` and reduces it through `setEffMod`.
+It also consumes `replayEfficiencyMod` for the matching active shared replay when the local client
+is a follower, using that same semantic. The leader ignores its own authoritative echo because it
+already applied the originating change locally. User-facing controls for originating modifier
+changes remain separate future work.
 
 #### Shared-replay suggestions
 

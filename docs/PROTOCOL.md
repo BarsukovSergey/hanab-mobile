@@ -451,6 +451,16 @@ same game reducer using spectator/finished semantics.
 `finishOngoingGame` records the database ID and shared replay leader. C12-A consumes the result
 metadata only; shared replay synchronization and controls remain outside this slice.
 
+Active shared replays may receive the authoritative efficiency-modifier update:
+
+```text
+replayEfficiencyMod {"tableID":123,"mod":2}
+```
+
+Mobile applies `mod` through the existing `setEffMod` state action only for the matching active
+shared replay when the local client is a follower. The shared-replay leader already applied its
+own originating change; mobile does not expose a control for originating modifier changes.
+
 ## Player actions
 
 Gameplay client command:
