@@ -132,4 +132,16 @@ describe('C17 hypothetical seating and action-hand separation', () => {
     expect(screen).toContain('lobbyRuntime.hypotheticalColorClue(selectedTarget, interaction.cluePreview.value)');
     expect(screen).toContain('lobbyRuntime.hypotheticalRankClue(selectedTarget, interaction.cluePreview.value)');
   });
+
+  test('uses dense clue controls for hypothetical planning and preserves ordinary clue presentation', () => {
+    const screen = readC17Screen();
+    const hypotheticalBranchStart = screen.indexOf('{hypothetical !== null ? <>');
+    const hypotheticalClueStart = screen.indexOf('{selectedTarget !== null ? <ClueComposer', hypotheticalBranchStart);
+    const ordinaryClueStart = screen.indexOf('</> : selectedTarget !== null ? <ClueComposer', hypotheticalClueStart);
+    const hypotheticalComposer = screen.slice(hypotheticalClueStart, screen.indexOf('/> : canPlayGameplay', hypotheticalClueStart));
+    const ordinaryComposer = screen.slice(ordinaryClueStart, screen.indexOf('/> : canPlayGameplay', ordinaryClueStart));
+
+    expect(hypotheticalComposer).toContain('\n            dense\n');
+    expect(ordinaryComposer).toContain('dense={usesDenseSideLabels}');
+  });
 });
