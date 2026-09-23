@@ -1,5 +1,6 @@
 import { getCharacter, getVariant } from '../upstream/gameData';
 import { ClueType } from '../upstream/enums/ClueType';
+import { PaceRisk } from '../upstream/enums/PaceRisk';
 import type { GameState } from '../upstream/interfaces/GameState';
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
 import { getCharacterNameForPlayer } from '../upstream/reducers/reducerHelpers';
@@ -132,22 +133,79 @@ export function getDisplayedClueTokens(clueTokens: number, variantName: string):
   return getUnadjustedClueTokens(clueTokens, getVariant(variantName));
 }
 
-/** Matches the pinned web client's live FRE display, including note and manual efficiency adjustments. */
-export function getDisplayedLiveFutureEfficiency(
-  game: Pick<GameState, 'stats'>,
-  efficiencyModifier: number,
-): number | null {
-  const cluesStillUsable = game.stats.cluesStillUsableNotRounded === null
-    ? null
-    : Math.floor(game.stats.cluesStillUsableNotRounded);
-  if (cluesStillUsable === null) return null;
+export type GameplayPresentation = {
+  readonly pace: string;
+  readonly paceRisk: PaceRisk | null;
+  readonly futureRequiredEfficiency: number | null;
+  readonly minimumRequiredEfficiency: number;
+  readonly currentEfficiency: number | null;
+  readonly rawCardsGotten: number;
+  readonly cardsGottenByNotes: number | null;
+  readonly efficiencyModifier: number | null;
+  readonly cardsRemainingToGet: number;
+  readonly remainingPossibleClues: number | null;
+  readonly potentialCluesLost: number;
+  readonly appliesEfficiencyModifier: boolean;
+  readonly shouldModifyEfficiency: boolean;
+  readonly finessesRequired: number | null;
+};
 
-  const cardsGotten = game.stats.cardsGotten
-    + efficiencyModifier
-    + (game.stats.cardsGottenByNotes ?? 0);
-  const cardsNotGotten = Math.max(game.stats.maxScore - cardsGotten, 0);
-  const futureEfficiency = getEfficiency(cardsNotGotten, cluesStillUsable);
-  return Number.isFinite(futureEfficiency) ? futureEfficiency : null;
+/** Shared mobile presentation semantics for Pace and efficiency in the game HUD. */
+export function getGameplayPresentation(
+  game: Pick<GameState, 'stats'>,
+  options: Pick<GameMetadata['options'], 'allOrNothing'>,
+  minimumRequiredEfficiency: number,
+  efficiencyModifier: number,
+  context: {
+    finished: boolean;
+    viewingOngoingGame: boolean;
+    sharedReplayUseSharedSegments: boolean;
+  },
+): GameplayPresentation {
+  const stats = game.stats;
+  const paceUnavailable = stats.pace === null
+    || stats.finalRoundEffectivelyStarted
+    || options.allOrNothing;
+  const shouldModifyEfficiency = context.finished
+    ? context.sharedReplayUseSharedSegments
+    : context.viewingOngoingGame;
+  const appliedModifier = shouldModifyEfficiency ? efficiencyModifier : null;
+  const appliedNotes = shouldModifyEfficiency ? stats.cardsGottenByNotes : null;
+  const adjustedCardsGotten = stats.cardsGotten
+    + (appliedModifier ?? 0)
+    + (appliedNotes ?? 0);
+  const cardsRemainingToGet = Math.max(stats.maxScore - adjustedCardsGotten, 0);
+  const remainingPossibleClues = stats.cluesStillUsableNotRounded;
+  const cluesStillUsable = remainingPossibleClues === null
+    ? null
+    : Math.floor(remainingPossibleClues);
+  const futureRequiredEfficiency = cluesStillUsable === null
+    ? null
+    : getEfficiency(cardsRemainingToGet, cluesStillUsable);
+  const currentEfficiency = stats.finalRoundEffectivelyStarted
+    ? null
+    : getEfficiency(adjustedCardsGotten, stats.potentialCluesLost);
+
+  return {
+    pace: paceUnavailable ? '-' : stats.pace > 0 ? `+${stats.pace}` : String(stats.pace),
+    paceRisk: paceUnavailable ? null : stats.paceRisk,
+    futureRequiredEfficiency: futureRequiredEfficiency !== null
+      && Number.isFinite(futureRequiredEfficiency) ? futureRequiredEfficiency : null,
+    minimumRequiredEfficiency,
+    currentEfficiency: currentEfficiency !== null && Number.isFinite(currentEfficiency)
+      ? currentEfficiency : null,
+    rawCardsGotten: stats.cardsGotten,
+    cardsGottenByNotes: appliedNotes,
+    efficiencyModifier: appliedModifier,
+    cardsRemainingToGet,
+    remainingPossibleClues,
+    potentialCluesLost: stats.potentialCluesLost,
+    appliesEfficiencyModifier: appliedModifier !== null && appliedModifier !== 0,
+    shouldModifyEfficiency,
+    finessesRequired: remainingPossibleClues === null
+      ? null
+      : Math.max(cardsRemainingToGet - Math.floor(remainingPossibleClues), 0),
+  };
 }
 
 export function getGameTableSuits(
