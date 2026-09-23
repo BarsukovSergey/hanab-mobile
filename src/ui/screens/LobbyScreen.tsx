@@ -2,12 +2,6 @@ import { useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
-import {
-  isJoinEligible,
-  isPregameSpectateEligible,
-  isReattendEligible,
-  isSpectateEligible,
-} from '../../runtime/LobbyRuntime';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { tableSelectors } from '../../store/store';
@@ -22,6 +16,7 @@ import {
   useHanabTheme,
   useResponsiveLayout,
 } from '../designSystem';
+import { getLobbySections } from '../lobbySections';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 
 const DEFAULT_OPTIONS: MobileTableOptions = {
@@ -41,9 +36,13 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
   const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
   const tables = useAppSelector(tableSelectors.selectAll);
   const roomState = useAppSelector((state) => state.room);
-  const spectateTables = tables.filter(isSpectateEligible);
-  const joinTables = tables.filter((table) => isJoinEligible(table) || isPregameSpectateEligible(table));
-  const reattendTables = tables.filter(isReattendEligible);
+  const {
+    yourRunningGames,
+    pregameTables,
+    runningTables,
+    sharedReplays,
+    showCreateTable,
+  } = getLobbySections(tables);
   const attendancePending = roomState.pendingSpectateTableID !== null
     || roomState.pendingRecovery !== null
     || roomState.pendingJoin !== null
@@ -62,68 +61,29 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
         <ActionButton compact title="Game history" onPress={onOpenHistory} />
       </Panel>
 
-      <View style={[styles.columns, wide && styles.columnsWide]}>
-        <Panel style={[styles.column, wide && styles.createColumn]}>
-          <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
-          <Field maxLength={45} onChangeText={setTableName} placeholder="Table name" value={tableName} />
-          <Field
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={setTablePassword}
-            placeholder="Table password (optional)"
-            secureTextEntry
-            value={tablePassword}
-          />
-          <View style={styles.stepperRow}>
-            <View style={styles.stepperCopy}>
-              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
-              <Text style={[styles.stepperValue, { color: theme.colors.text }]}>{maxPlayers}</Text>
-            </View>
-            <View style={styles.actionsRow}>
-              <ActionButton compact disabled={maxPlayers <= 2} title="−" onPress={() => setMaxPlayers((n) => n - 1)} />
-              <ActionButton compact disabled={maxPlayers >= 6} title="+" onPress={() => setMaxPlayers((n) => n + 1)} />
-            </View>
-          </View>
-          <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
-          <ActionButton
-            disabled={attendancePending || tableName.trim().length === 0}
-            title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}
-            tone="primary"
-            onPress={() => {
-              if (lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)) {
-                setTablePassword('');
-              }
-            }}
-          />
-        </Panel>
+      {yourRunningGames.length > 0 && (
+        <TableSection
+          empty="No game to resume."
+          title="Your running game"
+          tables={yourRunningGames}
+          action={(table) => (
+            <ActionButton
+              compact
+              disabled={attendancePending}
+              title="Return to game"
+              tone="primary"
+              onPress={() => lobbyRuntime.reattend(table.id)}
+            />
+          )}
+        />
+      )}
 
-        <View style={[styles.column, styles.listColumn]}>
-          <TableSection
-            empty="No game to resume."
-            title="Your running game"
-            tables={reattendTables}
-            action={(table) => (
-              <ActionButton
-                compact
-                disabled={attendancePending}
-                title="Return to game"
-                tone="primary"
-                onPress={() => lobbyRuntime.reattend(table.id)}
-              />
-            )}
-          />
-          <TableSection
-            empty="No running tables."
-            title="Running tables"
-            tables={spectateTables}
-            action={(table) => (
-              <ActionButton compact disabled={attendancePending} title="Spectate" onPress={() => lobbyRuntime.spectate(table.id)} />
-            )}
-          />
+      <View style={[styles.columns, wide && styles.columnsWide]}>
+        <View style={[styles.column, wide && styles.discoveryColumn]}>
           <Panel>
             <SectionHeading title="Pregame tables" detail="Join as a player or watch the room before it starts." />
-            {joinTables.length === 0 && <EmptyState>No pregame tables.</EmptyState>}
-            {joinTables.map((table) => (
+            {pregameTables.length === 0 && <EmptyState>No pregame tables.</EmptyState>}
+            {pregameTables.map((table) => (
               <View key={table.id} style={[styles.tableCard, { borderColor: theme.colors.border }]}>
                 <View style={styles.tableHeader}>
                   <View style={styles.tableCopy}>
@@ -145,7 +105,7 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
                   />
                 )}
                 <View style={styles.actionsRow}>
-                  {isJoinEligible(table) && (
+                  {table.numPlayers < table.maxPlayers && (
                     <ActionButton compact disabled={attendancePending} title="Join" tone="primary" onPress={() => {
                       const secret = joinPasswordTableID === table.id ? joinPassword : undefined;
                       if (lobbyRuntime.join(table.id, secret)) {
@@ -154,13 +114,71 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
                       }
                     }} />
                   )}
-                  {isPregameSpectateEligible(table) && (
-                    <ActionButton compact disabled={attendancePending} title="Spectate pregame" onPress={() => lobbyRuntime.spectate(table.id)} />
-                  )}
+                  <ActionButton
+                    compact
+                    disabled={attendancePending}
+                    title="Spectate pregame"
+                    onPress={() => lobbyRuntime.spectate(table.id)}
+                  />
                 </View>
               </View>
             ))}
           </Panel>
+
+          {showCreateTable && (
+            <Panel>
+              <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
+              <Field maxLength={45} onChangeText={setTableName} placeholder="Table name" value={tableName} />
+              <Field
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setTablePassword}
+                placeholder="Table password (optional)"
+                secureTextEntry
+                value={tablePassword}
+              />
+              <View style={styles.stepperRow}>
+                <View style={styles.stepperCopy}>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
+                  <Text style={[styles.stepperValue, { color: theme.colors.text }]}>{maxPlayers}</Text>
+                </View>
+                <View style={styles.actionsRow}>
+                  <ActionButton compact disabled={maxPlayers <= 2} title="−" onPress={() => setMaxPlayers((n) => n - 1)} />
+                  <ActionButton compact disabled={maxPlayers >= 6} title="+" onPress={() => setMaxPlayers((n) => n + 1)} />
+                </View>
+              </View>
+              <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
+              <ActionButton
+                disabled={attendancePending || tableName.trim().length === 0}
+                title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}
+                tone="primary"
+                onPress={() => {
+                  if (lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)) {
+                    setTablePassword('');
+                  }
+                }}
+              />
+            </Panel>
+          )}
+        </View>
+
+        <View style={[styles.column, styles.listColumn]}>
+          <TableSection
+            empty="No running tables."
+            title="Running tables"
+            tables={runningTables}
+            action={(table) => (
+              <ActionButton compact disabled={attendancePending} title="Spectate" onPress={() => lobbyRuntime.spectate(table.id)} />
+            )}
+          />
+          <TableSection
+            empty="No shared replays."
+            title="Shared replays"
+            tables={sharedReplays}
+            action={(table) => (
+              <ActionButton compact disabled={attendancePending} title="Open review" onPress={() => lobbyRuntime.spectate(table.id)} />
+            )}
+          />
         </View>
       </View>
       <ChatPanel room="lobby" title="Lobby chat" />
@@ -213,7 +231,7 @@ const styles = StyleSheet.create({
   columns: { gap: 16 },
   columnsWide: { alignItems: 'flex-start', flexDirection: 'row' },
   column: { flex: 1, gap: 16, minWidth: 0 },
-  createColumn: { flex: 0.92 },
+  discoveryColumn: { flex: 0.92 },
   listColumn: { flex: 1.08 },
   label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   stepperRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
