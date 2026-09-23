@@ -156,6 +156,6 @@ const styles = StyleSheet.create({
   rankChoice: { alignItems: 'center', borderRadius: 8, borderWidth: 2, height: 38, justifyContent: 'center', minWidth: 38, paddingHorizontal: 7 },
   denseRankChoice: { alignItems: 'center', borderRadius: 6, borderWidth: 2, height: 26, justifyContent: 'center', minWidth: 26, paddingHorizontal: 4 },
   rankChoiceText: { fontSize: 18, fontWeight: '900' },
-  denseRankChoiceText: { fontSize: 14, fontWeight: '900' },
+  denseRankChoiceText: { fontSize: 16, fontWeight: '900', lineHeight: 18 },
   choiceDisabled: { opacity: 0.42 },
 });
