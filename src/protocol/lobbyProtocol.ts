@@ -286,7 +286,7 @@ const pregamePlayerSchema = z.object({
       bestScores: z.array(z.object({
         numPlayers: z.number().int().min(2).max(6),
         score: z.number().int().nonnegative(),
-        modifier: z.number().int(),
+        modifier: z.number().int().min(0).max(4_294_967_295),
       })),
     }),
   }),
