@@ -35,6 +35,7 @@ import { isC17WorkspaceEligible } from './src/ui/game/c17Workspace';
 import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
+import { PeopleScreen } from './src/ui/screens/PeopleScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 
@@ -398,8 +399,13 @@ function AppContent() {
       onWatchReplay={(databaseID) => { if (lobbyRuntime.watchHistoricalGame(databaseID)) setReturnAfterUnattend('history'); }} />;
   } else if (localScreen === 'settings') {
     content = <SettingsScreen onBack={() => setLocalScreen('lobby')} />;
+  } else if (localScreen === 'people') {
+    content = <PeopleScreen onBack={() => setLocalScreen('lobby')} />;
   } else {
-    content = <LobbyScreen onOpenHistory={() => setLocalScreen('history')} />;
+    content = <LobbyScreen
+      onOpenHistory={() => setLocalScreen('history')}
+      onOpenPeople={() => setLocalScreen('people')}
+    />;
   }
 
   return (

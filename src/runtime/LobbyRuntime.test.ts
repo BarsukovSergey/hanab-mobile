@@ -610,6 +610,25 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
+  test('native PM shares slash validation and sends authoritative recipient casing', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sharedAction = jest.spyOn(chat, 'sendPrivateMessage');
+
+    expect(chat.sendPrivateMessage('bOB', '  native hello  ')).toBe(true);
+    expect(chat.sendPrivateMessage('Bob', '   ')).toBe(false);
+    expect(chat.sendPrivateMessage('Missing', 'hello')).toBe(false);
+    expect(chat.sendPrivateMessage('ada', 'hello')).toBe(false);
+    expect(chat.submit('/pm bob slash hello')).toBe(true);
+
+    expect(sharedAction).toHaveBeenLastCalledWith('bob', 'slash hello', 'lobby');
+    expect(socket.sent).toEqual([
+      'chatPM {"msg":"native hello","recipient":"Bob","room":"lobby"}',
+      'chatPM {"msg":"slash hello","recipient":"Bob","room":"lobby"}',
+    ]);
+  });
+
   test('reply without an incoming PM fails locally and keeps raw chat off the socket', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
@@ -763,6 +782,27 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toEqual(sentBeforeList);
     expect(store.getState().chat.messagesByRoom.lobby?.at(-1)?.msg)
       .toBe('Current friends: Bob, Cy');
+  });
+
+  test('native friend actions share the slash path and reject self without sending', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+    const sharedAction = jest.spyOn(chat, 'setFriend');
+
+    expect(chat.setFriend(' Bob ', true)).toBe(true);
+    expect(chat.setFriend('Bob', false)).toBe(true);
+    expect(chat.setFriend('Ada', true)).toBe(false);
+    expect(chat.setFriend('ada', false)).toBe(false);
+    expect(chat.submit('/friend Cy')).toBe(true);
+    expect(chat.submit('/unfriend Cy')).toBe(true);
+
+    expect(sharedAction).toHaveBeenLastCalledWith('Cy', false, 'lobby');
+    expect(socket.sent).toEqual([
+      'chatFriend {"name":"Bob"}',
+      'chatUnfriend {"name":"Bob"}',
+      'chatFriend {"name":"Cy"}',
+      'chatUnfriend {"name":"Cy"}',
+    ]);
   });
 
   test('link commands and aliases use exact upstream frames', async () => {

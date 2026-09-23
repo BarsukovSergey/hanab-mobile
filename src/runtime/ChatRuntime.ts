@@ -87,14 +87,10 @@ export class ChatRuntime {
     return this.handled(handler(this.currentRoom(), words));
   }
 
-  private register(commands: readonly string[], handler: CommandHandler): void {
-    for (const command of commands) this.commands.set(command, handler);
-  }
-
-  private privateMessage(room: string, args: readonly string[]): boolean {
-    const [recipient, ...msgArray] = args;
-    const msg = msgArray.join(' ').trim();
-    if (recipient === undefined || recipient === '' || msg === '') {
+  sendPrivateMessage(recipient: string, message: string, room = 'lobby'): boolean {
+    const normalizedRecipient = recipient.trim();
+    const msg = message.trim();
+    if (normalizedRecipient === '' || msg === '' || msg.length > 300) {
       this.localMessage(
         room,
         'The format of a private message is: <code>/w Alice hello</code>',
@@ -104,19 +100,57 @@ export class ChatRuntime {
     }
 
     const username = this.store.getState().session.authenticatedUser?.username;
-    if (username !== undefined && recipient.toLowerCase() === username.toLowerCase()) {
+    if (
+      username !== undefined
+      && normalizedRecipient.toLowerCase() === username.toLowerCase()
+    ) {
       this.localMessage(room, 'You cannot send a private message to yourself.', 'error');
       return false;
     }
 
     const matchingUser = Object.values(this.store.getState().lobby.users.entities).find(
-      (user) => user?.name.toLowerCase() === recipient.toLowerCase(),
+      (user) => user?.name.toLowerCase() === normalizedRecipient.toLowerCase(),
     );
     if (matchingUser === undefined) {
-      this.localMessage(room, `User "${recipient}" is not currently online.`, 'error');
+      this.localMessage(
+        room,
+        `User "${normalizedRecipient}" is not currently online.`,
+        'error',
+      );
       return false;
     }
     return this.lobbyRuntime.send('chatPM', { msg, recipient: matchingUser.name, room });
+  }
+
+  setFriend(name: string, add: boolean, room = 'lobby'): boolean {
+    const normalizedName = name.trim();
+    const command = add ? 'friend' : 'unfriend';
+    if (normalizedName === '') {
+      this.localMessage(
+        room,
+        `The format of the /${command} command is: <code>/${command} Alice</code>`,
+        'info',
+      );
+      return false;
+    }
+    const username = this.store.getState().session.authenticatedUser?.username;
+    if (username !== undefined && normalizedName.toLowerCase() === username.toLowerCase()) {
+      this.localMessage(room, `You cannot ${command} yourself.`, 'error');
+      return false;
+    }
+    return this.lobbyRuntime.send(
+      add ? 'chatFriend' : 'chatUnfriend',
+      { name: normalizedName },
+    );
+  }
+
+  private register(commands: readonly string[], handler: CommandHandler): void {
+    for (const command of commands) this.commands.set(command, handler);
+  }
+
+  private privateMessage(room: string, args: readonly string[]): boolean {
+    const [recipient, ...msgArray] = args;
+    return this.sendPrivateMessage(recipient ?? '', msgArray.join(' '), room);
   }
 
   private reply(room: string): false {
@@ -131,21 +165,7 @@ export class ChatRuntime {
   }
 
   private friend(room: string, args: readonly string[], add: boolean): boolean {
-    const command = add ? 'friend' : 'unfriend';
-    if (args.length === 0) {
-      this.localMessage(
-        room,
-        `The format of the /${command} command is: <code>/${command} Alice</code>`,
-        'info',
-      );
-      return false;
-    }
-    const name = args.join(' ');
-    const username = this.store.getState().session.authenticatedUser?.username;
-    if (username !== undefined && name.toLowerCase() === username.toLowerCase()) {
-      this.localMessage(room, `You cannot ${command} yourself.`, 'error');
-    }
-    return this.lobbyRuntime.send(add ? 'chatFriend' : 'chatUnfriend', { name });
+    return this.setFriend(args.join(' '), add, room);
   }
 
   private listFriends(room: string): boolean {
