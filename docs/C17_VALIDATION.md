@@ -17,7 +17,7 @@ Validate:
 - no root live scroll and no per-hand horizontal scrolling;
 - card readability wins over decorative chrome and empty spacing.
 
-4P–6P dense gameplay is **not** a beta.1 gate. Historical adaptive 6P results remain evidence, but the current Compact Overview / summary-icon presentation is not accepted as the final 4P–6P product design. Do not send beta.1 testers through repeated 4P–6P acceptance work.
+4P–6P dense gameplay remains **outside the frozen beta.1 gate**, but the current adaptive real-card path has now been physically validated on the tested Android portrait class. Current evidence covers 5P, ordinary true 6P, and 6P + One Extra Card with real card faces, plus the dense clue composer fitting without scroll and the C17 bottom edge respecting the Android navigation safe area. `Compact Overview` remains only an emergency fallback when the 46 dp opponent-card floor cannot be met. Do not retroactively expand the beta.1 gate; treat this as post-beta validation evidence.
 
 ## 2. Direct actions
 
@@ -151,7 +151,7 @@ Validate live spectator on C17:
 - observed player from authoritative metadata is the seating anchor;
 - no Play/Discard/Clue send route exists;
 - notes/empathy/history/replay/shared-review surfaces respect authoritative spectator capability;
-- spectator state remains readable in the 2P/3P beta target; 4P–6P density is post-beta work.
+- spectator state remains readable in the 2P/3P beta target; the dense allocator now has current 4P–6P player-path physical evidence, but that does not substitute for dedicated 4P–6P spectator/perspective validation.
 
 ## 11. Pregame / shell / More
 
@@ -194,7 +194,7 @@ For beta.1 cover:
 - finished/replay/shared review/Hypothetical;
 - live Rewind.
 
-A bespoke landscape/tablet layout is backlog; functional safe adaptation is still required. 4P–6P dense gameplay is post-beta and is not part of this matrix.
+A bespoke landscape/tablet layout is backlog; functional safe adaptation is still required. Current 4P–6P portrait evidence is recorded separately below and remains outside the frozen beta.1 matrix.
 
 ## 13. Serious-play beta.1 gate
 
@@ -212,7 +212,7 @@ Before treating beta.1 as stable enough for broader internal testing:
 
 Required outcomes: no accidental commits, no note migration, no keyboard/system-navigation overlap, no lost note draft, no stale live state after Rewind, and no lifecycle path that unexpectedly falls back to the wrong gameplay surface.
 
-4P–6P serious-play acceptance is deliberately deferred until its card-face layout is redesigned.
+The 4P–6P card-face repair itself is now physically validated on the tested Android portrait class. Broader 4P–6P serious-play/device-matrix acceptance remains a later validation activity and is not part of the frozen beta.1 gate.
 
 ## 14. Existing evidence
 
@@ -225,5 +225,8 @@ Required outcomes: no accidental commits, no note migration, no keyboard/system-
 | 2026-09-07 | `eaf4a9f2887b937f90c58fcc65255db539e22692` | Temporal foundation | PASS technical. |
 | 2026-09-08 | pre-linear C17-2 | Rewind discoverability | FAIL. |
 | 2026-09-08 | `dfbf9212b3ca8d37df4997cb2649d8d368844ec9` | Linear rewind implementation | PASS technical; physical acceptance pending. |
+| 2026-09-23 | `3d4845aa6e6427f9bca6b9330343f0b6e393517d` | Current adaptive 5P / ordinary true 6P portrait | PASS — real opponent card faces, no Compact Overview on the tested class, lower hand region clear of Android navigation. |
+| 2026-09-23 | `3a81135a0a5ae2d6b7f20f0c0e5202b7f64897ec` | Dense 6P clue composer | PASS — two-row palette plus Close/Give visible without scrolling while preserving the 56 dp dense Workbench reserve. |
+| 2026-09-23 | `92425ba087e9e625ce428d3551b5bd00142a86b7` | C17 bottom safe area + 6P One Extra Card | PASS — redundant internal bottom gap removed; four real cards per hand fit above Android navigation on the tested class. |
 
-Earlier evidence remains useful history but must not be treated as proof of superseded behaviors. In particular, historical 5P/6P fit results do not certify the current summary-icon UX or make 4P–6P part of the beta.1 gate.
+Earlier evidence remains useful history but must not be treated as proof of superseded behaviors. The 2026-09-23 rows are the current physical evidence for the merged adaptive real-card path; they still do not make 4P–6P part of the frozen beta.1 gate or certify every device/window class.
