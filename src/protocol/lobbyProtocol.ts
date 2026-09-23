@@ -251,6 +251,14 @@ export const replayLeaderSchema = z.object({
   name: z.string().min(1),
 }).strict();
 
+export const suggestionSchema = z.object({
+  tableID: idSchema,
+  userName: z.string().min(1),
+  segment: z.number().int(),
+}).strict();
+
+export type Suggestion = z.infer<typeof suggestionSchema>;
+
 export const replayEfficiencyModSchema = z.object({
   tableID: idSchema,
   mod: z.number().int(),
@@ -449,6 +457,7 @@ const schemas = {
   finishOngoingGame: finishOngoingGameSchema,
   replaySegment: replaySegmentSchema,
   replayLeader: replayLeaderSchema,
+  suggestion: suggestionSchema,
   replayEfficiencyMod: replayEfficiencyModSchema,
   hypothetical: hypotheticalSchema,
   hypoStart: hypoTableEventSchema,

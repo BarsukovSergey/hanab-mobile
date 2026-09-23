@@ -466,6 +466,19 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: { command: 'replayLeader', data: { tableID: 123, name: 'Ada' } },
     });
+    expect(decodeServerFrame('suggestion {"tableID":123,"userName":"Alice","segment":5}')).toEqual({
+      kind: 'event',
+      event: { command: 'suggestion', data: { tableID: 123, userName: 'Alice', segment: 5 } },
+    });
+    for (const payload of [
+      '{"tableID":123,"userName":"","segment":5}',
+      '{"tableID":123,"userName":"Alice","segment":5.5}',
+      '{"tableID":123,"userName":"Alice","segment":5,"extra":true}',
+    ]) {
+      expect(decodeServerFrame(`suggestion ${payload}`)).toEqual({
+        kind: 'malformed', command: 'suggestion', issue: 'invalid-payload',
+      });
+    }
     expect(decodeServerFrame(
       'spectators {"tableID":123,"spectators":[{"name":"Ada",'
       + '"shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}',

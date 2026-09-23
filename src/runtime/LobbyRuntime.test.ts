@@ -1288,6 +1288,22 @@ describe('deterministic lobby runtime', () => {
     expect(room.clientState.replay.shared).toMatchObject({ leader: 'Ada', amLeader: true });
   });
 
+  test('shared replay leader retains a valid inbound suggestion', async () => {
+    const { socket, store } = await makeSharedReplayRuntime();
+
+    socket.emitMessage('suggestion {"tableID":123,"userName":"Alice","segment":1}');
+
+    expect(store.getState().room.pendingReplaySuggestion).toMatchObject({
+      connectionEpoch: 1,
+      tableID: 123,
+      userName: 'Alice',
+      segment: 1,
+    });
+
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Bob"}');
+    expect(store.getState().room.pendingReplaySuggestion).toBeNull();
+  });
+
   test('shared replay follower consumes authoritative efficiency modifier updates only for its current replay', async () => {
     const { socket, store } = await makeSharedReplayRuntime('Bob');
     const getModifier = () => {
@@ -2239,6 +2255,7 @@ describe('deterministic lobby runtime', () => {
       pendingStart: null,
       pendingGameplayAction: null,
       pendingHypotheticalOperation: null,
+      pendingReplaySuggestion: null,
       room: {
         kind: 'awaiting_game_bootstrap',
         tableID: 123,
@@ -2321,6 +2338,7 @@ describe('deterministic lobby runtime', () => {
       pendingStart: null,
       pendingGameplayAction: null,
       pendingHypotheticalOperation: null,
+      pendingReplaySuggestion: null,
       room: { kind: 'none' },
     });
   });
@@ -3106,6 +3124,7 @@ describe('deterministic lobby runtime', () => {
       pendingStart: null,
       pendingGameplayAction: null,
       pendingHypotheticalOperation: null,
+      pendingReplaySuggestion: null,
       room: { kind: 'none' },
     });
     second.emitOpen();
@@ -3154,6 +3173,7 @@ describe('deterministic lobby runtime', () => {
       pendingStart: null,
       pendingGameplayAction: null,
       pendingHypotheticalOperation: null,
+      pendingReplaySuggestion: null,
       room: { kind: 'none' },
     });
     second.emitOpen();

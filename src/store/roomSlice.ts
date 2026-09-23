@@ -9,6 +9,7 @@ import type {
   TableJoined,
   TableLeft,
   TableStart,
+  Suggestion,
 } from '../protocol/lobbyProtocol';
 import { stateReducer } from '../game/client/reducers/stateReducer';
 import type { State } from '../game/client/types/State';
@@ -138,6 +139,10 @@ export type RoomSliceState = {
     gameLoadEpoch: number;
     finalAction: ActionIncludingHypothetical;
   } | null;
+  pendingReplaySuggestion: (Suggestion & {
+    connectionEpoch: number;
+    gameLoadEpoch: number;
+  }) | null;
   room: RoomState;
 };
 
@@ -161,6 +166,7 @@ const initialState: RoomSliceState = {
   rematchTransition: null,
   pendingGameplayAction: null,
   pendingHypotheticalOperation: null,
+  pendingReplaySuggestion: null,
   room: { kind: 'none' },
 };
 
@@ -697,7 +703,10 @@ export const roomSlice = createSlice({
       state.pendingGameplayAction = null;
       state.pendingHypotheticalOperation = null;
       state.pendingUnattendTableID = null;
-      if (oldReplayStillVisible) state.room = { kind: 'none' };
+      if (oldReplayStillVisible) {
+        state.pendingReplaySuggestion = null;
+        state.room = { kind: 'none' };
+      }
     },
     unsupportedRoomRejected(
       state,
@@ -710,6 +719,7 @@ export const roomSlice = createSlice({
       if (state.pregameSpectators?.tableID === tableID) state.pregameSpectators = null;
       if (state.pendingSpectateTableID === tableID) state.pendingSpectateTableID = null;
       if (state.room.kind !== 'none' && state.room.tableID === tableID) {
+        state.pendingReplaySuggestion = null;
         state.room = { kind: 'none' };
       }
       if (state.rematchTransition?.newTableID === tableID) state.rematchTransition = null;
@@ -788,6 +798,7 @@ export const roomSlice = createSlice({
       state.pendingLeaveTableID = null;
       state.pendingGameplayAction = null;
       state.pendingHypotheticalOperation = null;
+      state.pendingReplaySuggestion = null;
       state.room = { kind: 'none' };
       state.pregameSpectators = null;
     },
@@ -1158,6 +1169,12 @@ export const roomSlice = createSlice({
         });
       }
       state.room.clientState = castDraft(next);
+      if (
+        state.pendingReplaySuggestion !== null
+        && state.pendingReplaySuggestion.segment - 1 === payload.segment
+      ) {
+        state.pendingReplaySuggestion = null;
+      }
     },
     sharedReplayLeaderReceived(
       state,
@@ -1171,10 +1188,40 @@ export const roomSlice = createSlice({
         || state.room.clientState.replay.shared === null
       ) return;
       const current = original(state.room.clientState) ?? state.room.clientState;
-      state.room.clientState = castDraft(stateReducer(current, {
+      const next = stateReducer(current, {
         type: 'replayLeader',
         name: payload.name,
-      }));
+      });
+      state.room.clientState = castDraft(next);
+      if (next.replay.shared?.amLeader !== true) state.pendingReplaySuggestion = null;
+    },
+    replaySuggestionReceived(
+      state,
+      action: PayloadAction<{ epoch: number; suggestion: Suggestion }>,
+    ) {
+      const { epoch, suggestion } = action.payload;
+      const room = state.room;
+      const targetSegment = suggestion.segment - 1;
+      if (
+        state.connectionEpoch !== epoch
+        || room.kind !== 'live_game'
+        || room.tableID !== suggestion.tableID
+        || room.clientState.replay.shared === null
+        || !room.clientState.replay.shared.amLeader
+        || !room.clientState.finished
+        || room.clientState.replay.hypothetical !== null
+        || targetSegment < 0
+        || room.clientState.replay.states[targetSegment] === undefined
+        || room.clientState.replay.shared.segment === targetSegment
+      ) return;
+      state.pendingReplaySuggestion = {
+        connectionEpoch: epoch,
+        gameLoadEpoch: room.gameLoadEpoch,
+        ...suggestion,
+      };
+    },
+    replaySuggestionCleared(state) {
+      state.pendingReplaySuggestion = null;
     },
     sharedReplayEfficiencyModReceived(
       state,
@@ -1399,6 +1446,7 @@ export const roomSlice = createSlice({
         type: 'hypoStart', showDrawnCards: payload.showDrawnCards, actions: payload.actions,
       }));
       state.pendingHypotheticalOperation = null;
+      state.pendingReplaySuggestion = null;
     },
     hypotheticalEnded(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
       const payload = action.payload;
@@ -1468,6 +1516,7 @@ export const roomSlice = createSlice({
       state.room.sharedReplay = payload.clientState.replay.shared !== null;
       state.pendingGameplayAction = null;
       state.pendingHypotheticalOperation = null;
+      state.pendingReplaySuggestion = null;
     },
     gameHistoryAccepted(
       state,
@@ -1590,9 +1639,13 @@ export const roomSlice = createSlice({
       if (
         state.room.kind === 'live_game'
         && state.room.tableID === rematch.oldTableID
-      ) state.room = { kind: 'none' };
+      ) {
+        state.pendingReplaySuggestion = null;
+        state.room = { kind: 'none' };
+      }
       state.pendingGameplayAction = null;
       state.pendingHypotheticalOperation = null;
+      state.pendingReplaySuggestion = null;
       state.pendingUnattendTableID = null;
     });
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
@@ -1603,6 +1656,7 @@ export const roomSlice = createSlice({
       state.recoveryStagedGame = null;
       state.pendingGameplayAction = null;
       state.pendingHypotheticalOperation = null;
+      state.pendingReplaySuggestion = null;
       state.pendingUnattendTableID = null;
       state.pendingRestartTableID = null;
       state.pendingRestartHidePregame = null;
@@ -1617,6 +1671,7 @@ export const roomSlice = createSlice({
         state.pendingStart = null;
         state.pendingGameplayAction = null;
         state.pendingHypotheticalOperation = null;
+        state.pendingReplaySuggestion = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
         state.pendingRestartHidePregame = null;
@@ -1631,6 +1686,7 @@ export const roomSlice = createSlice({
         state.pendingStart = null;
         state.pendingGameplayAction = null;
         state.pendingHypotheticalOperation = null;
+        state.pendingReplaySuggestion = null;
         state.pendingUnattendTableID = null;
         state.pendingRestartTableID = null;
         state.pendingRestartHidePregame = null;

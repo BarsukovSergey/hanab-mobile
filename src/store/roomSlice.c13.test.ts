@@ -41,12 +41,17 @@ function sharedReplayState(): RoomSliceState {
       connected: null,
       clock: null,
       clientState: {
+        finished: true,
         metadata: {
           playerNames: ['Ada', 'Bob'],
           ourUsername: 'Ada',
         },
         replay: {
-          shared: { amLeader: true },
+          states: [{}, {}, {}],
+          hypothetical: null,
+          shared: {
+            amLeader: true, leader: 'Ada', segment: 1, useSharedSegments: true,
+          },
         },
       } as unknown as State,
     },
@@ -254,4 +259,53 @@ describe('authoritative pregame removal', () => {
 
     expect(next).toEqual(state);
   });
+});
+
+describe('shared replay suggestions', () => {
+  const receive = (state: RoomSliceState, tableID = 123, userName = 'Alice', segment = 1) => (
+    roomSlice.reducer(state, roomActions.replaySuggestionReceived({
+      epoch: 1,
+      suggestion: { tableID, userName, segment },
+    }))
+  );
+
+  test('retains a valid leader suggestion and replaces it with the newer valid suggestion', () => {
+    let state = receive(sharedReplayState(), 123, 'Alice', 1);
+    expect(state.pendingReplaySuggestion).toMatchObject({
+      connectionEpoch: 1, gameLoadEpoch: 7, tableID: 123, userName: 'Alice', segment: 1,
+    });
+
+    state = receive(state, 123, 'Bob', 3);
+    expect(state.pendingReplaySuggestion).toMatchObject({ userName: 'Bob', segment: 3 });
+  });
+
+  test('ignores wrong-table, non-leader, hypothetical, and invalid-target suggestions', () => {
+    const wrongTable = receive(sharedReplayState(), 999);
+    expect(wrongTable.pendingReplaySuggestion).toBeNull();
+
+    const follower = sharedReplayState();
+    if (follower.room.kind !== 'live_game' || follower.room.clientState.replay.shared === null) {
+      throw new Error('Expected shared replay');
+    }
+    follower.room.clientState = {
+      ...follower.room.clientState,
+      replay: {
+        ...follower.room.clientState.replay,
+        shared: { ...follower.room.clientState.replay.shared, amLeader: false },
+      },
+    };
+    expect(receive(follower).pendingReplaySuggestion).toBeNull();
+
+    const hypothetical = sharedReplayState();
+    if (hypothetical.room.kind !== 'live_game') throw new Error('Expected shared replay');
+    hypothetical.room.clientState = {
+      ...hypothetical.room.clientState,
+      replay: { ...hypothetical.room.clientState.replay, hypothetical: {} as never },
+    };
+    expect(receive(hypothetical).pendingReplaySuggestion).toBeNull();
+
+    expect(receive(sharedReplayState(), 123, 'Alice', 10).pendingReplaySuggestion).toBeNull();
+    expect(receive(sharedReplayState(), 123, 'Alice', 2).pendingReplaySuggestion).toBeNull();
+  });
+
 });
