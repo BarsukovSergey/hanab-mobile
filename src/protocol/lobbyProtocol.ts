@@ -277,6 +277,19 @@ const pregamePlayerSchema = z.object({
   name: z.string().min(1),
   you: z.boolean(),
   present: z.boolean(),
+  stats: z.object({
+    numGames: z.number().int().nonnegative(),
+    variant: z.object({
+      numGames: z.number().int().nonnegative(),
+      averageScore: z.number(),
+      numStrikeouts: z.number().int().nonnegative(),
+      bestScores: z.array(z.object({
+        numPlayers: z.number().int().min(2).max(6),
+        score: z.number().int().nonnegative(),
+        modifier: z.number().int().min(0).max(4_294_967_295),
+      })),
+    }),
+  }),
 });
 
 export const pregameGameSchema = z.object({

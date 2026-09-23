@@ -16,6 +16,7 @@ import {
   useResponsiveLayout,
 } from '../designSystem';
 import { TableOptionsEditor } from '../TableOptionsEditor';
+import { formatPregamePlayerStats } from './pregamePlayerStats';
 
 export function PregameScreen() {
   const { theme } = useHanabTheme();
@@ -92,6 +93,9 @@ export function PregameScreen() {
                     </Text>
                     <Text style={[styles.playerState, { color: player.present ? theme.colors.success : theme.colors.warning }]}>
                       {player.present ? 'Present' : 'Away'}
+                    </Text>
+                    <Text style={[styles.playerStats, { color: theme.colors.textMuted }]}>
+                      {formatPregamePlayerStats(player, room.data.players.length)}
                     </Text>
                   </View>
                   {((isOwner && !player.you) || (canTakeLeadership && player.you)) && (
@@ -207,6 +211,7 @@ const styles = StyleSheet.create({
   playerCopy: { flex: 1, gap: 2 },
   playerName: { fontSize: 15, fontWeight: '800' },
   playerState: { fontSize: 12, fontWeight: '700' },
+  playerStats: { fontSize: 12, lineHeight: 17 },
   stepperRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   stepperCopy: { gap: 2 },
   label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
