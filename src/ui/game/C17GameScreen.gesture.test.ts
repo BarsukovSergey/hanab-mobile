@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 function readC17Screen() {
-  return fs.readFileSync(path.join(process.cwd(), 'src/ui/game/C17GameScreen.tsx'), 'utf8');
+  return fs.readFileSync(path.join(process.cwd(), 'src/ui/game/C17GameScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 }
 
 function readClueComposer() {
@@ -18,8 +18,8 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
-  expect(screen).toContain('styles.opponentCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
-  expect(screen).toContain('styles.ownCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.ownCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }');
   expect(screen).toContain('if (canEnterClue && !isActionHand) onSelectClueTarget(index);');
   const opponentStart = screen.indexOf('accessibilityLabel={`Player ${playerName}`}');
   const opponentRow = screen.slice(opponentStart, opponentStart + 1000);
@@ -94,7 +94,7 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain('const seatingAnchorIndex = clientState?.metadata.ourPlayerIndex ?? null;');
   expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
   expect(screen).toContain('empathyPlayers,');
-  expect(screen).toContain("isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'");
+  expect(screen).toContain("isSpectator ? 'OBSERVED' : usesSideLabelRows ? 'YOU' : 'YOUR HAND'");
   expect(screen).toContain("canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName");
   expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
   expect(screen).toContain('if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {');
@@ -107,9 +107,12 @@ test('C17 uses ordinary side labels without confusing the current actor with a c
   const lastAction = screen.slice(screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]}>'), screen.indexOf('</View></AuthoritativePulse>', screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]>')));
 
   expect(screen).toContain('const usesSideLabels = opponents.length <= 2;');
-  expect(screen).toContain("{playerName}{!usesSideLabels && currentActor ? ' · TURN' : ''}");
+  expect(screen).toContain('const usesDenseSideLabels = opponents.length >= 3;');
+  expect(screen).toContain('const usesCompactWorkbench = usesSideLabels;');
+  expect(screen).toContain("{playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}");
   expect(screen).toContain('currentActorDot');
-  expect(screen).toContain("currentActor && (usesSideLabels\n                ? { backgroundColor: theme.colors.surfaceMuted }\n                : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent })");
+  expect(screen).toContain('currentActor && (usesSideLabelRows');
+  expect(screen).toContain('borderColor: theme.colors.accent');
   expect(screen).toContain('target && { borderColor: theme.colors.accent }');
   expect(lastAction).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
   expect(lastAction).toContain('title="Rewind"');
@@ -118,7 +121,7 @@ test('C17 uses ordinary side labels without confusing the current actor with a c
 test('C17 reserves the ordinary Workbench slot while keeping a selected-card tray content-sized', () => {
   const screen = readC17Screen();
 
-  expect(screen).toContain('const compactOrdinaryWorkbench = usesSideLabels');
+  expect(screen).toContain('const compactOrdinaryWorkbench = usesCompactWorkbench');
   expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
   expect(screen).toContain('compactWorkbenchReserve');
   expect(screen).toContain('compactWorkbenchTray');
@@ -129,7 +132,7 @@ test('C17 reserves the ordinary Workbench slot while keeping a selected-card tra
 test('C17 caps every side-label stateful Workbench mode at the stable physical slot', () => {
   const screen = readC17Screen();
 
-  expect(screen).toContain('const compactCappedWorkbench = usesSideLabels && (compactOrdinaryWorkbench');
+  expect(screen).toContain('const compactCappedWorkbench = usesCompactWorkbench && (compactOrdinaryWorkbench');
   expect(screen).toContain('|| hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);');
   expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
   expect(screen).toContain('styles.workbenchScroll');

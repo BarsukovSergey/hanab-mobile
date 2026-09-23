@@ -5,6 +5,8 @@ import {
   getC17AmbientEnvelope,
   getC17HandsRegionHeight,
   getC17WorkbenchHeight,
+  C17_SIDE_LABEL_LANE_WIDTH,
+  C17_SIDE_LABEL_ROW_GAP,
   getRelativeOpponentIndices,
   hasC17AmbientRegionChanged,
 } from './c17DenseLayout';
@@ -54,7 +56,7 @@ describe('C17 dense portrait layout', () => {
     expect(result.opponentRowHeight).toBe(32);
     expect(result.ownCardHeight).toBeGreaterThan(result.opponentCardHeight);
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(76);
-    expect(result.ownRowHeight).toBe(result.ownCardHeight + result.cardTopHeadroom + 22);
+    expect(result.ownRowHeight).toBe(result.ownCardHeight + result.cardTopHeadroom + 6);
     expect(result.handsHeight).toBeLessThanOrEqual(315);
   });
 
@@ -111,7 +113,7 @@ describe('C17 dense portrait layout', () => {
 
     expect(result.mode).toBe('full-ledger');
     expect(result.ownCardHeight).not.toBe(result.opponentCardHeight);
-    expect(result.opponentRowHeight).toBe(result.opponentCardHeight + result.cardTopHeadroom + 22);
+    expect(result.opponentRowHeight).toBe(result.opponentCardHeight + result.cardTopHeadroom + 6);
     expect(result.handsHeight).toBe(
       result.ownRowHeight + opponentCount * result.opponentRowHeight + (opponentCount - 1) * 2 + 5,
     );
@@ -119,12 +121,12 @@ describe('C17 dense portrait layout', () => {
   });
 
   test('falls back when dense opponent cards cannot reach the readable floor', () => {
-    const result = layout({ opponentCount: 3, handsRegionHeight: 260 });
+    const result = layout({ opponentCount: 3, handsRegionHeight: 170 });
 
     expect(result.mode).toBe('compact-overview');
     expect(result.opponentCardHeight).toBe(24);
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(46);
-    expect(result.handsHeight).toBeLessThanOrEqual(260);
+    expect(result.handsHeight).toBeLessThanOrEqual(170);
   });
 
   test('stabilizes the same-shell ambient envelope while accepting a new shell', () => {
@@ -188,15 +190,37 @@ describe('C17 dense portrait layout', () => {
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(90);
   });
 
-  test('reserves a stable compact Workbench for ordinary two-player and three-player games', () => {
+  test('reserves 136dp for two-player and three-player Workbenches', () => {
     expect(getC17WorkbenchHeight(915, 1)).toBe(136);
     expect(getC17WorkbenchHeight(600, 2)).toBe(136);
   });
 
-  test('preserves four-player and larger Workbench sizing from the window class', () => {
-    expect(getC17WorkbenchHeight(915, 3)).toBe(176);
+  test('reserves the minimum actionable Workbench for dense four-, five-, and six-player games', () => {
+    expect(getC17WorkbenchHeight(915, 3)).toBe(56);
+    expect(getC17WorkbenchHeight(640, 4)).toBe(56);
+    expect(getC17WorkbenchHeight(600, 5)).toBe(56);
     expect(getC17WorkbenchHeight(915)).toBe(176);
     expect(getC17WorkbenchHeight(640)).toBe(156);
     expect(getC17WorkbenchHeight(600)).toBe(140);
+  });
+
+  test('fits ordinary six-player real cards in a constrained ambient body with side-label lanes', () => {
+    const workbenchHeight = getC17WorkbenchHeight(600, 5);
+    const handsRegionHeight = getC17HandsRegionHeight(481, workbenchHeight);
+    const cardLaneWidth = getC17CardLaneWidth(390, C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP);
+    const result = layout({
+      opponentCount: 5,
+      cardsPerHand: 4,
+      opponentCardLaneWidth: cardLaneWidth,
+      ownCardLaneWidth: cardLaneWidth,
+      handsRegionHeight,
+      workbenchHeight,
+    });
+
+    expect(workbenchHeight).toBe(56);
+    expect(result.mode).toBe('full-ledger');
+    expect(result.opponentCardHeight).toBeGreaterThanOrEqual(46);
+    expect(result.ownCardHeight).toBeGreaterThanOrEqual(result.opponentCardHeight);
+    expect(result.handsHeight).toBeLessThanOrEqual(handsRegionHeight);
   });
 });

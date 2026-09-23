@@ -80,7 +80,7 @@ describe('C17 hypothetical seating and action-hand separation', () => {
     expect(screen).toContain('onSelect={() => onSelectCard(order)}');
     expect(screen).toContain('if (canEnterClue && !isActionHand) onSelectClueTarget(index);');
     expect(screen).toContain('if (canEnterClue && !anchoredIsActionHand) onSelectClueTarget(seatingAnchorIndex);');
-    expect(screen).toContain("{isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'}");
+    expect(screen).toContain("{isSpectator ? 'OBSERVED' : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}");
     expect(screen).not.toContain('`ACTOR · ${metadata.playerNames');
     expect(screen).toContain('lobbyRuntime.hypotheticalPlay(selectedCard)');
     expect(screen).toContain('lobbyRuntime.hypotheticalDiscard(selectedCard)');

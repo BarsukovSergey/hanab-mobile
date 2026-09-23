@@ -52,6 +52,7 @@ const COMPACT_OPPONENT_ROW_HEIGHT = 32;
  */
 export function getC17WorkbenchHeight(viewportHeight: number, opponentCount?: number): number {
   if (opponentCount !== undefined && opponentCount <= 2) return 136;
+  if (opponentCount !== undefined && opponentCount >= 3) return 56;
   if (viewportHeight >= 780) return 176;
   if (viewportHeight >= 640) return 156;
   return 140;
@@ -126,8 +127,8 @@ export function getC17DenseLayout({
     }
     if (opponentCardHeight >= MIN_DENSE_OPPONENT_CARD_HEIGHT) {
       const cardTopHeadroom = getCardTopHeadroom(ownCardHeight);
-      const opponentRowHeight = opponentCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-      const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+      const opponentRowHeight = opponentCardHeight + cardTopHeadroom + SIDE_LABEL_ROW_CHROME;
+      const ownRowHeight = ownCardHeight + cardTopHeadroom + SIDE_LABEL_ROW_CHROME;
       const handsHeight = getDenseHandsHeight(ownCardHeight, opponentCardHeight, cardTopHeadroom, opponents);
       return {
         mode: 'full-ledger',
@@ -162,10 +163,11 @@ export function getC17DenseLayout({
     };
   }
 
-  const ownCardHeight = maxCompactOwnCardHeightThatFits(ownWidthFit, handsRegionHeight, opponents);
+  const compactOwnRowChrome = opponents >= 3 ? SIDE_LABEL_ROW_CHROME : HAND_ROW_CHROME;
+  const ownCardHeight = maxCompactOwnCardHeightThatFits(ownWidthFit, handsRegionHeight, opponents, compactOwnRowChrome);
   const cardTopHeadroom = getCardTopHeadroom(ownCardHeight);
-  const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-  const handsHeight = getCompactHandsHeight(ownCardHeight, opponents);
+  const ownRowHeight = ownCardHeight + cardTopHeadroom + compactOwnRowChrome;
+  const handsHeight = getCompactHandsHeight(ownCardHeight, opponents, compactOwnRowChrome);
 
   return {
     mode: 'compact-overview',
@@ -207,8 +209,8 @@ function getDenseHandsHeight(
   cardTopHeadroom: number,
   opponents: number,
 ): number {
-  const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-  const opponentRowHeight = opponentCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  const ownRowHeight = ownCardHeight + cardTopHeadroom + SIDE_LABEL_ROW_CHROME;
+  const opponentRowHeight = opponentCardHeight + cardTopHeadroom + SIDE_LABEL_ROW_CHROME;
   return ownRowHeight + opponents * opponentRowHeight
     + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
     + HAND_ROW_GAP;
@@ -266,14 +268,19 @@ function getHandsHeight(cardHeight: number, opponents: number, rowChrome: number
     + HAND_ROW_GAP;
 }
 
-function maxCompactOwnCardHeightThatFits(widthFit: number, handsRegionHeight: number, opponents: number): number {
+function maxCompactOwnCardHeightThatFits(
+  widthFit: number,
+  handsRegionHeight: number,
+  opponents: number,
+  ownRowChrome: number,
+): number {
   let low = 1;
   let high = Math.max(1, widthFit);
   let best = 1;
 
   while (low <= high) {
     const candidate = Math.floor((low + high) / 2);
-    if (getCompactHandsHeight(candidate, opponents) <= handsRegionHeight) {
+    if (getCompactHandsHeight(candidate, opponents, ownRowChrome) <= handsRegionHeight) {
       best = candidate;
       low = candidate + 1;
     } else {
@@ -284,8 +291,8 @@ function maxCompactOwnCardHeightThatFits(widthFit: number, handsRegionHeight: nu
   return best;
 }
 
-function getCompactHandsHeight(ownCardHeight: number, opponents: number): number {
-  const ownRowHeight = ownCardHeight + getCardTopHeadroom(ownCardHeight) + HAND_ROW_CHROME;
+function getCompactHandsHeight(ownCardHeight: number, opponents: number, ownRowChrome: number): number {
+  const ownRowHeight = ownCardHeight + getCardTopHeadroom(ownCardHeight) + ownRowChrome;
   return opponents * COMPACT_OPPONENT_ROW_HEIGHT
     + ownRowHeight
     + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
