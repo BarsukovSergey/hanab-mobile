@@ -6,6 +6,7 @@ const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf8').re
 const people = read('PeopleScreen.tsx');
 const pregame = read('PregameScreen.tsx');
 const shared = read('../UserContextActions.tsx');
+const app = read('../../../App.tsx');
 
 describe('player context actions', () => {
   test('People uses the shared actions while keeping Spectate in People', () => {
@@ -22,6 +23,16 @@ describe('player context actions', () => {
     expect(pregame).toContain('<UserContextActions');
     expect(pregame).toContain('session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())');
     expect(pregame).toContain('room={`table${room.tableID}`}');
+  });
+
+  test('Game menu exposes table actions for players and spectators except the authenticated user', () => {
+    expect(app).toContain("import { UserContextActions } from './src/ui/UserContextActions'");
+    expect(app).toContain('liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))');
+    expect(app).toContain('liveClientState.spectators.map((spectator, index) => renderLiveUser(spectator.name, `spectator-${index}-${spectator.name}`))');
+    expect(app).toContain('<UserContextActions username={name} isFriend={isFriend} room={`table${liveTableID}`} />');
+    expect(app).toContain('name.toLocaleLowerCase() === authenticatedUsername.toLocaleLowerCase()');
+    expect(app).toContain('!isAuthenticatedUser && (');
+    expect(app).toContain('session.friends.some((friend) => friend.toLocaleLowerCase() === name.toLocaleLowerCase())');
   });
 
   test('shared Dialog shows session messages and sends in context while keeping friends unchanged', () => {
