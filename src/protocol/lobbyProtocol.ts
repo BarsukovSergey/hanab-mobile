@@ -415,7 +415,7 @@ export const hypoShowDrawnCardsSchema = z.object({
 export const replayCreateCommandSchema = z.object({
   source: z.literal('id'),
   databaseID: z.number().int().positive(),
-  visibility: z.literal('solo'),
+  visibility: z.enum(['solo', 'shared']),
 }).strict();
 
 const schemas = {
@@ -700,8 +700,8 @@ export function encodeHistoryGetSeedFrame(seed: string, friends: boolean): strin
   return encodeClientFrame('historyGetSeed', historyGetSeedCommandSchema.parse({ seed, friends }));
 }
 
-export function encodeReplayCreateFrame(databaseID: number): string {
+export function encodeReplayCreateFrame(databaseID: number, visibility: 'solo' | 'shared' = 'solo'): string {
   return encodeClientFrame('replayCreate', replayCreateCommandSchema.parse({
-    source: 'id', databaseID, visibility: 'solo',
+    source: 'id', databaseID, visibility,
   }));
 }

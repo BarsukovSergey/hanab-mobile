@@ -425,7 +425,7 @@ function AppContent() {
     content = <PregameScreen />;
   } else if (localScreen === 'history') {
     content = <HistoryScreen onBack={() => { setReturnAfterUnattend(null); setLocalScreen('lobby'); }}
-      onWatchReplay={(databaseID) => { if (lobbyRuntime.watchHistoricalGame(databaseID)) setReturnAfterUnattend('history'); }} />;
+      onWatchReplay={(databaseID, visibility) => { if (lobbyRuntime.watchHistoricalGame(databaseID, visibility)) setReturnAfterUnattend('history'); }} />;
   } else if (localScreen === 'settings') {
     content = <SettingsScreen onBack={() => setLocalScreen('lobby')} />;
   } else if (localScreen === 'people') {

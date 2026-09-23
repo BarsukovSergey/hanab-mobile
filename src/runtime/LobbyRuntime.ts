@@ -369,7 +369,7 @@ export class LobbyRuntime {
     this.store.dispatch(historyActions.otherScoresDismissed());
   }
 
-  watchHistoricalGame(databaseID: number): boolean {
+  watchHistoricalGame(databaseID: number, visibility: 'solo' | 'shared' = 'solo'): boolean {
     const state = this.store.getState();
     const item = [...state.history.items, ...state.history.friendItems,
       ...(state.history.otherScores?.games ?? [])]
@@ -397,7 +397,7 @@ export class LobbyRuntime {
       || room.pendingGameplayAction !== null
       || state.history.pendingReplayCreate !== null
     ) return false;
-    if (!this.sendEncoded(encodeReplayCreateFrame(databaseID))) return false;
+    if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
     this.store.dispatch(historyActions.replayCreateRequested({
       connectionEpoch: state.session.connectionEpoch,
       databaseID,
