@@ -14,7 +14,13 @@ This note answers two post-beta backlog questions:
 Upstream command behavior was checked against `Hanabi-Live/hanabi-live` at
 `c1d970bd610395087958fe7d1bb96f52244f7b04`. Bot join behavior was checked against the current
 `will-hanabi-bot/scala-bot` implementation at
-`86cb2507c400dfefe172ae7f8bef79b9eec97679`, plus the older JS bot where useful.
+`86cb2507c400dfefe172ae7f8bef79b9eec97679`, plus the official
+`Hanabi-Live/hanabi-live-bot` reference implementation at
+`e8e8f36d4fb63cc7d5fa931212d25708fad5638e` where useful.
+
+Important distinction: the maintained scala-bot accepts `/join <password>`, while the official
+reference bot only documents/implements the open-table `/join` path and sends `tableJoin` without
+a password. "Bot" therefore does not imply one universal invitation capability set.
 
 ## Current mobile command boundary
 
@@ -121,7 +127,9 @@ example a small source-controlled data file containing:
 - stable bot ID;
 - exact hanab.live username;
 - display name;
-- optional short capability/convention description.
+- optional short capability/convention description;
+- explicit capabilities such as `passwordJoin`, rather than assuming every bot accepts the same PM
+  commands.
 
 The actual production usernames must be verified before entries are added. Online/offline state can
 then be derived by matching those exact usernames against the authoritative lobby user list.
@@ -135,14 +143,17 @@ Do not weaken that boundary just to support bots.
 
 For an open table:
 
-- selecting a bot can immediately send PM body `/join`.
+- selecting a bot can immediately send PM body `/join` when that bot's verified registry entry
+  declares the ordinary PM-join capability.
 
 For a password-protected table created through mobile, avoid asking for the same password twice.
 The create-table flow already owns the password as transient form state, so it can optionally collect
 **multiple bot selections** at the same time. The picker should allow selecting as many bots as can
 fit in the intended table, not assume a 2-player game. After authoritative table creation/attendance
-is confirmed, re-check the actual free player slots and send each still-eligible selected bot a PM
-with `/join <password>`, then clear the create-form password and bot selections together. The password still never needs to enter persistent room/application
+is confirmed, re-check the actual free player slots and send each still-eligible selected bot that
+declares `passwordJoin` a PM with `/join <password>`, then clear the create-form password and bot
+selections together. Bots without verified protected-table support should be visibly unavailable for
+that protected-table flow rather than receiving a command they do not understand. The password still never needs to enter persistent room/application
 state.
 
 For an already-existing password-protected table, or a table the current user joined rather than
@@ -156,14 +167,16 @@ retention boundary.
 
 A later implementation can stay small:
 
-1. add a source-controlled `knownBots` registry with only verified exact usernames;
+1. add a source-controlled `knownBots` registry with only verified exact usernames and verified
+   per-bot capabilities such as open-table join and protected-table join;
 2. add an optional **multi-select** bot picker to Create table so the creator can choose several bots
    before submitting;
 3. cap selection by the intended player capacity (creator + selected bots must fit) and, after
    authoritative create/attendance confirmation, re-check actual free player slots before each
    invite;
-4. use the still-transient create-form password to send every still-eligible selected bot `/join`
-   or `/join <password>`, then clear that form state;
+4. use the still-transient create-form password to send each still-eligible bot only the join form
+   its verified capability set supports; protected tables require `passwordJoin`; then clear that
+   form state;
 5. also show `Add bot` in pregame when there is room for another player;
 6. open the same multi-select bot picker showing known bots and their current online/offline state;
 7. disable bots already present at the table and prevent selecting more bots than currently free
