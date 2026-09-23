@@ -5,6 +5,7 @@ import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { ChatPanel } from '../ChatPanel';
+import { UserContextActions } from '../UserContextActions';
 import {
   ActionButton,
   Field,
@@ -93,6 +94,13 @@ export function PregameScreen() {
                       {player.present ? 'Present' : 'Away'}
                     </Text>
                   </View>
+                  {!player.you && (
+                    <UserContextActions
+                      username={player.name}
+                      isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
+                      room={`table${room.tableID}`}
+                    />
+                  )}
                   {((isOwner && !player.you) || (canTakeLeadership && player.you)) && (
                     <ActionButton
                       compact
