@@ -1,5 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { isC17WorkspaceEligible } from './c17Workspace';
+
+const appSource = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8');
+const c17ScreenSource = readFileSync(resolve(__dirname, 'C17GameScreen.tsx'), 'utf8');
 
 const livePlayerPortrait = {
   isLiveParticipant: true,
@@ -9,6 +14,15 @@ const livePlayerPortrait = {
 };
 
 describe('C17 workspace route', () => {
+  test('reduces only C17 bottom spacing and keeps the bottom safe area', () => {
+    expect(appSource).toMatch(/gameContainer: \{[^}]*paddingBottom: 18/);
+    expect(appSource).toMatch(/gameContainerC17: \{[^}]*paddingBottom: 0/);
+    expect(appSource).toMatch(/gameWorkspace: \{[^}]*paddingBottom: 10/);
+    expect(appSource).toMatch(/gameWorkspaceC17: \{[^}]*paddingBottom: 0/);
+    expect(c17ScreenSource).toMatch(/workspace: \{ flex: 1, minHeight: 0 \}/);
+    expect(appSource).toMatch(/<SafeAreaView edges=\{\['bottom'\]\}/);
+  });
+
   test('keeps the C17 ledger while locally reviewing a live game', () => {
     expect(isC17WorkspaceEligible({
       ...livePlayerPortrait,
