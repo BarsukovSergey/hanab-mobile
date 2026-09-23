@@ -1325,7 +1325,7 @@ function getCardLabel(game: GameState, playerNames: readonly string[], order: nu
 }
 
 const styles = StyleSheet.create({
-  workspace: { flex: 1, minHeight: 0, paddingBottom: 4 },
+  workspace: { flex: 1, minHeight: 0 },
   workspaceBody: { flex: 1, minHeight: 0 },
   ledgerChrome: { gap: 5 },
   grow: { flex: 1, minWidth: 0 },
