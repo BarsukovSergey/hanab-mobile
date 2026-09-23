@@ -387,6 +387,17 @@ export function C17GameScreen() {
     ? clientState.spectators.map((spectator) => spectator.name)
       .filter((name) => name !== replay.shared?.leader)
     : [];
+  const pendingReplaySuggestion = roomState.pendingReplaySuggestion !== null
+    && roomState.pendingReplaySuggestion.connectionEpoch === roomState.connectionEpoch
+    && roomState.pendingReplaySuggestion.tableID === liveRoom.tableID
+    && roomState.pendingReplaySuggestion.gameLoadEpoch === liveRoom.gameLoadEpoch
+    && replay.shared?.amLeader === true
+    && isFinishedReplay
+    && hypothetical === null
+    && replay.states[roomState.pendingReplaySuggestion.segment - 1] !== undefined
+    && replay.shared.segment !== roomState.pendingReplaySuggestion.segment - 1
+    ? roomState.pendingReplaySuggestion
+    : null;
 
   return <>
     <C17DenseWorkspace
@@ -458,6 +469,13 @@ export function C17GameScreen() {
       onReturnLive={returnLive}
       onQuickRematch={() => lobbyRuntime.quickRematch()}
       onRemake={() => lobbyRuntime.restartToPregame()}
+      onAcceptReplaySuggestion={() => {
+        if (
+          pendingReplaySuggestion !== null
+          && lobbyRuntime.navigateReplaySegment(pendingReplaySuggestion.segment - 1)
+        ) dispatch(roomActions.replaySuggestionCleared());
+      }}
+      onDismissReplaySuggestion={() => dispatch(roomActions.replaySuggestionCleared())}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
         if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {
@@ -474,6 +492,7 @@ export function C17GameScreen() {
       onToggleHypotheticalDrawn={() => lobbyRuntime.toggleHypotheticalDrawnCards()}
       seatingAnchorIndex={seatingAnchorIndex}
       pendingText={pendingText ?? null}
+      pendingReplaySuggestion={pendingReplaySuggestion}
       canEnterClue={enabled || hypotheticalEnabled}
       recentActions={recentActions}
       result={result}
@@ -573,6 +592,8 @@ function C17DenseWorkspace({
   onReturnLive,
   onQuickRematch,
   onRemake,
+  onAcceptReplaySuggestion,
+  onDismissReplaySuggestion,
   onScrubAction,
   onSelectCard,
   onSelectClueTarget,
@@ -584,6 +605,7 @@ function C17DenseWorkspace({
   onToggleHypotheticalDrawn,
   seatingAnchorIndex,
   pendingText,
+  pendingReplaySuggestion,
   recentActions,
   result,
   reviewActive,
@@ -658,6 +680,8 @@ function C17DenseWorkspace({
   onReturnLive: () => void;
   onQuickRematch: () => void;
   onRemake: () => void;
+  onAcceptReplaySuggestion: () => void;
+  onDismissReplaySuggestion: () => void;
   onScrubAction: (segment: number) => void;
   onSelectCard: (order: number) => void;
   onSelectClueTarget: (playerIndex: number | null) => void;
@@ -669,6 +693,7 @@ function C17DenseWorkspace({
   onToggleHypotheticalDrawn: () => void;
   seatingAnchorIndex: number;
   pendingText: string | null;
+  pendingReplaySuggestion: { userName: string; segment: number } | null;
   recentActions: readonly C17TemporalEntry[];
   result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
@@ -1190,6 +1215,13 @@ function C17DenseWorkspace({
             {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={onStartHypothetical} />}
           </> : <>
             <Text numberOfLines={1} style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Leader: {sharedReplay.leader}</Text>
+            {pendingReplaySuggestion !== null && <View style={styles.actionButtons}>
+              <Text style={[styles.workbenchText, { color: theme.colors.text }]}>
+                {pendingReplaySuggestion.userName} suggests turn {pendingReplaySuggestion.segment}
+              </Text>
+              <ActionButton compact title="Accept" tone="primary" onPress={onAcceptReplaySuggestion} />
+              <ActionButton compact title="Dismiss" onPress={onDismissReplaySuggestion} />
+            </View>}
             <View style={styles.actionButtons}>
               <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
               <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />

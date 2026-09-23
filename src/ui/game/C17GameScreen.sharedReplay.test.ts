@@ -57,3 +57,13 @@ test('C17 shared replay preserves existing leader-only restart eligibility', () 
   expect(screen).toContain('const readOnlyReplay = finishedReplay || sharedReplay !== null;');
   expect(screen).toContain('const hasAvailableNote = (order: number) => readOnlyReplay');
 });
+
+test('C17 shared replay exposes suggestion Accept and Dismiss using the user-facing turn offset', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('{pendingReplaySuggestion.userName} suggests turn {pendingReplaySuggestion.segment}');
+  expect(screen).toContain('title="Accept" tone="primary" onPress={onAcceptReplaySuggestion}');
+  expect(screen).toContain('title="Dismiss" onPress={onDismissReplaySuggestion}');
+  expect(screen).toContain('lobbyRuntime.navigateReplaySegment(pendingReplaySuggestion.segment - 1)');
+  expect(screen).toContain(') dispatch(roomActions.replaySuggestionCleared());');
+});

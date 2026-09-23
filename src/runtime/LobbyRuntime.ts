@@ -1390,6 +1390,12 @@ export class LobbyRuntime {
           name: event.data.name,
         }));
         break;
+      case 'suggestion':
+        this.store.dispatch(roomActions.replaySuggestionReceived({
+          epoch,
+          suggestion: event.data,
+        }));
+        break;
       case 'replayEfficiencyMod':
         this.store.dispatch(roomActions.sharedReplayEfficiencyModReceived({
           epoch,
