@@ -81,6 +81,7 @@ const END_CONDITIONS: Record<number, string> = {
 const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
+const DENSE_CLUE_WORKBENCH_HEIGHT = 60;
 
 export function C17GameScreen() {
   const { theme } = useHanabTheme();
@@ -693,7 +694,10 @@ function C17DenseWorkspace({
   const usesSideLabelRows = usesSideLabels || usesDenseSideLabels;
   const usesCompactWorkbench = usesSideLabels;
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight, opponents.length);
-  const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
+  const workbenchReserveHeight = usesDenseSideLabels
+    ? Math.max(workbenchHeight, DENSE_CLUE_WORKBENCH_HEIGHT)
+    : workbenchHeight;
+  const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchReserveHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
     shellKey: '',
     ambientBodyHeight: 0,
@@ -706,7 +710,7 @@ function C17DenseWorkspace({
   const shellMeasured = layoutMetrics.shellKey === shellKey
     && layoutMetrics.ambientBodyHeight > 0
     && layoutMetrics.ambientBodyWidth > 0;
-  const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
+  const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchReserveHeight);
   const cardLaneWidth = getC17CardLaneWidth(
     layoutMetrics.ambientBodyWidth,
     usesSideLabelRows ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
@@ -717,7 +721,7 @@ function C17DenseWorkspace({
     ownCardLaneWidth: cardLaneWidth,
     opponentCount: opponents.length,
     cardsPerHand,
-    workbenchHeight,
+    workbenchHeight: workbenchReserveHeight,
   });
   const captureAmbientBody = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((currentMetrics) => {
@@ -780,6 +784,12 @@ function C17DenseWorkspace({
     : (notes[order]?.text.trim().length ?? 0) > 0;
   const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedActionCard !== null || noteCard !== null || pendingText !== null;
+  const denseClueWorkbench = usesDenseSideLabels && selectedTarget !== null
+    && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null;
+  const denseClueAvailableHeight = Math.max(
+    layout.workbenchHeight,
+    handsRegionHeight + layout.workbenchHeight - layout.handsHeight,
+  );
   const compactOrdinaryWorkbench = usesCompactWorkbench
     && hypothetical === null
     && !reviewActive
@@ -1095,15 +1105,18 @@ function C17DenseWorkspace({
       {(!shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
       compactOrdinaryWorkbench ? styles.compactWorkbenchReserve : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
-      compactCappedWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
+      denseClueWorkbench
+        ? [styles.denseClueWorkbench, { maxHeight: denseClueAvailableHeight }]
+        : compactCappedWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
       usesDenseSideLabels && { minHeight: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
       {showRewindScrubber && <View style={styles.workbenchScrubber}>
         <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
       </View>}
-      <ScrollView contentContainerStyle={styles.workbenchContent} nestedScrollEnabled style={[
+      <ScrollView contentContainerStyle={denseClueWorkbench ? styles.denseClueWorkbenchContent : styles.workbenchContent} nestedScrollEnabled style={[
         styles.workbenchScroll,
+        denseClueWorkbench && styles.denseClueScroll,
         compactOrdinaryWorkbench && [styles.compactWorkbenchTray, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }],
       ]}>
         {hypothetical !== null ? <>
@@ -1202,6 +1215,7 @@ function C17DenseWorkspace({
             </Text>
           </View>}
         </> : selectedTarget !== null ? <ClueComposer
+          dense={usesDenseSideLabels}
           choices={clueChoices}
           variantName={variantName}
           enabled={clueEnabled}
@@ -1369,12 +1383,15 @@ const styles = StyleSheet.create({
   clock: { flexShrink: 0, fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 14 },
   ownCards: { alignItems: 'center', flexDirection: 'row', gap: HAND_CARD_GAP, minWidth: 0 },
   workbench: { borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, marginTop: 5, overflow: 'hidden' },
+  denseClueWorkbench: { alignSelf: 'stretch', flex: 0, flexGrow: 0, flexShrink: 1 },
   compactWorkbenchReserve: { backgroundColor: 'transparent', borderWidth: 0, flexGrow: 0, flexShrink: 0, overflow: 'visible' },
   workbenchExpanded: { flex: 1 },
   workbenchScrubber: { paddingHorizontal: 10, paddingTop: 7 },
   workbenchScroll: { flex: 1 },
+  denseClueScroll: { flex: 0, flexGrow: 0, flexShrink: 1 },
   compactWorkbenchTray: { alignSelf: 'stretch', borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, flex: 0, flexGrow: 0, flexShrink: 1, maxHeight: '100%' },
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
+  denseClueWorkbenchContent: { flexGrow: 0, gap: 0, paddingHorizontal: 0, paddingVertical: 0 },
   idleWorkbench: { alignItems: 'flex-end', flex: 1, justifyContent: 'flex-start', marginTop: 5 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
   noteInspect: { gap: 3 },
