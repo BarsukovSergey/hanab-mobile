@@ -68,6 +68,25 @@ function pregame(tableID = 456): PregameGame {
   };
 }
 
+function pregameState(role: 'player' | 'spectator', tableID = 123): RoomSliceState {
+  const game = pregame(tableID);
+  return {
+    ...baseState(),
+    connectionEpoch: 1,
+    room: {
+      kind: 'pregame',
+      tableID,
+      role,
+      data: role === 'player'
+        ? game
+        : {
+            ...game,
+            players: game.players.map((player) => ({ ...player, you: false })),
+          },
+    },
+  };
+}
+
 describe('C13 restart lifecycle regressions', () => {
   test('idle replay tableGone closes the dead room but preserves the migration candidate', () => {
     let state = sharedReplayState();
@@ -157,5 +176,72 @@ describe('C13 restart lifecycle regressions', () => {
     expect(next.recoveryJoinedConfirmed).toBe(false);
     expect(next.recoveryStagedGame).toBeNull();
     expect(next.rematchTransition).toBeNull();
+  });
+});
+
+describe('authoritative pregame removal', () => {
+  test('matching unsolicited spectator left clears the room and a pending role switch', () => {
+    let state = pregameState('spectator');
+    state = roomSlice.reducer(state, roomActions.roleSwitchRequested({
+      epoch: 1,
+      tableID: 123,
+      targetRole: 'player',
+    }));
+    expect(state.pendingRoleSwitch).not.toBeNull();
+
+    state = roomSlice.reducer(state, roomActions.leftReceived({
+      epoch: 1,
+      left: { TableID: 123 },
+    }));
+
+    expect(state.room).toEqual({ kind: 'none' });
+    expect(state.pendingRoleSwitch).toBeNull();
+  });
+
+  test('matching unsolicited player left remains ignored', () => {
+    const state = pregameState('player');
+    const next = roomSlice.reducer(state, roomActions.leftReceived({
+      epoch: 1,
+      left: { TableID: 123 },
+    }));
+
+    expect(next).toEqual(state);
+  });
+
+  test.each([
+    { epoch: 0, tableID: 123 },
+    { epoch: 1, tableID: 999 },
+  ])('spectator left ignores stale or mismatched event %#', ({ epoch, tableID }) => {
+    const state = pregameState('spectator');
+    const next = roomSlice.reducer(state, roomActions.leftReceived({
+      epoch,
+      left: { TableID: tableID },
+    }));
+
+    expect(next).toEqual(state);
+  });
+
+  test('matching tableGone clears a pregame room and pending state', () => {
+    let state = pregameState('spectator');
+    state = roomSlice.reducer(state, roomActions.roleSwitchRequested({
+      epoch: 1,
+      tableID: 123,
+      targetRole: 'player',
+    }));
+
+    state = roomSlice.reducer(state, lobbyActions.tableGone({ epoch: 1, tableID: 123 }));
+
+    expect(state.room).toEqual({ kind: 'none' });
+    expect(state.pendingRoleSwitch).toBeNull();
+  });
+
+  test('unrelated tableGone leaves the current pregame room unchanged', () => {
+    const state = pregameState('spectator');
+    const next = roomSlice.reducer(
+      state,
+      lobbyActions.tableGone({ epoch: 1, tableID: 999 }),
+    );
+
+    expect(next).toEqual(state);
   });
 });

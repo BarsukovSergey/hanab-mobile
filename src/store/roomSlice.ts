@@ -807,6 +807,16 @@ export const roomSlice = createSlice({
         return;
       }
       if (
+        state.room.kind === 'pregame'
+        && state.room.tableID === tableID
+        && state.room.role === 'spectator'
+      ) {
+        clearC4BState(state);
+        state.pendingHypotheticalOperation = null;
+        state.room = { kind: 'none' };
+        return;
+      }
+      if (
         state.room.kind !== 'pregame'
         || state.room.tableID !== tableID
         || state.pendingLeaveTableID !== tableID
@@ -1510,10 +1520,19 @@ export const roomSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(lobbyActions.tableGone, (state, action) => {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      if (
+        state.room.kind === 'pregame'
+        && state.room.tableID === action.payload.tableID
+      ) {
+        clearC4BState(state);
+        state.pendingHypotheticalOperation = null;
+        state.room = { kind: 'none' };
+        return;
+      }
       const rematch = state.rematchTransition;
       if (
-        state.connectionEpoch !== action.payload.epoch
-        || rematch === null
+        rematch === null
         || action.payload.tableID !== rematch.oldTableID
       ) return;
       if (
