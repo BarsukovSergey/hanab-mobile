@@ -652,6 +652,26 @@ export class LobbyRuntime {
     return this.store.getState().room.pendingUnattendTableID === tableID;
   }
 
+  setSpectatorPerspective(shadowingPlayerIndex: number): boolean {
+    const room = this.store.getState().room.room;
+    if (
+      room.kind !== 'live_game'
+      || room.role !== 'spectator'
+      || room.sharedReplay
+      || room.clientState.replay.shared !== null
+      || room.clientState.finished
+      || room.clientState.replay.databaseID !== null
+      || room.clientState.ongoingGame.turn.currentPlayerIndex === null
+      || !Number.isInteger(shadowingPlayerIndex)
+      || shadowingPlayerIndex < -1
+      || shadowingPlayerIndex >= room.clientState.metadata.options.numPlayers
+      || shadowingPlayerIndex === (room.clientState.shadowing
+        ? room.clientState.metadata.ourPlayerIndex : -1)
+      || !this.isReadyCurrentRoom(room.tableID)
+    ) return false;
+    return this.sendEncoded(encodeTableSpectateFrame(room.tableID, shadowingPlayerIndex));
+  }
+
   navigateReplaySegment(segment: number): boolean {
     const state = this.store.getState();
     const room = state.room.room;

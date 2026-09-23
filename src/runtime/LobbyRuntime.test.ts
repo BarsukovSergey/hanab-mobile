@@ -1870,6 +1870,62 @@ describe('deterministic lobby runtime', () => {
       role: 'spectator',
       bootstrap: { phase: 'waiting_init' },
     });
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      spectating: true, shadowing: true, ourPlayerIndex: 1,
+    }))}`);
+    socket.emitMessage('gameActionList {"tableID":123,"list":[]}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', role: 'spectator',
+      clientState: { shadowing: true, metadata: { ourPlayerIndex: 1 } },
+    });
+  });
+
+  test('spectator perspective sends only the requested seat and reloads from tableStart', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('spectator');
+    const before = socket.sent.length;
+    expect(runtime.setSpectatorPerspective(1)).toBe(true);
+    expect(socket.sent.slice(before)).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":1}',
+    ]);
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', role: 'spectator',
+    });
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      spectating: true, shadowing: true, ourPlayerIndex: 1,
+    }))}`);
+    socket.emitMessage('gameActionList {"tableID":123,"list":[]}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', role: 'spectator',
+      clientState: { shadowing: true, metadata: { ourPlayerIndex: 1 } },
+    });
+    const beforeSamePerspective = socket.sent.length;
+    expect(runtime.setSpectatorPerspective(1)).toBe(false);
+    expect(socket.sent).toHaveLength(beforeSamePerspective);
+    expect(runtime.setSpectatorPerspective(-1)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}');
+  });
+
+  test('spectator perspective rejects invalid, player, finished, and shared replay states', async () => {
+    const spectator = await makeLiveRuntime('spectator');
+    const before = spectator.socket.sent.length;
+    for (const index of [-2, 2, 0.5, NaN, -1]) {
+      expect(spectator.runtime.setSpectatorPerspective(index)).toBe(false);
+    }
+    expect(spectator.socket.sent).toHaveLength(before);
+    const room = spectator.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    spectator.store.dispatch(roomActions.liveActionAccepted({
+      connectionEpoch: 1, tableID: 123, gameLoadEpoch: room.gameLoadEpoch,
+      expectedLiveActionCount: room.liveActionCount,
+      acceptedAction: { type: 'turn', num: 1, currentPlayerIndex: 1 },
+      clientState: { ...room.clientState, finished: true },
+    }));
+    expect(spectator.runtime.setSpectatorPerspective(1)).toBe(false);
+    const player = await makeLiveRuntime('player');
+    expect(player.runtime.setSpectatorPerspective(1)).toBe(false);
+    const shared = await makeSharedReplayRuntime();
+    expect(shared.runtime.setSpectatorPerspective(1)).toBe(false);
   });
 
   test('unexpected close retries with backoff and welcome resets the delay', async () => {

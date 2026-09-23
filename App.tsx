@@ -213,6 +213,14 @@ function AppContent() {
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
     const liveClientState = roomState.room.clientState;
+    const perspectiveEligible = roomState.room.role === 'spectator'
+      && !roomState.room.sharedReplay
+      && liveClientState.replay.shared === null
+      && !liveClientState.finished
+      && liveClientState.replay.databaseID === null
+      && liveClientState.ongoingGame.turn.currentPlayerIndex !== null;
+    const currentPerspective = liveClientState.shadowing
+      ? liveClientState.metadata.ourPlayerIndex : -1;
     const liveConnectionProblem = session.phase === 'failed' || session.phase === 'closed';
     const pauseEligible = session.phase === 'ready'
       && roomState.room.role === 'player'
@@ -284,7 +292,7 @@ function AppContent() {
               {liveSheet === 'menu'
                 ? <>
                   <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
-                  <View style={styles.menuActions}>
+                  <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions}>
                     <ActionButton title="Table chat" onPress={() => setLiveSheet('chat')} />
                     <SectionHeading title="Players" detail={liveClientState.metadata.playerNames.join(', ')} />
                     <SectionHeading
@@ -293,6 +301,28 @@ function AppContent() {
                         ? 'No spectators'
                         : liveClientState.spectators.map((spectator) => spectator.name).join(', ')}
                     />
+                    {perspectiveEligible && <>
+                      <SectionHeading
+                        title="Perspective"
+                        detail={currentPerspective === -1
+                          ? 'All hands'
+                          : `Viewing as ${liveClientState.metadata.playerNames[currentPerspective]}`}
+                      />
+                      <View style={styles.perspectiveChoices}>
+                        {[-1, ...liveClientState.metadata.playerNames.map((_, index) => index)].map((index) => (
+                          <ActionButton
+                            key={index}
+                            compact
+                            disabled={index === currentPerspective}
+                            tone={index === currentPerspective ? 'primary' : 'secondary'}
+                            title={index === -1 ? 'All hands' : liveClientState.metadata.playerNames[index] ?? ''}
+                            onPress={() => {
+                              if (lobbyRuntime.setSpectatorPerspective(index)) setLiveSheet(null);
+                            }}
+                          />
+                        ))}
+                      </View>
+                    </>}
                     <ActionButton
                       disabled={roomState.pendingUnattendTableID !== null}
                       title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
@@ -307,7 +337,7 @@ function AppContent() {
                     <TerminationControls />
                     <ActionButton title="Settings" onPress={() => setLiveSheet('settings')} />
                     <ActionButton title="Sign out" tone="ghost" onPress={() => void signOut()} />
-                  </View>
+                  </ScrollView>
                   <ActionButton title="Close" tone="ghost" onPress={() => setLiveSheet(null)} />
                 </>
                 : liveSheet === 'chat'
@@ -417,6 +447,8 @@ const styles = StyleSheet.create({
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
   menuActions: { gap: 7 },
+  menuScroll: { flexShrink: 1 },
+  perspectiveChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   loginIntro: { gap: 4, marginBottom: 4 },
   loginEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },

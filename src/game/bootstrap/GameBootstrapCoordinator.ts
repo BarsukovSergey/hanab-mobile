@@ -230,7 +230,7 @@ export class GameBootstrapCoordinator {
       return false;
     }
     const mismatch = (
-      init.shadowing
+      (init.shadowing && (load.role !== 'spectator' || !init.spectating || load.replay || load.expectedDatabaseID !== null))
       || init.replay !== load.replay
       || (!load.replay && init.sharedReplay)
       || (load.expectedDatabaseID !== null && init.databaseID !== load.expectedDatabaseID)

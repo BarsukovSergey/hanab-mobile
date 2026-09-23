@@ -245,6 +245,35 @@ describe('authoritative game bootstrap coordinator', () => {
       kind: 'live_game',
       role: 'spectator',
     });
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.shadowing).toBe(false);
+  });
+
+  test('shadowed spectator bootstrap preserves the authoritative perspective', () => {
+    const store = readyStore('spectator');
+    const coordinator = new GameBootstrapCoordinator(store, () => true);
+    expect(coordinator.startFromAuthoritativeRoom(1)).toBe(1);
+    expect(coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({
+      spectating: true, shadowing: true, ourPlayerIndex: 1,
+    })))).toBe(true);
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.shadowing).toBe(true);
+    expect(room.clientState.metadata.ourPlayerIndex).toBe(1);
+  });
+
+  test('shadowing init cannot bootstrap a player or an unshadowed spectator', () => {
+    for (const role of ['player', 'spectator'] as const) {
+      const store = readyStore(role);
+      const coordinator = new GameBootstrapCoordinator(store, () => true);
+      expect(coordinator.startFromAuthoritativeRoom(1)).toBe(1);
+      expect(coordinator.receiveInit(1, 1, gameInitSchema.parse(makeInit({
+        spectating: false, shadowing: true, ourPlayerIndex: 1,
+      })))).toBe(false);
+      expect(store.getState().room.room.kind).toBe('awaiting_game_bootstrap');
+    }
   });
 
   test('full-history replay is deterministic and preserves hidden source actions', () => {
