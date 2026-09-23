@@ -1,4 +1,8 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, jest, test } from '@jest/globals';
+
+jest.mock('./UpstreamCardFace', () => ({
+  UpstreamCardFace: () => null,
+}));
 
 import { getCardGeometry } from './GameCard';
 
