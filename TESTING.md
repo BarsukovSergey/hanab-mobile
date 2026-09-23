@@ -1,6 +1,6 @@
 # Hanab Mobile — Testing Guide
 
-This page is for people testing the **Hanab Mobile 1.0.0-beta.1 Android build**.
+This page is for people testing the **Hanab Mobile 1.0.0-beta.2 Android build**.
 
 You do not need to understand the C17 design documents or the implementation. Test it like a normal player. **If you need instructions to discover an ordinary gameplay control, report that as a problem.**
 

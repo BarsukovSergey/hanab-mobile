@@ -954,7 +954,7 @@ describe('deterministic lobby runtime', () => {
     expect(chat.submit('/version')).toBe(true);
     expect(socket.sent).toEqual([]);
     expect(store.getState().chat.messagesByRoom.lobby?.at(-1)).toMatchObject({
-      msg: 'You are running version 1.0.0-beta.1 of the client.',
+      msg: 'You are running version 1.0.0-beta.2 of the client.',
       datetime: '2026-09-22T10:00:00.000Z',
       server: true,
       localType: 'info',
