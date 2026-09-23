@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { lobbyRuntime } from '../../runtime/application';
@@ -21,6 +21,7 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
   const tables = useAppSelector(tableSelectors.selectAll);
   const authenticatedUser = useAppSelector((state) => state.session.authenticatedUser);
   const friends = useAppSelector((state) => state.session.friends);
+  const [composerUserID, setComposerUserID] = useState<number | null>(null);
   const rows = useMemo(
     () => getPeopleRows(users, friends, authenticatedUser, tables),
     [authenticatedUser, friends, tables, users],
@@ -56,8 +57,12 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
               </View>
 
               {row.canUseContextActions && (
-                <View style={styles.actions}>
-                  <UserContextActions username={row.user.name} isFriend={row.isFriend} />
+                <UserContextActions
+                  username={row.user.name}
+                  isFriend={row.isFriend}
+                  open={composerUserID === row.user.userID}
+                  onOpenChange={(open) => setComposerUserID(open ? row.user.userID : null)}
+                >
                   {tableAction !== null && (
                     <ActionButton
                       compact
@@ -65,9 +70,8 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
                       onPress={() => lobbyRuntime.spectate(tableAction.tableID)}
                     />
                   )}
-                </View>
+                </UserContextActions>
               )}
-
             </View>
           );
         })}
@@ -85,5 +89,4 @@ const styles = StyleSheet.create({
   username: { fontSize: 16, fontWeight: '800' },
   location: { fontSize: 13, lineHeight: 18 },
   indicators: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end' },
-  actions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

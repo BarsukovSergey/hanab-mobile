@@ -94,13 +94,6 @@ export function PregameScreen() {
                       {player.present ? 'Present' : 'Away'}
                     </Text>
                   </View>
-                  {!player.you && (
-                    <UserContextActions
-                      username={player.name}
-                      isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
-                      room={`table${room.tableID}`}
-                    />
-                  )}
                   {((isOwner && !player.you) || (canTakeLeadership && player.you)) && (
                     <ActionButton
                       compact
@@ -109,6 +102,13 @@ export function PregameScreen() {
                         ? 'Transferring…'
                         : player.you ? 'Take leadership' : 'Make leader'}
                       onPress={() => lobbyRuntime.setTableLeader(player.name)}
+                    />
+                  )}
+                  {!player.you && (
+                    <UserContextActions
+                      username={player.name}
+                      isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
+                      room={`table${room.tableID}`}
                     />
                   )}
                 </View>
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   column: { flex: 1, gap: 16, minWidth: 0 },
   players: { gap: 8 },
   roleSwitch: { gap: 10 },
-  playerRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingTop: 9 },
+  playerRow: { borderTopWidth: 1, gap: 8, paddingTop: 9 },
   playerCopy: { flex: 1, gap: 2 },
   playerName: { fontSize: 15, fontWeight: '800' },
   playerState: { fontSize: 12, fontWeight: '700' },

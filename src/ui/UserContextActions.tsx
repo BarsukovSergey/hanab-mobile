@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { chatRuntime } from '../runtime/application';
@@ -8,15 +8,26 @@ type UserContextActionsProps = {
   username: string;
   isFriend: boolean;
   room?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: ReactNode;
 };
 
 export function UserContextActions({
   username,
   isFriend,
   room = 'lobby',
+  open,
+  onOpenChange,
+  children,
 }: UserContextActionsProps) {
-  const [composing, setComposing] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const composing = open ?? internalOpen;
+  const setComposing = (nextOpen: boolean) => {
+    setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
   const closeComposer = () => {
     setComposing(false);
     setMessage('');
@@ -34,6 +45,7 @@ export function UserContextActions({
           title={isFriend ? 'Unfriend' : 'Friend'}
           onPress={() => chatRuntime.setFriend(username, !isFriend, room)}
         />
+        {children}
       </View>
       {composing && (
         <View style={styles.composer}>
