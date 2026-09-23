@@ -1139,6 +1139,7 @@ function C17DenseWorkspace({
             />)}
           </View>}
           {selectedTarget !== null ? <ClueComposer
+            dense
             choices={clueChoices}
             variantName={variantName}
             enabled={clueEnabled}
