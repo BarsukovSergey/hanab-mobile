@@ -39,6 +39,9 @@ const DEFAULT_WORKBENCH_HEIGHT = 156;
 const HANDS_TOP_MARGIN = 5;
 const WORKBENCH_TOP_MARGIN = 5;
 const MIN_FULL_LEDGER_CARD_HEIGHT = 76;
+const MIN_DENSE_OWN_CARD_HEIGHT = 54;
+const MAX_DENSE_OWN_CARD_HEIGHT = 72;
+const MIN_DENSE_OPPONENT_CARD_HEIGHT = 46;
 const COMPACT_OPPONENT_SUMMARY_HEIGHT = 24;
 const COMPACT_OPPONENT_ROW_HEIGHT = 32;
 
@@ -112,6 +115,32 @@ export function getC17DenseLayout({
   const usesSideLabels = opponents <= 2;
   const opponentWidthFit = cardHeightForWidth(opponentCardLaneWidth, capacity, OPPONENT_CARD_GAP);
   const ownWidthFit = cardHeightForWidth(ownCardLaneWidth, capacity, OWN_CARD_GAP);
+  if (opponents >= 3) {
+    const protectedOwnHeight = Math.min(MAX_DENSE_OWN_CARD_HEIGHT, ownWidthFit);
+    let ownCardHeight = protectedOwnHeight;
+    let opponentCardHeight = maxDenseOpponentCardHeight(opponentWidthFit, ownCardHeight, handsRegionHeight, opponents);
+    while (opponentCardHeight < MIN_DENSE_OPPONENT_CARD_HEIGHT
+      && ownCardHeight > Math.min(MIN_DENSE_OWN_CARD_HEIGHT, protectedOwnHeight)) {
+      ownCardHeight -= 1;
+      opponentCardHeight = maxDenseOpponentCardHeight(opponentWidthFit, ownCardHeight, handsRegionHeight, opponents);
+    }
+    if (opponentCardHeight >= MIN_DENSE_OPPONENT_CARD_HEIGHT) {
+      const cardTopHeadroom = getCardTopHeadroom(ownCardHeight);
+      const opponentRowHeight = opponentCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+      const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+      const handsHeight = getDenseHandsHeight(ownCardHeight, opponentCardHeight, cardTopHeadroom, opponents);
+      return {
+        mode: 'full-ledger',
+        opponentCardHeight,
+        ownCardHeight,
+        cardTopHeadroom,
+        opponentRowHeight,
+        ownRowHeight,
+        handsHeight,
+        workbenchHeight,
+      };
+    }
+  }
   const widthFit = Math.max(1, Math.min(opponentWidthFit, ownWidthFit));
   const baseCardHeight = maxCardHeightThatFits(widthFit, handsRegionHeight, opponents);
   if (opponents <= 2 || baseCardHeight >= MIN_FULL_LEDGER_CARD_HEIGHT) {
@@ -148,6 +177,41 @@ export function getC17DenseLayout({
     handsHeight,
     workbenchHeight,
   };
+}
+
+function maxDenseOpponentCardHeight(
+  widthFit: number,
+  ownCardHeight: number,
+  handsRegionHeight: number,
+  opponents: number,
+): number {
+  const cardTopHeadroom = getCardTopHeadroom(ownCardHeight);
+  let low = 1;
+  let high = Math.min(widthFit, ownCardHeight);
+  let best = 0;
+  while (low <= high) {
+    const candidate = Math.floor((low + high) / 2);
+    if (getDenseHandsHeight(ownCardHeight, candidate, cardTopHeadroom, opponents) <= handsRegionHeight) {
+      best = candidate;
+      low = candidate + 1;
+    } else {
+      high = candidate - 1;
+    }
+  }
+  return best;
+}
+
+function getDenseHandsHeight(
+  ownCardHeight: number,
+  opponentCardHeight: number,
+  cardTopHeadroom: number,
+  opponents: number,
+): number {
+  const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  const opponentRowHeight = opponentCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  return ownRowHeight + opponents * opponentRowHeight
+    + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
+    + HAND_ROW_GAP;
 }
 
 export function getRelativeOpponentIndices(playerCount: number, ourPlayerIndex: number): readonly number[] {
