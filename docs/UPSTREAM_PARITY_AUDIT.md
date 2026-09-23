@@ -136,8 +136,9 @@ feature backlog:
 | Login using existing hanab.live account | **Full** | — | Critical | Uses platform-owned cookies, verifies `/test-cookie`, then requires realtime `welcome`. |
 | Session persistence across relaunch | **Full by platform session** | — | High | No app password persistence is needed. |
 | Logout | **Full** | — | High | Network/session teardown is explicit and conservative. |
-| Registration | **Missing** | S if external link; L if native | Low–Medium | Mobile is sign-in-only. |
-| Password reset | **Missing UI** | XS–S | Medium | Upstream exposes a web reset page; mobile has no entry point. |
+| Account creation | **Full semantics, unclear UX** | XS | Medium | Upstream has no separate register endpoint: an unknown username submitted to `/login` creates an account. Mobile uses the same endpoint, so creation works, but its screen says only “Use your hanab.live account” and does not explain this behavior or the unique-password warning. |
+| Change password | **Missing UI/protocol field** | S | Medium | Upstream login supports `newPassword`; mobile `submitLogin` does not expose/send it. |
+| Password reset | **Missing UI** | XS–S | Medium | Upstream exposes `/password-reset`; mobile has no entry point. |
 | First-time tutorial (`firstTimeUser`) | **Missing** | M | Low–Medium | Field is sent in `welcome` but intentionally dropped by mobile schema. |
 | Account mute state (`muted`) | **Missing UI** | XS–S | Low | Server remains authoritative and can reject chat; mobile does not pre-explain mute state. |
 | Server shutdown / maintenance metadata | **Missing UI** | S | Medium | `shuttingDown`, `datetimeShutdownInit`, `maintenanceMode` are dropped from `welcome`. |
@@ -152,6 +153,13 @@ feature backlog:
 | Distinct Shared replay lobby section | **Missing in current UI** | S | Medium–High | Current `isSpectateEligible` grouping folds shared replays into Running. |
 | Lobby chat | **Full basic** | — | Medium | Send/receive/history works. |
 | Discord-replicated lobby chat | **Partial** | XS | Low | Messages arrive, but mobile metadata does not visually distinguish Discord origin. |
+
+### Authentication protocol difference
+
+Mobile deliberately submits `version=bot` to `POST /login`, using the server's documented bot
+exception to bypass the browser client's exact bundle-version check. This is an architectural
+compatibility choice, not a missing feature. It should remain explicit because mobile app versioning
+cannot reasonably track the website's browser-bundle integer one-for-one.
 
 ## Recommendation
 
