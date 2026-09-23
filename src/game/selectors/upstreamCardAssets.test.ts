@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getUpstreamCardKey,
   getUpstreamCardSvg,
+  resolveUpstreamCardPresentationMode,
   UPSTREAM_CARD_ASSET_COMMIT,
 } from './upstreamCardAssets';
 
@@ -36,5 +37,33 @@ describe('upstream card assets', () => {
   it('fails closed for unknown variants and card keys', () => {
     expect(getUpstreamCardSvg('Definitely Not A Variant', 'card-Red-1')).toBeNull();
     expect(getUpstreamCardSvg('No Variant', 'not-a-card')).toBeNull();
+  });
+
+  it('resolves presentation preferences with colorblind precedence', () => {
+    expect(resolveUpstreamCardPresentationMode({ colorblindMode: false, styleNumbers: false })).toBe('default');
+    expect(resolveUpstreamCardPresentationMode({ colorblindMode: false, styleNumbers: true })).toBe('styled');
+    expect(resolveUpstreamCardPresentationMode({ colorblindMode: true, styleNumbers: false })).toBe('colorblind');
+    expect(resolveUpstreamCardPresentationMode({ colorblindMode: true, styleNumbers: true })).toBe('colorblind');
+  });
+
+  it('resolves the same card in every canonical presentation mode', () => {
+    const defaults = getUpstreamCardSvg('No Variant', 'card-Red-1');
+    const colorblind = getUpstreamCardSvg('No Variant', 'card-Red-1', 'colorblind');
+    const styled = getUpstreamCardSvg('No Variant', 'card-Red-1', 'styled');
+    expect(defaults).toContain('<svg');
+    expect(colorblind).toContain('<svg');
+    expect(styled).toContain('<svg');
+    expect(new Set([defaults, colorblind, styled]).size).toBeGreaterThan(1);
+  });
+
+  it('includes every canonical mode in the generated manifest', () => {
+    const generatedManifest = require('../../../assets/cards/upstream/manifest.json') as {
+      modes: Record<string, Record<string, readonly (readonly [number, number])[]>>;
+    };
+    expect(Object.keys(generatedManifest.modes).sort()).toEqual(['colorblind', 'default', 'styled']);
+  });
+
+  it('fails closed for unknown keys in an explicitly selected mode', () => {
+    expect(getUpstreamCardSvg('No Variant', 'not-a-card', 'styled')).toBeNull();
   });
 });

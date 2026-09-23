@@ -3,32 +3,45 @@ type CardAssetManifest = {
   renderer: {
     width: number;
     height: number;
-    colorblindMode: boolean;
-    styleNumbers: boolean;
     enableShadows: boolean;
   };
   cardKeys: readonly string[];
   assets: readonly string[];
-  variants: Readonly<Record<string, readonly (readonly [number, number])[]>>;
+  modes: Readonly<Record<UpstreamCardPresentationMode, Readonly<Record<string, readonly (readonly [number, number])[]>>>>;
 };
+
+export type UpstreamCardPresentationMode = 'default' | 'colorblind' | 'styled';
+
+export function resolveUpstreamCardPresentationMode(preferences: {
+  colorblindMode: boolean;
+  styleNumbers: boolean;
+}): UpstreamCardPresentationMode {
+  if (preferences.colorblindMode) return 'colorblind';
+  if (preferences.styleNumbers) return 'styled';
+  return 'default';
+}
 
 type SvgChunk = Readonly<Record<string, string>>;
 
 const manifest = require('../../../assets/cards/upstream/manifest.json') as CardAssetManifest;
 
 const cardKeyIndexes = new Map(manifest.cardKeys.map((key, index) => [key, index]));
-const variantAssetIndexes = new Map<string, ReadonlyMap<number, number>>();
+const variantAssetIndexes = new Map<UpstreamCardPresentationMode, Map<string, ReadonlyMap<number, number>>>();
 const loadedChunks = new Map<string, SvgChunk>();
 
 export const UPSTREAM_CARD_ASSET_COMMIT = manifest.upstreamCommit;
 export const UPSTREAM_CARD_WIDTH = manifest.renderer.width;
 export const UPSTREAM_CARD_HEIGHT = manifest.renderer.height;
 
-export function getUpstreamCardSvg(variantName: string, cardKey: string): string | null {
+export function getUpstreamCardSvg(
+  variantName: string,
+  cardKey: string,
+  mode: UpstreamCardPresentationMode = 'default',
+): string | null {
   const cardKeyIndex = cardKeyIndexes.get(cardKey);
   if (cardKeyIndex === undefined) return null;
 
-  const assetIndex = getVariantAssetIndexes(variantName).get(cardKeyIndex);
+  const assetIndex = getVariantAssetIndexes(variantName, mode).get(cardKeyIndex);
   if (assetIndex === undefined) return null;
 
   const hash = manifest.assets[assetIndex];
@@ -44,13 +57,18 @@ export function getUpstreamCardKey(suitName: string | null, rank: number | null)
   return `card-${resolvedSuit}-${rank}`;
 }
 
-function getVariantAssetIndexes(variantName: string): ReadonlyMap<number, number> {
-  const cached = variantAssetIndexes.get(variantName);
+function getVariantAssetIndexes(variantName: string, mode: UpstreamCardPresentationMode): ReadonlyMap<number, number> {
+  let modeIndexes = variantAssetIndexes.get(mode);
+  if (modeIndexes === undefined) {
+    modeIndexes = new Map();
+    variantAssetIndexes.set(mode, modeIndexes);
+  }
+  const cached = modeIndexes.get(variantName);
   if (cached !== undefined) return cached;
 
-  const pairs = manifest.variants[variantName] ?? [];
+  const pairs = manifest.modes[mode]?.[variantName] ?? [];
   const indexes = new Map<number, number>(pairs);
-  variantAssetIndexes.set(variantName, indexes);
+  modeIndexes.set(variantName, indexes);
   return indexes;
 }
 
