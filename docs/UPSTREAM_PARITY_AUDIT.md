@@ -1008,3 +1008,131 @@ When the next feature cycle begins, the most defensible order is:
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped
 upstream adaptation.
+
+---
+
+# 18. Exhaustive documented chat-command inventory
+
+This appendix maps every command documented in current upstream `docs/chat-commands.md`.
+"Works through fallback" means mobile does not need a dedicated protocol implementation: unknown
+slash commands are sent as ordinary authoritative chat text and the server handles them.
+
+| Documented command | Mobile status | Implementation path | Native UI / remaining gap | Effort if improved | Importance |
+| --- | --- | --- | --- | ---: | ---: |
+| `/help` | **Full through fallback** | server chat command | Server help text works; no dedicated Help surface. | S | Low |
+| `/bga` | **Full through fallback** | server simple response | Link arrives as safe text rather than rich browser markup. | XS–S | Low |
+| `/discord` | **Full through fallback** | server simple response | Same link-presentation limitation. | XS–S | Low |
+| `/doc` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/efficiency` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/manual` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/new` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/path` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/variants` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/github` | **Full through fallback** | server simple response | Same. | XS–S | Low |
+| `/playerinfo [username...]` | **Full command path** | direct `chatPlayerInfo` | Native player/profile UI missing. | M | Medium |
+| `/playerinfo` | **Full command path** | direct `chatPlayerInfo` | Same. | M | Medium |
+| `/random [min] [max]` | **Full through fallback** | server chat command | No need for native UI. | — | Low |
+| `/replay [game ID] [turn]` | **Full through fallback** | server chat command | Produces share text/link; mobile does not offer structured replay-link action. | S | Low–Medium |
+| `/rules` | **Full through fallback** | server simple response | Link is plain/sanitized text. | XS–S | Low |
+| `/shrug` | **Full through fallback** | server chat command | No gap worth native UI. | — | Low |
+| `/timeleft` | **Full through fallback** | server chat command | Proactive shutdown UI is separately missing. | S | Low |
+| `/uptime` | **Full through fallback** | server chat command | No native UI needed. | — | Low |
+| `/pm [username] [msg]` | **Full command path** | direct `chatPM` | Contextual PM action / recipient-bound composer is still missing. | S–M | Medium |
+| `/r [msg]` | **Partial** | input rewrite to `/pm` | Normal typed `/r ` works; direct paste/submit `/r hello` hits the incomplete local handler and fails. | XS | Low |
+| `/friend [username]` | **Full command path** | direct `chatFriend` | Contextual Friend button/list UI missing. | S–M | Medium |
+| `/friends` | **Full command path** | local list from authoritative friends state | Dedicated Friends/People surface missing. | M | Medium |
+| `/unfriend [username]` | **Full command path** | direct `chatUnfriend` | Contextual action missing. | S | Medium |
+| `/link [username]` | **Full command path** | direct `chatLink` | Native explanation/workflow missing. | M | Low–Medium |
+| `/linked` | **Full command path** | direct `chatLinked` | Native linked-account surface missing. | M | Low |
+| `/unlink [username]` | **Full command path** | direct `chatUnlink` | Native action missing. | S | Low |
+| `/tagsearch [tag]` | **Full raw command path** | direct `tagSearch` | Results are server chat text; no structured results/history UI. | M | Medium |
+| `/version` | **Full mobile-local** | local mobile package version | Correctly reports mobile version rather than browser bundle version. | — | Low |
+| `/impostor` | **Full through fallback** | pregame server command | Novelty/power-user command; native UI unnecessary. | — | Low |
+| `/kick [username]` | **Full through fallback** | pregame server command | Good native owner action candidate on player row. | S | Medium |
+| `/s` | **Full through fallback** | server auto-start | Native convenience optional. | S | Low–Medium |
+| `/s2` | **Full through fallback** | server auto-start | Same. | S | Low |
+| `/s3` | **Full through fallback** | server auto-start | Same. | S | Low |
+| `/s4` | **Full through fallback** | server auto-start | Same. | S | Low |
+| `/s5` | **Full through fallback** | server auto-start | Same. | S | Low |
+| `/s6` | **Full through fallback** | server auto-start | Same. | S | Low |
+| `/setvariant [variant]` | **Full for supported variants** | direct `tableSetVariant` | Deliberately refuses the 184 unsupported mechanic variants. | — | Medium |
+| `/startin [minutes]` | **Full through fallback** | server pregame command | Optional native timer control. | S | Low |
+| `/split [usernames...]` | **Full through fallback** | server pregame command | Native UI only useful for large community tables. | M | Low |
+| `/splitauto`, `/sa` | **Full through fallback** | server pregame command | Same. | M | Low |
+| `/findvariant` | **Full through fallback** | server command | Strong native Pregame convenience candidate. | S | Medium |
+| `/missing` | **Full through fallback** | server command | Strong native Pregame convenience candidate. | S | Medium |
+| `/setleader` | **Full + native UI** | direct `tableSetLeader` | Already first-class in Pregame/shared review. | — | Medium |
+| `/pause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Native UI already covers ordinary pause/queue behavior. | — | Medium |
+| `/unpause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Already covered. | — | Medium |
+| `/terminate` | **Full + native UI** | termination runtime | Already covered. | — | Medium |
+| `/tag [tag]` | **Full command path** | direct `tag` | First-class game/replay tags workflow missing. | S–M | Medium |
+| `/copy` | **Missing** | browser-local upstream command | Mobile fallback sends text to server, which cannot perform the browser-local copy/export behavior. Needs replay JSON/share implementation. | M | Medium |
+| `/suggest [turn]` | **Partial** | direct `tableSuggest` send | Receive-side `suggestion` event/UI is missing, so mobile review interoperability is incomplete. | S–M | Medium |
+| `/tagdelete [tag]` | **Full command path** | direct `tagDelete` | Structured tags UI missing. | S–M | Medium |
+| `/tags` | **Full through fallback** | server replay command | Returns text; structured tag list missing. | S–M | Medium |
+| `/tagsdeleteall` | **Full command path** | direct `tagsDeleteAll` | Structured confirmation/UI missing. | S | Medium |
+
+### Command aliases implemented beyond the documentation
+
+Mobile also recognizes several upstream/browser aliases so command compatibility is broader than the
+manual table alone:
+
+- PM: `/w`, `/whisper`, `/msg`, `/tell`, `/t`;
+- friends list: `/f`, `/friendlist`, `/friendslist`;
+- leader: `/setlead`, `/setowner`, `/changeleader`, `/changelead`,
+  `/changeowner`;
+- variant: `/sv`, `/changevariant`, `/cv`;
+- player info: `/p`, `/games`, `/stats`;
+- tag delete: `/untag`;
+- linked accounts: `/links`;
+- termination vote: `/vote`.
+
+The command audit therefore does **not** justify a project to port every slash command into native
+buttons. Most already work. Native controls should be limited to actions where structured context
+makes the mobile experience materially safer or easier.
+
+---
+
+# 19. Exhaustive public web/JSON endpoint inventory
+
+These endpoints are upstream product capabilities, but an HTTP page/API is not automatically a
+mobile feature requirement. The table separates the underlying user need from literal page parity.
+
+## Human-facing website endpoints
+
+| Upstream endpoint | Purpose | Mobile status / equivalent | Effort for native equivalent | Importance |
+| --- | --- | --- | ---: | ---: |
+| `/scores/[username]` | Player profile + best scores | **Missing native profile**; `/playerinfo` only gives a compact text response/link. | L | Medium |
+| `/history/[username]` | One player's games | **Own history Full basic; arbitrary user missing** | M–L | Medium |
+| `/history/[username1]/.../[username6]` | Shared history for selected players | **Missing** | L | Low–Medium |
+| `/missing-scores/[username]` | Non-max scores for one player | Command-level `/missing` exists for current group; no native arbitrary-user page. | M–L | Low–Medium |
+| `/shared-missing-scores/2/[username...]` | Shared missing scores for 2–6 users | Current-table `/missing` fallback covers the common live need; page parity missing. | L | Low |
+| `/tags/[username]` | Player's tagged games | **Missing native tags/history surface** | M–L | Low–Medium |
+| `/seed/[seed]` | Games on the same deal | **Missing native Other Scores**; dedicated WS command exists. | M | Medium |
+| `/stats` | Site-wide statistics | External/web-only today | L | Low |
+| `/variant/[id]` | Variant statistics | External/web-only today | L | Low |
+| `/tag/[tag]` | Games matching a tag | Raw `/tagsearch` exists; structured native results missing. | M | Medium |
+
+For mobile, the best use of these capabilities is usually a native contextual subset (profile,
+history, seed comparison, tags), with an external-browser link for the long-tail statistics pages.
+
+## JSON/API endpoints
+
+| Upstream endpoint | Purpose | Mobile status / relevance | Effort | Importance |
+| --- | --- | --- | ---: | ---: |
+| `/export/[game ID]` | Full game JSON export | **Not used**; relevant to future `/copy`/research export. | M | Medium |
+| `/api/v1/variants` | Variant IDs/list | Not used; mobile vendors pinned variant data deliberately. | — | Low |
+| `/api/v1/variants-full` | Full variant metadata | Not used; pinned vendored closure is architecturally preferred for gameplay. | — | Low |
+| `/api/v1/variants/[variant ID]` | Paginated games for variant | Not used; analytics/research only. | M–L | Low |
+| `/api/v1/history/[username...]` | Paginated player/shared history | Not used; native history currently uses authenticated WS commands. | M | Low–Medium |
+| `/api/v1/history-full/[username...]` | Complete player/shared history | Not used; potentially expensive and not needed for core mobile UX. | M–L | Low |
+| `/api/v1/seed/[seed]` | Paginated games on seed | Not used; `historyGetSeed` is the better authenticated in-app path. | — | Low |
+| `/api/v1/seed-full/[seed]` | All games on seed | Not used; research/export use only. | M | Low |
+
+### Endpoint architecture rule
+
+Do not replace the current server-authoritative WebSocket/game-core architecture with ad-hoc REST
+fetches merely because a public JSON endpoint exists. Use the existing authenticated WS command when
+it already represents the in-app product flow; reserve public JSON endpoints for external/research
+work or when upstream has no equivalent realtime command.
+
