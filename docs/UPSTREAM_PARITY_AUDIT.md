@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- `main`: `20b61e05e4a89945e8370eb04cd4bdf5d6773921`
+- runtime/code snapshot: `92425ba087e9e625ce428d3551b5bd00142a86b7` (PR #41 merge; this audit update is docs-only)
 - distributed beta.1 runtime remains frozen at
   `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -89,16 +89,15 @@ already present:
 - most browser-local slash-command transport;
 - a very large portion of the upstream variant catalog.
 
-The biggest parity gaps are concentrated in five areas:
+The biggest remaining parity gaps are concentrated in five areas:
 
-1. **Dense 4P–6P presentation**, not the underlying game state.
-2. **Product shell / people / history power features**: profiles, friends discovery, seed comparison,
-   tags UI, shared replay creation, user list, pregame player stats.
-3. **Per-user upstream settings**: colorblind/style-number/reverse-hand/sounds/etc. are mostly ignored.
-4. **Power-user replay/review features**: arrows, Hypothetical morph UI, arbitrary JSON replay,
-   `/copy`, full clue-log navigation.
-5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and
-   detrimental-character tables.
+1. **Spectator perspective and contextual people actions**: shadowing is wire-supported but has no selector; online users/profile/PM/friend actions remain thin or missing.
+2. **Per-user accessibility/presentation settings**: colorblind mode, styled numbers, reverse-hand and sounds are mostly ignored.
+3. **History / product-shell power features**: seed comparison, tags UI, shared replay creation, pregame player stats and bot invite workflows.
+4. **Power-user replay/review features**: arrows, Hypothetical morph UI, arbitrary JSON replay, `/copy`, full clue-log navigation.
+5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
+
+Since the original audit snapshot, the lobby section restructure (#32) and the adaptive real-card 4P–6P portrait repair (#37–#41) have landed. The latter is physically validated on the tested Android portrait class for 5P, true 6P and 6P + One Extra Card; broader device/serious-play validation remains separate.
 
 The protocol surface is already broad:
 
@@ -118,10 +117,8 @@ with general feature backlog. All three have since been resolved:
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
-| 4P–6P dense real-card layout | Partial | L | High | Core state works, but ordinary 4P–6P falls into the temporary Compact Overview path. |
 | Spectator shadowing / player perspective | Wire-only | S–M | High | The protocol already carries `shadowingPlayerIndex`; mobile always requests `-1` and exposes no perspective selector. |
 | Colorblind + styled-number card presentation | Missing | S–M | High | Accessibility/presentation value; assets/tooling already understand upstream card variants. |
-| Lobby sections/create placement | Partial | M | High | Research contract exists; current runtime UI still uses the older grouping. |
 | Add several bots during Create/Pregame | Missing | M | Medium–High | Existing PM join semantics are sufficient; registry must use verified per-bot capabilities because not every reference/community bot supports protected-table joins. |
 | Online users / contextual player actions | Missing UI | M | Medium–High | User data is already stored; currently invisible. Unlocks PM/profile/friend/shadowing discovery. |
 | Pregame player stats | Missing UI | S–M | Medium | Server already sends stats; mobile schema currently discards them. |
@@ -154,9 +151,9 @@ with general feature backlog. All three have since been resolved:
 | User list rendering | **Missing** | M | Medium–High | No People/online-users surface exists yet. |
 | Friend-aware lobby sorting | **Missing** | S–M | Medium | Friends are stored but table/user ordering does not prioritize them. |
 | Friend visual highlighting | **Missing** | S | Medium | No user list; names are not styled as friends. |
-| Current lobby restructure | **Partial** | M | High | Research contract exists for Pregame → Create → Running → Shared replay, but runtime UI is still old layout. |
-| Hide Create while own game is reattendable | **Missing in current UI** | S | High | Contract exists; current LobbyScreen always renders Create. |
-| Distinct Shared replay lobby section | **Missing in current UI** | S | Medium–High | Current `isSpectateEligible` grouping folds shared replays into Running. |
+| Current lobby restructure | **Full** | — | High | PR #32 implements Your running game → Pregame → Create → Running → Shared replays, without duplicating the own reattendable game. |
+| Hide Create while own game is reattendable | **Full** | — | High | PR #32 hides Create while the user has a reattendable own running game. |
+| Distinct Shared replay lobby section | **Full** | — | Medium–High | PR #32 renders shared replays separately from ordinary Running tables. |
 | Lobby chat | **Full basic** | — | Medium | Send/receive/history works. |
 | Discord-replicated lobby chat | **Partial** | XS | Low | Messages arrive, but mobile metadata does not visually distinguish Discord origin. |
 
@@ -279,14 +276,22 @@ visual-HUD hierarchy remains a separate polish backlog item.
 
 ## 4P–6P
 
-The rules/state path supports 2–6 players, but the current C17 dense allocator is not accepted
-product UX for ordinary 4P–6P. The current `Compact Overview` summary-card fallback remains temporary.
+The rules/state path supports 2–6 players, and the current C17 portrait allocator now uses adaptive
+real-card rows for ordinary 4P–6P. The own hand is protected, opponent card faces may compress to the
+accepted 46 dp floor, dense side-label rows/chrome reclaim vertical space, and `Compact Overview`
+remains an emergency fallback only when geometry cannot meet the real-card floor.
 
-**Status:** Partial
-**Effort:** L
+Physical Android validation on 2026-09-23 covers 5P, ordinary true 6P, and 6P + One Extra Card with
+the authoritative four-card hand capacity. The dense clue composer also fits without scrolling and
+the lower workspace respects the Android navigation safe area. This does not retroactively expand
+the frozen beta.1 gate or claim full device-matrix/serious-play validation.
+
+**Status:** Full for the current portrait layout path
+**Effort:** — (resolved in #37–#41)
 **Importance:** High
 
-The dedicated diagnosis is in `docs/4P_6P_LAYOUT_RESEARCH.md`.
+The dedicated diagnosis and historical failure modes remain in `docs/4P_6P_LAYOUT_RESEARCH.md`; current
+physical evidence is recorded in `docs/C17_EVIDENCE.md` and `docs/C17_VALIDATION.md`.
 
 ---
 
@@ -327,7 +332,7 @@ is no current variant-list drift.
 | Card Cycling | **Full** | — | Medium | Exposed at create/update and handled by upstream reducer. |
 | Bottom-Deck Blind-Play (`deckPlays`) | **Unsupported** | L | Low–Medium | Requires deck action UI/eligibility and validation. |
 | Empty Clues | **Full** | — | Medium | Explicitly validated. |
-| One Extra Card | **Full core** | — | Medium | Dense layouts may amplify 4P–6P problems. |
+| One Extra Card | **Full core + current dense validation** | — | Medium | Current 6P portrait path is physically validated with the authoritative four-card hand capacity on the tested Android class. |
 | One Less Card | **Full** | — | Medium | Supported in create/update. |
 | All or Nothing | **Full core** | — | Medium | End conditions represented. |
 | Detrimental Characters | **Unsupported** | XL | Low–Medium | Broad rule/UI restrictions; explicitly rejected. |
@@ -940,45 +945,40 @@ Recommended scoped actions:
 
 # 16. Recommended priority by value versus effort
 
-## A. Correctness/drift fixes — do before broad parity work
+## A. Correctness/drift status
 
-1. **Handle unsolicited pregame spectator `left` / deleted table**
-   - effort: XS–S
-   - importance: High
-   - reason: real current-server lifecycle mismatch.
+The three concrete semantic/interoperability defects identified by this audit are now resolved:
 
-2. **Replay scrubber issue #4**
-   - effort: M after physical profiling
-   - importance: Medium
-   - reason: existing known defect; likely temporal-index recomputation.
+- pregame spectator cleanup drift — #26;
+- shared-replay efficiency modifier synchronization — #29;
+- Pace/FRE/MRE presentation context — #30.
 
-These should remain separate from tester feedback hotfixes unless a tester hits them in the supported
-beta scope.
+No unresolved high-priority current-server drift item remains from this audit. Keep replay scrubber
+jank (#4) and the direct `/r` submission edge case (#31) as non-blocking defect backlog unless real
+usage reprioritizes them.
 
 ## B. High-value, relatively low-risk post-feedback work
 
-1. Lobby restructure already specified in `LOBBY_SECTIONS_RESEARCH.md`.
-2. Spectator shadowing/perspective selector.
-3. Colorblind mode + styled-number presentation.
+1. Spectator shadowing/perspective selector.
+2. Colorblind mode + styled-number presentation.
+3. People / contextual PM, player-info and friend-unfriend actions.
 4. Pregame stats preservation/display.
-5. Expose seed/tags/same-seed count already present in history payload.
-6. Native contextual PM / player info / friend-unfriend.
-7. Multi-bot create/pregame picker.
-8. Shared-replay Suggest-current-turn button.
-9. Direct `/r` edge-case cleanup.
+5. Multi-bot create/pregame picker.
+6. Expose seed/tags/same-seed count already present in history payload.
+7. Shared-replay Suggest-current-turn button.
+8. Direct `/r` edge-case cleanup when convenient.
 
 ## C. Medium product slices
 
-1. 4P–6P dense real-card repair (**high importance but larger effort**).
-2. Other Scores / seed comparison.
-3. Friends history.
-4. Game/replay tags workflow.
-5. Shared replay creation from history.
-6. Arbitrary JSON replay import.
-7. `/copy` export/share.
-8. Hypothetical morph picker.
-9. Full user/profile surface.
-10. Chat unread/read/typing.
+1. Other Scores / seed comparison.
+2. Friends history.
+3. Game/replay tags workflow.
+4. Shared replay creation from history.
+5. Arbitrary JSON replay import.
+6. `/copy` export/share.
+7. Hypothetical morph picker.
+8. Broader user/profile surface.
+9. Chat unread/read/typing.
 
 ## D. Defer until demanded
 
@@ -992,8 +992,8 @@ beta scope.
 8. Rich sound parity.
 9. Native copies of every statistics website page.
 
-These are substantially worse value-per-risk than the product-shell, accessibility, spectator,
-history and 4P–6P work above.
+These are substantially worse value-per-risk than the product-shell, accessibility, spectator and
+history work above.
 
 ---
 
@@ -1006,6 +1006,8 @@ A useful way to describe current parity is:
 - authentication/session lifecycle;
 - ordinary supported table lifecycle;
 - 2P/3P core gameplay;
+- adaptive 4P–6P real-card portrait presentation on the currently tested Android class (broader serious-play/device validation remains separate);
+- current lobby section organization and own-game/Create placement;
 - clues/knowledge/pips/card presentation;
 - notes semantics;
 - empathy;
@@ -1020,7 +1022,6 @@ A useful way to describe current parity is:
 
 ### Functionally present but product-incomplete
 
-- 4P–6P;
 - spectators;
 - notes workflow;
 - replay navigation;
@@ -1030,7 +1031,6 @@ A useful way to describe current parity is:
 - tags;
 - slash-command discoverability;
 - H-group presentation;
-- lobby organization.
 
 ### Intentionally unsupported
 
@@ -1062,16 +1062,14 @@ Wait for the current beta.1 feedback window before merging large runtime changes
 When the next feature cycle begins, the most defensible order is:
 
 1. fix any tester-confirmed beta defects;
-2. land the two small current-upstream drift fixes;
-3. 4P–6P dense real-card repair;
-4. Lobby restructure;
-5. bot multi-select + contextual player actions;
-6. colorblind/style-number accessibility;
-7. spectator shadowing;
-8. history/seed/tags improvements;
-9. replay power features and JSON/`copy`;
-10. broader profiles/social/settings;
-11. only then consider expensive exotic rules/options.
+2. spectator shadowing/perspective;
+3. colorblind/style-number accessibility;
+4. People/contextual player actions plus compact pregame stats;
+5. multi-bot create/pregame picker;
+6. history/seed/tags improvements;
+7. replay power features, shared-replay creation and JSON/`copy`;
+8. broader profiles/social/settings;
+9. only then consider expensive exotic rules/options.
 
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped
