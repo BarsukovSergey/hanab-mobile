@@ -437,11 +437,12 @@ mobile-only server preference storage.
 | H-Group feature from upstream docs | Mobile status | Effort | Importance |
 | --- | --- | ---: | ---: |
 | H indicator in online user list | Missing because People UI missing | S after People | Low |
-| DDA card indication | **Full** | — | Medium |
-| Empathy-based DDA question-mark semantics | **Mostly Full** | — | Medium |
-| Locked-hand notification | Missing | S–M | Medium |
-| Low Score Phase score treatment | Missing | S | Low–Medium |
-| Discard-clued / DDA / order-chop-move sounds | Missing | M | Low |
+| DDA card indication | **Full card-level semantics** | — | Medium |
+| Empathy-based DDA card semantics | **Full card-level semantics** | — | Medium |
+| Global double-discard situation warning | **Missing UI** | S | Medium | Upstream also marks the discard-pile/current-player area while DDA is active; mobile only renders affected-card markers. |
+| Locked-hand notification | **Missing UI** | S–M | Medium |
+| Low Score Phase score treatment | **Missing UI** | S | Low–Medium |
+| Discard-clued / DDA / order-chop-move sounds | **Missing** | M | Low |
 | Hyphenated-convention-dependent card behavior | **Full effective state, no toggle** | S | Medium |
 
 ---
@@ -844,7 +845,7 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Real-Life Mode | **Missing** | Niche presentation option. |
 | Reverse Hand Direction | **Missing** | Genuine per-user preference; medium value. |
 | Pre-Playing | **Missing** | Deliberately low priority because speculative/premove actions raise mobile action-safety complexity. |
-| H-Group Conventions | **Partial** | Effective H-group state, DDA/empathy semantics exist; locked-hand/low-score presentation and settings toggle are incomplete. |
+| H-Group Conventions | **Partial** | Effective H-group state and card-level DDA/empathy semantics exist; the global DDA situation warning, locked-hand/low-score presentation, sounds and settings toggle are incomplete. |
 | Notes — Basic Description | **Full core** | Authoritative notes, card-order identity, replay persistence and spectator combined-note data are supported. |
 | Notes — Card Identity Notes | **Full parser/presentation semantics** | Exact-identity notes and falsification behavior come from upstream semantics. |
 | Notes — Card Partial Identity Notes | **Full parser semantics** | Possibility and exclusion syntax is supported. |
