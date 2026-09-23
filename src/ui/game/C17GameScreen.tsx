@@ -220,9 +220,10 @@ export function C17GameScreen() {
     ? null
     : ['Playing card', 'Discarding card', 'Giving color clue', 'Giving rank clue'][pending.type];
 
-  const inspectNote = (order: number, disarmSelectedCard = true) => {
+  const inspectNote = (order: number) => {
     setNote(clientState.notes.ourNotes[order]?.text ?? '');
-    if (disarmSelectedCard) interactionDispatch({ type: 'disarm-gameplay' });
+    const outsideActionHand = !actionHand.some((actionOrder) => actionOrder === order);
+    if (outsideActionHand) interactionDispatch({ type: 'disarm-gameplay' });
     interactionDispatch({ type: 'open-note', order });
   };
   const editNote = (order: number) => {
@@ -462,7 +463,7 @@ export function C17GameScreen() {
         if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {
           interactionDispatch({ type: 'select-card', order });
         }
-        inspectNote(order, false);
+        inspectNote(order);
       }}
       onSelectClueTarget={(playerIndex) => interactionDispatch({ type: 'select-clue-target', playerIndex })}
       onSelectRecentAction={jumpToAction}

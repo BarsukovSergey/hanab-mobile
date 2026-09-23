@@ -65,36 +65,49 @@ describe('C17 hypothetical seating and action-hand separation', () => {
     expect(actorZero.clueTargetIndices).toEqual([1, 2]);
   });
 
-  test('inspecting outside the action hand disarms the prior card and keeps the note open', () => {
+  test('inspecting or editing a foreign card disarms the prior card and keeps its note open', () => {
     const actionHand: readonly number[] = hands[0];
     const actionableOrder = actionHand[0]!;
+    const foreignOrder = hands[1][0]!;
     const selectedA = gameplayInteractionReducer(initialGameplayInteractionState, {
       type: 'select-card', order: actionableOrder,
     });
-    const disarmed = gameplayInteractionReducer(selectedA, { type: 'disarm-gameplay' });
-    const inspected = gameplayInteractionReducer(disarmed, { type: 'open-note', order: hands[1][0] });
+    const inspectForeign = gameplayInteractionReducer(
+      gameplayInteractionReducer(selectedA, { type: 'disarm-gameplay' }),
+      { type: 'open-note', order: foreignOrder },
+    );
+    const editForeign = gameplayInteractionReducer(
+      gameplayInteractionReducer(selectedA, { type: 'disarm-gameplay' }),
+      { type: 'open-note', order: foreignOrder },
+    );
 
-    expect(inspected.selectedCard).toBeNull();
-    expect(inspected.noteCard).toBe(hands[1][0]);
-    expect(inspected.selectedCard !== null && actionHand.includes(inspected.selectedCard)).toBe(false);
+    expect(inspectForeign.selectedCard).toBeNull();
+    expect(inspectForeign.noteCard).toBe(foreignOrder);
+    expect(editForeign.selectedCard).toBeNull();
+    expect(editForeign.noteCard).toBe(foreignOrder);
 
     const screen = readC17Screen();
-    expect(screen).toContain('const inspectNote = (order: number, disarmSelectedCard = true)');
-    expect(screen).toContain('if (disarmSelectedCard) interactionDispatch({ type: \'disarm-gameplay\' });');
+    expect(screen).toContain('const outsideActionHand = !actionHand.some((actionOrder) => actionOrder === order);');
+    expect(screen).toContain('if (outsideActionHand) interactionDispatch({ type: \'disarm-gameplay\' });');
     expect(screen).toContain('onInspectNote={inspectNote}');
+    expect(screen).toContain('const editNote = (order: number) => {');
+    expect(screen).toContain('inspectNote(order);');
   });
 
-  test('actionable card selection remains selected while opening its note', () => {
+  test('actionable card selection remains selected when tapped or edited', () => {
     const actionHand: readonly number[] = hands[0];
     const actionableOrder = actionHand[0]!;
     const selected = gameplayInteractionReducer(initialGameplayInteractionState, {
       type: 'select-card', order: actionableOrder,
     });
-    const inspected = gameplayInteractionReducer(selected, { type: 'open-note', order: actionableOrder });
+    const tapped = gameplayInteractionReducer(selected, { type: 'open-note', order: actionableOrder });
+    const edited = gameplayInteractionReducer(selected, { type: 'open-note', order: actionableOrder });
 
-    expect(inspected.selectedCard).toBe(actionableOrder);
-    expect(actionHand.includes(inspected.selectedCard!)).toBe(true);
-    expect(readC17Screen()).toContain('inspectNote(order, false)');
+    expect(tapped.selectedCard).toBe(actionableOrder);
+    expect(edited.selectedCard).toBe(actionableOrder);
+    expect(actionHand.includes(edited.selectedCard!)).toBe(true);
+    expect(readC17Screen()).toContain('onSelectCard={(order) => {');
+    expect(readC17Screen()).toContain('inspectNote(order);');
   });
 
   test('wires stable seating separately from hypothetical action semantics', () => {
