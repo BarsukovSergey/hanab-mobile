@@ -75,6 +75,9 @@ export const lobbySlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.notice = action.payload.notice;
     },
+    noticeDismissed(state) {
+      state.notice = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(sessionActions.connectionStarted, (state, action) => {
