@@ -2797,6 +2797,28 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.pendingLeaveTableID).toBeNull();
   });
 
+  test('authoritative left removes a pregame spectator without sending leave', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'pregame',
+      tableID: 123,
+      role: 'spectator',
+    });
+    const sentBeforeLeft = [...socket.sent];
+
+    socket.emitMessage('left {"TableID":123}');
+
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(socket.sent).toEqual(sentBeforeLeft);
+    expect(socket.sent).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+  });
+
   test('new epoch clears pending and staged C4-B state; stale events cannot restore it', async () => {
     const session = new FakeSession();
     const first = new FakeSocket();
