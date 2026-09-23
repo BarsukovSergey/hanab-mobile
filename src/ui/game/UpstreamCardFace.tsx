@@ -1,8 +1,9 @@
 import { memo } from 'react';
 import { Path, Svg, SvgAst, parse, type JsxAST } from 'react-native-svg';
 
-import { getUpstreamCardKey, getUpstreamCardSvg, UPSTREAM_CARD_HEIGHT, UPSTREAM_CARD_WIDTH } from '../../game/selectors/upstreamCardAssets';
+import { getUpstreamCardKey, getUpstreamCardSvg, resolveUpstreamCardPresentationMode, UPSTREAM_CARD_HEIGHT, UPSTREAM_CARD_WIDTH } from '../../game/selectors/upstreamCardAssets';
 import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
+import { useAppSelector } from '../../store/hooks';
 
 type UpstreamCardFaceProps = {
   rank: number | null;
@@ -16,10 +17,12 @@ const parsedCardCache = new Map<string, JsxAST | null>();
 const CARD_AST_OVERRIDE = { height: '100%', width: '100%' } as const;
 
 export const UpstreamCardFace = memo(function UpstreamCardFace({ rank, suitIndex, variantName }: UpstreamCardFaceProps) {
+  const presentation = useAppSelector((state) => state.session.cardPresentationSettings);
   const suits = getCardSuitVisuals(variantName);
   const suitName = suitIndex === null ? null : suits[suitIndex]?.name ?? null;
   const cardKey = getUpstreamCardKey(suitName, rank);
-  const svg = getUpstreamCardSvg(variantName, cardKey);
+  const mode = resolveUpstreamCardPresentationMode(presentation);
+  const svg = getUpstreamCardSvg(variantName, cardKey, mode);
   if (svg === null) return <MissingUpstreamCard />;
 
   if (parsedCardCache.has(svg)) {

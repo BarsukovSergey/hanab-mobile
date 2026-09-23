@@ -31,6 +31,7 @@ import {
 } from '../protocol/gameProtocol';
 import {
   decodeServerFrame,
+  encodeCardPresentationSettingFrame,
   encodeChatFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
@@ -54,6 +55,7 @@ import {
   encodeTableUpdateFrame,
   encodeTableUnattendFrame,
   type LobbyTable,
+  type CardPresentationSettingName,
   type MobileTableOptions,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
@@ -268,6 +270,19 @@ export class LobbyRuntime {
       return false;
     }
     return this.sendEncoded(frame);
+  }
+
+  setCardPresentationSetting(
+    name: CardPresentationSettingName,
+    enabled: boolean,
+  ): boolean {
+    const state = this.store.getState();
+    if (state.session.phase !== 'ready') return false;
+    if (state.session.cardPresentationSettings[name] === enabled) return true;
+
+    if (!this.sendEncoded(encodeCardPresentationSettingFrame(name, enabled))) return false;
+    this.store.dispatch(sessionActions.cardPresentationSettingUpdated({ name, enabled }));
+    return true;
   }
 
   loadMoreHistory(): boolean {

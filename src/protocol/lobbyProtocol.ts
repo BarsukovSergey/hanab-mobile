@@ -333,6 +333,26 @@ export const lobbyTableSchema = z.object({
 
 export type LobbyTable = z.infer<typeof lobbyTableSchema>;
 
+export const cardPresentationSettingNameSchema = z.enum([
+  'colorblindMode',
+  'styleNumbers',
+]);
+
+export type CardPresentationSettingName = z.infer<typeof cardPresentationSettingNameSchema>;
+
+const cardPresentationSettingsSchema = z.object({
+  colorblindMode: z.boolean().default(false),
+  styleNumbers: z.boolean().default(false),
+}).passthrough().default({
+  colorblindMode: false,
+  styleNumbers: false,
+});
+
+const cardPresentationSettingCommandSchema = z.object({
+  name: cardPresentationSettingNameSchema,
+  setting: z.enum(['true', 'false']),
+}).strict();
+
 export const welcomeSchema = z.object({
   userID: idSchema,
   username: z.string().min(1),
@@ -341,9 +361,12 @@ export const welcomeSchema = z.object({
   friends: z.array(z.string().min(1)).optional(),
   disconSpectatingTable: idSchema.optional(),
   disconShadowingSeat: z.number().int().optional(),
+  settings: cardPresentationSettingsSchema,
 });
 
-export type Welcome = z.infer<typeof welcomeSchema>;
+// Input typing keeps hand-authored fixtures compatible with the optional-on-wire settings field;
+// successful decoding always applies the schema defaults.
+export type Welcome = z.input<typeof welcomeSchema>;
 
 export const historyGetCommandSchema = z.object({
   offset: z.number().int().nonnegative(),
@@ -481,6 +504,17 @@ export function decodeServerFrame(frame: string): DecodeResult {
 
 export function encodeClientFrame(command: string, payload?: unknown): string {
   return payload === undefined ? command : `${command} ${JSON.stringify(payload)}`;
+}
+
+export function encodeCardPresentationSettingFrame(
+  name: CardPresentationSettingName,
+  enabled: boolean,
+): string {
+  const payload = cardPresentationSettingCommandSchema.parse({
+    name,
+    setting: enabled ? 'true' : 'false',
+  });
+  return encodeClientFrame('setting', payload);
 }
 
 export function encodeTableSpectateFrame(

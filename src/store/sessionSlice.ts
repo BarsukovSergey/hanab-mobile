@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { Welcome } from '../protocol/lobbyProtocol';
+import type { CardPresentationSettingName, Welcome } from '../protocol/lobbyProtocol';
 
 export type ConnectionPhase =
   | 'idle'
@@ -13,6 +13,11 @@ export type ConnectionPhase =
 export type AuthenticatedUser = {
   userID: number;
   username: string;
+};
+
+export type CardPresentationSettings = {
+  colorblindMode: boolean;
+  styleNumbers: boolean;
 };
 
 export type ResumeHints = Pick<
@@ -49,6 +54,7 @@ export type SessionState = {
   connectionEpoch: number;
   phase: ConnectionPhase;
   authenticatedUser: AuthenticatedUser | null;
+  cardPresentationSettings: CardPresentationSettings;
   friends: string[];
   resumeHints: ResumeHints | null;
   error: string | null;
@@ -68,6 +74,10 @@ const initialState: SessionState = {
   connectionEpoch: 0,
   phase: 'idle',
   authenticatedUser: null,
+  cardPresentationSettings: {
+    colorblindMode: false,
+    styleNumbers: false,
+  },
   friends: [],
   resumeHints: null,
   error: null,
@@ -111,6 +121,10 @@ export const sessionSlice = createSlice({
         userID: welcome.userID,
         username: welcome.username,
       };
+      state.cardPresentationSettings = {
+        colorblindMode: welcome.settings?.colorblindMode ?? false,
+        styleNumbers: welcome.settings?.styleNumbers ?? false,
+      };
       state.friends = [...(welcome.friends ?? [])];
       state.resumeHints = {
         playingAtTables: welcome.playingAtTables,
@@ -118,6 +132,12 @@ export const sessionSlice = createSlice({
         disconShadowingSeat: welcome.disconShadowingSeat,
       };
       state.error = null;
+    },
+    cardPresentationSettingUpdated(
+      state,
+      action: PayloadAction<{ name: CardPresentationSettingName; enabled: boolean }>,
+    ) {
+      state.cardPresentationSettings[action.payload.name] = action.payload.enabled;
     },
     friendsReceived(state, action: PayloadAction<{ epoch: number; friends: string[] }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;

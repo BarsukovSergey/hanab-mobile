@@ -17,3 +17,15 @@ test('the Settings screen used by App owns the dev-only gameplay scenario entry'
   expect(settings).toContain('__DEV__');
   expect(fs.existsSync(path.join(root, 'src', 'ui', 'secondary', 'SettingsScreen.tsx'))).toBe(false);
 });
+
+test('card appearance toggles use Redux values and the typed lobby runtime setter', () => {
+  const settings = read('src/ui/screens/SettingsScreen.tsx');
+
+  expect(settings).toContain('state.session.cardPresentationSettings');
+  expect(settings).toContain("lobbyRuntime.setCardPresentationSetting('colorblindMode', enabled)");
+  expect(settings).toContain("lobbyRuntime.setCardPresentationSetting('styleNumbers', enabled)");
+  expect(settings).toContain('value={presentation.colorblindMode}');
+  expect(settings).toContain('value={presentation.styleNumbers}');
+  expect(settings).toContain('accessibilityRole="switch"');
+  expect(settings).not.toContain('disabled={presentation.colorblindMode}');
+});
