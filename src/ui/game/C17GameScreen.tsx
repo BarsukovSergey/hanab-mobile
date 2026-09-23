@@ -23,7 +23,7 @@ import {
   canDiscardForVariant,
   getDisplayedClueTokens,
   getDisplayedClockString,
-  getDisplayedLiveFutureEfficiency,
+  getGameplayPresentation,
   getGameplayCardsPerHand,
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
@@ -35,6 +35,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { ActionButton, Notice, useHanabTheme } from '../designSystem';
 import { C17RewindScrubber } from './C17RewindScrubber';
+import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
 import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
@@ -270,7 +271,17 @@ export function C17GameScreen() {
     if (sent) interactionDispatch({ type: 'select-clue-target', playerIndex: null });
   };
 
-  const futureEfficiency = getDisplayedLiveFutureEfficiency(game, clientState.notes.efficiencyModifier);
+  const gameplayPresentation = getGameplayPresentation(
+    game,
+    metadata.options,
+    metadata.minEfficiency,
+    clientState.notes.efficiencyModifier,
+    {
+      finished: clientState.finished,
+      viewingOngoingGame: game === clientState.ongoingGame,
+      sharedReplayUseSharedSegments: clientState.replay.shared?.useSharedSegments === true,
+    },
+  );
   const liveTemporal = getC17TemporalContext({
     states: replay.states,
     selectedSegment: latest,
@@ -393,7 +404,7 @@ export function C17GameScreen() {
       cluePreview={cluePreview}
       cluePreviewState={interaction.cluePreview}
       empathyPlayer={interaction.empathyPlayer}
-      futureEfficiency={futureEfficiency}
+      gameplayPresentation={gameplayPresentation}
       game={game}
       hypothetical={hypothetical}
       hypotheticalActor={hypotheticalActor}
@@ -520,7 +531,7 @@ function C17DenseWorkspace({
   cluePreviewState,
   clockPaused,
   empathyPlayer,
-  futureEfficiency,
+  gameplayPresentation,
   game,
   hypothetical,
   hypotheticalActor,
@@ -605,7 +616,7 @@ function C17DenseWorkspace({
   cluePreviewState: { type: 'color' | 'rank'; value: number } | null;
   clockPaused: boolean;
   empathyPlayer: number | null;
-  futureEfficiency: number | null;
+  gameplayPresentation: ReturnType<typeof getGameplayPresentation>;
   game: GameState;
   hypothetical: HypotheticalState | null;
   hypotheticalActor: number | null;
@@ -674,6 +685,7 @@ function C17DenseWorkspace({
   const { theme } = useHanabTheme();
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
+  const [efficiencyDetailsOpen, setEfficiencyDetailsOpen] = useState(false);
   const committedClue = getLastCluePresentationFromState(game);
   const opponents = getC17HandRows(metadata.playerNames.length, seatingAnchorIndex, actionHandIndex).opponentIndices;
   const usesSideLabels = opponents.length <= 2;
@@ -797,8 +809,13 @@ function C17DenseWorkspace({
         <HudStat label="Clues" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(getDisplayedClueTokens(liveBefore.clueTokens, variantName), getDisplayedClueTokens(game.clueTokens, variantName))} value={getDisplayedClueTokens(game.clueTokens, variantName)} />
         <HudStat label="Strikes" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.strikes.length, game.strikes.length)} value={game.strikes.length} />
         <HudStat label="Deck" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)} value={game.cardsRemainingInTheDeck} />
-        {game.stats.pace !== null && <HudStat label="Pace" value={game.stats.pace} />}
-        {futureEfficiency !== null && <HudStat label="FRE" value={futureEfficiency.toFixed(2)} />}
+        <HudStat label="Pace" value={gameplayPresentation.pace}
+          valueColor={paceRiskColor(theme, gameplayPresentation.paceRisk)} />
+        <HudStat label="Eff" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
+          valueColor={gameplayPresentation.appliesEfficiencyModifier ? theme.colors.accent : undefined}
+          accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
+          accessibilityHint="Opens read-only efficiency calculation details"
+          onPress={() => setEfficiencyDetailsOpen(true)} />
       </View>
 
       <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
@@ -1227,6 +1244,11 @@ function C17DenseWorkspace({
         </View>
       </View>
     </Modal>
+    <EfficiencyDetailsModal
+      onClose={() => setEfficiencyDetailsOpen(false)}
+      presentation={gameplayPresentation}
+      visible={efficiencyDetailsOpen}
+    />
   </View>;
 }
 
@@ -1244,12 +1266,38 @@ function C17LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; pl
   return <Text style={[styles.clock, { color: theme.colors.text }]}>{display}</Text>;
 }
 
-function HudStat({ label, pulseEnabled, pulseKey, value }: { label: string; pulseEnabled?: boolean; pulseKey?: number | null; value: number | string }) {
+function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, onPress, accessibilityLabel, accessibilityHint }: {
+  label: string;
+  pulseEnabled?: boolean;
+  pulseKey?: number | null;
+  value: number | string;
+  valueColor?: string;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+}) {
   const { theme } = useHanabTheme();
-  return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}><View style={styles.hudStat}>
-    <Text style={[styles.hudValue, { color: theme.colors.text }]}>{value}</Text>
+  const contents = <>
+    <Text style={[styles.hudValue, { color: valueColor ?? theme.colors.text }]}>{value}</Text>
     <Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text>
-  </View></AuthoritativePulse>;
+  </>;
+  return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}>
+    {onPress === undefined
+      ? <View style={styles.hudStat}>{contents}</View>
+      : <Pressable accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>{contents}</Pressable>}
+  </AuthoritativePulse>;
+}
+
+function formatEfficiency(value: number | null): string {
+  return value === null ? '-' : value.toFixed(2);
+}
+
+function paceRiskColor(theme: ReturnType<typeof useHanabTheme>['theme'], risk: 'low' | 'medium' | 'high' | 'zero' | null): string {
+  if (risk === 'medium') return theme.colors.warning;
+  if (risk === 'high') return theme.dark ? '#fbbf24' : '#b45309';
+  if (risk === 'zero') return theme.colors.danger;
+  return theme.colors.text;
 }
 
 function getCardLabel(game: GameState, playerNames: readonly string[], order: number): string {

@@ -3,7 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getClueColorFill,
   getDisplayedClueTokens,
-  getDisplayedLiveFutureEfficiency,
+  getGameplayPresentation,
   getGameTableSuits,
   getGameplayClueChoices,
   getGameplayClueChoicesForPlayerIndex,
@@ -11,6 +11,7 @@ import {
   canDiscardForVariant,
   getDisplayedClockTime,
 } from './gameplay';
+import { PaceRisk } from '../upstream/enums/PaceRisk';
 
 describe('getGameTableSuits', () => {
   it('counts down only the active clock and ignores timeTaken', () => {
@@ -93,38 +94,119 @@ describe('getGameTableSuits', () => {
     expect(canDiscardForVariant(16, 'Clue Starved (5 Suits)')).toBe(false);
   });
 
-  it('matches pinned web live FRE semantics, including note and manual adjustments', () => {
-    const game = {
-      stats: {
-        maxScore: 25,
-        cardsGotten: 3,
-        cardsGottenByNotes: 2,
-        cluesStillUsableNotRounded: 20.9,
-      },
-    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
-
-    expect(getDisplayedLiveFutureEfficiency(game, 1)).toBeCloseTo(19 / 20);
+  it('applies notes and a manual modifier to the authoritative current game', () => {
+    const presentation = getPresentation({ viewingOngoingGame: true });
+    expect(presentation).toMatchObject({
+      rawCardsGotten: 3,
+      cardsGottenByNotes: 2,
+      efficiencyModifier: 1,
+      appliesEfficiencyModifier: true,
+      cardsRemainingToGet: 19,
+      remainingPossibleClues: 20.9,
+      futureRequiredEfficiency: 19 / 20,
+      currentEfficiency: 6 / 8,
+      finessesRequired: 0,
+    });
   });
 
-  it('hides live FRE when no finite future efficiency exists', () => {
-    const unavailable = {
-      stats: {
-        maxScore: 25,
-        cardsGotten: 3,
-        cardsGottenByNotes: 0,
-        cluesStillUsableNotRounded: null,
-      },
-    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
-    const noClues = {
-      stats: {
-        maxScore: 25,
-        cardsGotten: 3,
-        cardsGottenByNotes: 0,
-        cluesStillUsableNotRounded: 0,
-      },
-    } as unknown as Parameters<typeof getDisplayedLiveFutureEfficiency>[0];
+  it('ignores notes and modifier while rewound in an unfinished game', () => {
+    expect(getPresentation({ viewingOngoingGame: false })).toMatchObject({
+      cardsGottenByNotes: null,
+      efficiencyModifier: null,
+      appliesEfficiencyModifier: false,
+      cardsRemainingToGet: 22,
+      futureRequiredEfficiency: 22 / 20,
+      currentEfficiency: 3 / 8,
+      finessesRequired: 2,
+    });
+  });
 
-    expect(getDisplayedLiveFutureEfficiency(unavailable, 0)).toBeNull();
-    expect(getDisplayedLiveFutureEfficiency(noClues, 0)).toBeNull();
+  it('applies adjustments to a finished shared replay following shared segments', () => {
+    expect(getPresentation({ finished: true, sharedReplayUseSharedSegments: true }))
+      .toMatchObject({ cardsRemainingToGet: 19, futureRequiredEfficiency: 19 / 20 });
+  });
+
+  it.each([
+    ['detached shared replay', { finished: true, sharedReplayUseSharedSegments: false }],
+    ['finished solo replay', { finished: true, sharedReplayUseSharedSegments: false }],
+  ])('ignores adjustments in a %s', (_label, context) => {
+    expect(getPresentation(context)).toMatchObject({
+      cardsGottenByNotes: null,
+      efficiencyModifier: null,
+      cardsRemainingToGet: 22,
+      futureRequiredEfficiency: 22 / 20,
+    });
+  });
+
+  it('formats ordinary positive pace with a plus and retains risk', () => {
+    expect(getPresentation({ pace: 2.5, paceRisk: PaceRisk.High })).toMatchObject({
+      pace: '+2.5', paceRisk: 'high',
+    });
+  });
+
+  it.each([
+    ['final round', { finalRoundEffectivelyStarted: true }, {}],
+    ['All or Nothing', {}, { allOrNothing: true }],
+    ['null pace', { pace: null }, {}],
+  ])('suppresses pace and risk for %s', (_label, stats, options) => {
+    expect(getPresentation({ stats, options })).toMatchObject({ pace: '-', paceRisk: null });
+  });
+
+  it('returns immutable minimum efficiency and keeps MRE available when FRE is unavailable', () => {
+    const presentation = getPresentation({ cluesStillUsableNotRounded: 0 });
+    expect(presentation.futureRequiredEfficiency).toBeNull();
+    expect(presentation.finessesRequired).toBeNull();
+    expect(presentation.minimumRequiredEfficiency).toBe(0.88);
+    expect(`${presentation.futureRequiredEfficiency ?? '-'} | ${presentation.minimumRequiredEfficiency.toFixed(2)}`)
+      .toBe('- | 0.88');
   });
 });
+
+function getPresentation({
+  stats = {},
+  options = {},
+  ...context
+}: {
+  stats?: Record<string, unknown>;
+  options?: Record<string, unknown>;
+  finished?: boolean;
+  viewingOngoingGame?: boolean;
+  sharedReplayUseSharedSegments?: boolean;
+  pace?: number | null;
+  paceRisk?: PaceRisk;
+  finalRoundEffectivelyStarted?: boolean;
+  cluesStillUsableNotRounded?: number | null;
+} = {}) {
+  const game = {
+    stats: {
+      maxScore: 25,
+      pace: 1,
+      paceRisk: PaceRisk.Low,
+      finalRoundEffectivelyStarted: false,
+      cardsGotten: 3,
+      potentialCluesLost: 8,
+      cluesStillUsableNotRounded: 20.9,
+      cardsGottenByNotes: 2,
+      ...stats,
+      ...(context.pace === undefined ? {} : { pace: context.pace }),
+      ...(context.paceRisk === undefined ? {} : { paceRisk: context.paceRisk }),
+      ...(context.finalRoundEffectivelyStarted === undefined
+        ? {} : { finalRoundEffectivelyStarted: context.finalRoundEffectivelyStarted }),
+      ...(context.cluesStillUsableNotRounded === undefined
+        ? {} : { cluesStillUsableNotRounded: context.cluesStillUsableNotRounded }),
+    },
+  } as unknown as Parameters<typeof getGameplayPresentation>[0];
+  const selectorContext = {
+    finished: false,
+    viewingOngoingGame: false,
+    sharedReplayUseSharedSegments: false,
+    ...context,
+  };
+  return getGameplayPresentation(
+    game,
+    { allOrNothing: false, ...options } as Parameters<typeof getGameplayPresentation>[1],
+    0.88,
+    1,
+    selectorContext,
+  );
+}

@@ -108,17 +108,16 @@ The protocol surface is already broad:
   safely ignores **12** currently unsupported event families.
 
 The deeper audit found three concrete semantic/interoperability defects that should not be confused
-with general feature backlog. Two have since been resolved:
+with general feature backlog. All three have since been resolved:
 
 - **pregame spectator cleanup drift** after upstream #3129 — resolved in #26;
 - **dynamic shared-replay efficiency modifier synchronization** — resolved receive-side in #29;
-- **Pace/FRE presentation context differs from upstream** — still open in #30.
+- **Pace/FRE presentation context differed from upstream** — resolved in #30.
 
 ## Highest-value findings
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
-| Pace/FRE context semantics | Partial | S | Medium | Underlying stats are present, but final-round/AON/review/shared-modifier presentation differs from web (#30). |
 | 4P–6P dense real-card layout | Partial | L | High | Core state works, but ordinary 4P–6P falls into the temporary Compact Overview path. |
 | Spectator shadowing / player perspective | Wire-only | S–M | High | The protocol already carries `shadowingPlayerIndex`; mobile always requests `-1` and exposes no perspective selector. |
 | Colorblind + styled-number card presentation | Missing | S–M | High | Accessibility/presentation value; assets/tooling already understand upstream card variants. |
@@ -247,9 +246,9 @@ deleted pregame screen.
 | Fireworks/play stacks | **Full** | — | High | Variant-aware suit count. |
 | Current player / YOUR TURN | **Full** | — | High | Stable seating; no hand reordering. |
 | Score / Max / Clues / Strikes / Deck | **Full semantics** | S for polish | High | Presentation hierarchy is still a polish backlog item. |
-| Pace | **Partial presentation** | S | Medium | Underlying upstream value/risk exists, but mobile does not apply web final-round/All-or-Nothing suppression or PaceRisk color; tracked with stats parity in #30. |
-| Future Required Efficiency | **Partial presentation** | S | Medium | Live formula exists, but mobile applies note/manual adjustments in review modes where web suppresses them; tracked in #30. |
-| Minimum Required Efficiency | **Missing UI** | XS–S | Medium | `metadata.minEfficiency` already exists but is not shown. |
+| Pace | **Full presentation semantics** | — | Medium | Final-round/All-or-Nothing suppression, signed display and PaceRisk treatment match upstream. |
+| Future Required Efficiency | **Full presentation semantics** | — | Medium | FRE uses upstream review/shared modifier policy and exposes calculation details on tap. |
+| Minimum Required Efficiency | **Full presentation semantics** | — | Medium | Immutable `metadata.minEfficiency` is shown alongside FRE in the compact Eff HUD. |
 | Low-score-phase warning | **Missing explicit UI** | S | Low–Medium | Upstream H-group presentation has special score treatment. |
 | Locked-hand warning | **Missing explicit UI** | S–M | Medium | Underlying upstream rule helper exists. |
 | Full clue log | **Partial** | M | Medium | Mobile has Last Action + Recent timeline, not the full web clue-log behavior. |
@@ -272,10 +271,11 @@ Current upstream web:
 - omits note/manual efficiency adjustments during an in-game rewind;
 - in finished shared review, uses the shared efficiency modifier only while following shared turns.
 
-Mobile currently renders `game.stats.pace` whenever non-null and computes one FRE value with a
-helper that always includes the current note/manual adjustment. The mismatch is tracked as issue
-#30. This is distinct from the broader visual-HUD hierarchy backlog: the formulas/state do not need a
-new rules engine, but the presentation selector needs to encode the upstream context rules.
+Mobile now routes Pace/Eff through one presentation selector matching those upstream context rules.
+The compact HUD keeps Pace visible as `-` when suppressed, presents `Eff` as `FRE | MRE`, applies
+note/manual/shared efficiency adjustments only in the authoritative contexts where upstream does,
+and exposes the calculation context in a read-only details surface. This resolves #30. The broader
+visual-HUD hierarchy remains a separate polish backlog item.
 
 ## 4P–6P
 
@@ -803,9 +803,9 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | In-Game Replay | **Full core / partial shortcuts** | Live rewind and direct temporal navigation work. Web shortcuts for draw/first-clue/play/discard/strike/arbitrary-turn jumps are not all exposed. |
 | Game History and Profiles | **Partial** | Own history exists; profiles, arbitrary-player/group history and richer stats are missing. |
 | Replays | **Partial** | Database-ID solo replay works. Shared creation, arbitrary JSON replay and copy/export are missing. |
-| Shared Replays | **Partial but strong core** | Leader/follow/detach/segment/Hypothetical core works; annotations, suggestion receive-side, sound and dynamic efficiency-mod parity are incomplete. |
+| Shared Replays | **Partial but strong core** | Leader/follow/detach/segment/Hypothetical core works; dynamic efficiency-mod synchronization is implemented, while annotations, suggestion receive-side and sound remain incomplete. |
 | Hypotheticals | **Full core / morph missing** | Start/end/play/discard/clue/back/reveal work; arbitrary card morph/unmorph cannot be originated from mobile. |
-| In-Game Statistics | **Partial presentation** | Score/max/clues/strikes/deck/Pace/FRE state exists; upstream Pace/FRE context semantics are tracked in #30. |
+| In-Game Statistics | **Full core stats / HUD polish pending** | Score/max/clues/strikes/deck and Pace/Eff context semantics are present; broader HUD hierarchy remains polish. |
 | 6-Player Games | **Partial presentation** | Upstream hand-size/rules state works; current dense mobile layout is not accepted 4P–6P UX. |
 | Custom Game Options | **Full for exposed supported subset** | Pregame create/edit and authoritative option preservation exist; unsupported rule families are rejected deliberately. |
 | Variants | **2242/2426 supported** | 184 current variants are deliberately excluded by mechanic family; see variant matrix. |
@@ -816,7 +816,7 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Empty Clues | **Full** | Option, clue preview, legality and send path are implemented. |
 | One Extra Card | **Full core** | Rule supported; increases dense-layout pressure in 4P–6P. |
 | One Less Card | **Full** | Rule supported. |
-| All or Nothing | **Full core / stats presentation partial** | Rule/end conditions work; Pace hiding semantics need #30. |
+| All or Nothing | **Full core** | Rule/end conditions and Pace suppression presentation semantics are implemented. |
 | Detrimental Character Assignments | **Unsupported** | Tables are rejected rather than partially simulated. |
 | Password-Protected Games | **Full** | Create/join with transient password; no credential persistence. |
 | Other Options | **Partial** | Individual settings are classified in the settings matrix. |
@@ -834,9 +834,9 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Adding Context to Special Notes | **Full** | Bracketed semantic tokens and stacked effects are preserved. |
 | Notes — Note Shortcuts | **Full mobile equivalents** | F/CM/PTD/KT, Turn insertion and Repeat are explicit buttons rather than desktop modifier-clicks. |
 | Sounds | **Missing** | No gameplay/replay sound system yet. |
-| Pace & Efficiency | **Partial presentation** | Vendored formulas/state exist; context/display parity tracked in #30. |
-| Pace | **Partial presentation** | Final-round/AON suppression and risk treatment differ from web. |
-| Efficiency | **Partial presentation** | FRE exists; minimum required efficiency and review/shared modifier policy differ. |
+| Pace & Efficiency | **Full presentation semantics** | Vendored formulas/state plus final-round/AON/review/shared modifier presentation now match upstream; broader HUD redesign is separate. |
+| Pace | **Full presentation semantics** | Final-round/AON suppression, signed value display and risk treatment match upstream. |
+| Efficiency | **Full presentation semantics** | FRE/MRE and review/shared modifier policy match upstream; editing the manual modifier is not exposed in this presentation slice. |
 | Keyboard Shortcuts | **N/A literally** | Native controls/gestures should cover valuable actions rather than reproducing desktop key chords. |
 | Similar Deals and Competitive Play | **Partial** | Server seed selection works automatically; magic `!seed`/ `!replay` table names pass through; Other Scores and strong seed UI are missing. |
 | Chat | **Full basic / partial rich features** | Text/PM/history/commands work; read/unread/typing/emotes/link richness/zen are incomplete. |
