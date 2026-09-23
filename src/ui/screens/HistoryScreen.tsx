@@ -121,6 +121,7 @@ export function HistoryScreen({
               <Text style={[styles.players, { color: theme.colors.text }]}>{item.playerNames.join(', ')}</Text>
               <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{finishedLabel}</Text>
               <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{END_CONDITIONS[item.endCondition]}</Text>
+              {item.tags !== '' && <Text style={[styles.tags, { color: theme.colors.textMuted }]}>{item.tags}</Text>}
               {!supported && <Notice tone="error">This game uses unsupported options.</Notice>}
               <ActionButton
                 disabled={!supported || replayPending}
@@ -169,4 +170,5 @@ const styles = StyleSheet.create({
   variant: { fontSize: 13 },
   players: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   meta: { fontSize: 12, lineHeight: 17 },
+  tags: { fontSize: 12, lineHeight: 16 },
 });

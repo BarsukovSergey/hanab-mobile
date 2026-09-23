@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { lobbyRuntime, networkSession } from './src/runtime/application';
+import { chatRuntime, lobbyRuntime, networkSession } from './src/runtime/application';
 import { lobbyActions } from './src/store/lobbySlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
@@ -40,7 +40,7 @@ import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
-type LiveSheet = 'menu' | 'chat' | 'settings' | null;
+type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | null;
 
 export default function App() {
   return (
@@ -66,6 +66,7 @@ function AppContent() {
   const [localScreen, setLocalScreen] = useState<LocalScreen>('lobby');
   const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
+  const [tagDraft, setTagDraft] = useState('');
   const session = useAppSelector((state) => state.session);
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
@@ -297,6 +298,10 @@ function AppContent() {
                   <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
                   <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions}>
                     <ActionButton title="Table chat" onPress={() => setLiveSheet('chat')} />
+                    <ActionButton title="Add tag" onPress={() => {
+                      setTagDraft('');
+                      setLiveSheet('tag');
+                    }} />
                     <SectionHeading title="Players" detail={liveClientState.metadata.playerNames.join(', ')} />
                     <SectionHeading
                       title={`Spectators (${liveClientState.spectators.length})`}
@@ -350,6 +355,30 @@ function AppContent() {
                   </>
                   : liveSheet === 'settings'
                     ? <SettingsScreen onBack={() => setLiveSheet('menu')} />
+                    : liveSheet === 'tag'
+                      ? <>
+                        <SectionHeading title="Add tag" detail="Tags are attached to this game." />
+                        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setTagDraft}
+                          onSubmitEditing={() => {
+                            if (tagDraft.trim() !== '' && chatRuntime.submit(`/tag ${tagDraft.trim()}`)) {
+                              setTagDraft('');
+                              setLiveSheet(null);
+                            }
+                          }}
+                          placeholder="Tag" returnKeyType="send" value={tagDraft} />
+                        <ActionButton
+                          disabled={tagDraft.trim() === ''}
+                          title="Add tag"
+                          tone="primary"
+                          onPress={() => {
+                            if (chatRuntime.submit(`/tag ${tagDraft.trim()}`)) {
+                              setTagDraft('');
+                              setLiveSheet(null);
+                            }
+                          }}
+                        />
+                        <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
+                      </>
                     : null}
             </View>
           </View>
