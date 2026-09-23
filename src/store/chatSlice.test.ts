@@ -112,6 +112,50 @@ describe('chat state and plain-text conversion', () => {
     expect(store.getState().chat.lastPM).toBe('Cy');
   });
 
+  test('tracks table unread messages, ignores self/history/local messages, and marks read', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'Bob',
+      message: message('incoming', 'table123'),
+    }));
+    expect(store.getState().chat.unreadByRoom).toEqual({ table123: 1 });
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'bob',
+      message: { ...message('own echo', 'table123'), who: 'Bob' },
+    }));
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      messages: [message('history', 'table123')],
+    }));
+    store.dispatch(chatActions.localMessageAdded({
+      epoch: 1,
+      room: 'table123',
+      msg: 'local notice',
+      type: 'info',
+      datetime: '2026-09-01T10:00:00Z',
+    }));
+    expect(store.getState().chat.unreadByRoom).toEqual({ table123: 1 });
+
+    store.dispatch(chatActions.roomRead({ room: 'table123' }));
+    expect(store.getState().chat.unreadByRoom).toEqual({});
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'table123',
+      authenticatedUsername: 'Bob',
+      message: message('another inbound', 'table123'),
+    }));
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().chat.unreadByRoom).toEqual({});
+  });
+
   test('keeps ordinary room routing and drops unsupported garbage rooms', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
@@ -149,7 +193,7 @@ describe('chat state and plain-text conversion', () => {
     }));
     store.dispatch(sessionActions.signedOut());
     expect(store.getState().chat).toEqual({
-      connectionEpoch: 0, lastPM: null, messagesByRoom: {},
+      connectionEpoch: 0, lastPM: null, messagesByRoom: {}, unreadByRoom: {},
     });
   });
 });

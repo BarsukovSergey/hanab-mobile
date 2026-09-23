@@ -3,7 +3,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { chatRuntime, lobbyRuntime } from '../runtime/application';
 import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
-import { useAppSelector } from '../store/hooks';
+import { chatActions } from '../store/chatSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { transformChatInput } from './chatInput';
 import { chatMessageMetadata } from './chatPresentation';
 import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
@@ -16,6 +17,7 @@ type Props = {
 const EMPTY_MESSAGES: readonly never[] = [];
 
 export function ChatPanel({ room, title }: Props) {
+  const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
   const [draft, setDraft] = useState('');
   const historyRef = useRef<ScrollView>(null);
@@ -38,6 +40,10 @@ export function ChatPanel({ room, title }: Props) {
   useEffect(() => {
     historyRef.current?.scrollToEnd({ animated: false });
   }, [messages.length, room]);
+
+  useEffect(() => {
+    dispatch(chatActions.roomRead({ room }));
+  }, [dispatch, messages.length, room]);
 
   return (
     <Panel>
