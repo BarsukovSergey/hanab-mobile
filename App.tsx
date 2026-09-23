@@ -14,7 +14,8 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { lobbyRuntime, networkSession } from './src/runtime/application';
-import { useAppSelector } from './src/store/hooks';
+import { lobbyActions } from './src/store/lobbySlice';
+import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
 import { ChatPanel } from './src/ui/ChatPanel';
 import {
@@ -51,6 +52,7 @@ export default function App() {
 }
 
 function AppContent() {
+  const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
   const { contentMaxWidth, width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
@@ -418,9 +420,18 @@ function AppContent() {
             </>}
           </View>
         </View>
-        {lobbyNotice !== null && <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>}
         {content}
       </ScrollView>
+      {lobbyNotice !== null && (
+        <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
+          <SafeAreaView edges={['top']} style={styles.lobbyNoticeSafeArea}>
+            <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
+              <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>
+              <ActionButton compact title="Dismiss" tone="ghost" onPress={() => dispatch(lobbyActions.noticeDismissed())} />
+            </View>
+          </SafeAreaView>
+        </View>
+      )}
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
     </KeyboardAvoidingView>
   );
@@ -429,6 +440,9 @@ function AppContent() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
+  lobbyNoticeOverlay: { elevation: 10, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
+  lobbyNoticeSafeArea: { width: '100%' },
+  lobbyNoticeContainer: { alignSelf: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 6, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
   gameContainerC17: { flex: 1, paddingBottom: 0 },
   gameContainerLandscape: { gap: 4, paddingBottom: 10, paddingHorizontal: 8, paddingTop: 4 },

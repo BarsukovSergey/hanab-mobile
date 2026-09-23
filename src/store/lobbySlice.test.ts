@@ -97,4 +97,20 @@ describe('lobby Redux state', () => {
     store.dispatch(lobbyActions.tableListReceived({ epoch: 1, tables: [] }));
     expect(selectLobbyHydrated(store.getState())).toBe(true);
   });
+
+  test('server notices can be received, dismissed, and replaced by a later notice', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    const firstNotice = { kind: 'warning' as const, message: 'Server maintenance soon' };
+    const laterNotice = { kind: 'error' as const, message: 'Table creation failed' };
+
+    store.dispatch(lobbyActions.noticeReceived({ epoch: 1, notice: firstNotice }));
+    expect(store.getState().lobby.notice).toEqual(firstNotice);
+
+    store.dispatch(lobbyActions.noticeDismissed());
+    expect(store.getState().lobby.notice).toBeNull();
+
+    store.dispatch(lobbyActions.noticeReceived({ epoch: 1, notice: laterNotice }));
+    expect(store.getState().lobby.notice).toEqual(laterNotice);
+  });
 });
