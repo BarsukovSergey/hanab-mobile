@@ -222,6 +222,8 @@ export function C17GameScreen() {
 
   const inspectNote = (order: number) => {
     setNote(clientState.notes.ourNotes[order]?.text ?? '');
+    const outsideActionHand = !actionHand.some((actionOrder) => actionOrder === order);
+    if (outsideActionHand) interactionDispatch({ type: 'disarm-gameplay' });
     interactionDispatch({ type: 'open-note', order });
   };
   const editNote = (order: number) => {
