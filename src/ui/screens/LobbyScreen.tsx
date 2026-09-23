@@ -17,7 +17,7 @@ import {
   useResponsiveLayout,
 } from '../designSystem';
 import { getLobbySections } from '../lobbySections';
-import { formatLobbyRoster } from '../lobbyTablePresentation';
+import { formatLobbyRoster, getLobbyFriendContext } from '../lobbyTablePresentation';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 
 const DEFAULT_OPTIONS: MobileTableOptions = {
@@ -46,6 +46,7 @@ export function LobbyScreen({
   const tables = useAppSelector(tableSelectors.selectAll);
   const roomState = useAppSelector((state) => state.room);
   const randomTableName = useAppSelector((state) => state.session.randomTableName);
+  const friends = useAppSelector((state) => state.session.friends);
   const effectiveName = tableName.trim() || randomTableName?.trim() || '';
   const {
     yourRunningGames,
@@ -53,7 +54,7 @@ export function LobbyScreen({
     runningTables,
     sharedReplays,
     showCreateTable,
-  } = getLobbySections(tables);
+  } = getLobbySections(tables, friends);
   const attendancePending = roomState.pendingSpectateTableID !== null
     || roomState.pendingRecovery !== null
     || roomState.pendingJoin !== null
@@ -80,6 +81,7 @@ export function LobbyScreen({
           empty="No game to resume."
           title="Your running game"
           tables={yourRunningGames}
+          friends={friends}
           action={(table) => (
             <ActionButton
               compact
@@ -110,6 +112,7 @@ export function LobbyScreen({
                         {formatLobbyRoster(table.players)}
                       </Text>
                     )}
+                    <TableFriendContext table={table} friends={friends} />
                   </View>
                   {table.passwordProtected && <Pill>Private</Pill>}
                 </View>
@@ -204,6 +207,7 @@ export function LobbyScreen({
             empty="No running tables."
             title="Running tables"
             tables={runningTables}
+            friends={friends}
             action={(table) => (
               <ActionButton compact disabled={attendancePending} title="Spectate" onPress={() => lobbyRuntime.spectate(table.id)} />
             )}
@@ -212,6 +216,7 @@ export function LobbyScreen({
             empty="No shared replays."
             title="Shared replays"
             tables={sharedReplays}
+            friends={friends}
             action={(table) => (
               <ActionButton compact disabled={attendancePending} title="Open review" onPress={() => lobbyRuntime.spectate(table.id)} />
             )}
@@ -229,11 +234,13 @@ function TableSection({
   title,
   empty,
   tables,
+  friends,
   action,
 }: {
   title: string;
   empty: string;
   tables: LobbyTable[];
+  friends: readonly string[];
   action: (table: LobbyTable) => ReactNode;
 }) {
   const { theme } = useHanabTheme();
@@ -254,12 +261,28 @@ function TableSection({
                   {formatLobbyRoster(table.players)}
                 </Text>
               )}
+              <TableFriendContext table={table} friends={friends} />
             </View>
             {action(table)}
           </View>
         </View>
       ))}
     </Panel>
+  );
+}
+
+function TableFriendContext({ table, friends }: { table: LobbyTable; friends: readonly string[] }) {
+  const { theme } = useHanabTheme();
+  const context = getLobbyFriendContext(table, friends);
+  if (!context.hasFriends) return null;
+  const details = [
+    context.playing.length > 0 ? `Playing: ${context.playing.join(', ')}` : null,
+    context.watching.length > 0 ? `Watching: ${context.watching.join(', ')}` : null,
+  ].filter((detail) => detail !== null);
+  return (
+    <Text numberOfLines={2} style={[styles.tableFriendContext, { color: theme.colors.accent }]}>
+      {details.join(' · ')}{table.running ? ` · ${table.progress}%` : ''}
+    </Text>
   );
 }
 
@@ -288,4 +311,5 @@ const styles = StyleSheet.create({
   tableName: { fontSize: 15, fontWeight: '800' },
   tableMeta: { fontSize: 13, lineHeight: 18 },
   tableRoster: { fontSize: 12, lineHeight: 16 },
+  tableFriendContext: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
 });

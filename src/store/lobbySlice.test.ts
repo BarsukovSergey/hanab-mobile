@@ -35,6 +35,7 @@ const table = (id: number, name = `table-${id}`): LobbyTable => ({
   joined: false,
   progress: 0,
   players: ['Ada'],
+  spectators: [],
   sharedReplay: false,
 });
 
