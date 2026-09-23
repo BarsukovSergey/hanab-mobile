@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { lobbyRuntime } from '../../runtime/application';
@@ -17,6 +17,7 @@ import {
   useResponsiveLayout,
 } from '../designSystem';
 import { getLobbySections } from '../lobbySections';
+import { formatLobbyRoster } from '../lobbyTablePresentation';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 
 const DEFAULT_OPTIONS: MobileTableOptions = {
@@ -24,6 +25,8 @@ const DEFAULT_OPTIONS: MobileTableOptions = {
   cardCycle: false, emptyClues: false,
   oneExtraCard: false, oneLessCard: false, allOrNothing: false,
 };
+
+const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 
 export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
   const { theme } = useHanabTheme();
@@ -91,6 +94,11 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
                     <Text style={[styles.tableMeta, { color: theme.colors.textMuted }]}>
                       {table.variant} · {table.numPlayers}/{table.maxPlayers}
                     </Text>
+                    {formatLobbyRoster(table.players) !== null && (
+                      <Text numberOfLines={2} style={[styles.tableRoster, { color: theme.colors.textMuted }]}>
+                        {formatLobbyRoster(table.players)}
+                      </Text>
+                    )}
                   </View>
                   {table.passwordProtected && <Pill>Private</Pill>}
                 </View>
@@ -137,14 +145,32 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
                 secureTextEntry
                 value={tablePassword}
               />
-              <View style={styles.stepperRow}>
-                <View style={styles.stepperCopy}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
-                  <Text style={[styles.stepperValue, { color: theme.colors.text }]}>{maxPlayers}</Text>
-                </View>
-                <View style={styles.actionsRow}>
-                  <ActionButton compact disabled={maxPlayers <= 2} title="−" onPress={() => setMaxPlayers((n) => n - 1)} />
-                  <ActionButton compact disabled={maxPlayers >= 6} title="+" onPress={() => setMaxPlayers((n) => n + 1)} />
+              <View style={styles.playerSelector}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
+                <View style={styles.playerOptions}>
+                  {MAX_PLAYER_OPTIONS.map((value) => {
+                    const selected = maxPlayers === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        hitSlop={6}
+                        onPress={() => setMaxPlayers(value)}
+                        style={[
+                          styles.playerOption,
+                          {
+                            backgroundColor: selected ? theme.colors.accent : theme.colors.surfaceRaised,
+                            borderColor: selected ? theme.colors.accent : theme.colors.borderStrong,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.playerOptionText, { color: selected ? theme.colors.accentText : theme.colors.text }]}>
+                          {value}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
               <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
@@ -212,6 +238,11 @@ function TableSection({
               <Text style={[styles.tableMeta, { color: theme.colors.textMuted }]}>
                 {table.variant} · {table.numPlayers}/{table.maxPlayers}
               </Text>
+              {formatLobbyRoster(table.players) !== null && (
+                <Text numberOfLines={2} style={[styles.tableRoster, { color: theme.colors.textMuted }]}>
+                  {formatLobbyRoster(table.players)}
+                </Text>
+              )}
             </View>
             {action(table)}
           </View>
@@ -234,13 +265,15 @@ const styles = StyleSheet.create({
   discoveryColumn: { flex: 0.92 },
   listColumn: { flex: 1.08 },
   label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  stepperRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  stepperCopy: { gap: 2 },
-  stepperValue: { fontSize: 24, fontWeight: '800' },
+  playerSelector: { gap: 8 },
+  playerOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  playerOption: { alignItems: 'center', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 44, minWidth: 44, paddingHorizontal: 12 },
+  playerOptionText: { fontSize: 15, fontWeight: '800' },
   actionsRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tableCard: { borderTopWidth: 1, gap: 10, paddingTop: 12 },
   tableHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   tableCopy: { flex: 1, gap: 2, minWidth: 0 },
   tableName: { fontSize: 15, fontWeight: '800' },
   tableMeta: { fontSize: 13, lineHeight: 18 },
+  tableRoster: { fontSize: 12, lineHeight: 16 },
 });
