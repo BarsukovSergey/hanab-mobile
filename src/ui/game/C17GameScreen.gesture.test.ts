@@ -129,6 +129,21 @@ test('C17 reserves the ordinary Workbench slot while keeping a selected-card tra
   expect(screen).toContain("flex: 0, flexGrow: 0");
 });
 
+test('C17 gives dense hands a compact shell and the same Workbench minimum when idle or active', () => {
+  const screen = readC17Screen();
+
+  expect(screen).toContain('tightChrome={usesDenseSideLabels}');
+  expect(screen).toContain('usesDenseSideLabels && styles.denseLastAction');
+  expect(screen).toContain('usesDenseSideLabels ? <View style={styles.denseLastActionRow}>');
+  expect(screen).toContain('onPress={() => setRecentOpen(true)} style={styles.denseLastActionSummary}');
+  expect(screen).toContain('title="Rewind" onPress={onEnterRewind}');
+  expect(screen).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
+  expect(screen).toContain('usesDenseSideLabels && { minHeight: layout.workbenchHeight }');
+  expect(screen).toContain('styles.workbenchScroll');
+  expect(screen).toContain('styles.idleWorkbench, usesDenseSideLabels && { minHeight: layout.workbenchHeight }');
+  expect(screen).toContain('const usesCompactWorkbench = usesSideLabels;');
+});
+
 test('C17 caps every side-label stateful Workbench mode at the stable physical slot', () => {
   const screen = readC17Screen();
 

@@ -21,6 +21,7 @@ export function CompactTable({
   variantName,
   onOpenDiscards,
   dense = false,
+  tightChrome = false,
   pulseDiscard,
   pulseEnabled = true,
   pulsePlay,
@@ -29,6 +30,7 @@ export function CompactTable({
   variantName: string;
   onOpenDiscards?: () => void;
   dense?: boolean;
+  tightChrome?: boolean;
   pulseDiscard?: number | null;
   pulseEnabled?: boolean;
   pulsePlay?: { segment: number; suitIndex: number } | null;
@@ -54,12 +56,13 @@ export function CompactTable({
   return <View style={[
     styles.surface,
     landscapePhone && styles.surfaceLandscape,
+    tightChrome && styles.surfaceTight,
     { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
   ]}>
-    <View style={styles.sectionHeader}>
+    {!tightChrome && <View style={styles.sectionHeader}>
       <Text style={[styles.label, { color: theme.colors.textMuted }]}>FIREWORKS</Text>
       {!landscapePhone && <Text numberOfLines={1} style={[styles.variant, { color: theme.colors.textMuted }]}>{variantName}</Text>}
-    </View>
+    </View>}
     <View
       onLayout={(event) => {
         const nextWidth = event.nativeEvent.layout.width;
@@ -158,6 +161,7 @@ function compactSuitName(name: string): string {
 const styles = StyleSheet.create({
   surface: { borderRadius: 12, borderWidth: 1, gap: 5, padding: 7 },
   surfaceLandscape: { gap: 3, padding: 5 },
+  surfaceTight: { gap: 2, padding: 4 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   label: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   variant: { flexShrink: 1, fontSize: 9, fontWeight: '700', textAlign: 'right' },
