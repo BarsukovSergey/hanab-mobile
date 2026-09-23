@@ -38,6 +38,7 @@ import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { PeopleScreen } from './src/ui/screens/PeopleScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
+import { UserContextActions } from './src/ui/UserContextActions';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | null;
@@ -219,6 +220,20 @@ function AppContent() {
 
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
+    const authenticatedUsername = session.authenticatedUser?.username;
+    const renderLiveUser = (name: string, key: string) => {
+      const isAuthenticatedUser = authenticatedUsername !== undefined
+        && name.toLocaleLowerCase() === authenticatedUsername.toLocaleLowerCase();
+      const isFriend = session.friends.some((friend) => friend.toLocaleLowerCase() === name.toLocaleLowerCase());
+      return (
+        <View key={key} style={styles.liveUserRow}>
+          <Text style={{ color: theme.colors.text }}>{name}</Text>
+          {!isAuthenticatedUser && (
+            <UserContextActions username={name} isFriend={isFriend} room={`table${liveTableID}`} />
+          )}
+        </View>
+      );
+    };
     const liveClientState = roomState.room.clientState;
     const perspectiveEligible = roomState.room.role === 'spectator'
       && !roomState.room.sharedReplay
@@ -311,13 +326,14 @@ function AppContent() {
                       setTagDraft('');
                       setLiveSheet('tag');
                     }} />
-                    <SectionHeading title="Players" detail={liveClientState.metadata.playerNames.join(', ')} />
+                    <SectionHeading title={`Players (${liveClientState.metadata.playerNames.length})`} />
+                    {liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))}
                     <SectionHeading
                       title={`Spectators (${liveClientState.spectators.length})`}
-                      detail={liveClientState.spectators.length === 0
-                        ? 'No spectators'
-                        : liveClientState.spectators.map((spectator) => spectator.name).join(', ')}
                     />
+                    {liveClientState.spectators.length === 0
+                      ? <Text style={{ color: theme.colors.textMuted }}>No spectators</Text>
+                      : liveClientState.spectators.map((spectator, index) => renderLiveUser(spectator.name, `spectator-${index}-${spectator.name}`))}
                     {perspectiveEligible && <>
                       <SectionHeading
                         title="Perspective"
@@ -505,6 +521,7 @@ const styles = StyleSheet.create({
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
   menuActions: { gap: 7 },
+  liveUserRow: { alignItems: 'flex-start', gap: 4, paddingVertical: 2 },
   menuScroll: { flexShrink: 1 },
   perspectiveChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
