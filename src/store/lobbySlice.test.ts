@@ -80,6 +80,7 @@ describe('lobby Redux state', () => {
     store.dispatch(lobbyActions.userReceived({ epoch: 1, user: user(1) }));
     store.dispatch(lobbyActions.userReceived({ epoch: 1, user: user(1, 'updated') }));
     store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: table(1) }));
+    expect(userSelectors.selectTotal(store.getState())).toBe(1);
     expect(userSelectors.selectById(store.getState(), 1)?.name).toBe('updated');
     store.dispatch(lobbyActions.userLeft({ epoch: 1, userID: 1 }));
     store.dispatch(lobbyActions.tableGone({ epoch: 1, tableID: 1 }));

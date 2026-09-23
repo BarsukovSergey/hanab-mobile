@@ -28,7 +28,13 @@ const DEFAULT_OPTIONS: MobileTableOptions = {
 
 const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 
-export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
+export function LobbyScreen({
+  onOpenHistory,
+  onOpenPeople,
+}: {
+  onOpenHistory: () => void;
+  onOpenPeople: () => void;
+}) {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
   const [tableName, setTableName] = useState('');
@@ -61,7 +67,10 @@ export function LobbyScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
             {tables.length} {tables.length === 1 ? 'table' : 'tables'} available
           </Text>
         </View>
-        <ActionButton compact title="Game history" onPress={onOpenHistory} />
+        <View style={styles.heroActions}>
+          <ActionButton compact title="People" onPress={onOpenPeople} />
+          <ActionButton compact title="Game history" onPress={onOpenHistory} />
+        </View>
       </Panel>
 
       {yourRunningGames.length > 0 && (
@@ -256,6 +265,7 @@ const styles = StyleSheet.create({
   root: { gap: 16 },
   hero: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   heroCopy: { flex: 1, gap: 2 },
+  heroActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   heroTitle: { fontSize: 28, fontWeight: '900' },
   heroDetail: { fontSize: 14 },

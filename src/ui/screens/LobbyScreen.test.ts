@@ -7,6 +7,11 @@ import { formatLobbyRoster } from '../lobbyTablePresentation';
 const screen = readFileSync(resolve(__dirname, 'LobbyScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('lobby table details and create selector', () => {
+  test('exposes compact People and Game history actions together in the hero', () => {
+    expect(screen).toContain('<ActionButton compact title="People" onPress={onOpenPeople} />');
+    expect(screen).toContain('<ActionButton compact title="Game history" onPress={onOpenHistory} />');
+  });
+
   test('formats authoritative players in server order and omits an empty roster', () => {
     expect(formatLobbyRoster(['Ada', 'Bob', 'Cy'])).toBe('Ada · Bob · Cy');
     expect(formatLobbyRoster([])).toBeNull();
