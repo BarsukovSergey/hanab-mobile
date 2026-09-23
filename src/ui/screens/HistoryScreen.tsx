@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { areTableOptionsSupported } from '../../game/client/supportedVariants';
@@ -35,6 +35,12 @@ export function HistoryScreen({
   const [selection, setSelection] = useState<{ epoch: number; friends: boolean }>({
     epoch: session.connectionEpoch, friends: false,
   });
+  useEffect(() => {
+    if (
+      session.friends.length === 0
+      && (selection.epoch !== session.connectionEpoch || selection.friends)
+    ) setSelection({ epoch: session.connectionEpoch, friends: false });
+  }, [selection, session.connectionEpoch, session.friends.length]);
   const showingFriends = selection.epoch === session.connectionEpoch
     && selection.friends && session.friends.length > 0;
   const items = showingFriends ? history.friendItems : history.items;
