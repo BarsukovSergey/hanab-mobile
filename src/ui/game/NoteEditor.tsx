@@ -49,6 +49,7 @@ export function NoteEditor({
   const { theme } = useHanabTheme();
   const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState(false);
+  const [presentationReady, setPresentationReady] = useState(false);
   const [draft, setDraft] = useState(value);
   const lastSubmittedNote = useRef('');
   const sessionOpen = useRef(false);
@@ -65,6 +66,7 @@ export function NoteEditor({
   useEffect(() => {
     if (!visible) {
       sessionOpen.current = false;
+      setPresentationReady(false);
       setEditing(false);
       return;
     }
@@ -113,8 +115,16 @@ export function NoteEditor({
     setEditing(false);
     onClose();
   };
+  const autofocusReady = editable && editing && presentationReady;
 
-  return <Modal animationType="slide" onRequestClose={cancelAndClose} statusBarTranslucent transparent visible={visible}>
+  return <Modal
+    animationType="slide"
+    onRequestClose={cancelAndClose}
+    onShow={() => setPresentationReady(true)}
+    statusBarTranslucent
+    transparent
+    visible={visible}
+  >
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.keyboardAvoider}
@@ -134,11 +144,11 @@ export function NoteEditor({
               <ActionButton compact title="Close" tone="ghost" onPress={cancelAndClose} />
             </View>
             <Field
-              autoFocus={editing}
+              autoFocus={autofocusReady}
               blurOnSubmit={editing}
               editable={editing}
               enterKeyHint={editing ? 'done' : undefined}
-              key={editing ? 'editing' : 'readonly'}
+              key={autofocusReady ? 'editing-ready' : editing ? 'editing-pending' : 'readonly'}
               maxLength={editing ? 300 : undefined}
               multiline={!editing}
               onChangeText={editing ? change : undefined}
