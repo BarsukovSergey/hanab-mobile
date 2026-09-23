@@ -117,7 +117,7 @@ export function GameCard({
         statePresentation?.shouldFade && styles.engineTrashCard,
       ]}>
         <UpstreamCardFace rank={knowledge.displayRank} suitIndex={knowledge.displaySuitIndex} variantName={variantName} />
-        {knowledge.borderColor !== null && <SemanticBorder color={knowledge.borderColor} height={height} />}
+        {knowledge.borderColor !== null && <SemanticBorder color={knowledge.borderColor} radius={geometry.radius} height={renderedCardHeight} />}
         <HiddenKnowledgeOverlay height={height} knowledge={knowledge} variantName={variantName} />
         <CardStateIndicators
           clued={knowledge.borderColor === 'orange'}
@@ -200,7 +200,7 @@ export function VisibleHanabiCard({
     statePresentation?.shouldFade && styles.engineTrashCard,
   ]}>
     <UpstreamCardFace rank={faceRank} suitIndex={faceSuitIndex} variantName={variantName} />
-    {activeSemanticBorder !== null && size === 'hand' && <SemanticBorder color={activeSemanticBorder} height={height} />}
+    {activeSemanticBorder !== null && size === 'hand' && <SemanticBorder color={activeSemanticBorder} radius={geometry.radius} height={renderedCardHeight} />}
     {empathyActive && <HiddenKnowledgeOverlay height={height} knowledge={empathyKnowledge} variantName={variantName} />}
     <CardStateIndicators
       clued={activeSemanticBorder === 'orange'}
@@ -349,11 +349,10 @@ export function CardKnowledgeDetails({ knowledge, variantName }: { knowledge: Ca
   </View>;
 }
 
-function SemanticBorder({ color, height }: { color: string; height?: number }) {
-  const scale = (height ?? 112) / 406;
+function SemanticBorder({ color, radius, height }: { color: string; radius: number; height: number }) {
+  const scale = height / 406;
   const outsideWidth = 20 * scale;
   const insideWidth = 12 * scale;
-  const radius = 6 * scale;
 
   return <View pointerEvents="none" style={styles.semanticBorderLayer}>
     <View style={[styles.semanticBorderStroke, { borderColor: '#0d0d0d', borderRadius: radius, borderWidth: outsideWidth }]} />
@@ -435,7 +434,7 @@ function CluePointerMarker({ height, marker, variantName }: { height?: number; m
   </View>;
 }
 
-function getCardGeometry(height: number) {
+export function getCardGeometry(height: number) {
   return { radius: height * 286 / 406 * 0.12 };
 }
 
