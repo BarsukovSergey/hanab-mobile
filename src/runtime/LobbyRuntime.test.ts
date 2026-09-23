@@ -2220,6 +2220,7 @@ describe('deterministic lobby runtime', () => {
 
     expect(store.getState().room).toEqual({
       connectionEpoch: 1,
+      pregameSpectators: null,
       pendingSpectateTableID: null,
       pendingRecovery: null,
       recoveryJoinedConfirmed: false,
@@ -2301,6 +2302,7 @@ describe('deterministic lobby runtime', () => {
 
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
+      pregameSpectators: null,
       pendingSpectateTableID: null,
       pendingRecovery: null,
       recoveryJoinedConfirmed: false,
@@ -2419,6 +2421,36 @@ describe('deterministic lobby runtime', () => {
     },
   );
 
+  test('pregame spectator snapshots survive pending join and replace the visible list', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.spectate(123)).toBe(true);
+    socket.emitMessage(pregameFrame().replace('"you":true', '"you":false'));
+    expect(store.getState().room.pendingJoin?.tableID).toBe(123);
+    const frame = (tableID: number, spectators: unknown[]) =>
+      `pregameSpectators ${JSON.stringify({ tableID, spectators })}`;
+    const cy = { name: 'Cy', shadowingPlayerIndex: -1, shadowingPlayerUsername: '' };
+    const dee = { name: 'Dee', shadowingPlayerIndex: 0, shadowingPlayerUsername: 'Ada' };
+    socket.emitMessage(frame(123, [cy]));
+    socket.emitMessage('joined {"tableID":123}');
+    expect(store.getState().room.room.kind).toBe('pregame');
+    expect(store.getState().room.pregameSpectators).toEqual({ tableID: 123, spectators: [cy] });
+    socket.emitMessage(frame(999, [dee]));
+    expect(store.getState().room.pregameSpectators?.spectators).toEqual([cy]);
+    socket.emitMessage(frame(123, [dee]));
+    expect(store.getState().room.pregameSpectators?.spectators).toEqual([dee]);
+    store.dispatch(roomActions.pregameSpectatorsReceived({ epoch: 0, tableID: 123, spectators: [cy] }));
+    expect(store.getState().room.pregameSpectators?.spectators).toEqual([dee]);
+    socket.emitMessage(frame(123, []));
+    expect(store.getState().room.pregameSpectators?.spectators).toEqual([]);
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    expect(store.getState().room.pregameSpectators).toBeNull();
+    store.dispatch(roomActions.pregameSpectatorsReceived({ epoch: 1, tableID: 123, spectators: [cy] }));
+    expect(store.getState().room.pregameSpectators).toBeNull();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().room.pregameSpectators).toBeNull();
+  });
+
   test('pregame player-to-spectator sends leave then spectate, stays present through left, and confirms from game plus joined', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     addJoinableTable(store);
@@ -2433,6 +2465,8 @@ describe('deterministic lobby runtime', () => {
       'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
     ]);
     expect(store.getState().room.room).toMatchObject({ kind: 'pregame', role: 'player' });
+    socket.emitMessage('pregameSpectators {"tableID":123,"spectators":[{"name":"Cy","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}');
+    expect(store.getState().room.pregameSpectators?.spectators).toHaveLength(1);
     socket.emitMessage('left {"TableID":123}');
     expect(store.getState().room.room.kind).toBe('pregame');
     socket.emitMessage(createdPregameFrame(['Bob'], 123).replace('"you":true', '"you":false'));
@@ -3053,6 +3087,7 @@ describe('deterministic lobby runtime', () => {
 
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
+      pregameSpectators: null,
       pendingSpectateTableID: null,
       pendingRecovery: null,
       recoveryJoinedConfirmed: false,
@@ -3100,6 +3135,7 @@ describe('deterministic lobby runtime', () => {
 
     expect(store.getState().room).toEqual({
       connectionEpoch: 2,
+      pregameSpectators: null,
       pendingSpectateTableID: null,
       pendingRecovery: null,
       recoveryJoinedConfirmed: false,

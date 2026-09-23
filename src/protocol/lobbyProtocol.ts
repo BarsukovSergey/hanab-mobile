@@ -441,6 +441,7 @@ const schemas = {
   hypoAction: hypoActionSchema,
   hypoShowDrawnCards: hypoShowDrawnCardsSchema,
   spectators: spectatorsSchema,
+  pregameSpectators: spectatorsSchema,
   boot: bootSchema,
   chat: chatMessageSchema,
   chatList: chatListSchema,

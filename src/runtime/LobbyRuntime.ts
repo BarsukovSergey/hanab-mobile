@@ -1369,6 +1369,13 @@ export class LobbyRuntime {
           spectators: event.data.spectators,
         }));
         break;
+      case 'pregameSpectators':
+        this.store.dispatch(roomActions.pregameSpectatorsReceived({
+          epoch,
+          tableID: event.data.tableID,
+          spectators: event.data.spectators,
+        }));
+        break;
       case 'noteListPlayer': {
         const room = this.store.getState().room.room;
         if (room.kind !== 'live_game') break;
