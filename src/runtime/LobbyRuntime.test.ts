@@ -650,6 +650,32 @@ describe('deterministic lobby runtime', () => {
     });
   });
 
+  test('direct reply sends through the existing PM path to the last sender', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    socket.emitMessage('chat {"msg":"incoming","who":"Bob","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"",'
+      + '"recipient":"Ada"}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/r hello')).toBe(true);
+    expect(socket.sent).toEqual([
+      'chatPM {"msg":"hello","recipient":"Bob","room":"lobby"}',
+    ]);
+  });
+
+  test('direct reply with an empty body does not send', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    socket.emitMessage('chat {"msg":"incoming","who":"Bob","discord":false,'
+      + '"server":false,"datetime":"2026-09-01T10:00:00Z","room":"",'
+      + '"recipient":"Ada"}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/r')).toBe(false);
+    expect(socket.sent).toEqual([]);
+  });
+
   test('transformed shrug uses normal chat and never emits a literal slash command', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
