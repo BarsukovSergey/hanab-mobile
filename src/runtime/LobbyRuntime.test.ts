@@ -151,10 +151,17 @@ const joinableTable: LobbyTable = {
 
 const pregameFrame = (tableID = 123, name = 'Pregame table') => (
   `game {"tableID":${tableID},"name":"${name}","owner":2,`
-  + '"players":[{"index":0,"name":"Bob","you":false,"present":true,"stats":{}},'
-  + '{"index":1,"name":"Ada","you":true,"present":true,"stats":{}}],'
+  + `"players":[{"index":0,"name":"Bob","you":false,"present":true,"stats":${JSON.stringify(pregameStats)}},`
+  + `{"index":1,"name":"Ada","you":true,"present":true,"stats":${JSON.stringify(pregameStats)}}],`
   + `"options":${JSON.stringify(tableOptions)},"passwordProtected":false,"maxPlayers":5}`
 );
+
+const pregameStats = {
+  numGames: 10,
+  variant: { numGames: 5, averageScore: 20.4, numStrikeouts: 1, bestScores: [
+    { numPlayers: 2, score: 25, modifier: 0 },
+  ] },
+};
 
 function createdPregameFrame(
   players: readonly string[] = ['Ada'],
@@ -172,6 +179,7 @@ function createdPregameFrame(
       name: playerName,
       you: index === 0,
       present: true,
+      stats: pregameStats,
     })),
     options,
     passwordProtected: false,

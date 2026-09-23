@@ -59,14 +59,24 @@ function pregame(tableID = 456): PregameGame {
     name: 'Restarted table',
     owner: 1,
     players: [
-      { index: 0, name: 'Ada', you: true, present: true },
-      { index: 1, name: 'Bob', you: false, present: true },
+      { index: 0, name: 'Ada', you: true, present: true, stats: pregameStats },
+      { index: 1, name: 'Bob', you: false, present: true, stats: pregameStats },
     ],
     options,
     passwordProtected: false,
     maxPlayers: 5,
   };
 }
+
+const pregameStats = {
+  numGames: 10,
+  variant: {
+    numGames: 5,
+    averageScore: 20.4,
+    numStrikeouts: 1,
+    bestScores: [{ numPlayers: 2, score: 25, modifier: 0 }],
+  },
+};
 
 function pregameState(role: 'player' | 'spectator', tableID = 123): RoomSliceState {
   const game = pregame(tableID);

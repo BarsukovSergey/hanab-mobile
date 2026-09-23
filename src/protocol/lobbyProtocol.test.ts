@@ -361,7 +361,7 @@ describe('lobby protocol decoder', () => {
     expect(() => encodeTableStartFrame(123, ['Ada'])).toThrow();
   });
 
-  test('validates exact joined, left, and minimal pregame payloads', () => {
+  test('validates joined and left and preserves authoritative pregame player stats', () => {
     expect(decodeServerFrame('joined {"tableID":123}')).toEqual({
       kind: 'event',
       event: { command: 'joined', data: { tableID: 123 } },
@@ -372,7 +372,10 @@ describe('lobby protocol decoder', () => {
     });
     expect(decodeServerFrame(
       'game {"tableID":123,"name":"Table","owner":7,'
-      + '"players":[{"index":0,"name":"Ada","you":true,"present":true,"stats":{}}],'
+      + '"players":[{"index":0,"name":"Ada","you":true,"present":true,'
+      + '"stats":{"numGames":42,"variant":{"numGames":12,"averageScore":23.46,'
+      + '"numStrikeouts":2,"bestScores":[{"numPlayers":2,"score":25,"modifier":1},'
+      + '{"numPlayers":3,"score":24,"modifier":-1}]}}}],'
       + '"options":{"variantName":"No Variant","timed":false,"timeBase":0,'
       + '"timePerTurn":0,"speedrun":false,"cardCycle":false,"deckPlays":false,'
       + '"emptyClues":false,"oneExtraCard":false,"oneLessCard":false,'
@@ -386,7 +389,19 @@ describe('lobby protocol decoder', () => {
           tableID: 123,
           name: 'Table',
           owner: 7,
-          players: [{ index: 0, name: 'Ada', you: true, present: true }],
+          players: [{
+            index: 0, name: 'Ada', you: true, present: true,
+            stats: {
+              numGames: 42,
+              variant: {
+                numGames: 12, averageScore: 23.46, numStrikeouts: 2,
+                bestScores: [
+                  { numPlayers: 2, score: 25, modifier: 1 },
+                  { numPlayers: 3, score: 24, modifier: -1 },
+                ],
+              },
+            },
+          }],
           options: {
             variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
             speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
