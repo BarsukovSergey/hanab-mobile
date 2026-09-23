@@ -89,19 +89,33 @@ describe('C17 dense portrait layout', () => {
   });
 
   test('keeps six-player One Extra Card capacity width-safe', () => {
-    const result = layout({ opponentCount: 5, cardsPerHand: 5, opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 500 });
-    const widthSafeOpponentHeight = Math.floor((600 - 4 * 3) / 5 / (300 / 420));
+    const result = layout({ opponentCount: 5, cardsPerHand: 4, opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 500 });
+    const widthSafeOpponentHeight = Math.floor((600 - 3 * 3) / 4 / (300 / 420));
     expect(result.mode).toBe('full-ledger');
     expect(result.opponentCardHeight).toBeLessThanOrEqual(widthSafeOpponentHeight);
     expect(result.opponentCardHeight).toBeLessThanOrEqual(result.ownCardHeight);
   });
 
-  test('uses authoritative dense hand capacity for stable width allocation', () => {
+  test('uses authoritative dense hand capacity for a general width stress case', () => {
     const ordinary = layout({ opponentCount: 5, cardsPerHand: 4, opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 500 });
     const oneExtraCard = layout({ opponentCount: 5, cardsPerHand: 5, opponentCardLaneWidth: 600, ownCardLaneWidth: 300, handsRegionHeight: 500 });
     expect(ordinary.mode).toBe('full-ledger');
     expect(oneExtraCard.mode).toBe('full-ledger');
     expect(oneExtraCard.opponentCardHeight).toBeLessThanOrEqual(ordinary.opponentCardHeight);
+  });
+
+  test('uses shared headroom for unequal dense card heights and vertical capacity', () => {
+    const handsRegionHeight = 500;
+    const opponentCount = 5;
+    const result = layout({ opponentCount, handsRegionHeight, opponentCardLaneWidth: 600, ownCardLaneWidth: 300 });
+
+    expect(result.mode).toBe('full-ledger');
+    expect(result.ownCardHeight).not.toBe(result.opponentCardHeight);
+    expect(result.opponentRowHeight).toBe(result.opponentCardHeight + result.cardTopHeadroom + 22);
+    expect(result.handsHeight).toBe(
+      result.ownRowHeight + opponentCount * result.opponentRowHeight + (opponentCount - 1) * 2 + 5,
+    );
+    expect(result.handsHeight).toBeLessThanOrEqual(handsRegionHeight);
   });
 
   test('falls back when dense opponent cards cannot reach the readable floor', () => {

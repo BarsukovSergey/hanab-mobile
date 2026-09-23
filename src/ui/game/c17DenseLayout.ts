@@ -126,9 +126,9 @@ export function getC17DenseLayout({
     }
     if (opponentCardHeight >= MIN_DENSE_OPPONENT_CARD_HEIGHT) {
       const cardTopHeadroom = getCardTopHeadroom(ownCardHeight);
-      const opponentRowHeight = opponentCardHeight + getCardTopHeadroom(opponentCardHeight) + HAND_ROW_CHROME;
+      const opponentRowHeight = opponentCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
       const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
-      const handsHeight = getDenseHandsHeight(ownCardHeight, opponentCardHeight, opponents);
+      const handsHeight = getDenseHandsHeight(ownCardHeight, opponentCardHeight, cardTopHeadroom, opponents);
       return {
         mode: 'full-ledger',
         opponentCardHeight,
@@ -185,12 +185,13 @@ function maxDenseOpponentCardHeight(
   handsRegionHeight: number,
   opponents: number,
 ): number {
+  const cardTopHeadroom = getCardTopHeadroom(ownCardHeight);
   let low = 1;
   let high = Math.min(widthFit, ownCardHeight);
   let best = 0;
   while (low <= high) {
     const candidate = Math.floor((low + high) / 2);
-    if (getDenseHandsHeight(ownCardHeight, candidate, opponents) <= handsRegionHeight) {
+    if (getDenseHandsHeight(ownCardHeight, candidate, cardTopHeadroom, opponents) <= handsRegionHeight) {
       best = candidate;
       low = candidate + 1;
     } else {
@@ -200,9 +201,14 @@ function maxDenseOpponentCardHeight(
   return best;
 }
 
-function getDenseHandsHeight(ownCardHeight: number, opponentCardHeight: number, opponents: number): number {
-  const ownRowHeight = ownCardHeight + getCardTopHeadroom(ownCardHeight) + HAND_ROW_CHROME;
-  const opponentRowHeight = opponentCardHeight + getCardTopHeadroom(opponentCardHeight) + HAND_ROW_CHROME;
+function getDenseHandsHeight(
+  ownCardHeight: number,
+  opponentCardHeight: number,
+  cardTopHeadroom: number,
+  opponents: number,
+): number {
+  const ownRowHeight = ownCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
+  const opponentRowHeight = opponentCardHeight + cardTopHeadroom + HAND_ROW_CHROME;
   return ownRowHeight + opponents * opponentRowHeight
     + Math.max(0, opponents - 1) * OPPONENT_ROW_GAP
     + HAND_ROW_GAP;
