@@ -204,10 +204,18 @@ describe('C17 dense portrait layout', () => {
     expect(getC17WorkbenchHeight(600)).toBe(140);
   });
 
-  test('fits ordinary six-player real cards in a constrained ambient body with side-label lanes', () => {
+  test('dense shell space restores ordinary six-player real cards on a tight portrait body', () => {
     const workbenchHeight = getC17WorkbenchHeight(600, 5);
-    const handsRegionHeight = getC17HandsRegionHeight(481, workbenchHeight);
-    const cardLaneWidth = getC17CardLaneWidth(390, C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP);
+    const cardLaneWidth = getC17CardLaneWidth(360, C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP);
+    const beforeChrome = layout({
+      opponentCount: 5,
+      cardsPerHand: 4,
+      opponentCardLaneWidth: cardLaneWidth,
+      ownCardLaneWidth: cardLaneWidth,
+      handsRegionHeight: getC17HandsRegionHeight(380, workbenchHeight),
+      workbenchHeight,
+    });
+    const handsRegionHeight = getC17HandsRegionHeight(420, workbenchHeight);
     const result = layout({
       opponentCount: 5,
       cardsPerHand: 4,
@@ -218,6 +226,7 @@ describe('C17 dense portrait layout', () => {
     });
 
     expect(workbenchHeight).toBe(56);
+    expect(beforeChrome.mode).toBe('compact-overview');
     expect(result.mode).toBe('full-ledger');
     expect(result.opponentCardHeight).toBeGreaterThanOrEqual(46);
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(result.opponentCardHeight);

@@ -821,9 +821,19 @@ function C17DenseWorkspace({
           onPress={() => setEfficiencyDetailsOpen(true)} />
       </View>
 
-      <CompactTable dense game={game} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
+      <CompactTable dense tightChrome={usesDenseSideLabels} game={game} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
 
-      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, usesDenseSideLabels && styles.denseLastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+        {usesDenseSideLabels ? <View style={styles.denseLastActionRow}>
+          <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.denseLastActionSummary}>
+            <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{reviewActive ? `LAST T${selectedTurn}` : 'LAST'} · {lastAction}</Text>
+            <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
+          </Pressable>
+          <View style={styles.denseLastActionActions}>
+            {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={onEnterRewind} />}
+            <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+          </View>
+        </View> : <>
         <View style={[styles.rowBetween, styles.lastActionHeader]}>
           <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
           <View style={styles.actionButtons}>
@@ -836,6 +846,7 @@ function C17DenseWorkspace({
           <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
           <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
         </Pressable>
+        </>}
       </View></AuthoritativePulse>
     </View>
 
@@ -1085,6 +1096,7 @@ function C17DenseWorkspace({
       styles.workbench,
       compactOrdinaryWorkbench ? styles.compactWorkbenchReserve : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
       compactCappedWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
+      usesDenseSideLabels && { minHeight: layout.workbenchHeight },
       !shellMeasured && styles.shellPending,
     ]}>
       {showRewindScrubber && <View style={styles.workbenchScrubber}>
@@ -1220,7 +1232,7 @@ function C17DenseWorkspace({
           {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
         </>}
       </ScrollView>
-    </View> : <View style={styles.idleWorkbench} />}
+    </View> : <View style={[styles.idleWorkbench, usesDenseSideLabels && { minHeight: layout.workbenchHeight }]} />}
     </View>
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
@@ -1324,6 +1336,10 @@ const styles = StyleSheet.create({
   hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
   hudLabel: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
   lastAction: { borderRadius: 8, borderWidth: 1, gap: 3, minHeight: 37, paddingHorizontal: 7, paddingVertical: 4 },
+  denseLastAction: { gap: 0, paddingHorizontal: 5, paddingVertical: 2 },
+  denseLastActionRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  denseLastActionSummary: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 4, minWidth: 0 },
+  denseLastActionActions: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, gap: 3 },
   lastActionHeader: { minHeight: 32 },
   lastActionPressable: { alignItems: 'center', flexDirection: 'row', gap: 7, minHeight: 24 },
   lastActionText: { flex: 1, fontSize: 10, fontWeight: '700', minWidth: 0 },
