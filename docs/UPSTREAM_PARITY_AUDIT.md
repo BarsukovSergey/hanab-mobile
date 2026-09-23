@@ -804,6 +804,99 @@ production bot-discovery service. Its README documents PM `/join` as the invitat
 
 ---
 
+# 13A. Exhaustive upstream manual-section coverage
+
+This checklist exists specifically to prevent "we never classified that section of the upstream
+manual" omissions. It follows the current `docs/features.md` structure.
+
+| Upstream manual section | Mobile classification | Detail / cross-reference |
+| --- | --- | --- |
+| Basic How-To | **Full mobile adaptation for accepted scope** | Create/join/start and core Play/Discard/Clue are present. Desktop drag interactions are intentionally replaced by safer explicit mobile selection/confirmation. |
+| Major Features | **Section header** | Its concrete subsections are classified below. |
+| Clue Indication | **Full core, mobile-adapted** | Touched-card marker, brand-new vs retouch distinction, orange clue border, accumulated knowledge and empathy are present. Full desktop hover/clue-log interaction is not. |
+| Pips | **Full** | Suit/rank possibilities and elimination come from the vendored upstream game state. |
+| Critical Indicator | **Full** | Critical-card marker is rendered. |
+| Clue Log | **Partial** | Last Action + Recent can jump into rewind, but mobile does not expose the complete always-available clue log or card↔clue hover highlighting. |
+| Termination | **Full** | Server idle termination remains authoritative; player termination/voting has native UI/runtime support. |
+| Spectators | **Partial** | Spectating/all-hands/list support exists; player-perspective shadowing and pregame spectator list are missing. |
+| In-Game Replay | **Full core / partial shortcuts** | Live rewind and direct temporal navigation work. Web shortcuts for draw/first-clue/play/discard/strike/arbitrary-turn jumps are not all exposed. |
+| Game History and Profiles | **Partial** | Own history exists; profiles, arbitrary-player/group history and richer stats are missing. |
+| Replays | **Partial** | Database-ID solo replay works. Shared creation, arbitrary JSON replay and copy/export are missing. |
+| Shared Replays | **Partial but strong core** | Leader/follow/detach/segment/Hypothetical core works; annotations, suggestion receive-side, sound and dynamic efficiency-mod parity are incomplete. |
+| Hypotheticals | **Full core / morph missing** | Start/end/play/discard/clue/back/reveal work; arbitrary card morph/unmorph cannot be originated from mobile. |
+| In-Game Statistics | **Partial presentation** | Score/max/clues/strikes/deck/Pace/FRE state exists; upstream Pace/FRE context semantics are tracked in #30. |
+| 6-Player Games | **Partial presentation** | Upstream hand-size/rules state works; current dense mobile layout is not accepted 4P–6P UX. |
+| Custom Game Options | **Full for exposed supported subset** | Pregame create/edit and authoritative option preservation exist; unsupported rule families are rejected deliberately. |
+| Variants | **2242/2426 supported** | 184 current variants are deliberately excluded by mechanic family; see variant matrix. |
+| Timed Games | **Full** | Creation/update, clocks, timeout end conditions and pause/queued pause are supported. |
+| Speedruns | **Unsupported** | Requires different controls/semantics and is intentionally rejected. |
+| Card Cycling | **Full** | Option is exposed and the vendored reducer handles cycling. |
+| Bottom Deck Blind Plays | **Unsupported** | `deckPlays` tables are rejected; no deck-action UI. |
+| Empty Clues | **Full** | Option, clue preview, legality and send path are implemented. |
+| One Extra Card | **Full core** | Rule supported; increases dense-layout pressure in 4P–6P. |
+| One Less Card | **Full** | Rule supported. |
+| All or Nothing | **Full core / stats presentation partial** | Rule/end conditions work; Pace hiding semantics need #30. |
+| Detrimental Character Assignments | **Unsupported** | Tables are rejected rather than partially simulated. |
+| Password-Protected Games | **Full** | Create/join with transient password; no credential persistence. |
+| Other Options | **Partial** | Individual settings are classified in the settings matrix. |
+| Keldon Mode | **Missing / low-value desktop layout parity** | Mobile uses its own responsive layout. |
+| Color-Blind Mode | **Missing** | High-value accessibility candidate. |
+| Real-Life Mode | **Missing** | Niche presentation option. |
+| Reverse Hand Direction | **Missing** | Genuine per-user preference; medium value. |
+| Pre-Playing | **Missing** | Deliberately low priority because speculative/premove actions raise mobile action-safety complexity. |
+| H-Group Conventions | **Partial** | Effective H-group state, DDA/empathy semantics exist; locked-hand/low-score presentation and settings toggle are incomplete. |
+| Notes — Basic Description | **Full core** | Authoritative notes, card-order identity, replay persistence and spectator combined-note data are supported. |
+| Notes — Card Identity Notes | **Full parser/presentation semantics** | Exact-identity notes and falsification behavior come from upstream semantics. |
+| Notes — Card Partial Identity Notes | **Full parser semantics** | Possibility and exclusion syntax is supported. |
+| Notes — Special Note Borders | **Full** | Finesse and Chop Move. |
+| Notes — Other Special Notes | **Full semantics / some one-tap UI missing** | trash/KT/fix/?/!/blank/clued/unclued are understood; dedicated Clued/Unclued/Blank controls remain backlog. |
+| Notes — Adding Context | **Full** | Bracketed semantic tokens and stacked effects are preserved. |
+| Notes — Note Shortcuts | **Full mobile equivalents** | F/CM/PTD/KT, Turn insertion and Repeat are explicit buttons rather than desktop modifier-clicks. |
+| Sounds | **Missing** | No gameplay/replay sound system yet. |
+| Pace & Efficiency | **Partial presentation** | Vendored formulas/state exist; context/display parity tracked in #30. |
+| Pace | **Partial presentation** | Final-round/AON suppression and risk treatment differ from web. |
+| Efficiency | **Partial presentation** | FRE exists; minimum required efficiency and review/shared modifier policy differ. |
+| Keyboard Shortcuts | **N/A literally** | Native controls/gestures should cover valuable actions rather than reproducing desktop key chords. |
+| Similar Deals and Competitive Play | **Partial** | Server seed selection works automatically; magic `!seed`/ `!replay` table names pass through; Other Scores and strong seed UI are missing. |
+| Chat | **Full basic / partial rich features** | Text/PM/history/commands work; read/unread/typing/emotes/link richness/zen are incomplete. |
+| Friends | **Partial** | Commands + state work; People/friends UI and friend-aware sorting are missing. |
+| Linked Accounts | **Command-complete / UI missing** | Link/unlink/linked commands work; native explanation/workflow absent. |
+| Tags | **Command-complete / workflow missing** | Add/delete/search/list command paths exist; history/tag browser UI absent. |
+| Website Endpoints | **Audited individually** | See endpoint matrix. |
+| Research & Bots | **Partial** | Same server protocol can host bots; native bot picker and arbitrary JSON replay are missing. |
+| JSON Endpoints | **Audited individually** | See endpoint matrix. |
+| Password Reset | **Missing entry point** | Web reset page exists. |
+| Project History | **N/A** | Documentation/community information, not a mobile runtime feature. |
+
+This coverage table is intentionally redundant with the deeper sections: its purpose is completeness,
+not compactness.
+
+## Public Hanabi-Live repositories
+
+A repository-level organization search currently returns exactly two public repositories:
+
+1. `Hanabi-Live/hanabi-live` — the website/server/client/game monorepo;
+2. `Hanabi-Live/hanabi-live-bot` — the Python reference bot.
+
+There is no separate official Hanabi-Live mobile SDK, bot registry or protocol repository to audit.
+
+### Reference bot caveat
+
+The official Python reference bot is useful as a protocol example but should not be treated as a
+current bot-capability standard:
+
+- its latest commit is a source-layout refactor from 2023, while most functional implementation work
+  dates to 2020;
+- its documented invitation is PM `/join`;
+- its `tableJoin` implementation does not include a password;
+- it does not define authoritative production bot usernames.
+
+The more actively maintained community scala-bot supports `/join <password>`. Therefore the planned
+mobile bot registry must store verified per-bot capabilities rather than infer one universal command
+set from the word "bot".
+
+---
+
 # 14A. Exhaustive documented slash-command matrix
 
 This table covers every command currently documented in upstream `docs/chat-commands.md`.
