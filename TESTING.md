@@ -17,6 +17,8 @@ Please note:
 
 If you were given an APK/build directly, install that build. You do not need the source repository.
 
+If beta.1 is already installed, beta.2 should preferably be installed **over it without uninstalling first** so upgrade continuity is exercised.
+
 ## What to test
 
 ### 1. Normal live play
@@ -30,6 +32,8 @@ Try to answer without hunting through menus:
 - What just happened?
 - Can you select your own card and understand how to Play or Discard it?
 - Does anything important move, clip or disappear?
+
+Play/Discard should remain an explicit commit action; accidental gameplay sends are high-priority failures.
 
 ### 2. Last Action and Recent actions
 
@@ -85,15 +89,36 @@ During normal play and rewind, briefly check:
 - no hand requires horizontal scrolling;
 - required gameplay controls remain comfortably tappable.
 
+The 2P/3P path remains the core smoke target. Beta.2 also includes substantial 4P–6P real-card layout work, so a larger table is useful regression coverage when convenient.
+
+### 6. Beta.2 additions
+
+If convenient, sample the newer beta.2 surfaces:
+
+- spectator mode and perspective switching;
+- colorblind/styled-number card settings;
+- Pregame player stats and spectator list;
+- Friends history and same-seed Other Scores;
+- shared replay creation from History and turn suggestions;
+- game tag display/Add flow;
+- live table chat unread indicator;
+- a session PM Dialog from People, Pregame, or live-game player/spectator context.
+
+These are regression targets, not a requirement to exhaust every feature in one session.
+
 ## Beta scope and known limitations
 
-This beta is accepted around **2P/3P** gameplay, replay/review, Hypothetical and spectator flows.
+Beta.2 is centered on reliable **2P/3P** gameplay and review while also carrying the newer adaptive 4P–6P real-card layout.
 
-**4P–6P dense gameplay is not certified for this beta.** The current Compact Overview / summary-icon layout is known unfinished work and should not be treated as the intended final experience.
+The current 4P–6P path uses real cards as the primary UI with Compact Overview reserved as an emergency fallback. Report clipping, unreadable cards, excessive density, or an unexpected fallback.
 
-Also known and non-blocking for this beta: rapid replay scrubber movement can still show visible jank. `/copy` is intentionally deferred.
+Known non-blockers:
 
-Still report crashes, broken navigation, accidental sends, lost state, clipped UI, unreadable cards, or anything that makes ordinary 2P/3P play confusing.
+- rapid replay scrubber movement can still show visible jank (issue #4);
+- compact shell/Pregame information-density polish remains future work (issue #58);
+- `/copy` replay export is intentionally deferred.
+
+Still report crashes, broken navigation, accidental sends, lost state, clipped UI, unreadable cards, or anything that makes ordinary play confusing.
 
 ## How to report a problem
 

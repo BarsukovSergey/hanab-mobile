@@ -2,7 +2,9 @@
 
 Mobile Hanabi client focused on serious live play on phones.
 
-The current Android test build is **1.0.0-beta.2**. C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
+The current Android tester candidate is **1.0.0-beta.2**. The frozen APK has been built successfully from candidate commit `45d99d15960d04934ea0ce07fcb90db73eb206df`; physical-device smoke is still pending before broad tester distribution.
+
+C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
 
 ## For testers
 
@@ -10,18 +12,22 @@ If someone sent you an Android build/APK, you do **not** need to build the proje
 
 Please test the app as a player, not as someone trying to guess how the UI was implemented. If an action is hard to discover or a screen is confusing without instructions, report that as a UX problem.
 
+Beta.2 release notes, exact frozen build identity, checksum, and current validation state are tracked in [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
+
 ## Current test focus
 
-The first Android beta is certified around **2P/3P** gameplay and review flows:
+The Android beta remains centered on reliable serious play and review flows:
 
 - card selection and explicit Play/Discard actions;
 - notes, clue planning, knowledge/empathy and discard inspection;
 - Last Action / Recent and live rewind;
 - finished/shared replay and Hypothetical;
 - spectator and lifecycle behavior;
-- Android safe-area, rotation, keyboard and reconnect behavior.
+- Android safe-area, rotation, keyboard and reconnect behavior;
+- focused 4P–6P real-card layout regression on supported phone layouts;
+- social/history additions shipped after beta.1.
 
-**4P–6P dense layout is not part of this beta acceptance scope.** Its current Compact Overview / summary-icon presentation is known unfinished work.
+The compact product shell and some dense presentation details are still post-beta polish rather than release blockers.
 
 See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug-report format.
 
@@ -75,5 +81,6 @@ npm test
 ## Project documentation
 
 - Testers: start with [`TESTING.md`](./TESTING.md).
-- Android beta build/release notes: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
+- Beta.2 release notes: [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
+- Android beta build/release guidance: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
 - Maintainers: [`docs/README.md`](./docs/README.md) is the documentation map and marks current authority versus historical snapshots.
