@@ -1,6 +1,8 @@
 # C17 Post-beta Backlog
 
-Date: 2026-09-22
+Date: 2026-09-24
+
+Last reconciled with `main` at `f6f71737c8ba4f9c63993f06bcb9a4072c917bba` (PR #73).
 
 These items were explicitly removed from the C17 release gate during product review. They must not silently re-enter C17 acceptance work unless separately reprioritized.
 
@@ -31,21 +33,17 @@ These items were explicitly removed from the C17 release gate during product rev
 - **2P portrait space allocation:** reduce the large dead vertical band that can appear between the hand/table region and Workbench without destabilizing denser player-count layouts.
 - **Live HUD hierarchy / compact notation:** revisit the dense Score/Max/Clues/Strikes/Deck/Pace/Eff presentation, including compact score/max notation and whether some metrics belong closer to their table context. Issue #30 has corrected the upstream Pace/Eff context semantics (final-round/All-or-Nothing suppression, pace risk, Minimum Required Efficiency, and review-mode modifier policy); preserve that semantic boundary during later visual redesign and do not invent mobile-only stats.
 - **Live-game header chrome:** reduce the visual prominence/cost of rarely used Lobby navigation during active play while keeping exit/navigation discoverable and safe.
-- **Card presentation preferences:** investigate exposing upstream-compatible card preferences such as colorblind mode and styled numbers. If added, generate/bundle the corresponding pinned renderer assets deliberately rather than approximating them in UI.
 - Dedicated two-column landscape composition.
 - Dedicated tablet / large-screen persistent side-pane composition and polish.
 - Richer / prettier / cinematic gameplay animations beyond the minimal functional C17 transitions.
 
 ## Product shell / social
 
-- **Native controls for useful slash-command actions:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. Prioritize contextual PM/player-info/friend actions, pregame kick and score/variant helpers, shared-replay turn suggestion, and tags where the structured mobile context improves on command typing. Existing leader/variant/pause/termination controls are already first-class UI. Preserve slash-command support as the parity/fallback path.
+- **Native controls for useful slash-command actions:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. People/Pregame already expose contextual Message and Friend/Unfriend actions. Remaining candidates include pregame kick and score/variant helpers, shared-replay turn suggestion, and tags where structured mobile context improves on command typing. Existing leader/variant/pause/termination controls remain first-class UI. Preserve slash-command support as the parity/fallback path.
 - **Simple bot invite UI:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. Use a **multi-select** bot picker in Create table so the creator can choose several bots up to available player capacity. Back it with an explicit registry of verified bot usernames **and per-bot invite capabilities**: the official reference bot only demonstrates open-table `/join`, while maintained community bots may also support `/join <password>`. For a newly created protected table, reuse the still-transient create-form password only for selected bots whose verified capability set includes protected-table join; visibly disable incompatible bots instead of guessing. Keep the same multi-select `Add bot` action in Pregame for existing tables. Do not persist table passwords or create a bot-only protocol.
-- **Spectator perspective / shadowing:** expose the existing authoritative `shadowingPlayerIndex` capability so a spectator can view an ongoing game from a selected player's perspective and clearly return to all-hands spectator view. The transport/state already carries shadowing metadata; do not invent a second visibility model.
-- **Pregame player stats:** preserve and present the authoritative pregame `stats` payload (total games, variant games, average score, strikeout rate, best-score context) instead of dropping it in the mobile schema. Keep this compact/contextual rather than turning Pregame into a full profile page.
 - **Account-management UX:** clarify on the login screen that a new username creates an account (matching upstream), preserve the unique-password warning, and provide deliberate Change password / Forgot password entry points without storing credentials in app state.
-- People surface.
-- Rich/compact profiles beyond what is strictly required by existing gameplay/table identity.
-- Friends list / online-friends affordances.
+- Rich/compact profiles beyond the existing People/context-action surfaces.
+- Broader friends/social UX beyond current People/Friend actions, friend-aware Lobby ordering, and Friends history.
 - Social feeds, recommendations, achievements, messaging redesign.
 - **Chat typing/read-state polish:** optional typing indicators and/or unread/read-state affordances if the authoritative server/client capability is worth exposing on mobile.
 - **Push notifications:** research mobile notifications for genuinely useful events (for example turn/table/social events) only after verifying server/background-delivery capability and notification permission UX.
@@ -53,7 +51,6 @@ These items were explicitly removed from the C17 release gate during product rev
 
 ## Replay / command parity
 
-- **Seed comparison / other scores:** investigate a history/replay view for other games played on the same seed, using authoritative history/server data rather than client-side score guessing. Treat this as an optional history enhancement.
 - **Advanced shared-replay parity:** research the remaining useful web power-user features such as explicit shared-replay creation from history, complete send/receive turn suggestions, replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. Initial `sharedReplayEffMod` state and authoritative follower-side `replayEfficiencyMod` updates are supported; controls for originating modifier changes remain future work. Do not rebuild the semantic state separately in UI.
 - **Arbitrary JSON replay import:** add the upstream `replayCreate` `source=json` workflow for research/bot review only after deliberately adopting the current upstream JSON seed/deck/player-name semantics recorded in `docs/UPSTREAM_PARITY_AUDIT.md`.
 - **Game/replay tags workflow:** the protocol/runtime can already carry game-history `tags` data and raw tag commands, but there is no first-class mobile workflow. Research whether tag search/add/delete deserves native UI. This is distinct from note quick tags.
@@ -78,5 +75,10 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Hypothetical using upstream/server semantics.
 - Live spectator C17 workspace.
 - Pregame player/spectator role switching where authoritative capability permits.
+- Spectator perspective switching between all hands and an authoritative player shadow seat.
+- Colorblind and styled-number card presentation using generated pinned-upstream assets and server settings.
+- People/Pregame contextual Message and Friend/Unfriend actions, plus friend-aware Lobby ordering.
+- Compact authoritative Pregame player stats and spectator list.
+- Own History, Friends history, and same-seed Other Scores comparison.
 - Minimal functional state-change animation.
 - Adaptive 4P–6P real-card portrait allocation with the 46 dp opponent floor and emergency-only Compact Overview fallback; current physical evidence covers 5P, true 6P, and 6P + One Extra Card on the tested Android class.
