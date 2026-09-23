@@ -430,6 +430,7 @@ const schemas = {
   userInactive: userInactiveSchema,
   voteChange: voteChangeSchema,
   gameHistory: gameHistorySchema,
+  gameHistoryFriends: gameHistorySchema,
   cardIdentities: cardIdentitiesSchema,
   finishOngoingGame: finishOngoingGameSchema,
   replaySegment: replaySegmentSchema,
@@ -675,6 +676,10 @@ export function encodeInactiveFrame(inactive: boolean): string {
 
 export function encodeHistoryGetFrame(offset: number, amount = 10): string {
   return encodeClientFrame('historyGet', historyGetCommandSchema.parse({ offset, amount }));
+}
+
+export function encodeHistoryFriendsGetFrame(offset: number, amount = 10): string {
+  return encodeClientFrame('historyFriendsGet', historyGetCommandSchema.parse({ offset, amount }));
 }
 
 export function encodeReplayCreateFrame(databaseID: number): string {

@@ -36,6 +36,15 @@ The finished-game `note.unclued` presentation behavior deliberately includes the
 
 The semantic contract and mobile parity notes for this selector live in `docs/CARD_PRESENTATION_PARITY.md`.
 
+## Friends history protocol pin
+
+Friends history is adapted from `Hanabi-Live/hanabi-live` commit
+`c1d970bd610395087958fe7d1bb96f52244f7b04`, specifically
+`server/src/websocket_connect.go`, `server/src/command_history_friends_get.go`,
+`packages/client/src/lobby/lobbyCommands.ts`, `packages/client/src/lobby/history.ts`,
+and `packages/client/src/lobby/types/GameHistory.ts`. This scoped protocol fact does
+not advance the baseline game/protocol pin above.
+
 ## Hypothetical replay core pin
 
 Hypothetical replay state, reducer semantics, and replay-action protocol are adapted from:

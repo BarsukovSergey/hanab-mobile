@@ -18,22 +18,30 @@ export type HistoryState = {
   connectionEpoch: number;
   totalGames: number;
   items: GameHistoryItem[];
+  friendItems: GameHistoryItem[];
   initialPageReceived: boolean;
+  friendInitialPageReceived: boolean;
   pendingRequest: PendingHistoryRequest | null;
+  friendPendingRequest: PendingHistoryRequest | null;
   pendingReplayCreate: PendingReplayCreate | null;
   error: string | null;
   hasMore: boolean;
+  friendHasMore: boolean;
 };
 
 const initialState: HistoryState = {
   connectionEpoch: 0,
   totalGames: 0,
   items: [],
+  friendItems: [],
   initialPageReceived: false,
+  friendInitialPageReceived: false,
   pendingRequest: null,
+  friendPendingRequest: null,
   pendingReplayCreate: null,
   error: null,
   hasMore: false,
+  friendHasMore: false,
 };
 
 function uniqueItems(items: readonly GameHistoryItem[]): GameHistoryItem[] {
@@ -86,11 +94,55 @@ export const historySlice = createSlice({
       state.hasMore = rawLength >= pending.amount && state.items.length < state.totalGames;
       state.error = null;
     },
+    friendPageRequested(state, action: PayloadAction<PendingHistoryRequest>) {
+      if (
+        state.connectionEpoch !== action.payload.connectionEpoch
+        || state.friendPendingRequest !== null
+        || action.payload.amount !== 10
+        || (state.friendInitialPageReceived
+          ? !state.friendHasMore || action.payload.offset !== state.friendItems.length
+          : action.payload.offset !== 0)
+      ) return;
+      state.friendPendingRequest = action.payload;
+      state.error = null;
+    },
+    friendPageReceived(
+      state,
+      action: PayloadAction<{ connectionEpoch: number; history: GameHistory }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch) return;
+      const rawLength = action.payload.history.length;
+      if (!state.friendInitialPageReceived) {
+        state.friendItems = uniqueItems(action.payload.history);
+        state.friendInitialPageReceived = true;
+        state.friendPendingRequest = null;
+        state.friendHasMore = rawLength >= 10;
+        state.error = null;
+        return;
+      }
+      const pending = state.friendPendingRequest;
+      if (pending === null || pending.connectionEpoch !== action.payload.connectionEpoch) return;
+      // An explicit offset-zero request can race the automatic initial page.
+      if (pending.offset === 0) {
+        state.friendPendingRequest = null;
+        return;
+      }
+      const seen = new Set(state.friendItems.map((item) => item.id));
+      for (const item of action.payload.history) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          state.friendItems.push(item);
+        }
+      }
+      state.friendPendingRequest = null;
+      state.friendHasMore = rawLength >= pending.amount;
+      state.error = null;
+    },
     replayCreateRequested(state, action: PayloadAction<PendingReplayCreate>) {
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
         || state.pendingReplayCreate !== null
-        || !state.items.some((item) => item.id === action.payload.databaseID)
+        || ![...state.items, ...state.friendItems].some((item) => item.id === action.payload.databaseID)
       ) return;
       state.pendingReplayCreate = action.payload;
       state.error = null;
@@ -108,6 +160,7 @@ export const historySlice = createSlice({
     ) {
       if (state.connectionEpoch !== action.payload.connectionEpoch) return;
       state.pendingRequest = null;
+      state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
       state.error = action.payload.message;
     },
@@ -127,11 +180,13 @@ export const historySlice = createSlice({
     builder.addCase(sessionActions.connectionFailed, (state, action) => {
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.pendingRequest = null;
+      state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.pendingRequest = null;
+      state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
     });
     builder.addCase(sessionActions.signedOut, () => initialState);

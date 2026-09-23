@@ -32,6 +32,46 @@ function readyStore(totalGames = 30) {
 }
 
 describe('C15 history state', () => {
+  test('friends pages stay independent, preserve order, and stop on a short page', () => {
+    const store = readyStore(1);
+    store.dispatch(historyActions.pageReceived({ connectionEpoch: 1, history: [item(1)] }));
+    store.dispatch(historyActions.friendPageReceived({
+      connectionEpoch: 1,
+      history: [item(20), item(19), item(20), ...Array.from({ length: 8 }, (_, i) => item(18 - i))],
+    }));
+    expect(store.getState().history.friendItems.map(({ id }) => id))
+      .toEqual([20, 19, 18, 17, 16, 15, 14, 13, 12, 11]);
+    expect(store.getState().history).toMatchObject({
+      items: [item(1)], totalGames: 1, hasMore: false,
+      friendInitialPageReceived: true, friendHasMore: true,
+    });
+    store.dispatch(historyActions.friendPageReceived({ connectionEpoch: 1, history: [item(99)] }));
+    expect(store.getState().history.friendItems.map(({ id }) => id)[0]).toBe(20);
+    store.dispatch(historyActions.friendPageRequested({ connectionEpoch: 1, offset: 10, amount: 10 }));
+    store.dispatch(historyActions.friendPageReceived({
+      connectionEpoch: 1, history: [item(11), item(10)],
+    }));
+    expect(store.getState().history.friendItems.map(({ id }) => id))
+      .toEqual([20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10]);
+    expect(store.getState().history.friendHasMore).toBe(false);
+    expect(store.getState().history.totalGames).toBe(1);
+    expect(store.getState().history.items.map(({ id }) => id)).toEqual([1]);
+  });
+
+  test('friend initial request races the automatic page safely and resets at a new epoch', () => {
+    const store = readyStore();
+    store.dispatch(historyActions.friendPageRequested({ connectionEpoch: 1, offset: 0, amount: 10 }));
+    store.dispatch(historyActions.friendPageReceived({ connectionEpoch: 1, history: [item(5)] }));
+    store.dispatch(historyActions.friendPageReceived({ connectionEpoch: 1, history: [item(6)] }));
+    expect(store.getState().history.friendItems.map(({ id }) => id)).toEqual([5]);
+    expect(store.getState().history.friendPendingRequest).toBeNull();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    store.dispatch(historyActions.friendPageReceived({ connectionEpoch: 1, history: [item(7)] }));
+    expect(store.getState().history).toMatchObject({
+      friendItems: [], friendInitialPageReceived: false, friendPendingRequest: null,
+      friendHasMore: false,
+    });
+  });
   test('automatic first page initializes in server order and dedupes by id', () => {
     const store = readyStore();
     const page = [item(30), item(29), item(30), ...Array.from({ length: 8 }, (_, i) => item(28 - i))];

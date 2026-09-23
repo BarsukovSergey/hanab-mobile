@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { areTableOptionsSupported } from '../../game/client/supportedVariants';
@@ -30,6 +31,17 @@ export function HistoryScreen({
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
   const history = useAppSelector((state) => state.history);
+  const session = useAppSelector((state) => state.session);
+  const [selection, setSelection] = useState<{ epoch: number; friends: boolean }>({
+    epoch: session.connectionEpoch, friends: false,
+  });
+  const showingFriends = selection.epoch === session.connectionEpoch
+    && selection.friends && session.friends.length > 0;
+  const items = showingFriends ? history.friendItems : history.items;
+  const initialPageReceived = showingFriends
+    ? history.friendInitialPageReceived : history.initialPageReceived;
+  const hasMore = showingFriends ? history.friendHasMore : history.hasMore;
+  const pendingRequest = showingFriends ? history.friendPendingRequest : history.pendingRequest;
   const replayPending = history.pendingReplayCreate !== null;
   return (
     <View style={styles.root}>
@@ -41,14 +53,27 @@ export function HistoryScreen({
         <ActionButton compact title="Back to lobby" onPress={onBack} />
       </Panel>
 
-      {!history.initialPageReceived && <Notice>Loading game history…</Notice>}
+      {session.friends.length > 0 && (
+        <View style={styles.switcher}>
+          <ActionButton compact title="My history" tone={showingFriends ? 'secondary' : 'primary'}
+            onPress={() => setSelection({ epoch: session.connectionEpoch, friends: false })} />
+          <ActionButton compact title="Friends history" tone={showingFriends ? 'primary' : 'secondary'}
+            onPress={() => {
+              setSelection({ epoch: session.connectionEpoch, friends: true });
+              lobbyRuntime.ensureFriendsHistory();
+            }} />
+        </View>
+      )}
+
+      {!initialPageReceived && <Notice>{showingFriends ? 'Loading friends history…' : 'Loading game history…'}</Notice>}
       {history.error !== null && <Notice tone="error">{history.error}</Notice>}
-      {history.initialPageReceived && history.items.length === 0 && (
-        <Panel><EmptyState>No finished games yet.</EmptyState></Panel>
+      {initialPageReceived && items.length === 0 && (
+        <Panel><EmptyState>{showingFriends
+          ? 'None of your friends have played any games yet.' : 'No finished games yet.'}</EmptyState></Panel>
       )}
 
       <View style={[styles.grid, wide && styles.gridWide]}>
-        {history.items.map((item) => {
+        {items.map((item) => {
           const supported = areTableOptionsSupported(item.options);
           const finished = new Date(item.datetimeFinished);
           const finishedLabel = Number.isNaN(finished.getTime())
@@ -78,20 +103,22 @@ export function HistoryScreen({
         })}
       </View>
 
-      {history.hasMore && (
+      {hasMore && (
         <ActionButton
-          disabled={history.pendingRequest !== null}
-          title={history.pendingRequest === null ? 'Load more' : 'Loading more…'}
-          onPress={() => lobbyRuntime.loadMoreHistory()}
+          disabled={pendingRequest !== null}
+          title={pendingRequest === null ? 'Load more' : 'Loading more…'}
+          onPress={() => showingFriends
+            ? lobbyRuntime.loadMoreFriendsHistory() : lobbyRuntime.loadMoreHistory()}
         />
       )}
-      {history.pendingRequest !== null && <Text style={{ color: theme.colors.textMuted }}>Loading another page…</Text>}
+      {pendingRequest !== null && <Text style={{ color: theme.colors.textMuted }}>Loading another page…</Text>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { gap: 16 },
+  switcher: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   headerCopy: { flex: 1, gap: 3 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
