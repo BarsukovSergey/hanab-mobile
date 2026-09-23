@@ -2,7 +2,7 @@
 
 Mobile Hanabi client focused on serious live play on phones.
 
-The current Android test build is **1.0.0-beta.1**. C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
+The current Android test build is **1.0.0-beta.2**. C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
 
 ## For testers
 
@@ -63,7 +63,7 @@ Build the standalone internal beta APK:
 npm run android:beta-apk
 ```
 
-The APK is written to `dist/Hanab-Mobile-1.0.0-beta.1.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
+The APK is written to `dist/Hanab-Mobile-1.0.0-beta.2.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
 
 Validation used in CI:
 
