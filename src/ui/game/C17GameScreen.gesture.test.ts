@@ -195,6 +195,41 @@ test('ClueComposer leaves touched and invalid clues to card highlighting and dis
   expect(composer).toContain('isCluePreviewConfirmable(preview, allowEmptyClues, variantName)');
 });
 
+test('dense ClueComposer keeps a two-row palette beside explicit Close and Give actions', () => {
+  const composer = readClueComposer();
+  const denseComposer = composer.slice(composer.indexOf('{dense ? <View style={styles.denseLayout}>'), composer.indexOf(': <>', composer.indexOf('{dense ? <View style={styles.denseLayout}>')));
+
+  expect(composer).toContain('dense?: boolean;');
+  expect(denseComposer).not.toContain('targetName}</Text>');
+  expect(denseComposer).toContain('styles.densePalette');
+  expect(denseComposer).toContain('styles.denseActionRail');
+  expect(denseComposer).toContain('>Close</Text>');
+  expect(denseComposer).toContain('>Give</Text>');
+  expect(denseComposer).toContain('disabled={!confirmAllowed || !validPreview}');
+  expect(denseComposer).toContain('hitSlop={{ top: 5, bottom: 5, left: 2, right: 2 }}');
+  expect(denseComposer).toContain('styles.denseColorChoice');
+  expect(denseComposer).toContain('styles.denseRankChoice');
+  expect(composer).toContain("previewState?.type === 'color' && previewState.value === choice.value");
+  expect(composer).toContain("previewState?.type === 'rank' && previewState.value === choice.value");
+  expect(composer).toContain('height: 26');
+  expect(composer).toContain('minHeight: 26');
+  expect(composer).toContain('>{targetName}</Text>');
+  expect(composer).toContain('title="Give clue"');
+});
+
+test('dense clue Workbench reserves content height without moving Ledger hands', () => {
+  const screen = readC17Screen();
+
+  expect(screen).not.toContain('DENSE_CLUE_WORKBENCH_HEIGHT');
+  expect(screen).toContain('getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight)');
+  expect(screen).toContain('workbenchHeight,');
+  expect(screen).toContain('const denseClueWorkbench = usesDenseSideLabels && selectedTarget !== null');
+  expect(screen).toContain('denseClueWorkbench\n        ? [styles.denseClueWorkbench, { maxHeight: denseClueAvailableHeight }]');
+  expect(screen).toContain('contentContainerStyle={denseClueWorkbench ? styles.denseClueWorkbenchContent : styles.workbenchContent}');
+  expect(screen).toContain('denseClueWorkbench && styles.denseClueScroll');
+  expect(screen).toContain('dense={usesDenseSideLabels}');
+});
+
 test('C17 renders authoritative live clocks only for an eligible timed live game', () => {
   const screen = readC17Screen();
   const eligibility = screen.slice(screen.indexOf('const liveClock ='), screen.indexOf('const latest ='));
