@@ -232,8 +232,9 @@ deleted pregame screen.
 | Fireworks/play stacks | **Full** | — | High | Variant-aware suit count. |
 | Current player / YOUR TURN | **Full** | — | High | Stable seating; no hand reordering. |
 | Score / Max / Clues / Strikes / Deck | **Full semantics** | S for polish | High | Presentation hierarchy is still a polish backlog item. |
-| Pace | **Full semantics** | — | Medium | Displayed when meaningful. |
-| Future efficiency | **Full semantics** | — | Medium | Uses upstream stats + efficiency modifier. |
+| Pace | **Partial presentation** | S | Medium | Underlying upstream value/risk exists, but mobile does not apply web final-round/All-or-Nothing suppression or PaceRisk color; tracked with stats parity in #30. |
+| Future Required Efficiency | **Partial presentation** | S | Medium | Live formula exists, but mobile applies note/manual adjustments in review modes where web suppresses them; tracked in #30. |
+| Minimum Required Efficiency | **Missing UI** | XS–S | Medium | `metadata.minEfficiency` already exists but is not shown. |
 | Low-score-phase warning | **Missing explicit UI** | S | Low–Medium | Upstream H-group presentation has special score treatment. |
 | Locked-hand warning | **Missing explicit UI** | S–M | Medium | Underlying upstream rule helper exists. |
 | Full clue log | **Partial** | M | Medium | Mobile has Last Action + Recent timeline, not the full web clue-log behavior. |
@@ -241,6 +242,25 @@ deleted pregame screen.
 | Card-specific replay jump shortcuts | **Missing mobile equivalents** | M | Medium | Web can jump to draw/first-clue/play/discard/strike via different clicks. |
 | Card animation richness | **Partial** | L | Low | Mobile intentionally keeps minimal state-change motion. |
 | Gameplay sounds | **Missing** | M | Low–Medium | All upstream action/result/H-group sounds absent. |
+
+## Stats presentation nuance
+
+The mobile client has the authoritative upstream stats state, but its current compact HUD is a
+simplified presentation rather than full web parity.
+
+Current upstream web:
+
+- suppresses Pace once the final round has effectively started;
+- suppresses Pace for All or Nothing;
+- colors Pace by `paceRisk`;
+- shows both Future Required Efficiency and immutable Minimum Required Efficiency;
+- omits note/manual efficiency adjustments during an in-game rewind;
+- in finished shared review, uses the shared efficiency modifier only while following shared turns.
+
+Mobile currently renders `game.stats.pace` whenever non-null and computes one FRE value with a
+helper that always includes the current note/manual adjustment. The mismatch is tracked as issue
+#30. This is distinct from the broader visual-HUD hierarchy backlog: the formulas/state do not need a
+new rules engine, but the presentation selector needs to encode the upstream context rules.
 
 ## 4P–6P
 
