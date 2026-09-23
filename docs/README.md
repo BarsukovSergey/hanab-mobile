@@ -4,11 +4,11 @@ This directory mixes current product/technical authority with historical impleme
 
 ## Start here
 
-- `../README.md` — project overview, local development, current Android beta scope.
-- `../TESTING.md` — tester-facing beta script and bug-report format.
-- `BETA_2_RELEASE_NOTES.md` — exact beta.2 candidate/build identity, tester-visible changes, known limitations, and focused regression targets.
-- `ANDROID_BETA_RELEASE.md` — current internal APK version, build command, acceptance checklist, and frozen-build policy.
-- `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the tester window plus the next tester-build/version/upgrade checklist.
+- `../README.md` — project overview, local development, current Android beta scope and release-candidate state.
+- `../TESTING.md` — tester-facing beta.2 script, focused regression targets, known limitations, and bug-report format.
+- `BETA_2_RELEASE_NOTES.md` — exact beta.2 candidate/build identity, APK checksum, tester-visible changes, validation state, and focused regression targets.
+- `ANDROID_BETA_RELEASE.md` — current internal APK version, build identity, acceptance checklist, and frozen-build policy.
+- `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the beta.1 tester window plus the version/upgrade checklist used to prepare beta.2.
 
 ## Current authority
 

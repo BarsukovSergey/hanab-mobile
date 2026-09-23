@@ -2,15 +2,27 @@
 
 Current Android tester candidate: **1.0.0-beta.2**
 
-Frozen beta.2 candidate commit:
+Build status: **APK built successfully; physical-device smoke pending before broad distribution.**
 
-`45d99d15960d04934ea0ce07fcb90db73eb206df`
+## Frozen beta.2 identity
 
-Android `versionCode`: **2**
+- version: `1.0.0-beta.2`
+- Android `versionCode`: `2`
+- candidate commit: `45d99d15960d04934ea0ce07fcb90db73eb206df`
+- workflow: `Android Beta APK`
+- workflow run: `#2` / run ID `35932310051`
+- workflow result: **success**
+- artifact: `Hanab-Mobile-1.0.0-beta.2`
+- artifact ID: `10781674355`
+- APK: `Hanab-Mobile-1.0.0-beta.2.apk`
+- APK size: `134635991` bytes
+- APK SHA-256: `17f88df7ce70e4889495cda68eca9117540bc644f3ca3ba9e0e42757de6014f8`
 
-Manual GitHub Actions build: **Android Beta APK run #2** (artifact identity is finalized in [`BETA_2_RELEASE_NOTES.md`](./BETA_2_RELEASE_NOTES.md)).
+The workflow artifact metadata reports `head_sha = 45d99d15960d04934ea0ce07fcb90db73eb206df`, matching the frozen candidate.
 
-The binary identity is the candidate commit above plus the exact produced APK hash. Documentation-only commits after that candidate do **not** redefine the beta.2 binary.
+The binary identity is the candidate commit above plus the exact APK checksum. Documentation-only commits after that candidate do **not** redefine the beta.2 binary.
+
+See [`BETA_2_RELEASE_NOTES.md`](./BETA_2_RELEASE_NOTES.md) for the tester-facing release packet.
 
 ## Beta.2 scope
 
@@ -35,8 +47,6 @@ Known non-blockers:
 - `/copy` replay export is intentionally deferred;
 - broader account-management UX remains future product work;
 - this remains a standalone internal APK flow, not the Play Store/AAB pipeline.
-
-See [`BETA_2_RELEASE_NOTES.md`](./BETA_2_RELEASE_NOTES.md) for tester-facing notes.
 
 ## Build
 
@@ -71,6 +81,8 @@ Prefer validating beta.2 as an **upgrade over beta.1** on a physical Android dev
 10. background/foreground once and confirm no stale gameplay action fires.
 
 Also perform at least one clean install before wider distribution.
+
+Until this smoke is completed, beta.2 is a **built release candidate**, not a fully validated tester release.
 
 ## Historical beta.1 reference
 

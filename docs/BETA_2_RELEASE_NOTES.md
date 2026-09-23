@@ -2,19 +2,25 @@
 
 Date: **2026-09-24**
 
-Status: **release candidate build in progress**
+Status: **APK built successfully; physical-device smoke pending**
 
 ## Frozen candidate
 
 - version: `1.0.0-beta.2`
 - Android `versionCode`: `2`
 - candidate commit: `45d99d15960d04934ea0ce07fcb90db73eb206df`
-- GitHub Actions workflow: `Android Beta APK`
-- workflow run: `#2` / run ID `35932310051`
-- workflow artifact name: `Hanab-Mobile-1.0.0-beta.2`
-- expected APK filename: `Hanab-Mobile-1.0.0-beta.2.apk`
-- APK byte size: **pending**
-- APK SHA-256: **pending**
+- ordinary CI on candidate: **success** (run #608 / run ID `35932060039`)
+- Android workflow: `Android Beta APK`
+- Android workflow run: **success** (run #2 / run ID `35932310051`)
+- workflow artifact: `Hanab-Mobile-1.0.0-beta.2`
+- artifact ID: `10781674355`
+- artifact ZIP size: `40192228` bytes
+- artifact ZIP SHA-256: `375c93551ce1ec17d7818469567fd416aa39d525691bac7c29ca239f85f01c94`
+- APK filename: `Hanab-Mobile-1.0.0-beta.2.apk`
+- APK byte size: `134635991`
+- APK SHA-256: `17f88df7ce70e4889495cda68eca9117540bc644f3ca3ba9e0e42757de6014f8`
+
+The workflow artifact metadata reports `head_sha = 45d99d15960d04934ea0ce07fcb90db73eb206df`, matching the frozen candidate.
 
 The candidate SHA above defines the runtime code for beta.2. Later documentation-only commits do not redefine the binary.
 
@@ -44,7 +50,7 @@ Beta.2 is a broad tester refresh rather than a single-feature build.
 - same-seed Other Scores comparison;
 - shared replay creation from History;
 - shared-replay turn suggestion receive/UI;
-- first-class game tag action.
+- first-class game tag display/Add action.
 
 ### Chat and social
 
@@ -69,7 +75,7 @@ Prefer installing beta.2 **over beta.1 without uninstalling**.
 
 Please especially exercise:
 
-- normal 2P/3P play;
+- normal 2P/3P play and explicit Play/Discard safety;
 - at least one 4P–6P game if a group is available;
 - Rewind and Return to Live;
 - finished/shared replay and Hypothetical;
@@ -83,4 +89,8 @@ Report the build version, device model, Android version and the first point wher
 
 ## Distribution record
 
-Do not mark this candidate as distributed until the workflow completes successfully and the exact APK hash is recorded above.
+The APK exists and its identity is frozen above.
+
+**Not yet marked ready for broad tester distribution:** physical upgrade-over-beta.1 and clean-install smoke have not been recorded as completed.
+
+Once physical smoke is complete, record the distribution date here without changing the candidate SHA or APK hash.

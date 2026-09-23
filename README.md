@@ -2,7 +2,9 @@
 
 Mobile Hanabi client focused on serious live play on phones.
 
-The current Android tester candidate is **1.0.0-beta.2**. C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
+The current Android tester candidate is **1.0.0-beta.2**. The frozen APK has been built successfully from candidate commit `45d99d15960d04934ea0ce07fcb90db73eb206df`; physical-device smoke is still pending before broad tester distribution.
+
+C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
 
 ## For testers
 
@@ -10,7 +12,7 @@ If someone sent you an Android build/APK, you do **not** need to build the proje
 
 Please test the app as a player, not as someone trying to guess how the UI was implemented. If an action is hard to discover or a screen is confusing without instructions, report that as a UX problem.
 
-Beta.2 release notes and the exact frozen build identity are tracked in [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
+Beta.2 release notes, exact frozen build identity, checksum, and current validation state are tracked in [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
 
 ## Current test focus
 
@@ -22,10 +24,10 @@ The Android beta remains centered on reliable serious play and review flows:
 - finished/shared replay and Hypothetical;
 - spectator and lifecycle behavior;
 - Android safe-area, rotation, keyboard and reconnect behavior;
-- focused 4P–6P dense-layout regression on supported phone layouts;
+- focused 4P–6P real-card layout regression on supported phone layouts;
 - social/history additions shipped after beta.1.
 
-The compact product shell and some dense presentation details are still post-beta polish rather than a release blocker.
+The compact product shell and some dense presentation details are still post-beta polish rather than release blockers.
 
 See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug-report format.
 
