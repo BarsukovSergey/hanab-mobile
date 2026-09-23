@@ -481,6 +481,20 @@ describe('lobby protocol decoder', () => {
     });
   });
 
+  test('pregame spectator snapshots use the live spectator payload contract', () => {
+    const payload = '{"tableID":123,"spectators":[{"name":"Cy","shadowingPlayerIndex":-1,"shadowingPlayerUsername":""}]}';
+    expect(decodeServerFrame(`pregameSpectators ${payload}`)).toEqual({
+      kind: 'event',
+      event: { command: 'pregameSpectators', data: JSON.parse(payload) },
+    });
+    expect(decodeServerFrame(`spectators ${payload}`)).toEqual({
+      kind: 'event',
+      event: { command: 'spectators', data: JSON.parse(payload) },
+    });
+    expect(decodeServerFrame('pregameSpectators {"tableID":123,"spectators":[{"name":"Cy"}]}'))
+      .toMatchObject({ kind: 'malformed', issue: 'invalid-payload' });
+  });
+
   test('encodes exact replay navigation and quick-rematch commands', () => {
     expect(encodeReplayActionFrame(123, 7)).toBe(
       'replayAction {"tableID":123,"type":0,"segment":7}',

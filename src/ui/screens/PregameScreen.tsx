@@ -56,6 +56,8 @@ export function PregameScreen() {
   const roleSwitchPending = roomState.pendingRoleSwitch !== null;
   const canSwitchToSpectator = room.role === 'player' && room.data.players.length >= 2;
   const canJoinAsPlayer = room.role === 'spectator' && room.data.players.length < room.data.maxPlayers;
+  const spectators = roomState.pregameSpectators?.tableID === room.tableID
+    ? roomState.pregameSpectators.spectators : [];
 
   return (
     <View style={styles.root}>
@@ -114,6 +116,21 @@ export function PregameScreen() {
                       isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
                       room={`table${room.tableID}`}
                     />
+                  )}
+                </View>
+              ))}
+            </View>
+            <View style={styles.spectators}>
+              <SectionHeading title="Spectators" detail={`${spectators.length}`} />
+              {spectators.length === 0 ? (
+                <Text style={[styles.playerStats, { color: theme.colors.textMuted }]}>No spectators</Text>
+              ) : spectators.map((spectator) => (
+                <View key={spectator.name} style={styles.spectatorRow}>
+                  <Text style={[styles.playerName, { color: theme.colors.text }]}>{spectator.name}</Text>
+                  {spectator.shadowingPlayerIndex !== -1 && spectator.shadowingPlayerUsername !== '' && (
+                    <Text style={[styles.playerStats, { color: theme.colors.textMuted }]}>
+                      Watching {spectator.shadowingPlayerUsername}
+                    </Text>
                   )}
                 </View>
               ))}
@@ -206,6 +223,8 @@ const styles = StyleSheet.create({
   columnsWide: { alignItems: 'flex-start', flexDirection: 'row' },
   column: { flex: 1, gap: 16, minWidth: 0 },
   players: { gap: 8 },
+  spectators: { gap: 8, marginTop: 12 },
+  spectatorRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
   roleSwitch: { gap: 10 },
   playerRow: { borderTopWidth: 1, gap: 8, paddingTop: 9 },
   playerCopy: { flex: 1, gap: 2 },
