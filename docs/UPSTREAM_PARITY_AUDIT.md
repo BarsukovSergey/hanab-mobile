@@ -467,11 +467,11 @@ is mainly a contextual UI/runtime action rather than new game logic.
 | Follower follow shared turns | **Full** | — | High |
 | Follower detach/local review | **Full** | — | High |
 | Transfer leader | **Full** | — | Medium |
-| Suggest a turn | **Command support; native button missing** | S | Medium |
+| Suggest a turn | **Partial: send works, receive event missing** | S–M | Medium | `tableSuggest` can be sent, but mobile ignores authoritative `suggestion` broadcasts. |
 | Shared arrows/annotations | **Missing** | M–L | Medium |
 | Local arrows | **Missing** | M | Low–Medium |
 | Shared replay sounds | Missing | M | Low |
-| Efficiency-modifier state | **Wire/state present, UI missing** | S–M | Low–Medium |
+| Efficiency-modifier initial state | **Partial / current update event missing** | S | Medium | Initial `sharedReplayEffMod` works, but later `replayEfficiencyMod` broadcasts are ignored; tracked in #29. |
 | Explicit shared replay creation | Missing | S–M | Medium |
 
 ## Hypothetical
@@ -653,6 +653,93 @@ Current upstream server command map versus mobile:
 
 This table is the clearest evidence that many missing product features are **UI/state-selection
 work**, not new networking work.
+
+---
+
+# 12A. Server → client event audit
+
+Unknown WebSocket commands are intentionally future-compatible in mobile: `decodeServerFrame`
+classifies them as `unknown`, `LobbyRuntime` records an inbound diagnostic, and then returns
+without raising a protocol issue or mutating authoritative state. That means the gaps below are
+generally **safe omissions**, not connection failures. The exception is where the ignored event is
+itself authoritative state that mobile already presents.
+
+Current upstream events missing from the mobile server-event schema include:
+
+| Upstream event | Mobile effect today | Classification | Effort | Importance |
+| --- | --- | --- | ---: | ---: |
+| `name` | ignored | Missing convenience | XS–S | Low | 
+| `tableProgress` | ignored; lobby table progress remains at snapshot value | Missing presentation data | S | Low |
+| `pregameSpectators` | ignored | Missing data/UI | S–M | Medium |
+| `chatTyping` | ignored | Missing chat polish | S–M | Low |
+| `shutdown` | ignored | Missing server-status UX | S | Medium |
+| `maintenance` | ignored | Missing server-status UX | S | Medium |
+| `soundLobby` | ignored | Missing sound parity | M with sound system | Low |
+| `gameHistoryFriends` | ignored | Missing friends-history feature | M | Medium |
+| `gameHistoryOtherScores` | ignored | Missing same-seed comparison | M | Medium |
+| `suggestion` | ignored | Partial shared-review interoperability | S–M | Medium |
+| `replayIndicator` | ignored | Missing shared arrows/annotations | M–L | Medium |
+| `replaySound` | ignored | Missing shared-replay sound parity | M | Low |
+| `replayEfficiencyMod` | **ignored despite displayed efficiency state** | **Interop drift / correctness** | S | **Medium** |
+
+### Important event-level findings
+
+#### Dynamic shared-replay efficiency modifier
+
+Mobile correctly consumes the initial `sharedReplayEffMod` from `init` and reduces it through
+`setEffMod`. Current upstream later broadcasts leader changes through `replayEfficiencyMod`.
+Because mobile does not know this event, a mobile follower can keep displaying stale efficiency/FRE
+after a web leader changes the modifier.
+
+Tracked as GitHub issue #29. The receive-side fix should reuse the existing `setEffMod` semantic;
+a mobile control for originating modifier changes is a separate product feature.
+
+#### Shared-replay suggestions
+
+Mobile can **send** `tableSuggest` through the browser-command-compatible path, but it does not
+parse the corresponding `suggestion { userName, segment }` event. As a result:
+
+- a suggestion typed from mobile can still reach web clients;
+- a suggestion from a web/mobile peer is invisible to a mobile leader/follower;
+- adding only a native "Suggest current turn" button without receive-side presentation would still
+  be incomplete.
+
+Treat turn suggestion as a send + receive UI slice.
+
+#### Pregame spectator updates
+
+The server uses `pregameSpectators` rather than the in-game `spectators` event before game start.
+Mobile currently has neither that event nor a Pregame spectator list. Any future spectator
+perspective/People work should add this event instead of trying to infer pregame spectators from
+player state.
+
+#### Shutdown and maintenance
+
+The server remains safe even when mobile ignores these events:
+
+- maintenance mode rejects new table creation authoritatively;
+- shutdown/restart eventually manifests through normal server warnings/socket lifecycle.
+
+But web can proactively disable/explain creation before the rejected command. A small mobile status
+notice would improve clarity and avoid unnecessary failed create attempts.
+
+#### Table progress
+
+Upstream sends incremental `tableProgress` as games/shared replays advance. Mobile stores the
+initial `progress` from each table snapshot but does not update it and currently does not render
+that field. This is therefore a low-priority data parity gap, not a gameplay-state bug.
+
+### Lobby table payload fields intentionally dropped by mobile
+
+Current upstream lobby table rows also contain fields mobile does not retain:
+
+- `ownerID`;
+- `spectators`;
+- top-level `timed`, `timeBase`, and `timePerTurn` duplicates of option data.
+
+The timing fields are redundant with the retained options object. `ownerID` and `spectators`
+could become useful for richer lobby/People presentation, but are not required for current join/
+spectate correctness.
 
 ---
 
