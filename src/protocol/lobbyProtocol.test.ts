@@ -198,7 +198,7 @@ describe('lobby protocol decoder', () => {
     const table = {
       id: 12, name: 'Table', numPlayers: 2, maxPlayers: 5, running: false,
       variant: 'No Variant', options, passwordProtected: false, joined: false,
-      progress: 0, players: ['Ada', 'Bob'], sharedReplay: false,
+      progress: 0, players: ['Ada', 'Bob'], spectators: [], sharedReplay: false,
     };
     expect(decodeServerFrame(`table ${JSON.stringify(table)}`)).toMatchObject({
       kind: 'event', event: { command: 'table', data: { options } },
@@ -479,6 +479,28 @@ describe('lobby protocol decoder', () => {
     expect(decodeServerFrame('boot {"tableID":123}')).toMatchObject({
       kind: 'malformed', command: 'boot', issue: 'invalid-payload',
     });
+  });
+
+  test('retains table and tableList spectators with shadowing data', () => {
+    const table = {
+      id: 12, name: 'Table', numPlayers: 2, maxPlayers: 5, running: true,
+      variant: 'No Variant', options: {
+        variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+        speedrun: false, cardCycle: false, deckPlays: false, emptyClues: false,
+        oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+        detrimentalCharacters: false,
+      },
+      passwordProtected: false, joined: false, progress: 42,
+      players: ['Ada', 'Bob'], sharedReplay: false,
+      spectators: [{ name: 'Cy', shadowingPlayerIndex: 1, shadowingPlayerUsername: 'Bob' }],
+    };
+    for (const [command, payload] of [['table', table], ['tableList', [table]]] as const) {
+      const result = decodeServerFrame(`${command} ${JSON.stringify(payload)}`);
+      expect(result).toMatchObject({ kind: 'event', event: { command, data: payload } });
+      const invalid = { ...table, spectators: [{ name: 'Cy', shadowingPlayerIndex: -2, shadowingPlayerUsername: '' }] };
+      expect(decodeServerFrame(`${command} ${JSON.stringify(command === 'table' ? invalid : [invalid])}`))
+        .toEqual({ kind: 'malformed', command, issue: 'invalid-payload' });
+    }
   });
 
   test('pregame spectator snapshots use the live spectator payload contract', () => {

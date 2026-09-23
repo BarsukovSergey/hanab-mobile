@@ -341,6 +341,7 @@ export const lobbyTableSchema = z.object({
   joined: z.boolean(),
   progress: z.number().int().nonnegative(),
   players: z.array(z.string().min(1)),
+  spectators: z.array(spectatorSchema),
   sharedReplay: z.boolean(),
 });
 

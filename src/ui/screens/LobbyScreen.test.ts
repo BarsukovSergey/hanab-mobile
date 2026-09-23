@@ -40,6 +40,21 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)');
   });
 
+  test('uses authoritative friends for compact table context and running progress', () => {
+    expect(screen).toContain('state.session.friends');
+    expect(screen).toContain('getLobbySections(tables, friends)');
+    expect(screen).toContain('getLobbyFriendContext(table, friends)');
+    expect(screen).toContain('<TableFriendContext table={table} friends={friends} />');
+    expect(screen).toContain("if (!context.hasFriends) return null;");
+    expect(screen).toContain('table.running ? ` · ${table.progress}%`');
+    expect(screen).toContain('title="Return to game"');
+    expect(screen).toContain('title="Join"');
+    expect(screen).toContain('title="Spectate pregame"');
+    expect(screen).toContain('title="Spectate"');
+    expect(screen).toContain('title="Open review"');
+    expect(screen).toContain('title="Create table"');
+  });
+
   test('uses the server name as the blank field placeholder and permits blank create', () => {
     expect(screen).toContain('state.session.randomTableName');
     expect(screen).toContain("placeholder={randomTableName ?? 'Table name'}");

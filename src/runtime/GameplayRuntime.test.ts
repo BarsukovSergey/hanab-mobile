@@ -98,6 +98,7 @@ const playerTable = {
   joined: false,
   progress: 0,
   players: ['Bob'],
+  spectators: [],
   sharedReplay: false,
 };
 

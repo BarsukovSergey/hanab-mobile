@@ -29,6 +29,7 @@ const table = (id: number, changes: Partial<LobbyTable> = {}): LobbyTable => ({
   joined: false,
   progress: 0,
   players: ['Bob'],
+  spectators: [],
   sharedReplay: false,
   ...changes,
 });

@@ -137,6 +137,7 @@ const runningTable: LobbyTable = {
   joined: false,
   progress: 7,
   players: ['Ada', 'Bob', 'Cy'],
+  spectators: [],
   sharedReplay: false,
 };
 
