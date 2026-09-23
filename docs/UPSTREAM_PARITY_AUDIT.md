@@ -804,7 +804,7 @@ production bot-discovery service. Its README documents PM `/join` as the invitat
 
 ---
 
-# 13A. Exhaustive upstream manual-section coverage
+# 14A. Exhaustive upstream manual-section coverage
 
 This checklist exists specifically to prevent "we never classified that section of the upstream
 manual" omissions. It follows the current `docs/features.md` structure.
@@ -894,174 +894,6 @@ current bot-capability standard:
 The more actively maintained community scala-bot supports `/join <password>`. Therefore the planned
 mobile bot registry must store verified per-bot capabilities rather than infer one universal command
 set from the word "bot".
-
----
-
-# 14A. Exhaustive documented slash-command matrix
-
-This table covers every command currently documented in upstream `docs/chat-commands.md`.
-"Fallback" means mobile does not intercept the command locally; it sends the original slash-prefixed
-chat text and the authoritative server command parser handles it.
-
-| Command | Mobile status | Native UI | Effort for better mobile UX | Importance | Notes |
-| --- | --- | --- | ---: | ---: | --- |
-| `/help` | **Full via server fallback** | No | XS | Low | Server returns command help/link. |
-| `/bga` | **Full via server fallback** | No | XS | Low | Link-only helper. |
-| `/discord` | **Full via server fallback** | No | XS | Low | Link-only helper. |
-| `/doc` | **Full via server fallback** | No | XS | Low | H-Group reference link. |
-| `/efficiency` | **Full via server fallback** | No | XS | Low | Link-only helper. |
-| `/manual` | **Full via server fallback** | No | XS | Low | Link-only helper. |
-| `/new` | **Full via server fallback** | No | XS | Low | Beginner guide link. |
-| `/path` | **Full via server fallback** | No | XS | Low | Learning-path link. |
-| `/variants` | **Full via server fallback** | No | XS | Low | Variant documentation link. |
-| `/github` | **Full via server fallback** | No | XS | Low | Repository link. |
-| `/playerinfo ...` | **Full command transport** | Missing native profile | M | Medium | Mobile intercepts and sends `chatPlayerInfo`. Server response is chat text + web profile link. |
-| `/random [min] [max]` | **Full via server fallback** | No | — | Low | Native control unnecessary. |
-| `/replay [game ID] [turn]` | **Full via server fallback** | No | S for share UI | Low–Medium | Generates shareable web replay link. |
-| `/rules` | **Full via server fallback** | No | XS | Low | Community guidelines link. |
-| `/shrug` | **Full via server fallback** | No | — | Low | Novelty command. |
-| `/timeleft` | **Full via server fallback** | No | S if server-status UI exists | Low | Useful during scheduled shutdown. |
-| `/uptime` | **Full via server fallback** | No | — | Low | Server-info command. |
-| `/pm [username] [msg]` | **Full command transport** | Partial contextual UI | S–M | Medium | Mobile intercepts PM aliases and sends `chatPM`. |
-| `/r [msg]` | **Partial** | Input rewrite only | XS | Low | Typing exactly `/r ` expands to `/pm <lastPM> `; direct/pasted `/r hello` reaches a handler that returns failure. |
-| `/friend [username]` | **Full command transport** | Missing | S–M | Medium | Better as contextual user action. |
-| `/friends` | **Full command transport** | Missing | M | Medium | Friends state exists. |
-| `/unfriend [username]` | **Full command transport** | Missing | S–M | Medium | Better as contextual user action. |
-| `/link [username]` | **Full command transport** | Missing | M | Low–Medium | Seed-avoidance/account-link semantics need explanation. |
-| `/linked` | **Full command transport** | Missing | M | Low–Medium | — |
-| `/unlink [username]` | **Full command transport** | Missing | M | Low–Medium | — |
-| `/tagsearch [tag]` | **Full command transport** | Missing workflow | M | Medium | Results arrive as server chat text; no structured tagged-games browser. |
-| `/version` | **Full mobile-local** | No | — | Low | Reports mobile package version. |
-| `/impostor` | **Full via server fallback** | No | — | Low | Pregame novelty helper. |
-| `/kick [username]` | **Full via server fallback** | Missing | S | Medium | Strong native pregame contextual candidate. |
-| `/s` | **Full via server fallback** | Missing | S | Low–Medium | Auto-start on next join. |
-| `/s2` | **Full via server fallback** | Missing | S | Low–Medium | Auto-start at 2. |
-| `/s3` | **Full via server fallback** | Missing | S | Low–Medium | Auto-start at 3. |
-| `/s4` | **Full via server fallback** | Missing | S | Low–Medium | Auto-start at 4. |
-| `/s5` | **Full via server fallback** | Missing | S | Low–Medium | Auto-start at 5. |
-| `/s6` | **Full via server fallback** | Missing | S | Low–Medium | Auto-start at 6. |
-| `/setvariant [variant]` | **Full for supported variants** | Full options UI | — | Medium | Mobile intercepts aliases; rejects intentionally unsupported variant families. |
-| `/startin [minutes]` | **Full via server fallback** | Missing | S | Low | — |
-| `/split ...` | **Full via server fallback** | Missing | S–M | Low | Mainly large-community pregame convenience. |
-| `/splitauto` / `/sa` | **Full via server fallback** | Missing | S–M | Low | — |
-| `/findvariant` | **Full via server fallback** | Missing | S | Medium | Useful native pregame helper. |
-| `/missing` | **Full via server fallback** | Missing | S | Medium | Useful native pregame/game helper. |
-| `/setleader` | **Full** | **Full** | — | Medium | Native leader transfer/take-lead path exists. |
-| `/pause` | **Full via server fallback + native timed UI** | **Full** | — | High | Native Pause/queue path is primary. |
-| `/unpause` | **Full via server fallback + native timed UI** | **Full** | — | High | — |
-| `/terminate` | **Full** | **Full** | — | High | Mobile intercepts into termination runtime. |
-| `/tag [tag]` | **Full command transport** | Missing workflow | S–M | Medium | — |
-| `/copy` | **Missing** | Missing | M | Medium | Browser-local command; forwarding to server cannot implement clipboard/replay serialization. |
-| `/suggest [turn]` | **Partial** | Missing native button | S–M | Medium | Send works; mobile currently ignores the incoming `suggestion` event. |
-| `/tagdelete [tag]` | **Full command transport** | Missing workflow | S–M | Medium | `/untag` alias also works mobile-side. |
-| `/tags` | **Full via server fallback** | Missing workflow | S | Medium | Server returns current tags in chat. |
-| `/tagsdeleteall` | **Full command transport** | Missing workflow | S | Medium | — |
-
-The important distinction is that **native-control absence is not command absence**. Almost every
-documented server chat command already functions today; native work is mostly discoverability and
-contextual UX.
-
----
-
-# 14B. Website and JSON endpoint parity
-
-The upstream website exposes substantial HTTP functionality outside the WebSocket app. These
-endpoints should not automatically be reimplemented natively, but they are part of upstream product
-capability and therefore belong in the parity inventory.
-
-## Website endpoints
-
-| Upstream endpoint | Purpose | Mobile status | Effort | Importance |
-| --- | --- | --- | ---: | ---: |
-| `/scores/[username]` | Profile + best scores | **Missing native profile** | L | Medium |
-| `/history/[username]` | Player history | **Own history native; arbitrary user missing** | M–L | Medium |
-| `/history/[user1]/[user2]...` | Shared history for up to 6 players | **Missing** | M–L | Low–Medium |
-| `/missing-scores/[username]` | Non-max scores | **Command fallback only via `/missing` for current context** | M for native page | Medium |
-| `/shared-missing-scores/N/... ` | Team missing scores | **Command fallback only in table context** | M | Medium |
-| `/tags/[username]` | Player tagged games | **Missing native page** | M–L | Low–Medium |
-| `/seed/[seed]` | Games on same seed | **Missing native page; dedicated WS command available** | M | Medium |
-| `/stats` | Whole-site statistics | **External only / no native copy** | L | Low |
-| `/variant/[id]` | Variant statistics | **External only / no native copy** | L | Low |
-| `/tag/[tag]` | Global games matching tag | **Command search only; no native page** | M–L | Low–Medium |
-
-For mobile, native implementation is most justified for **profiles, seed comparison and tags**.
-Whole-site/variant stats can remain external links until a concrete product need exists.
-
-## JSON endpoints
-
-| Upstream endpoint | Purpose | Mobile status | Effort | Importance |
-| --- | --- | --- | ---: | ---: |
-| `/export/[game ID]` | Export arbitrary game JSON | **Unused** | S–M to integrate | Medium for research/share |
-| `/api/v1/variants` | Variant names/IDs | **Unused; vendored variant data is authoritative for current build** | — | Low |
-| `/api/v1/variants-full` | Full variant metadata | **Unused** | — | Low |
-| `/api/v1/variants/[id]` | Paginated variant games | **Unused** | M | Low |
-| `/api/v1/history/[username...]` | Paginated player/group history | **Unused; own history uses WS `historyGet`** | M | Low–Medium |
-| `/api/v1/history-full/[username...]` | Full player/group history | **Unused** | M | Low |
-| `/api/v1/seed/[seed]` | Paginated same-seed games | **Unused; WS `historyGetSeed` is better for native flow** | M | Medium |
-| `/api/v1/seed-full/[seed]` | Full same-seed games | **Unused** | M | Low–Medium |
-
-The native client should prefer existing authenticated WebSocket commands when they already provide
-the desired product flow. HTTP JSON endpoints are most useful for **external research tooling** and
-possibly replay import/export, not as duplicate in-app data paths.
-
-## Other account HTTP surfaces
-
-| Surface | Mobile status | Effort | Importance |
-| --- | --- | ---: | ---: |
-| Sign in / create account through `POST /login` | **Full semantics** | XS UX clarification | High |
-| Change password via `POST /login` + `newPassword` | **Missing** | S | Medium |
-| `/password-reset` instructions | **Missing entry point** | XS–S | Medium |
-| `/logout` | **Full** | — | High |
-| `/test-cookie` | **Full internal session probe** | — | Critical |
-
----
-
-# 14C. Strict-schema compatibility review
-
-Mobile intentionally mixes strict validation for stable payloads with permissive schemas for
-evolving upstream payloads.
-
-### Current production Go server
-
-No current strict-schema break was found in the payloads mobile already claims to support:
-
-- `tableStart`;
-- `joined`;
-- `left`;
-- `replaySegment`;
-- `replayLeader`;
-- in-game `spectators`;
-- `userInactive`;
-- Hypothetical bootstrap/toggle events;
-- game-history rows.
-
-Large/evolving payloads such as `welcome`, lobby `table`, `init`, options and gameplay actions are
-already non-strict/passthrough where appropriate, so new unrelated upstream fields are dropped rather
-than turning into connection failures.
-
-### Deliberately dropped current fields
-
-Safe field dropping is responsible for several parity gaps documented elsewhere:
-
-- `welcome.settings`, `muted`, `firstTimeUser`, random table name, maintenance/shutdown state;
-- lobby `ownerID`, spectators and redundant timing fields;
-- pregame player `stats`.
-
-These are product/data omissions, not protocol decode failures.
-
-### Future server-migration watch item
-
-Current Go spectator payloads always send
-`shadowingPlayerUsername: ""` when no player is shadowed, matching mobile's strict
-`z.string()` requirement.
-
-The newer TypeScript data model defines `shadowingPlayerUsername` as optional and the TS table
-serializer passes that value through. If production eventually switches to a server path that omits
-the field, the mobile strict spectator schema would reject the whole `spectators` event.
-
-This is **not a current production defect**. Before a server implementation migration, make the
-mobile spectator schema accept the upstream optional representation and normalize missing/empty
-username at the boundary.
 
 ---
 
@@ -1396,4 +1228,55 @@ Do not replace the current server-authoritative WebSocket/game-core architecture
 fetches merely because a public JSON endpoint exists. Use the existing authenticated WS command when
 it already represents the in-app product flow; reserve public JSON endpoints for external/research
 work or when upstream has no equivalent realtime command.
+
+---
+
+# 20. Strict-schema compatibility review
+
+Mobile intentionally mixes strict validation for stable payloads with permissive schemas for
+evolving upstream payloads.
+
+### Current production Go server
+
+No current strict-schema break was found in the payloads mobile already claims to support:
+
+- `tableStart`;
+- `joined`;
+- `left`;
+- `replaySegment`;
+- `replayLeader`;
+- in-game `spectators`;
+- `userInactive`;
+- Hypothetical bootstrap/toggle events;
+- game-history rows.
+
+Large/evolving payloads such as `welcome`, lobby `table`, `init`, options and gameplay actions are
+already non-strict/passthrough where appropriate, so new unrelated upstream fields are dropped rather
+than turning into connection failures.
+
+### Deliberately dropped current fields
+
+Safe field dropping is responsible for several parity gaps documented elsewhere:
+
+- `welcome.settings`, `muted`, `firstTimeUser`, random table name, maintenance/shutdown state;
+- lobby `ownerID`, spectators and redundant timing fields;
+- pregame player `stats`.
+
+These are product/data omissions, not protocol decode failures.
+
+### Future server-migration watch item
+
+Current Go spectator payloads always send
+`shadowingPlayerUsername: ""` when no player is shadowed, matching mobile's strict
+`z.string()` requirement.
+
+The newer TypeScript data model defines `shadowingPlayerUsername` as optional and the TS table
+serializer passes that value through. If production eventually switches to a server path that omits
+the field, the mobile strict spectator schema would reject the whole `spectators` event.
+
+This is **not a current production defect**. Before a server implementation migration, make the
+mobile spectator schema accept the upstream optional representation and normalize missing/empty
+username at the boundary.
+
+---
 
