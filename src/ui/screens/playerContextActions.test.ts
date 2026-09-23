@@ -24,13 +24,15 @@ describe('player context actions', () => {
     expect(pregame).toContain('room={`table${room.tableID}`}');
   });
 
-  test('shared component sends in context, limits messages, and updates friends without optimistic state', () => {
+  test('shared Dialog shows session messages and sends in context while keeping friends unchanged', () => {
     expect(shared).toContain('open?: boolean');
     expect(shared).toContain('onOpenChange?: (open: boolean) => void');
     expect(shared).toContain('maxLength={300}');
+    expect(shared).toContain('title="Dialog"');
+    expect(shared).toContain('sessionPrivateMessages(messagesByRoom, authenticatedUsername, username)');
     expect(shared).toContain('chatRuntime.sendPrivateMessage(username, message, room)');
     expect(shared).toContain('chatRuntime.setFriend(username, !isFriend, room)');
-    expect(shared).toContain('if (chatRuntime.sendPrivateMessage(username, message, room)) closeComposer()');
+    expect(shared).toContain('if (chatRuntime.sendPrivateMessage(username, message, room)) setMessage(\'\')');
     expect(shared).not.toContain('setIsFriend');
   });
 

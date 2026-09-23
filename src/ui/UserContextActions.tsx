@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { chatRuntime } from '../runtime/application';
-import { ActionButton, Field } from './designSystem';
+import { useAppSelector } from '../store/hooks';
+import { sessionPrivateMessages } from './chatPresentation';
+import { ActionButton, EmptyState, Field, useHanabTheme } from './designSystem';
 
 type UserContextActionsProps = {
   username: string;
@@ -23,6 +25,10 @@ export function UserContextActions({
 }: UserContextActionsProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const { theme } = useHanabTheme();
+  const messagesByRoom = useAppSelector((state) => state.chat.messagesByRoom);
+  const authenticatedUsername = useAppSelector((state) => state.session.authenticatedUser?.username);
+  const transcript = sessionPrivateMessages(messagesByRoom, authenticatedUsername, username);
   const composing = open ?? internalOpen;
   const setComposing = (nextOpen: boolean) => {
     setInternalOpen(nextOpen);
@@ -36,7 +42,7 @@ export function UserContextActions({
   return (
     <View style={styles.root}>
       <View style={styles.actions}>
-        <ActionButton compact title="Message" onPress={() => {
+        <ActionButton compact title="Dialog" onPress={() => {
           setMessage('');
           setComposing(true);
         }} />
@@ -49,6 +55,19 @@ export function UserContextActions({
       </View>
       {composing && (
         <View style={styles.composer}>
+          <ScrollView style={[styles.transcript, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+            {transcript.length === 0 ? <EmptyState>No messages yet.</EmptyState> : transcript.map((entry, index) => {
+              const outgoing = authenticatedUsername !== undefined
+                && entry.who.toLocaleLowerCase() === authenticatedUsername.toLocaleLowerCase();
+              return <View key={`${entry.datetime}-${index}`} style={styles.transcriptMessage}>
+                <Text style={{ color: theme.colors.text, fontWeight: '700' }}>
+                  {outgoing ? `To ${entry.recipient}` : `From ${entry.who}`}
+                </Text>
+                <Text style={{ color: theme.colors.text }}>{entry.msg}</Text>
+                <Text style={{ color: theme.colors.textMuted, fontSize: 11 }}>{entry.datetime}</Text>
+              </View>;
+            })}
+          </ScrollView>
           <Field
             autoCapitalize="sentences"
             maxLength={300}
@@ -64,7 +83,7 @@ export function UserContextActions({
               title="Send"
               tone="primary"
               onPress={() => {
-                if (chatRuntime.sendPrivateMessage(username, message, room)) closeComposer();
+                if (chatRuntime.sendPrivateMessage(username, message, room)) setMessage('');
               }}
             />
             <ActionButton compact title="Cancel" tone="ghost" onPress={closeComposer} />
@@ -79,4 +98,6 @@ const styles = StyleSheet.create({
   root: { gap: 8 },
   actions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   composer: { gap: 8 },
+  transcript: { borderRadius: 8, borderWidth: 1, maxHeight: 240, padding: 8 },
+  transcriptMessage: { gap: 2, paddingVertical: 6 },
 });

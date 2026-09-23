@@ -196,4 +196,16 @@ describe('chat state and plain-text conversion', () => {
       connectionEpoch: 0, lastPM: null, messagesByRoom: {}, unreadByRoom: {},
     });
   });
+
+  test('connection reset clears the underlying session transcript', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'lobby',
+      message: { ...message('private'), recipient: 'Bob', room: '' },
+    }));
+    expect(store.getState().chat.messagesByRoom.lobby).toHaveLength(1);
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().chat.messagesByRoom).toEqual({});
+  });
 });
