@@ -35,6 +35,7 @@ import {
   encodeChatFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
+  encodeHistoryFriendsGetFrame,
   encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeClientFrame,
@@ -306,9 +307,45 @@ export class LobbyRuntime {
     return this.store.getState().history.pendingRequest?.offset === request.offset;
   }
 
+  ensureFriendsHistory(): boolean {
+    const state = this.store.getState();
+    const history = state.history;
+    if (
+      state.session.phase !== 'ready'
+      || history.connectionEpoch !== state.session.connectionEpoch
+      || state.session.friends.length === 0
+      || history.friendInitialPageReceived
+      || history.friendPendingRequest !== null
+    ) return false;
+    if (!this.sendEncoded(encodeHistoryFriendsGetFrame(0))) return false;
+    this.store.dispatch(historyActions.friendPageRequested({
+      connectionEpoch: state.session.connectionEpoch, offset: 0, amount: 10,
+    }));
+    return this.store.getState().history.friendPendingRequest?.offset === 0;
+  }
+
+  loadMoreFriendsHistory(): boolean {
+    const state = this.store.getState();
+    const history = state.history;
+    if (
+      state.session.phase !== 'ready'
+      || history.connectionEpoch !== state.session.connectionEpoch
+      || !history.friendInitialPageReceived
+      || !history.friendHasMore
+      || history.friendPendingRequest !== null
+    ) return false;
+    const offset = history.friendItems.length;
+    if (!this.sendEncoded(encodeHistoryFriendsGetFrame(offset))) return false;
+    this.store.dispatch(historyActions.friendPageRequested({
+      connectionEpoch: state.session.connectionEpoch, offset, amount: 10,
+    }));
+    return this.store.getState().history.friendPendingRequest?.offset === offset;
+  }
+
   watchHistoricalGame(databaseID: number): boolean {
     const state = this.store.getState();
-    const item = state.history.items.find((candidate) => candidate.id === databaseID);
+    const item = [...state.history.items, ...state.history.friendItems]
+      .find((candidate) => candidate.id === databaseID);
     const room = state.room;
     if (
       state.session.phase !== 'ready'
@@ -1293,6 +1330,12 @@ export class LobbyRuntime {
         }));
         this.gameBootstrap.receiveGameHistory(epoch, event.data);
         break;
+      case 'gameHistoryFriends':
+        this.store.dispatch(historyActions.friendPageReceived({
+          connectionEpoch: epoch,
+          history: event.data,
+        }));
+        break;
       case 'cardIdentities':
         this.gameBootstrap.receiveCardIdentities(epoch, event.data);
         break;
@@ -1527,7 +1570,9 @@ export class LobbyRuntime {
     const history = this.store.getState().history;
     if (
       history.connectionEpoch === epoch
-      && (history.pendingRequest !== null || history.pendingReplayCreate !== null)
+      && (history.pendingRequest !== null
+        || history.friendPendingRequest !== null
+        || history.pendingReplayCreate !== null)
     ) this.store.dispatch(historyActions.operationFailed({
       connectionEpoch: epoch,
       message: message.slice(0, MAX_STATUS_LENGTH),

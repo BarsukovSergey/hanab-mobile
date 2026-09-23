@@ -432,6 +432,14 @@ The mobile client must still treat server state as authoritative and must not in
 
 ## Finished game lifecycle
 
+Friends history uses the scoped upstream pin recorded in `UPSTREAM.md`. On connection, the
+server sends up to ten own games as `gameHistory` and, when the user has friends, up to ten
+friends' games as `gameHistoryFriends`. Both are bare arrays of the same `GameHistory` item
+shape. `historyFriendsGet {"offset":N,"amount":10}` requests another friends page; the
+response is `gameHistoryFriends`. The server supplies no friends total, so pagination uses
+raw page length. Friends games are kept separate from own history and are not passed to
+game bootstrap.
+
 At the pinned commit, the server finishes an ongoing game in this order:
 
 ```text

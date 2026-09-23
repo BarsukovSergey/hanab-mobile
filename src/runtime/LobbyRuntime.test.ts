@@ -3515,6 +3515,62 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().history.hasMore).toBe(false);
   });
 
+  test('friends history receives separately and paginates with the exact frame', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const bootstrapHistory = jest.spyOn(runtime['gameBootstrap'], 'receiveGameHistory');
+    store.dispatch(sessionActions.friendsReceived({ epoch: 1, friends: ['Bob'] }));
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify(
+      Array.from({ length: 10 }, (_, i) => historicalGame(20 - i)),
+    )}`);
+    expect(store.getState().history.items).toEqual([]);
+    expect(store.getState().history.totalGames).toBe(0);
+    expect(store.getState().history.friendItems).toHaveLength(10);
+    expect(bootstrapHistory).not.toHaveBeenCalled();
+    expect(runtime.loadMoreFriendsHistory()).toBe(true);
+    expect(runtime.loadMoreFriendsHistory()).toBe(false);
+    expect(socket.sent).toEqual(['historyFriendsGet {"offset":10,"amount":10}']);
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify([historicalGame(10)])}`);
+    expect(store.getState().history.friendItems).toHaveLength(11);
+    expect(store.getState().history.friendHasMore).toBe(false);
+  });
+
+  test('ensure friends history sends only when needed and a duplicate initial page is ignored', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.ensureFriendsHistory()).toBe(false);
+    store.dispatch(sessionActions.friendsReceived({ epoch: 1, friends: ['Bob'] }));
+    socket.failSend = true;
+    expect(runtime.ensureFriendsHistory()).toBe(false);
+    expect(store.getState().history.friendPendingRequest).toBeNull();
+    socket.failSend = false;
+    expect(runtime.ensureFriendsHistory()).toBe(true);
+    expect(runtime.ensureFriendsHistory()).toBe(false);
+    expect(socket.sent).toEqual(['historyFriendsGet {"offset":0,"amount":10}']);
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify([historicalGame(5)])}`);
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify([historicalGame(6)])}`);
+    expect(store.getState().history.friendItems.map(({ id }) => id)).toEqual([5]);
+    expect(runtime.ensureFriendsHistory()).toBe(false);
+  });
+
+  test('failed friends load-more send leaves no pending request', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify(
+      Array.from({ length: 10 }, (_, i) => historicalGame(20 - i)),
+    )}`);
+    socket.failSend = true;
+    expect(runtime.loadMoreFriendsHistory()).toBe(false);
+    expect(store.getState().history.friendPendingRequest).toBeNull();
+  });
+
+  test('friend-only game uses the existing solo replay path', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify([historicalGame(77)])}`);
+    expect(store.getState().history.items).toEqual([]);
+    expect(runtime.watchHistoricalGame(77)).toBe(true);
+    expect(socket.sent).toEqual([
+      'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
+    ]);
+  });
+
   test('history and replay send failures leave no fake pending state', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     store.dispatch(sessionActions.welcomeReceived({

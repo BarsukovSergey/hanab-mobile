@@ -6,6 +6,7 @@ import {
   encodeChatFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
+  encodeHistoryFriendsGetFrame,
   encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeReplayActionFrame,
@@ -84,6 +85,9 @@ describe('lobby protocol decoder', () => {
       'welcome {"userID":1,"username":"Ada","playingAtTables":[]}',
     )).toMatchObject({ kind: 'malformed', command: 'welcome' });
     expect(encodeHistoryGetFrame(10)).toBe('historyGet {"offset":10,"amount":10}');
+    expect(encodeHistoryFriendsGetFrame(10)).toBe('historyFriendsGet {"offset":10,"amount":10}');
+    expect(() => encodeHistoryFriendsGetFrame(-1)).toThrow();
+    expect(() => encodeHistoryFriendsGetFrame(0, 9)).toThrow();
     expect(encodeReplayCreateFrame(77)).toBe(
       'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
     );
@@ -479,6 +483,29 @@ describe('lobby protocol decoder', () => {
     expect(decodeServerFrame('boot {"tableID":123}')).toMatchObject({
       kind: 'malformed', command: 'boot', issue: 'invalid-payload',
     });
+  });
+  test('friends history uses the same strict game item schema', () => {
+    const game = {
+      id: 77,
+      options: {
+        numPlayers: 2, startingPlayer: 0, variantID: 0, variantName: 'No Variant',
+        timed: false, timeBase: 0, timePerTurn: 0, speedrun: false, cardCycle: false,
+        deckPlays: false, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+        allOrNothing: false, detrimentalCharacters: false,
+      },
+      seed: 'seed', score: 20, numTurns: 30, endCondition: 1,
+      datetimeStarted: '2026-09-01T00:00:00Z', datetimeFinished: '2026-09-01T00:10:00Z',
+      numGamesOnThisSeed: 1, playerNames: ['Ada', 'Bob'], incrementNumGames: true, tags: '',
+    };
+    const payload = JSON.stringify([game]);
+    expect(decodeServerFrame(`gameHistoryFriends ${payload}`)).toMatchObject({
+      kind: 'event', event: { command: 'gameHistoryFriends', data: [game] },
+    });
+    expect(decodeServerFrame(`gameHistory ${payload}`)).toMatchObject({
+      kind: 'event', event: { command: 'gameHistory', data: [game] },
+    });
+    expect(decodeServerFrame(`gameHistoryFriends ${JSON.stringify([{ ...game, id: '77' }])}`))
+      .toMatchObject({ kind: 'malformed', command: 'gameHistoryFriends' });
   });
 
   test('retains table and tableList spectators with shadowing data', () => {
