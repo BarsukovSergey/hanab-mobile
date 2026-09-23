@@ -1,8 +1,8 @@
 # Upstream parity audit
 
-Date: 2026-09-23
+Date: 2026-09-24
 
-Status: **research / planning authority for parity discussions; not permission to change the frozen beta.1 runtime**
+Status: **research / planning snapshot refreshed against current `main`; the distributed beta.1 build remains a historical tester artifact, not the current runtime baseline**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- runtime/code snapshot: `92425ba087e9e625ce428d3551b5bd00142a86b7` (PR #41 merge; this audit update is docs-only)
+- runtime/code snapshot: `f6f71737c8ba4f9c63993f06bcb9a4072c917bba` (PR #73 merge; this audit refresh is docs-only)
 - distributed beta.1 runtime remains frozen at
   `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -89,22 +89,17 @@ already present:
 - most browser-local slash-command transport;
 - a very large portion of the upstream variant catalog.
 
-The biggest remaining parity gaps are concentrated in five areas:
+The biggest remaining parity gaps are now concentrated in five areas:
 
-1. **Spectator perspective and contextual people actions**: shadowing is wire-supported but has no selector; online users/profile/PM/friend actions remain thin or missing.
-2. **Per-user accessibility/presentation settings**: colorblind mode, styled numbers, reverse-hand and sounds are mostly ignored.
-3. **History / product-shell power features**: seed comparison, tags UI, shared replay creation, pregame player stats and bot invite workflows.
-4. **Power-user replay/review features**: arrows, Hypothetical morph UI, arbitrary JSON replay, `/copy`, full clue-log navigation.
+1. **Replay/review power features**: shared replay creation from History, receive/UI support for turn suggestions, replay arrows/annotations, JSON import, `/copy`, and selected leader controls.
+2. **Tags and richer history/profile workflows**: first-class tag presentation/management, arbitrary-player history, and richer profile/best-score surfaces.
+3. **Product/account/bot surfaces**: multi-bot invite UI, account-management entry points, and optional linked-account UX.
+4. **Chat/presentation long tail**: unread/read/typing polish, sounds, reverse-hand preference, and other non-core presentation settings.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, the lobby section restructure (#32) and the adaptive real-card 4P–6P portrait repair (#37–#41) have landed. The latter is physically validated on the tested Android portrait class for 5P, true 6P and 6P + One Extra Card; broader device/serious-play validation remains separate.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), and same-seed Other Scores (#73). Spectator perspective switching is also now first-class in the live Game menu.
 
-The protocol surface is already broad:
-
-- upstream exposes **42** direct client→server WebSocket commands; mobile has **34 full**, **2
-  partial**, and **6 missing** command families;
-- current Go server emits **53** relevant server→client event names; mobile recognizes **41** and
-  safely ignores **12** currently unsupported event families.
+The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
 The deeper audit found three concrete semantic/interoperability defects that should not be confused
 with general feature backlog. All three have since been resolved:
@@ -115,20 +110,28 @@ with general feature backlog. All three have since been resolved:
 
 ## Highest-value findings
 
+Recently completed high-value parity work:
+- spectator perspective / player shadow selector;
+- colorblind + styled-number card presentation;
+- People/Pregame contextual Message and Friend/Unfriend actions;
+- compact Pregame player stats and spectator list;
+- random table-name parity and friend-aware Lobby discovery;
+- Friends history and same-seed Other Scores.
+
+The highest-value remaining items are:
+
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
-| Spectator shadowing / player perspective | Wire-only | S–M | High | The protocol already carries `shadowingPlayerIndex`; mobile always requests `-1` and exposes no perspective selector. |
-| Colorblind + styled-number card presentation | Missing | S–M | High | Accessibility/presentation value; assets/tooling already understand upstream card variants. |
-| Add several bots during Create/Pregame | Missing | M | Medium–High | Existing PM join semantics are sufficient; registry must use verified per-bot capabilities because not every reference/community bot supports protected-table joins. |
-| Online users / contextual player actions | Missing UI | M | Medium–High | User data is already stored; currently invisible. Unlocks PM/profile/friend/shadowing discovery. |
-| Pregame player stats | Missing UI | S–M | Medium | Server already sends stats; mobile schema currently discards them. |
-| Seed comparison / Other Scores | Missing | M | Medium | Server has dedicated `historyGetSeed`; history already carries seed and `numGamesOnThisSeed`. |
-| Shared replay creation from history | Missing | S–M | Medium | Mobile replayCreate is currently hard-coded to `visibility: solo`. |
-| Arbitrary JSON replay import | Missing | M | Medium | Useful for research/bots; current upstream recently expanded JSON seed semantics. |
-| Hypothetical morph UI | Wire/state-only | M | Medium | Reducers and rendering understand morph/unmorph, but mobile cannot originate one. |
-| `/copy` replay export | Missing | M | Medium | Explicitly deferred; current fallback sends it to server where it is not a server command. |
-| Chat typing/read/unread | Partial | S–M | Low–Medium | Payload support exists for unread; typing/read commands/events are absent. |
-| Upstream account/settings surface | Missing | M–L | Medium | Server sends settings but mobile welcome parser discards them. |
+| Game/replay tags workflow | Command/data support | S–M | Medium | History already carries tags and raw tag commands work; the missing piece is a first-class mobile workflow. |
+| Shared replay creation from History | Missing | S–M | Medium | Solo database replay creation exists; shared visibility is the remaining History action. |
+| Shared-replay turn suggestion receive/UI | Partial | S–M | Medium | Send path exists, but suggestion receive/presentation is incomplete. |
+| Add several bots during Create/Pregame | Missing | M | Medium–High | Existing join semantics are sufficient; registry must use verified per-bot capabilities. |
+| Arbitrary JSON replay import | Missing | M | Medium | Useful for research/bots; current upstream expanded JSON seed/deck/player-name semantics. |
+| Hypothetical morph UI | Wire/state-only | M | Medium | Reducers/rendering understand morph/unmorph, but mobile cannot originate one. |
+| `/copy` replay export | Missing | M | Medium | Browser-local upstream behavior needs a deliberate mobile export/share implementation. |
+| Rich player profile / arbitrary-player history | Partial | M–L | Medium | People/context actions exist; richer profile/history presentation does not. |
+| Account-management UX | Partial | S–M | Medium | Login/session work; change/reset password and broader settings surfaces remain. |
+| Chat unread/read/typing polish | Partial | S–M | Low–Medium | Core chat works; discovery/read-state polish remains. |
 
 ---
 
@@ -187,8 +190,8 @@ PM, friend/unfriend, spectator perspective and bot discovery without changing th
 | Set/take leader | **Full** | — | Medium | Native UI + slash aliases. |
 | Table option updates | **Full for exposed options** | — | High | Owner applies; non-owner proposals remain server authoritative. |
 | Table option proposals | **Full** | — | Medium | Mobile parses server proposal chat and gives owner Apply button. |
-| Pregame spectators list | **Missing UI** | S | Medium | Lobby table data has spectators; PregameScreen shows players only. |
-| Pregame player stats | **Missing data/UI** | S–M | Medium | Server `game` payload includes `stats`; mobile `pregamePlayerSchema` drops it. |
+| Pregame spectators list | **Full basic** | — | Medium | Authoritative `pregameSpectators` snapshots are retained and displayed. |
+| Pregame player stats | **Full compact** | — | Medium | Authoritative total/variant games, average, strikeout rate, and player-count best score are preserved and shown. |
 | Pregame player profile shortcut | **Missing** | S–M | Medium | Depends on People/profile work. |
 | Kick player native action | **Chat fallback only** | S | Medium | Server `/kick` already works through chat. |
 | Auto-start next join / N players | **Chat fallback only** | S | Low–Medium | `/s`, `/s2`…`/s6`. |
@@ -443,13 +446,12 @@ mobile-only server preference storage.
 | Spectate pregame | **Full basic** | — | Medium | See lifecycle drift above. |
 | See all hands | **Full** | — | High | Uses authoritative spectator visibility. |
 | Spectator count/list in live menu | **Full basic** | — | Medium | Names shown. |
-| Spectator list in pregame | Missing UI | S | Medium | Data exists in lobby table. |
-| Shadow a player's perspective | **Wire-only** | S–M | **High** | Schema supports `shadowingPlayerIndex`; UI/runtime always spectates with `-1`. |
+| Spectator list in pregame | **Full basic** | — | Medium | Authoritative pregame spectator snapshots are retained and shown. |
+| Shadow a player's perspective | **Full** | — | **High** | Live Game menu exposes All hands and every player seat through authoritative `tableSpectate` shadowing. |
 | Show who each spectator is shadowing | **Data-only** | S | Medium | Spectator records retain shadowing fields. |
 | Reconnect to previous shadow seat | **Full transport** | — | Medium | `disconShadowingSeat` retained in resume hints. |
 
-Spectator shadowing is one of the best parity wins: the protocol and server already support it, so it
-is mainly a contextual UI/runtime action rather than new game logic.
+Spectator shadowing is now exposed as a first-class live Game-menu action while keeping the server's `shadowingPlayerIndex` model authoritative.
 
 ---
 
@@ -518,9 +520,9 @@ missing piece is an originating identity-picker/action for the shared-replay lea
 | History displays players/score/variant/end condition/date | **Full basic** | — | High | — |
 | History displays seed | Missing UI | XS | Medium | Data already present. |
 | History displays tags | Missing UI | XS–S | Medium | Data already present. |
-| History shows count played on same seed | Missing UI | XS | Medium | `numGamesOnThisSeed` already present. |
-| Other Scores / same-seed comparison | **Missing** | M | Medium | Dedicated upstream `historyGetSeed` command. |
-| Friends history | **Missing** | M | Medium | Dedicated `historyFriendsGet` command. |
+| History shows count played on same seed | **Full** | — | Medium | History cards expose `Other scores · N` from authoritative `numGamesOnThisSeed - 1`. |
+| Other Scores / same-seed comparison | **Full** | — | Medium | Uses authoritative `historyGetSeed` / `gameHistoryOtherScores` and preserves server score ordering. |
+| Friends history | **Full** | — | Medium | Separate authoritative collection and pagination via `gameHistoryFriends` / `historyFriendsGet`. |
 | Other player's history | Missing native UI | M–L | Medium | Web/API supports it; mobile history state is self-only. |
 | Player profile / best scores | **Missing native UI** | L | Medium | `chatPlayerInfo` only returns a short server message + web link. |
 | Player-info command | **Full command transport** | — | Low–Medium | Native profile presentation missing. |
@@ -650,11 +652,11 @@ Current upstream server command map versus mobile:
 | `chatUnlink` | Full | — |
 | `chatLinked` | Full | — |
 | `chatPlayerInfo` | Full command path | Native profile absent. |
-| `getName` | **Missing** | Random create-table name absent. |
+| `getName` | **Full** | Random create-table name refresh uses the authoritative server value. |
 | `inactive` | Full | App lifecycle. |
 | `historyGet` | Full | Own history. |
-| `historyGetSeed` | **Missing** | Same-seed scores. |
-| `historyFriendsGet` | **Missing** | Friends history. |
+| `historyGetSeed` | **Full** | Same-seed Other Scores comparison. |
+| `historyFriendsGet` | **Full** | Independent Friends history pagination. |
 | `replayCreate` | **Partial** | Only database-ID + solo. No shared or JSON source. |
 | `tagSearch` | Full raw command path | Results only as server chat. |
 | `getGameInfo1` | Full | Bootstrap. |
@@ -687,13 +689,13 @@ Current upstream events missing from the mobile server-event schema include:
 | --- | --- | --- | ---: | ---: |
 | `name` | ignored | Missing convenience | XS–S | Low |
 | `tableProgress` | ignored; lobby table progress remains at snapshot value | Missing presentation data | S | Low |
-| `pregameSpectators` | ignored | Missing data/UI | S–M | Medium |
+| `pregameSpectators` | handled | **Full basic** | — | Medium |
 | `chatTyping` | ignored | Missing chat polish | S–M | Low |
 | `shutdown` | ignored | Missing server-status UX | S | Medium |
 | `maintenance` | ignored | Missing server-status UX | S | Medium |
 | `soundLobby` | ignored | Missing sound parity | M with sound system | Low |
-| `gameHistoryFriends` | ignored | Missing friends-history feature | M | Medium |
-| `gameHistoryOtherScores` | ignored | Missing same-seed comparison | M | Medium |
+| `gameHistoryFriends` | handled | **Full** | — | Medium |
+| `gameHistoryOtherScores` | handled | **Full** | — | Medium |
 | `suggestion` | ignored | Partial shared-review interoperability | S–M | Medium |
 | `replayIndicator` | ignored | Missing shared arrows/annotations | M–L | Medium |
 | `replaySound` | ignored | Missing shared-replay sound parity | M | Low |
@@ -843,9 +845,9 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Pace | **Full presentation semantics** | Final-round/AON suppression, signed value display and risk treatment match upstream. |
 | Efficiency | **Full presentation semantics** | FRE/MRE and review/shared modifier policy match upstream; editing the manual modifier is not exposed in this presentation slice. |
 | Keyboard Shortcuts | **N/A literally** | Native controls/gestures should cover valuable actions rather than reproducing desktop key chords. |
-| Similar Deals and Competitive Play | **Partial** | Server seed selection works automatically; magic `!seed`/ `!replay` table names pass through; Other Scores and strong seed UI are missing. |
+| Similar Deals and Competitive Play | **Partial+** | Server seed selection works automatically; magic `!seed`/`!replay` table names pass through; native Other Scores is implemented, while broader seed browsing remains web-oriented. |
 | Chat | **Full basic / partial rich features** | Text/PM/history/commands work; read/unread/typing/emotes/link richness/zen are incomplete. |
-| Friends | **Partial** | Commands + state work; People/friends UI and friend-aware sorting are missing. |
+| Friends | **Strong partial** | Commands/state, People contextual actions, friend-aware Lobby ordering, and Friends history are implemented; richer profiles/social flows remain. |
 | Linked Accounts | **Command-complete / UI missing** | Link/unlink/linked commands work; native explanation/workflow absent. |
 | Tags | **Command-complete / workflow missing** | Add/delete/search/list command paths exist; history/tag browser UI absent. |
 | Website Endpoints | **Audited individually** | See endpoint matrix. |
@@ -957,28 +959,23 @@ No unresolved high-priority current-server drift item remains from this audit. K
 jank (#4) and the direct `/r` submission edge case (#31) as non-blocking defect backlog unless real
 usage reprioritizes them.
 
-## B. High-value, relatively low-risk post-feedback work
+## B. High-value, relatively low-risk next work
 
-1. Spectator shadowing/perspective selector.
-2. Colorblind mode + styled-number presentation.
-3. People / contextual PM, player-info and friend-unfriend actions.
-4. Pregame stats preservation/display.
-5. Multi-bot create/pregame picker.
-6. Expose seed/tags/same-seed count already present in history payload.
-7. Shared-replay Suggest-current-turn button.
-8. Direct `/r` edge-case cleanup when convenient.
+1. Game/replay tags presentation and a small first-class mutation flow.
+2. Shared replay creation from History.
+3. Shared-replay Suggest receive/UI parity.
+4. Multi-bot Create/Pregame picker.
+5. Direct `/r` submission edge-case cleanup when convenient.
 
 ## C. Medium product slices
 
-1. Other Scores / seed comparison.
-2. Friends history.
-3. Game/replay tags workflow.
-4. Shared replay creation from history.
-5. Arbitrary JSON replay import.
-6. `/copy` export/share.
-7. Hypothetical morph picker.
-8. Broader user/profile surface.
-9. Chat unread/read/typing.
+1. Arbitrary JSON replay import.
+2. `/copy` export/share.
+3. Hypothetical morph picker.
+4. Richer user/profile and arbitrary-player history surfaces.
+5. Account-management / linked-account UX.
+6. Chat unread/read/typing polish.
+7. Remaining shared-replay arrows/annotations/sounds/leader controls.
 
 ## D. Defer until demanded
 
@@ -1015,9 +1012,11 @@ A useful way to describe current parity is:
 - live rewind;
 - finished/solo/shared replay core;
 - Hypothetical core;
-- spectator read-only gameplay;
+- spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
-- basic history;
+- generated upstream card presentation with colorblind/styled-number server settings;
+- own History, Friends history, and same-seed Other Scores;
+- People/Pregame contextual friend/message actions and compact Pregame stats;
 - core chat and most command transport.
 
 ### Functionally present but product-incomplete
@@ -1041,14 +1040,12 @@ A useful way to describe current parity is:
 
 ### Missing largely because mobile has not built the product surface yet
 
-- upstream account settings;
-- People/profiles;
-- pregame stats;
-- Other Scores/friends history;
-- shared replay creation;
+- broader account-management/settings beyond the implemented card appearance settings;
+- rich profiles and arbitrary-player history beyond existing People/context actions;
+- first-class game/replay tags workflow;
+- shared replay creation from History;
 - JSON import/export;
-- sounds;
-- colorblind/style-number/reverse-hand preferences;
+- sounds and reverse-hand preference;
 - typing/read/unread chat polish;
 - bot picker.
 
@@ -1059,17 +1056,16 @@ or a protocol rewrite.
 
 Wait for the current beta.1 feedback window before merging large runtime changes.
 
-When the next feature cycle begins, the most defensible order is:
+For the current feature cycle, the most defensible order is:
 
-1. fix any tester-confirmed beta defects;
-2. spectator shadowing/perspective;
-3. colorblind/style-number accessibility;
-4. People/contextual player actions plus compact pregame stats;
-5. multi-bot create/pregame picker;
-6. history/seed/tags improvements;
-7. replay power features, shared-replay creation and JSON/`copy`;
-8. broader profiles/social/settings;
-9. only then consider expensive exotic rules/options.
+1. fix any tester-confirmed runtime defects;
+2. finish the first-class game/replay tags workflow;
+3. add shared replay creation from History;
+4. complete useful shared-review power tools such as suggestion receive/UI;
+5. add the multi-bot Create/Pregame picker;
+6. tackle JSON/`copy` and other replay power features deliberately;
+7. expand profiles/account/social/settings only where mobile context adds value;
+8. only then consider expensive exotic rules/options.
 
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped
@@ -1104,11 +1100,11 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/shrug` | **Full through fallback** | server chat command | No gap worth native UI. | — | Low |
 | `/timeleft` | **Full through fallback** | server chat command | Proactive shutdown UI is separately missing. | S | Low |
 | `/uptime` | **Full through fallback** | server chat command | No native UI needed. | — | Low |
-| `/pm [username] [msg]` | **Full command path** | direct `chatPM` | Contextual PM action / recipient-bound composer is still missing. | S–M | Medium |
+| `/pm [username] [msg]` | **Full command path + contextual UI** | direct `chatPM` | People/Pregame expose a contextual Message action; richer conversation UX remains optional. | — | Medium |
 | `/r [msg]` | **Partial** | input rewrite to `/pm` | Normal typed `/r ` works; direct paste/submit `/r hello` hits the incomplete local handler and fails. | XS | Low |
-| `/friend [username]` | **Full command path** | direct `chatFriend` | Contextual Friend button/list UI missing. | S–M | Medium |
-| `/friends` | **Full command path** | local list from authoritative friends state | Dedicated Friends/People surface missing. | M | Medium |
-| `/unfriend [username]` | **Full command path** | direct `chatUnfriend` | Contextual action missing. | S | Medium |
+| `/friend [username]` | **Full command path + contextual UI** | direct `chatFriend` | People/Pregame expose Friend action backed by authoritative snapshots. | — | Medium |
+| `/friends` | **Full command path + People surface** | local list from authoritative friends state | People and friend-aware Lobby/History surfaces use the same authoritative state. | — | Medium |
+| `/unfriend [username]` | **Full command path + contextual UI** | direct `chatUnfriend` | People/Pregame expose Unfriend action without optimistic mutation. | — | Medium |
 | `/link [username]` | **Full command path** | direct `chatLink` | Native explanation/workflow missing. | M | Low–Medium |
 | `/linked` | **Full command path** | direct `chatLinked` | Native linked-account surface missing. | M | Low |
 | `/unlink [username]` | **Full command path** | direct `chatUnlink` | Native action missing. | S | Low |
@@ -1175,7 +1171,7 @@ mobile feature requirement. The table separates the underlying user need from li
 | `/missing-scores/[username]` | Non-max scores for one player | Command-level `/missing` exists for current group; no native arbitrary-user page. | M–L | Low–Medium |
 | `/shared-missing-scores/2/[username...]` | Shared missing scores for 2–6 users | Current-table `/missing` fallback covers the common live need; page parity missing. | L | Low |
 | `/tags/[username]` | Player's tagged games | **Missing native tags/history surface** | M–L | Low–Medium |
-| `/seed/[seed]` | Games on the same deal | **Missing native Other Scores**; dedicated WS command exists. | M | Medium |
+| `/seed/[seed]` | Games on the same deal | **Native contextual equivalent implemented** via authenticated Other Scores; full public seed page remains web-only. | — | Medium |
 | `/stats` | Site-wide statistics | External/web-only today | L | Low |
 | `/variant/[id]` | Variant statistics | External/web-only today | L | Low |
 | `/tag/[tag]` | Games matching a tag | Raw `/tagsearch` exists; structured native results missing. | M | Medium |
@@ -1232,9 +1228,9 @@ than turning into connection failures.
 
 Safe field dropping is responsible for several parity gaps documented elsewhere:
 
-- `welcome.settings`, `muted`, `firstTimeUser`, random table name, maintenance/shutdown state;
-- lobby `ownerID`, spectators and redundant timing fields;
-- pregame player `stats`.
+- welcome fields still not surfaced broadly, including `muted`, `firstTimeUser`, and maintenance/shutdown UX; card presentation settings and random table names are now retained;
+- lobby `ownerID` and redundant timing fields remain omitted where unused; spectator data is now retained;
+- other evolving fields not needed by supported mobile flows continue to be dropped at permissive boundaries.
 
 These are product/data omissions, not protocol decode failures.
 
