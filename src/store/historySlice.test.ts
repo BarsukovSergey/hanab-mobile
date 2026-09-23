@@ -32,6 +32,35 @@ function readyStore(totalGames = 30) {
 }
 
 describe('C15 history state', () => {
+  test('same-seed results require matching pending context and preserve server order', () => {
+    const store = readyStore();
+    const source = { ...item(1), numGamesOnThisSeed: 3 };
+    store.dispatch(historyActions.pageReceived({ connectionEpoch: 1, history: [source] }));
+    store.dispatch(historyActions.friendPageReceived({ connectionEpoch: 1, history: [item(20)] }));
+    const result = { games: [{ ...item(9), score: 20 }, { ...item(3), score: 20 }, item(7)], variantName: 'No Variant', friends: false, seed: source.seed };
+    store.dispatch(historyActions.otherScoresReceived({ connectionEpoch: 1, result }));
+    expect(store.getState().history.otherScores).toBeNull();
+    const request = { connectionEpoch: 1, sourceDatabaseID: 1, seed: source.seed, friends: false };
+    store.dispatch(historyActions.otherScoresRequested(request));
+    store.dispatch(historyActions.otherScoresRequested(request));
+    store.dispatch(historyActions.otherScoresReceived({ connectionEpoch: 1, result: { ...result, friends: true } }));
+    store.dispatch(historyActions.otherScoresReceived({ connectionEpoch: 1, result: { ...result, seed: 'wrong' } }));
+    store.dispatch(historyActions.otherScoresReceived({ connectionEpoch: 0, result }));
+    expect(store.getState().history.otherScores).toBeNull();
+    store.dispatch(historyActions.otherScoresReceived({ connectionEpoch: 1, result }));
+    expect(store.getState().history.otherScores?.games.map(({ id }) => id)).toEqual([9, 3, 7]);
+    expect(store.getState().history.items).toEqual([source]);
+    expect(store.getState().history.friendItems).toEqual([item(20)]);
+    store.dispatch(historyActions.otherScoresDismissed());
+    expect(store.getState().history.otherScores).toBeNull();
+    store.dispatch(historyActions.otherScoresRequested(request));
+    store.dispatch(historyActions.operationFailed({ connectionEpoch: 1, message: 'failed' }));
+    expect(store.getState().history.pendingOtherScores).toBeNull();
+    expect(store.getState().history.items).toEqual([source]);
+    store.dispatch(historyActions.otherScoresRequested(request));
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().history.pendingOtherScores).toBeNull();
+  });
   test('friends pages stay independent, preserve order, and stop on a short page', () => {
     const store = readyStore(1);
     store.dispatch(historyActions.pageReceived({ connectionEpoch: 1, history: [item(1)] }));

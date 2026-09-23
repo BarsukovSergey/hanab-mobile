@@ -388,6 +388,19 @@ export const historyGetCommandSchema = z.object({
   amount: z.literal(10),
 }).strict();
 
+const historySeedSchema = z.string().regex(/^[A-Za-z0-9-]+$/);
+export const historyGetSeedCommandSchema = z.object({
+  seed: historySeedSchema,
+  friends: z.boolean(),
+}).strict();
+export const gameHistoryOtherScoresSchema = z.object({
+  games: gameHistorySchema,
+  variantName: z.string().min(1),
+  friends: z.boolean(),
+  seed: historySeedSchema,
+}).strict();
+export type GameHistoryOtherScores = z.infer<typeof gameHistoryOtherScoresSchema>;
+
 // These three Go message structs intentionally lack json tags, so encoding/json emits `TableID`.
 const hypoTableEventSchema = z.object({ TableID: idSchema }).strict();
 export const hypotheticalSchema = z.object({
@@ -431,6 +444,7 @@ const schemas = {
   voteChange: voteChangeSchema,
   gameHistory: gameHistorySchema,
   gameHistoryFriends: gameHistorySchema,
+  gameHistoryOtherScores: gameHistoryOtherScoresSchema,
   cardIdentities: cardIdentitiesSchema,
   finishOngoingGame: finishOngoingGameSchema,
   replaySegment: replaySegmentSchema,
@@ -680,6 +694,10 @@ export function encodeHistoryGetFrame(offset: number, amount = 10): string {
 
 export function encodeHistoryFriendsGetFrame(offset: number, amount = 10): string {
   return encodeClientFrame('historyFriendsGet', historyGetCommandSchema.parse({ offset, amount }));
+}
+
+export function encodeHistoryGetSeedFrame(seed: string, friends: boolean): string {
+  return encodeClientFrame('historyGetSeed', historyGetSeedCommandSchema.parse({ seed, friends }));
 }
 
 export function encodeReplayCreateFrame(databaseID: number): string {
