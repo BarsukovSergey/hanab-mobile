@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 
 import {
   decodeServerFrame,
+  encodeCardPresentationSettingFrame,
   encodeChatFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
@@ -33,6 +34,36 @@ const user = {
 };
 
 describe('lobby protocol decoder', () => {
+  test('parses presentation settings, tolerates other settings, and defaults absent settings', () => {
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"sounds":true}}',
+    )).toMatchObject({
+      kind: 'event',
+      event: {
+        command: 'welcome',
+        data: { settings: { colorblindMode: true, styleNumbers: false, sounds: true } },
+      },
+    });
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[]}',
+    )).toMatchObject({
+      kind: 'event',
+      event: {
+        command: 'welcome',
+        data: { settings: { colorblindMode: false, styleNumbers: false } },
+      },
+    });
+  });
+
+  test('encodes exact supported presentation setting frames', () => {
+    expect(encodeCardPresentationSettingFrame('colorblindMode', true)).toBe(
+      'setting {"name":"colorblindMode","setting":"true"}',
+    );
+    expect(encodeCardPresentationSettingFrame('styleNumbers', false)).toBe(
+      'setting {"name":"styleNumbers","setting":"false"}',
+    );
+  });
+
   test('retains required totalGames and encodes exact C15 commands', () => {
     expect(decodeServerFrame(
       'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[]}',

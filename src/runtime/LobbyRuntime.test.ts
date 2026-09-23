@@ -2100,6 +2100,41 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toEqual(['futureCommand {"value":1}']);
   });
 
+  test('card presentation settings send once and update locally after success', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+
+    expect(runtime.setCardPresentationSetting('colorblindMode', true)).toBe(true);
+    expect(socket.sent).toEqual([
+      'setting {"name":"colorblindMode","setting":"true"}',
+    ]);
+    expect(store.getState().session.cardPresentationSettings.colorblindMode).toBe(true);
+
+    expect(runtime.setCardPresentationSetting('colorblindMode', true)).toBe(true);
+    expect(socket.sent).toHaveLength(1);
+  });
+
+  test('card presentation setting send failure leaves local state unchanged', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    socket.failSend = true;
+
+    expect(runtime.setCardPresentationSetting('styleNumbers', true)).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().session.cardPresentationSettings.styleNumbers).toBe(false);
+  });
+
+  test('card presentation settings require a ready connection', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store);
+    await runtime.connect();
+    socket.emitOpen();
+
+    expect(runtime.setCardPresentationSetting('styleNumbers', false)).toBe(false);
+    expect(socket.sent).toEqual([]);
+  });
+
   test('spectate sends exactly once and does not transition before tableStart', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
