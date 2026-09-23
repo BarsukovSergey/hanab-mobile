@@ -35,7 +35,7 @@ export class ChatRuntime {
     private readonly now: () => Date = () => new Date(),
   ) {
     this.register(PM_COMMANDS, (room, args) => this.privateMessage(room, args));
-    this.register(['r'], (room) => this.reply(room));
+    this.register(['r'], (room, args) => this.reply(room, args));
     this.register(['friend', 'addfriend'], (room, args) => this.friend(room, args, true));
     this.register(['unfriend'], (room, args) => this.friend(room, args, false));
     this.register(FRIENDS_COMMANDS, (room) => this.listFriends(room));
@@ -153,15 +153,17 @@ export class ChatRuntime {
     return this.sendPrivateMessage(recipient ?? '', msgArray.join(' '), room);
   }
 
-  private reply(room: string): false {
-    if (this.store.getState().chat.lastPM === null) {
+  private reply(room: string, args: readonly string[]): boolean {
+    const lastPM = this.store.getState().chat.lastPM;
+    if (lastPM === null) {
       this.localMessage(
         room,
         'No-one has sent you a private message yet, so you cannot reply.',
         'info',
       );
+      return false;
     }
-    return false;
+    return this.sendPrivateMessage(lastPM, args.join(' '), room);
   }
 
   private friend(room: string, args: readonly string[], add: boolean): boolean {
