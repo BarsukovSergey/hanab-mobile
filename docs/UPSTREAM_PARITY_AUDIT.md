@@ -107,10 +107,9 @@ The protocol surface is already broad:
 - current Go server emits **53** relevant server→client event names; mobile recognizes **40** and
   safely ignores **13** currently unsupported event families.
 
-The deeper audit found four concrete semantic/interoperability defects that should not be confused
+The deeper audit found three concrete semantic/interoperability defects that should not be confused
 with general feature backlog:
 
-- **finished-game `note.unclued` presentation drift** after upstream #3116 — #27;
 - **pregame spectator cleanup drift** after upstream #3129 — #26;
 - **dynamic shared-replay efficiency modifier updates are ignored** — #29;
 - **Pace/FRE presentation context differs from upstream** — #30.
@@ -119,7 +118,6 @@ with general feature backlog:
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
-| Finished replay `unclued` border behavior | Drift | XS | Medium | Current upstream intentionally disables the `unclued` override after game end; mobile still has the older behavior. |
 | Pregame spectator removed when table disappears | Drift | XS–S | High | Current server now sends an unsolicited `left` when the last player leaves; mobile ignores it unless a local leave/role-switch is pending. |
 | Shared replay efficiency-modifier updates | Interop drift | S | Medium | Initial value is consumed, but later `replayEfficiencyMod` broadcasts are ignored; follower FRE can go stale (#29). |
 | Pace/FRE context semantics | Partial | S | Medium | Underlying stats are present, but final-round/AON/review/shared-modifier presentation differs from web (#30). |
@@ -376,30 +374,6 @@ closed. The current 2242 variants already represent the overwhelming majority of
 | Hold-and-drag note peeking | **Missing** | M | Low–Medium | Backlog. |
 | Deep Knowledge workspace | **Missing** | L | Low–Medium | Backlog. |
 | Compare cards/hands | **Missing** | L | Low–Medium | Backlog. |
-
-## Current upstream card-presentation drift
-
-Upstream commit `f92dbefaad90894612eff8369e376843ae6b3621` (#3116) changed the finished-game
-border rule:
-
-- while live, `note.unclued` can suppress the orange clue border;
-- when the game is finished, `unclued` is deactivated for presentation so a genuinely clued card
-  still shows its clue border.
-
-Mobile `src/game/client/cardPresentation.ts` still uses the older condition:
-
-`!note.unclued && (isCardClued(state) || note.clued)`
-
-without the current-upstream `!finished` qualification.
-
-**Classification:** Drift
-**Effort:** XS
-**Importance:** Medium (replay/presentation correctness)
-
-This should be handled as a scoped card-presentation pin update/regression test, not by silently
-reading arbitrary current upstream source.
-
----
 
 # 6. Per-user settings
 
@@ -930,7 +904,7 @@ the live server, or browser-only fixes irrelevant to React Native.
 | `8bdc56d` | Direct Variant access through Game | Upstream refactor; inspect only when repinning game core. |
 | `c89874c` | Validate names/seed in replays | Server-side; future JSON import should use current validation. |
 | `7a9c601` | Extract card-presentation selectors | **Already the scoped mobile card pin.** |
-| `f92dbef` | Disable `note.unclued` when finished | **Relevant mobile drift; fix recommended.** |
+| `f92dbef` | Disable `note.unclued` when finished | **Adopted as a scoped card-presentation follow-up.** |
 | `3a149d7` | Formatting | None. |
 | `3f6079e` | Chat emote markup fix | Browser rendering; mobile uses inert plain text. |
 | `020923d` | Reject malformed server input/panics | Server-side benefit. |
@@ -963,9 +937,8 @@ Do not move the broad baseline pin merely because `main` is ahead.
 
 Recommended scoped actions:
 
-1. advance/adapt the **card-presentation** source through #3116 for the finished `unclued` fix;
-2. add mobile lifecycle coverage for the **server-side #3129 pregame-spectator behavior**;
-3. when implementing JSON replay/import/`copy`, deliberately source the complete current JSON
+1. add mobile lifecycle coverage for the **server-side #3129 pregame-spectator behavior**;
+2. when implementing JSON replay/import/`copy`, deliberately source the complete current JSON
    semantics from the 2026-09-15..18 upstream changes rather than the older baseline.
 
 ---
@@ -979,12 +952,7 @@ Recommended scoped actions:
    - importance: High
    - reason: real current-server lifecycle mismatch.
 
-2. **Update finished-game `note.unclued` presentation**
-   - effort: XS
-   - importance: Medium
-   - reason: real scoped upstream semantic drift.
-
-3. **Replay scrubber issue #4**
+2. **Replay scrubber issue #4**
    - effort: M after physical profiling
    - importance: Medium
    - reason: existing known defect; likely temporal-index recomputation.

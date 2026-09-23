@@ -101,7 +101,7 @@ Do not compute these independently in `GameCard` or other UI components; consume
 
 ### Note overrides
 
-- `note.unclued` suppresses the clue border.
+- `note.unclued` suppresses the clue border only while the game is not finished.
 - `note.clued` can force the clue border even when normal positive-clue state would not.
 - If both convention-note flags are present, the precedence above still applies.
 
