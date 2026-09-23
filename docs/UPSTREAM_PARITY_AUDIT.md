@@ -862,7 +862,7 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Notes — Card Partial Identity Notes | **Full parser semantics** | Possibility and exclusion syntax is supported. |
 | Notes — Special Note Borders | **Full** | Finesse and Chop Move. |
 | Notes — Other Special Notes | **Full semantics / some one-tap UI missing** | trash/KT/fix/?/!/blank/clued/unclued are understood; dedicated Clued/Unclued/Blank controls remain backlog. |
-| Notes — Adding Context | **Full** | Bracketed semantic tokens and stacked effects are preserved. |
+| Adding Context to Special Notes | **Full** | Bracketed semantic tokens and stacked effects are preserved. |
 | Notes — Note Shortcuts | **Full mobile equivalents** | F/CM/PTD/KT, Turn insertion and Repeat are explicit buttons rather than desktop modifier-clicks. |
 | Sounds | **Missing** | No gameplay/replay sound system yet. |
 | Pace & Efficiency | **Partial presentation** | Vendored formulas/state exist; context/display parity tracked in #30. |
@@ -1134,7 +1134,8 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/path` | **Full through fallback** | server simple response | Same. | XS–S | Low |
 | `/variants` | **Full through fallback** | server simple response | Same. | XS–S | Low |
 | `/github` | **Full through fallback** | server simple response | Same. | XS–S | Low |
-| `/playerinfo [username...]` | **Full command path** | direct `chatPlayerInfo` | Native player/profile UI missing. | M | Medium |
+| `/playerinfo [username]` | **Full command path** | direct `chatPlayerInfo` | Native player/profile UI missing. | M | Medium |
+| `/playerinfo [username1] [username2]` | **Full command path** | direct `chatPlayerInfo` | Same command path; multi-player comparison still renders as server text rather than native profile comparison. | M | Medium |
 | `/playerinfo` | **Full command path** | direct `chatPlayerInfo` | Same. | M | Medium |
 | `/random [min] [max]` | **Full through fallback** | server chat command | No need for native UI. | — | Low |
 | `/replay [game ID] [turn]` | **Full through fallback** | server chat command | Produces share text/link; mobile does not offer structured replay-link action. | S | Low–Medium |
@@ -1162,7 +1163,7 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/s6` | **Full through fallback** | server auto-start | Same. | S | Low |
 | `/setvariant [variant]` | **Full for supported variants** | direct `tableSetVariant` | Deliberately refuses the 184 unsupported mechanic variants. | — | Medium |
 | `/startin [minutes]` | **Full through fallback** | server pregame command | Optional native timer control. | S | Low |
-| `/split [usernames...]` | **Full through fallback** | server pregame command | Native UI only useful for large community tables. | M | Low |
+| `/split [username1] [username2] ...` | **Full through fallback** | server pregame command | Native UI only useful for large community tables. | M | Low |
 | `/splitauto`, `/sa` | **Full through fallback** | server pregame command | Same. | M | Low |
 | `/findvariant` | **Full through fallback** | server command | Strong native Pregame convenience candidate. | S | Medium |
 | `/missing` | **Full through fallback** | server command | Strong native Pregame convenience candidate. | S | Medium |
