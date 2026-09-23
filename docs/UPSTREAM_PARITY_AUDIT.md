@@ -485,7 +485,7 @@ is mainly a contextual UI/runtime action rather than new game logic.
 | Shared arrows/annotations | **Missing** | M–L | Medium |
 | Local arrows | **Missing** | M | Low–Medium |
 | Shared replay sounds | Missing | M | Low |
-| Efficiency-modifier initial state | **Partial / current update event missing** | S | Medium | Initial `sharedReplayEffMod` works, but later `replayEfficiencyMod` broadcasts are ignored; tracked in #29. |
+| Efficiency-modifier synchronization | **Adopted (#29 receive-side)** | S | Medium | Initial `sharedReplayEffMod` and authoritative follower-side `replayEfficiencyMod` updates use the existing `setEffMod` semantic. User-facing modifier controls remain future work. |
 | Explicit shared replay creation | Missing | S–M | Medium |
 
 ## Hypothetical
@@ -700,13 +700,11 @@ Current upstream events missing from the mobile server-event schema include:
 
 #### Dynamic shared-replay efficiency modifier
 
-Mobile correctly consumes the initial `sharedReplayEffMod` from `init` and reduces it through
-`setEffMod`. Current upstream later broadcasts leader changes through `replayEfficiencyMod`.
-Because mobile does not know this event, a mobile follower can keep displaying stale efficiency/FRE
-after a web leader changes the modifier.
-
-Tracked as GitHub issue #29. The receive-side fix should reuse the existing `setEffMod` semantic;
-a mobile control for originating modifier changes is a separate product feature.
+Mobile consumes the initial `sharedReplayEffMod` from `init` and reduces it through `setEffMod`.
+It also consumes `replayEfficiencyMod` for the matching active shared replay when the local client
+is a follower, using that same semantic. The leader ignores its own authoritative echo because it
+already applied the originating change locally. User-facing controls for originating modifier
+changes remain separate future work.
 
 #### Shared-replay suggestions
 

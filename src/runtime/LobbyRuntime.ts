@@ -1272,6 +1272,13 @@ export class LobbyRuntime {
           name: event.data.name,
         }));
         break;
+      case 'replayEfficiencyMod':
+        this.store.dispatch(roomActions.sharedReplayEfficiencyModReceived({
+          epoch,
+          tableID: event.data.tableID,
+          mod: event.data.mod,
+        }));
+        break;
       case 'hypothetical': {
         const room = this.store.getState().room.room;
         if (room.kind !== 'live_game' || room.clientState.replay.shared === null) break;

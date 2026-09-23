@@ -19,6 +19,19 @@ import {
 import { makeInit } from './gameProtocol.fixtures';
 
 describe('pinned game bootstrap protocol', () => {
+  test('strictly decodes shared replay efficiency modifier updates', () => {
+    expect(decodeServerFrame('replayEfficiencyMod {"tableID":123,"mod":2}')).toEqual({
+      kind: 'event',
+      event: { command: 'replayEfficiencyMod', data: { tableID: 123, mod: 2 } },
+    });
+    expect(decodeServerFrame('replayEfficiencyMod {"tableID":-1,"mod":2}'))
+      .toMatchObject({ kind: 'malformed', command: 'replayEfficiencyMod' });
+    expect(decodeServerFrame('replayEfficiencyMod {"tableID":123,"mod":2.5}'))
+      .toMatchObject({ kind: 'malformed', command: 'replayEfficiencyMod' });
+    expect(decodeServerFrame('replayEfficiencyMod {"tableID":123,"mod":2,"extra":true}'))
+      .toMatchObject({ kind: 'malformed', command: 'replayEfficiencyMod' });
+  });
+
   test('encodes the exact info and player-presence handshake frames', () => {
     expect(encodeGetGameInfo1Frame(123)).toBe('getGameInfo1 {"tableID":123}');
     expect(encodeGetGameInfo2Frame(123)).toBe('getGameInfo2 {"tableID":123}');

@@ -1239,6 +1239,45 @@ describe('deterministic lobby runtime', () => {
     expect(room.clientState.replay.shared).toMatchObject({ leader: 'Ada', amLeader: true });
   });
 
+  test('shared replay follower consumes authoritative efficiency modifier updates only for its current replay', async () => {
+    const { socket, store } = await makeSharedReplayRuntime('Bob');
+    const getModifier = () => {
+      const room = store.getState().room.room;
+      if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+      return room.clientState.notes.efficiencyModifier;
+    };
+
+    const initialModifier = getModifier();
+    const sentBefore = socket.sent.length;
+    socket.emitMessage('replayEfficiencyMod {"tableID":123,"mod":2}');
+    expect(getModifier()).toBe(2);
+    expect(getModifier()).not.toBe(initialModifier);
+    expect(socket.sent).toHaveLength(sentBefore);
+
+    socket.emitMessage('replayEfficiencyMod {"tableID":999,"mod":3}');
+    expect(getModifier()).toBe(2);
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    socket.emitMessage('replayEfficiencyMod {"tableID":123,"mod":4}');
+    expect(getModifier()).toBe(2);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('shared replay efficiency modifier ignores a stale connection epoch and ordinary replays', async () => {
+    const stale = await makeSharedReplayRuntime('Bob');
+    stale.store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    stale.socket.emitMessage('replayEfficiencyMod {"tableID":123,"mod":3}');
+    expect(stale.store.getState().room.room).toEqual({ kind: 'none' });
+
+    const ordinary = await makeSharedReplayRuntime('Bob', ['Ada', 'Bob'], false);
+    let room = ordinary.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected ordinary replay');
+    const before = room.clientState.notes.efficiencyModifier;
+    ordinary.socket.emitMessage('replayEfficiencyMod {"tableID":123,"mod":3}');
+    room = ordinary.store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected ordinary replay');
+    expect(room.clientState.notes.efficiencyModifier).toBe(before);
+  });
+
   test('shared replay leader can pass only to an active spectator', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime();
 

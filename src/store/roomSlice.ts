@@ -1166,6 +1166,24 @@ export const roomSlice = createSlice({
         name: payload.name,
       }));
     },
+    sharedReplayEfficiencyModReceived(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; mod: number }>,
+    ) {
+      const payload = action.payload;
+      if (
+        state.connectionEpoch !== payload.epoch
+        || state.room.kind !== 'live_game'
+        || state.room.tableID !== payload.tableID
+        || state.room.clientState.replay.shared === null
+        || state.room.clientState.replay.shared.amLeader
+      ) return;
+      const current = original(state.room.clientState) ?? state.room.clientState;
+      state.room.clientState = castDraft(stateReducer(current, {
+        type: 'setEffMod',
+        mod: payload.mod,
+      }));
+    },
     spectatorsReceived(
       state,
       action: PayloadAction<{

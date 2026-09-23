@@ -251,6 +251,13 @@ export const replayLeaderSchema = z.object({
   name: z.string().min(1),
 }).strict();
 
+export const replayEfficiencyModSchema = z.object({
+  tableID: idSchema,
+  mod: z.number().int(),
+}).strict();
+
+export type ReplayEfficiencyMod = z.infer<typeof replayEfficiencyModSchema>;
+
 export const spectatorSchema = z.object({
   name: z.string().min(1),
   shadowingPlayerIndex: z.number().int().min(-1),
@@ -388,6 +395,7 @@ const schemas = {
   finishOngoingGame: finishOngoingGameSchema,
   replaySegment: replaySegmentSchema,
   replayLeader: replayLeaderSchema,
+  replayEfficiencyMod: replayEfficiencyModSchema,
   hypothetical: hypotheticalSchema,
   hypoStart: hypoTableEventSchema,
   hypoEnd: hypoTableEventSchema,
