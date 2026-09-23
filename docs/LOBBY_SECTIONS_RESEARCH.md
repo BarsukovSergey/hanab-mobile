@@ -6,12 +6,13 @@ Status: research / implementation contract only. No runtime behavior changes.
 
 ## Goal
 
-Restructure the mobile Lobby so table discovery has four clear ordered surfaces:
+Restructure the mobile Lobby so the user's active game is immediately recoverable and the remaining table discovery surfaces stay clearly separated:
 
-1. **Pregame tables**
-2. **Create table** (only when starting another table is contextually valid)
-3. **Running tables**
-4. **Shared replays**
+1. **Your running game** (only when a reattendable own game exists)
+2. **Pregame tables**
+3. **Create table** (only when starting another table is contextually valid)
+4. **Running tables**
+5. **Shared replays**
 
 The distributed beta.1 APK remains unchanged while tester feedback is collected.
 
@@ -61,24 +62,32 @@ In current terms this can continue to derive from:
 Public and password-protected pregames remain in the same section. The existing Private indicator
 and transient join-password input remain valid.
 
+### Your running game
+
+A lobby table belongs in Your running game when:
+
+- it is running;
+- it is joined by the authenticated user;
+- it is not a shared replay;
+- existing table options are supported.
+
+In current terms this is `isReattendEligible(table)`.
+
+Render this as a dedicated top-level section above all other lobby table surfaces. Use
+`Return to game` as the primary action. Do not duplicate the same table in Running.
+
 ### Running tables
 
 A lobby table belongs in Running when:
 
 - it is running;
 - it is **not** a shared replay;
-- and it is either the user's own reattendable game or an ordinarily spectatable running table.
+- it is not the user's own reattendable game;
+- it is ordinarily spectatable.
 
-In current terms:
+In current terms this is `isSpectateEligible(table) && !table.sharedReplay`.
 
-- own game: `isReattendEligible(table)`;
-- other game: `isSpectateEligible(table) && !table.sharedReplay`.
-
-The user's own running game should be the first entry in this section and use `Return to game`.
-Other running games use `Spectate`.
-
-Do not keep a separate "Your running game" section; it is still a running table and can be
-distinguished inside the Running section.
+Ordinary running games use `Spectate`.
 
 ### Shared replays
 
@@ -128,11 +137,12 @@ Do not key this decision from `localScreen`, stale welcome hints, or a remembere
 Phone reading order should be explicit in the component tree:
 
 1. Lobby hero / history entry
-2. Pregame tables
-3. Create table, when allowed
-4. Running tables
-5. Shared replays
-6. Lobby chat
+2. Your running game, when present
+3. Pregame tables
+4. Create table, when allowed
+5. Running tables
+6. Shared replays
+7. Lobby chat
 
 On wider layouts, responsive columns may be used, but the visual/reading order must remain obvious
 and the Create surface must stay conceptually between Pregame and Running rather than becoming an
@@ -171,11 +181,16 @@ Exact palette values belong to implementation/design-system work.
 - Spectate pregame remains available where supported.
 - Password input stays local/transient to the selected protected table.
 
+### Your running game
+
+- Dedicated top-level section shown only when a reattendable own game exists.
+- Action: `Return to game`, primary emphasis.
+- Never duplicate this table in Running.
+
 ### Running
 
-- Own joined running game: `Return to game`, primary emphasis, "Your game" indicator.
-- Other running games: `Spectate`.
-- Do not duplicate the own game in another section.
+- Contains only other ordinary running games.
+- Action: `Spectate`.
 
 ### Shared replays
 
@@ -193,6 +208,7 @@ Exact palette values belong to implementation/design-system work.
 
 Avoid redefining protocol eligibility. Add small presentation selectors/helpers, for example:
 
+- `getYourRunningLobbyTables(tables)`
 - `getPregameLobbyTables(tables)`
 - `getRunningLobbyTables(tables)`
 - `getSharedReplayLobbyTables(tables)`
@@ -200,10 +216,8 @@ Avoid redefining protocol eligibility. Add small presentation selectors/helpers,
 
 These can compose the existing runtime eligibility functions.
 
-The three section outputs should be mutually exclusive.
-
-For Running, sort the reattendable own game first, then keep a deterministic order for the rest
-(existing table order or table ID is sufficient).
+The section outputs should be mutually exclusive. The user's reattendable game belongs only in
+Your running game; it must not also appear in Running.
 
 ## Characterization / acceptance tests
 
@@ -213,7 +227,7 @@ Before or with implementation, cover:
 2. password-protected unstarted table appears only in Pregame;
 3. ordinary running unjoined table appears only in Running;
 4. shared replay appears only in Shared replays and never Running;
-5. own running joined table appears only in Running, first, with Return to game semantics;
+5. own running joined table appears only in Your running game, above the other table sections, with Return to game semantics;
 6. own running game makes Create table disappear;
 7. no own running game makes Create table appear;
 8. a shared replay being joined/spectatable does not hide Create table by itself;
