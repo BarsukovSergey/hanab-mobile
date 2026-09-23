@@ -51,7 +51,7 @@ These items were explicitly removed from the C17 release gate during product rev
 - Social feeds, recommendations, achievements, messaging redesign.
 - **Chat typing/read-state polish:** optional typing indicators and/or unread/read-state affordances if the authoritative server/client capability is worth exposing on mobile.
 - **Push notifications:** research mobile notifications for genuinely useful events (for example turn/table/social events) only after verifying server/background-delivery capability and notification permission UX.
-- **Discord/account linking:** optional account-integration parity; no implementation until the upstream purpose, transport, and mobile value are verified.
+- **Linked hanab.live accounts:** optional native UI for the already-supported `/link` / `/linked` / `/unlink` semantics. Upstream linking is **not Discord account linking**; it is asymmetric hanab.live account linkage used when choosing seeds so linked accounts do not receive deals the linked user has already played. Discord is a separate lobby-chat/community integration.
 
 ## Replay / command parity
 
