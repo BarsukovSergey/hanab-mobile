@@ -71,6 +71,9 @@ function AppContent() {
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
+  const liveChatUnreadCount = useAppSelector((state) => state.room.room.kind === 'live_game'
+    ? state.chat.unreadByRoom[`table${state.room.room.tableID}`] ?? 0
+    : 0);
   const pendingReplayCreate = useAppSelector((state) => state.history.pendingReplayCreate);
 
   const runProbe = useCallback(async () => {
@@ -263,6 +266,12 @@ function AppContent() {
             <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
           </View>}
           <View style={[styles.headerActions, landscapePhone && styles.headerActionsLandscape]}>
+            <ActionButton
+              compact
+              title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
+              tone="ghost"
+              onPress={() => setLiveSheet('chat')}
+            />
             <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
           </View>
         </View>

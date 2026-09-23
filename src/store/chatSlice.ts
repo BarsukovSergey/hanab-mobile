@@ -15,6 +15,7 @@ export type ChatState = {
   connectionEpoch: number;
   lastPM: string | null;
   messagesByRoom: Record<string, ReadableChatMessage[]>;
+  unreadByRoom: Record<string, number>;
 };
 
 const MAX_MESSAGES_PER_ROOM = 1000;
@@ -23,6 +24,7 @@ const initialState: ChatState = {
   connectionEpoch: 0,
   lastPM: null,
   messagesByRoom: {},
+  unreadByRoom: {},
 };
 
 function isSupportedRoom(room: string | undefined): room is string {
@@ -52,6 +54,9 @@ export const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
+    roomRead(state, action: PayloadAction<{ room: string }>) {
+      delete state.unreadByRoom[action.payload.room];
+    },
     localMessageAdded(
       state,
       action: PayloadAction<{
@@ -104,6 +109,12 @@ export const chatSlice = createSlice({
       messages.push(message);
       cap(messages);
       state.messagesByRoom[message.room] = messages;
+      const isOwnMessage = action.payload.authenticatedUsername !== undefined
+        && message.who.toLocaleLowerCase()
+          === action.payload.authenticatedUsername.toLocaleLowerCase();
+      if (!isOwnMessage) {
+        state.unreadByRoom[message.room] = (state.unreadByRoom[message.room] ?? 0) + 1;
+      }
     },
     historyReceived(
       state,
@@ -134,6 +145,7 @@ export const chatSlice = createSlice({
       state.connectionEpoch = action.payload.epoch;
       state.lastPM = null;
       state.messagesByRoom = {};
+      state.unreadByRoom = {};
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
   },
