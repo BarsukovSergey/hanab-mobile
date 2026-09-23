@@ -3589,8 +3589,9 @@ describe('deterministic lobby runtime', () => {
     expect(bootstrapHistory).not.toHaveBeenCalled();
     expect(store.getState().history.otherScores?.games.map(({ id }) => id)).toEqual([90, 77]);
     expect(store.getState().history.items.map(({ id }) => id)).toEqual([77]);
-    expect(runtime.watchHistoricalGame(90)).toBe(true);
-    expect(socket.sent.at(-1)).toBe('replayCreate {"source":"id","databaseID":90,"visibility":"solo"}');
+    expect(runtime.watchHistoricalGame(90, 'shared')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('replayCreate {"source":"id","databaseID":90,"visibility":"shared"}');
+    expect(store.getState().history.pendingReplayCreate).toMatchObject({ databaseID: 90 });
   });
 
   test('same-seed failed send leaves no pending request and friends context is sent', async () => {
@@ -3673,8 +3674,11 @@ describe('deterministic lobby runtime', () => {
     expect(runtime.watchHistoricalGame(80)).toBe(false);
     store.dispatch(roomActions.spectateRequested({ epoch: 1, tableID: 123 }));
     expect(runtime.watchHistoricalGame(79)).toBe(false);
+    expect(runtime.watchHistoricalGame(79, 'shared')).toBe(false);
     store.dispatch(roomActions.commandPendingCleared({ epoch: 1 }));
-    expect(runtime.watchHistoricalGame(79)).toBe(true);
+    expect(runtime.watchHistoricalGame(79, 'shared')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('replayCreate {"source":"id","databaseID":79,"visibility":"shared"}');
+    expect(runtime.watchHistoricalGame(79, 'shared')).toBe(false);
     socket.emitMessage('tableStart {"tableID":9002,"replay":true}');
     socket.emitMessage(`init ${JSON.stringify(makeInit({
       tableID: 9002, replay: true, sharedReplay: false, spectating: false,

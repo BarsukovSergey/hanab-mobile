@@ -92,6 +92,9 @@ describe('lobby protocol decoder', () => {
     expect(encodeReplayCreateFrame(77)).toBe(
       'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
     );
+    expect(encodeReplayCreateFrame(77, 'shared')).toBe(
+      'replayCreate {"source":"id","databaseID":77,"visibility":"shared"}',
+    );
   });
   test('validates exact pinned chat and chatList payloads', () => {
     const chat = {

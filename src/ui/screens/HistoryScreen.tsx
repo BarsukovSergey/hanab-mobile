@@ -26,7 +26,7 @@ export function HistoryScreen({
   onWatchReplay,
 }: {
   onBack: () => void;
-  onWatchReplay: (databaseID: number) => void;
+  onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
 }) {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
@@ -127,7 +127,14 @@ export function HistoryScreen({
                 disabled={!supported || replayPending}
                 title={replayPending ? 'Opening replay…' : 'Watch replay'}
                 tone={supported ? 'primary' : 'secondary'}
-                onPress={() => onWatchReplay(item.id)}
+                onPress={() => onWatchReplay(item.id, 'solo')}
+              />
+              <ActionButton
+                compact
+                disabled={!supported || replayPending}
+                title="Share replay"
+                tone="secondary"
+                onPress={() => onWatchReplay(item.id, 'shared')}
               />
               {!comparing && <ActionButton
                 compact

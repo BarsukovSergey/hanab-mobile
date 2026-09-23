@@ -30,7 +30,11 @@ describe('History screen source contract', () => {
     expect(screen).toContain('history.friendHasMore');
     expect(screen).toContain('lobbyRuntime.loadMoreFriendsHistory() : lobbyRuntime.loadMoreHistory()');
     expect(screen).toContain('None of your friends have played any games yet.');
-    expect(screen).toContain('onPress={() => onWatchReplay(item.id)}');
+    expect(screen).toContain("onPress={() => onWatchReplay(item.id, 'solo')}");
+    expect(screen).toContain("onPress={() => onWatchReplay(item.id, 'shared')}");
+    expect(screen).toContain('title="Share replay"');
+    expect(screen).toContain('disabled={!supported || replayPending}');
+    expect(screen).toContain('(comparing ? history.otherScores?.games ?? [] : items).map((item) => {');
   });
 
   test('resets selection to My history on an empty friends list without auto-selecting on re-add', () => {
