@@ -1010,7 +1010,7 @@ function C17DenseWorkspace({
         style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       >
         <View style={[styles.ownTitleLane, usesSideLabelRows && styles.sideLabelLane]}>
-          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? 'OBSERVED' : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
+          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
           {liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
