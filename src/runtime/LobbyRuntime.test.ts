@@ -3571,6 +3571,41 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
+  test('same-seed comparison uses authoritative own or friends source and enables result replay', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const bootstrapHistory = jest.spyOn(runtime['gameBootstrap'], 'receiveGameHistory');
+    const source = { ...historicalGame(77), numGamesOnThisSeed: 3 };
+    socket.emitMessage(`gameHistory ${JSON.stringify([source])}`);
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify([{ ...source, id: 88, seed: 'friends-seed' }])}`);
+    bootstrapHistory.mockClear();
+    expect(runtime.loadOtherScores(999, false)).toBe(false);
+    expect(runtime.loadOtherScores(77, true)).toBe(false);
+    expect(runtime.loadOtherScores(90, false)).toBe(false);
+    expect(runtime.loadOtherScores(77, false)).toBe(true);
+    expect(runtime.loadOtherScores(88, true)).toBe(false);
+    expect(socket.sent).toEqual(['historyGetSeed {"seed":"seed-77","friends":false}']);
+    const result = { games: [historicalGame(90), source], variantName: 'No Variant', friends: false, seed: source.seed };
+    socket.emitMessage(`gameHistoryOtherScores ${JSON.stringify(result)}`);
+    expect(bootstrapHistory).not.toHaveBeenCalled();
+    expect(store.getState().history.otherScores?.games.map(({ id }) => id)).toEqual([90, 77]);
+    expect(store.getState().history.items.map(({ id }) => id)).toEqual([77]);
+    expect(runtime.watchHistoricalGame(90)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('replayCreate {"source":"id","databaseID":90,"visibility":"solo"}');
+  });
+
+  test('same-seed failed send leaves no pending request and friends context is sent', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(`gameHistory ${JSON.stringify([historicalGame(77)])}`);
+    expect(runtime.loadOtherScores(77, false)).toBe(false);
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify([{ ...historicalGame(88), numGamesOnThisSeed: 2 }])}`);
+    socket.failSend = true;
+    expect(runtime.loadOtherScores(88, true)).toBe(false);
+    expect(store.getState().history.pendingOtherScores).toBeNull();
+    socket.failSend = false;
+    expect(runtime.loadOtherScores(88, true)).toBe(true);
+    expect(socket.sent).toEqual(['historyGetSeed {"seed":"seed-88","friends":true}']);
+  });
+
   test('history and replay send failures leave no fake pending state', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     store.dispatch(sessionActions.welcomeReceived({

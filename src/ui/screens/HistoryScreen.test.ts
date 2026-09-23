@@ -5,6 +5,16 @@ import { describe, expect, test } from '@jest/globals';
 const screen = readFileSync(resolve(__dirname, 'HistoryScreen.tsx'), 'utf8');
 
 describe('History screen source contract', () => {
+  test('same-seed comparison keeps source context and server order', () => {
+    expect(screen).toContain('Math.max(0, item.numGamesOnThisSeed - 1)');
+    expect(screen).toContain('lobbyRuntime.loadOtherScores(item.id, showingFriends)');
+    expect(screen).toContain('otherCount === 0');
+    expect(screen).toContain('comparing ? history.otherScores?.games ?? [] : items');
+    expect(screen).toContain("item.playerNames.includes(session.authenticatedUser?.username ?? '')");
+    expect(screen).toContain('title="Return to history" onPress={returnFromComparison}');
+    expect(screen).toContain('friends: friends && session.friends.length > 0');
+    expect(screen).toContain('lobbyRuntime.dismissOtherScores()');
+  });
   test('offers Friends history only for authoritative friends and uses its independent pages', () => {
     expect(screen).toContain('session.friends.length > 0');
     expect(screen).toContain('title="My history"');

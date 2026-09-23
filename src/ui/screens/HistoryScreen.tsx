@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { areTableOptionsSupported } from '../../game/client/supportedVariants';
+import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import {
@@ -49,17 +49,37 @@ export function HistoryScreen({
   const hasMore = showingFriends ? history.friendHasMore : history.hasMore;
   const pendingRequest = showingFriends ? history.friendPendingRequest : history.pendingRequest;
   const replayPending = history.pendingReplayCreate !== null;
+  const comparing = history.pendingOtherScores !== null || history.otherScores !== null;
+  const returnFromComparison = () => {
+    const friends = history.otherScores?.friends ?? history.pendingOtherScores?.friends ?? false;
+    setSelection({ epoch: session.connectionEpoch, friends: friends && session.friends.length > 0 });
+    lobbyRuntime.dismissOtherScores();
+  };
   return (
     <View style={styles.root}>
       <Panel style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>REPLAYS</Text>
-          <SectionHeading title="Game history" detail="Open a finished game using the same authoritative replay path." />
+          <SectionHeading title={comparing ? 'Other Scores' : 'Game history'} detail={comparing
+            ? 'Games played on this seed.'
+            : 'Open a finished game using the same authoritative replay path.'} />
         </View>
-        <ActionButton compact title="Back to lobby" onPress={onBack} />
+        <ActionButton compact title="Back to lobby" onPress={() => {
+          if (comparing) lobbyRuntime.dismissOtherScores();
+          onBack();
+        }} />
       </Panel>
 
-      {session.friends.length > 0 && (
+      {comparing && (
+        <Panel style={styles.gameCard}>
+          <Text style={[styles.gameTitle, { color: theme.colors.text }]}>Seed {history.otherScores?.seed ?? history.pendingOtherScores?.seed}</Text>
+          {history.otherScores && <Text style={{ color: theme.colors.textMuted }}>{history.otherScores.variantName}</Text>}
+          {history.pendingOtherScores && <Notice>Loading other scores…</Notice>}
+          <ActionButton compact title="Return to history" onPress={returnFromComparison} />
+        </Panel>
+      )}
+
+      {!comparing && session.friends.length > 0 && (
         <View style={styles.switcher}>
           <ActionButton compact title="My history" tone={showingFriends ? 'secondary' : 'primary'}
             onPress={() => setSelection({ epoch: session.connectionEpoch, friends: false })} />
@@ -71,16 +91,18 @@ export function HistoryScreen({
         </View>
       )}
 
-      {!initialPageReceived && <Notice>{showingFriends ? 'Loading friends history…' : 'Loading game history…'}</Notice>}
+      {!comparing && !initialPageReceived && <Notice>{showingFriends ? 'Loading friends history…' : 'Loading game history…'}</Notice>}
       {history.error !== null && <Notice tone="error">{history.error}</Notice>}
-      {initialPageReceived && items.length === 0 && (
+      {!comparing && initialPageReceived && items.length === 0 && (
         <Panel><EmptyState>{showingFriends
           ? 'None of your friends have played any games yet.' : 'No finished games yet.'}</EmptyState></Panel>
       )}
 
       <View style={[styles.grid, wide && styles.gridWide]}>
-        {items.map((item) => {
+        {(comparing ? history.otherScores?.games ?? [] : items).map((item) => {
           const supported = areTableOptionsSupported(item.options);
+          const maxScore = comparing && supported ? getSupportedVariantMaxScore(item.options.variantName) : null;
+          const otherCount = Math.max(0, item.numGamesOnThisSeed - 1);
           const finished = new Date(item.datetimeFinished);
           const finishedLabel = Number.isNaN(finished.getTime())
             ? item.datetimeFinished
@@ -92,8 +114,10 @@ export function HistoryScreen({
                   <Text style={[styles.gameTitle, { color: theme.colors.text }]}>Game #{item.id}</Text>
                   <Text style={[styles.variant, { color: theme.colors.textMuted }]}>{item.options.variantName}</Text>
                 </View>
-                <Pill active={supported}>Score {item.score}</Pill>
+                <Pill active={supported}>Score {item.score}{maxScore !== null ? ` / ${maxScore}` : ''}</Pill>
               </View>
+              {comparing && item.playerNames.includes(session.authenticatedUser?.username ?? '')
+                && <Pill active>Your game</Pill>}
               <Text style={[styles.players, { color: theme.colors.text }]}>{item.playerNames.join(', ')}</Text>
               <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{finishedLabel}</Text>
               <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{END_CONDITIONS[item.endCondition]}</Text>
@@ -104,12 +128,19 @@ export function HistoryScreen({
                 tone={supported ? 'primary' : 'secondary'}
                 onPress={() => onWatchReplay(item.id)}
               />
+              {!comparing && <ActionButton
+                compact
+                disabled={otherCount === 0 || history.pendingOtherScores !== null}
+                title={`Other scores · ${otherCount}`}
+                tone="secondary"
+                onPress={() => lobbyRuntime.loadOtherScores(item.id, showingFriends)}
+              />}
             </Panel>
           );
         })}
       </View>
 
-      {hasMore && (
+      {!comparing && hasMore && (
         <ActionButton
           disabled={pendingRequest !== null}
           title={pendingRequest === null ? 'Load more' : 'Loading more…'}
@@ -117,7 +148,7 @@ export function HistoryScreen({
             ? lobbyRuntime.loadMoreFriendsHistory() : lobbyRuntime.loadMoreHistory()}
         />
       )}
-      {pendingRequest !== null && <Text style={{ color: theme.colors.textMuted }}>Loading another page…</Text>}
+      {!comparing && pendingRequest !== null && <Text style={{ color: theme.colors.textMuted }}>Loading another page…</Text>}
     </View>
   );
 }

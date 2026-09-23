@@ -36,6 +36,8 @@ import {
   encodeInactiveFrame,
   encodeHistoryGetFrame,
   encodeHistoryFriendsGetFrame,
+  encodeHistoryGetSeedFrame,
+  historyGetSeedCommandSchema,
   encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeClientFrame,
@@ -342,9 +344,35 @@ export class LobbyRuntime {
     return this.store.getState().history.friendPendingRequest?.offset === offset;
   }
 
+  loadOtherScores(databaseID: number, friends: boolean): boolean {
+    const state = this.store.getState();
+    const history = state.history;
+    const source = (friends ? history.friendItems : history.items)
+      .find((item) => item.id === databaseID);
+    if (state.session.phase !== 'ready'
+      || history.connectionEpoch !== state.session.connectionEpoch
+      || !Number.isInteger(databaseID) || databaseID <= 0
+      || source === undefined || source.numGamesOnThisSeed <= 1
+      || !historyGetSeedCommandSchema.safeParse({ seed: source.seed, friends }).success
+      || history.pendingOtherScores !== null) return false;
+    if (!this.sendEncoded(encodeHistoryGetSeedFrame(source.seed, friends))) return false;
+    this.store.dispatch(historyActions.otherScoresRequested({
+      connectionEpoch: state.session.connectionEpoch,
+      sourceDatabaseID: databaseID,
+      seed: source.seed,
+      friends,
+    }));
+    return this.store.getState().history.pendingOtherScores?.sourceDatabaseID === databaseID;
+  }
+
+  dismissOtherScores(): void {
+    this.store.dispatch(historyActions.otherScoresDismissed());
+  }
+
   watchHistoricalGame(databaseID: number): boolean {
     const state = this.store.getState();
-    const item = [...state.history.items, ...state.history.friendItems]
+    const item = [...state.history.items, ...state.history.friendItems,
+      ...(state.history.otherScores?.games ?? [])]
       .find((candidate) => candidate.id === databaseID);
     const room = state.room;
     if (
@@ -1336,6 +1364,12 @@ export class LobbyRuntime {
           history: event.data,
         }));
         break;
+      case 'gameHistoryOtherScores':
+        this.store.dispatch(historyActions.otherScoresReceived({
+          connectionEpoch: epoch,
+          result: event.data,
+        }));
+        break;
       case 'cardIdentities':
         this.gameBootstrap.receiveCardIdentities(epoch, event.data);
         break;
@@ -1572,7 +1606,8 @@ export class LobbyRuntime {
       history.connectionEpoch === epoch
       && (history.pendingRequest !== null
         || history.friendPendingRequest !== null
-        || history.pendingReplayCreate !== null)
+        || history.pendingReplayCreate !== null
+        || history.pendingOtherScores !== null)
     ) this.store.dispatch(historyActions.operationFailed({
       connectionEpoch: epoch,
       message: message.slice(0, MAX_STATUS_LENGTH),

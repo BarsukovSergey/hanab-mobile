@@ -7,6 +7,7 @@ import {
   encodeInactiveFrame,
   encodeHistoryGetFrame,
   encodeHistoryFriendsGetFrame,
+  encodeHistoryGetSeedFrame,
   encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeReplayActionFrame,
@@ -506,6 +507,21 @@ describe('lobby protocol decoder', () => {
     });
     expect(decodeServerFrame(`gameHistoryFriends ${JSON.stringify([{ ...game, id: '77' }])}`))
       .toMatchObject({ kind: 'malformed', command: 'gameHistoryFriends' });
+    const comparison = { games: [game], variantName: 'No Variant', friends: true, seed: 'p2v0s1' };
+    expect(decodeServerFrame(`gameHistoryOtherScores ${JSON.stringify(comparison)}`))
+      .toMatchObject({ kind: 'event', event: { command: 'gameHistoryOtherScores', data: comparison } });
+    expect(decodeServerFrame(`gameHistoryOtherScores ${JSON.stringify({ ...comparison, games: [{ ...game, id: '77' }] })}`))
+      .toMatchObject({ kind: 'malformed', command: 'gameHistoryOtherScores' });
+    expect(decodeServerFrame(`gameHistoryOtherScores ${JSON.stringify({ ...comparison, seed: 'bad seed' })}`))
+      .toMatchObject({ kind: 'malformed', command: 'gameHistoryOtherScores' });
+  });
+
+  test('encodes valid same-seed requests and rejects invalid seeds', () => {
+    expect(encodeHistoryGetSeedFrame('p2v0s1', false)).toBe('historyGetSeed {"seed":"p2v0s1","friends":false}');
+    expect(encodeHistoryGetSeedFrame('p2v0s1', true)).toBe('historyGetSeed {"seed":"p2v0s1","friends":true}');
+    for (const seed of ['', ' ', 'bad seed', 'a_b', 'é']) {
+      expect(() => encodeHistoryGetSeedFrame(seed, false)).toThrow();
+    }
   });
 
   test('retains table and tableList spectators with shadowing data', () => {

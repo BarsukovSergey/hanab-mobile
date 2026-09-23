@@ -22,6 +22,10 @@ export function isVariantNameSupported(name: string): boolean {
   return supportedVariantNames.has(name);
 }
 
+export function getSupportedVariantMaxScore(name: string): number | null {
+  return isVariantNameSupported(name) ? getVariant(name).maxScore : null;
+}
+
 export type CompatibilityOptions = {
   variantName: string;
   timed: boolean;

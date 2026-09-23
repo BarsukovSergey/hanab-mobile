@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { GameHistory, GameHistoryItem } from '../protocol/gameProtocol';
+import type { GameHistoryOtherScores } from '../protocol/lobbyProtocol';
 import { sessionActions } from './sessionSlice';
 
 export type PendingHistoryRequest = {
@@ -14,6 +15,13 @@ export type PendingReplayCreate = {
   databaseID: number;
 };
 
+export type PendingOtherScores = {
+  connectionEpoch: number;
+  sourceDatabaseID: number;
+  seed: string;
+  friends: boolean;
+};
+
 export type HistoryState = {
   connectionEpoch: number;
   totalGames: number;
@@ -24,6 +32,8 @@ export type HistoryState = {
   pendingRequest: PendingHistoryRequest | null;
   friendPendingRequest: PendingHistoryRequest | null;
   pendingReplayCreate: PendingReplayCreate | null;
+  pendingOtherScores: PendingOtherScores | null;
+  otherScores: GameHistoryOtherScores | null;
   error: string | null;
   hasMore: boolean;
   friendHasMore: boolean;
@@ -39,6 +49,8 @@ const initialState: HistoryState = {
   pendingRequest: null,
   friendPendingRequest: null,
   pendingReplayCreate: null,
+  pendingOtherScores: null,
+  otherScores: null,
   error: null,
   hasMore: false,
   friendHasMore: false,
@@ -142,7 +154,8 @@ export const historySlice = createSlice({
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
         || state.pendingReplayCreate !== null
-        || ![...state.items, ...state.friendItems].some((item) => item.id === action.payload.databaseID)
+        || ![...state.items, ...state.friendItems, ...(state.otherScores?.games ?? [])]
+          .some((item) => item.id === action.payload.databaseID)
       ) return;
       state.pendingReplayCreate = action.payload;
       state.error = null;
@@ -154,6 +167,29 @@ export const historySlice = createSlice({
         && pending.databaseID === action.payload.databaseID
       ) state.pendingReplayCreate = null;
     },
+    otherScoresRequested(state, action: PayloadAction<PendingOtherScores>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || state.pendingOtherScores !== null) return;
+      const source = (action.payload.friends ? state.friendItems : state.items)
+        .find((item) => item.id === action.payload.sourceDatabaseID);
+      if (source?.seed !== action.payload.seed || source.numGamesOnThisSeed <= 1) return;
+      state.pendingOtherScores = action.payload;
+      state.otherScores = null;
+      state.error = null;
+    },
+    otherScoresReceived(state, action: PayloadAction<{ connectionEpoch: number; result: GameHistoryOtherScores }>) {
+      const pending = state.pendingOtherScores;
+      if (state.connectionEpoch !== action.payload.connectionEpoch
+        || pending?.connectionEpoch !== action.payload.connectionEpoch
+        || pending.seed !== action.payload.result.seed
+        || pending.friends !== action.payload.result.friends) return;
+      state.otherScores = action.payload.result;
+      state.pendingOtherScores = null;
+      state.error = null;
+    },
+    otherScoresDismissed(state) {
+      state.pendingOtherScores = null;
+      state.otherScores = null;
+    },
     operationFailed(
       state,
       action: PayloadAction<{ connectionEpoch: number; message: string }>,
@@ -162,6 +198,7 @@ export const historySlice = createSlice({
       state.pendingRequest = null;
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
+      state.pendingOtherScores = null;
       state.error = action.payload.message;
     },
   },
@@ -182,12 +219,14 @@ export const historySlice = createSlice({
       state.pendingRequest = null;
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
+      state.pendingOtherScores = null;
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.pendingRequest = null;
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
+      state.pendingOtherScores = null;
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
   },
