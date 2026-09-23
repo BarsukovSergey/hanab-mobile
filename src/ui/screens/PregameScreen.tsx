@@ -5,6 +5,7 @@ import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { ChatPanel } from '../ChatPanel';
+import { UserContextActions } from '../UserContextActions';
 import {
   ActionButton,
   Field,
@@ -103,6 +104,13 @@ export function PregameScreen() {
                       onPress={() => lobbyRuntime.setTableLeader(player.name)}
                     />
                   )}
+                  {!player.you && (
+                    <UserContextActions
+                      username={player.name}
+                      isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
+                      room={`table${room.tableID}`}
+                    />
+                  )}
                 </View>
               ))}
             </View>
@@ -195,7 +203,7 @@ const styles = StyleSheet.create({
   column: { flex: 1, gap: 16, minWidth: 0 },
   players: { gap: 8 },
   roleSwitch: { gap: 10 },
-  playerRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingTop: 9 },
+  playerRow: { borderTopWidth: 1, gap: 8, paddingTop: 9 },
   playerCopy: { flex: 1, gap: 2 },
   playerName: { fontSize: 15, fontWeight: '800' },
   playerState: { fontSize: 12, fontWeight: '700' },

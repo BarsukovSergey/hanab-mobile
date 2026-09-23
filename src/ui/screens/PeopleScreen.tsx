@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { chatRuntime, lobbyRuntime } from '../../runtime/application';
+import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { tableSelectors, userSelectors } from '../../store/store';
 import {
   ActionButton,
   EmptyState,
-  Field,
   Panel,
   Pill,
   SectionHeading,
   useHanabTheme,
 } from '../designSystem';
 import { getPeopleRows } from '../peoplePresentation';
+import { UserContextActions } from '../UserContextActions';
 
 export function PeopleScreen({ onBack }: { onBack: () => void }) {
   const { theme } = useHanabTheme();
@@ -22,16 +22,10 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
   const authenticatedUser = useAppSelector((state) => state.session.authenticatedUser);
   const friends = useAppSelector((state) => state.session.friends);
   const [composerUserID, setComposerUserID] = useState<number | null>(null);
-  const [message, setMessage] = useState('');
   const rows = useMemo(
     () => getPeopleRows(users, friends, authenticatedUser, tables),
     [authenticatedUser, friends, tables, users],
   );
-
-  const closeComposer = () => {
-    setComposerUserID(null);
-    setMessage('');
-  };
 
   return (
     <View style={styles.root}>
@@ -46,7 +40,6 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
       <Panel>
         {rows.length === 0 && <EmptyState>No users online.</EmptyState>}
         {rows.map((row) => {
-          const composing = composerUserID === row.user.userID;
           const tableAction = row.tableAction;
           return (
             <View key={row.user.userID} style={[styles.userRow, { borderColor: theme.colors.border }]}>
@@ -64,20 +57,12 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
               </View>
 
               {row.canUseContextActions && (
-                <View style={styles.actions}>
-                  <ActionButton
-                    compact
-                    title="Message"
-                    onPress={() => {
-                      setComposerUserID(row.user.userID);
-                      setMessage('');
-                    }}
-                  />
-                  <ActionButton
-                    compact
-                    title={row.isFriend ? 'Unfriend' : 'Friend'}
-                    onPress={() => chatRuntime.setFriend(row.user.name, !row.isFriend)}
-                  />
+                <UserContextActions
+                  username={row.user.name}
+                  isFriend={row.isFriend}
+                  open={composerUserID === row.user.userID}
+                  onOpenChange={(open) => setComposerUserID(open ? row.user.userID : null)}
+                >
                   {tableAction !== null && (
                     <ActionButton
                       compact
@@ -85,32 +70,7 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
                       onPress={() => lobbyRuntime.spectate(tableAction.tableID)}
                     />
                   )}
-                </View>
-              )}
-
-              {composing && row.canUseContextActions && (
-                <View style={styles.composer}>
-                  <Field
-                    autoCapitalize="sentences"
-                    maxLength={300}
-                    multiline
-                    onChangeText={setMessage}
-                    placeholder={`Message ${row.user.name}`}
-                    value={message}
-                  />
-                  <View style={styles.actions}>
-                    <ActionButton
-                      compact
-                      disabled={message.trim().length === 0}
-                      title="Send"
-                      tone="primary"
-                      onPress={() => {
-                        if (chatRuntime.sendPrivateMessage(row.user.name, message)) closeComposer();
-                      }}
-                    />
-                    <ActionButton compact title="Cancel" tone="ghost" onPress={closeComposer} />
-                  </View>
-                </View>
+                </UserContextActions>
               )}
             </View>
           );
@@ -129,6 +89,4 @@ const styles = StyleSheet.create({
   username: { fontSize: 16, fontWeight: '800' },
   location: { fontSize: 13, lineHeight: 18 },
   indicators: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end' },
-  actions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  composer: { gap: 8 },
 });
