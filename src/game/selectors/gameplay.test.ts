@@ -155,6 +155,7 @@ describe('getGameTableSuits', () => {
   it('returns immutable minimum efficiency and keeps MRE available when FRE is unavailable', () => {
     const presentation = getPresentation({ cluesStillUsableNotRounded: 0 });
     expect(presentation.futureRequiredEfficiency).toBeNull();
+    expect(presentation.finessesRequired).toBeNull();
     expect(presentation.minimumRequiredEfficiency).toBe(0.88);
     expect(`${presentation.futureRequiredEfficiency ?? '-'} | ${presentation.minimumRequiredEfficiency.toFixed(2)}`)
       .toBe('- | 0.88');

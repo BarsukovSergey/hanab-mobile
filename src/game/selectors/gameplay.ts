@@ -202,7 +202,9 @@ export function getGameplayPresentation(
     potentialCluesLost: stats.potentialCluesLost,
     appliesEfficiencyModifier: appliedModifier !== null && appliedModifier !== 0,
     shouldModifyEfficiency,
-    finessesRequired: remainingPossibleClues === null
+    finessesRequired: futureRequiredEfficiency === null
+      || !Number.isFinite(futureRequiredEfficiency)
+      || remainingPossibleClues === null
       ? null
       : Math.max(cardsRemainingToGet - Math.floor(remainingPossibleClues), 0),
   };
