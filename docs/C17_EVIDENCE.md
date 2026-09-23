@@ -1,6 +1,6 @@
 # C17 Physical UX Evidence
 
-Date: 2026-09-06
+Date: 2026-09-23
 Status: **evidence / defect history, not product authority**
 
 Product/UI authority remains `docs/C17_UX_CONTRACT.md`. Ratified decisions live in `docs/C17_UX_DECISIONS.md`; validation gates and pass/fail status live in `docs/C17_VALIDATION.md`.
@@ -30,7 +30,7 @@ The immediate fallback hard-capped ordinary portrait opponent cards around 34 dp
 - a large amount of useful vertical space remained empty below the Workbench;
 - therefore a binary breakpoint with fixed compact card heights wastes space and is not the correct final policy.
 
-### Current density rule produced by both failures
+### Current density rule implemented after both failures
 
 C17 should allocate dense portrait space adaptively rather than choose between two arbitrary fixed card sizes:
 
@@ -46,11 +46,29 @@ The Workbench is a protected interaction region, not a permanently oversized emp
 
 Geometry remains stable for the current window/text-scale/player-count/hand-capacity class and must not reflow merely because hands shrink later in the game.
 
-A new physical screenshot is required to validate this adaptive allocation on the same 6P + One Extra Card device state.
+### Current adaptive implementation — PASS on the tested Android portrait class
+
+The repair landed incrementally across PRs #37–#41 rather than as another fixed breakpoint:
+
+- #37 introduced the adaptive allocator with a protected own hand, a 46 dp opponent-card readability floor, shared card headroom, and authoritative `cardsPerHand` capacity;
+- #38 integrated side-label rows and reduced dense Workbench/chrome cost into the production C17 workspace;
+- #39 reclaimed enough production vertical space for real-card 6P on the physical device class by compacting dense Last Action/table chrome without lowering the 46 dp floor;
+- #40 made the dense ClueComposer fit inside the existing 56 dp Workbench reserve, with a two-row palette and explicit Close/Give actions visible without scrolling;
+- #41 removed redundant C17-only bottom padding while keeping the bottom `SafeAreaView` as the Android navigation protection.
+
+Physical validation on 2026-09-23 now covers:
+
+- 5P portrait with real opponent card faces;
+- ordinary true 6P portrait with five real opponent hands and a real own hand, without `Compact Overview`;
+- 6P + One Extra Card with the authoritative four-card hand capacity and real cards for every hand;
+- dense clue planning with the full palette and Close/Give visible without scrolling;
+- the C17 lower edge ending at the Android navigation safe-area boundary without the former redundant internal gap.
+
+This closes the current 4P–6P **card-face layout repair** for the tested portrait class. It does not claim full serious-play coverage on every device, font scale, landscape/tablet composition, or spectator perspective. `Compact Overview` remains an emergency fallback for geometry that cannot satisfy the real-card floor.
 
 ### Other defects visible in the same prototype evidence
 
-These were visible and remain later-slice work rather than reasons to repeat the density test:
+These were visible in the C17-0 prototype and are retained as historical evidence; do not assume they remain current without reproduction:
 
 - opening turn still displays `TURN 0` even though human-facing turn numbering should start at 1;
 - empty discard presentation still says `None`; target terminology is `Empty`;
