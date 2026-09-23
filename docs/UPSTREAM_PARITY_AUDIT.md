@@ -221,8 +221,8 @@ An unsolicited server `left` for a spectator is therefore ignored. `tableGone` a
 normally clear an arbitrary pregame room. The likely visible failure is a spectator remaining on a
 deleted pregame screen.
 
-**Classification:** Drift / correctness bug  
-**Effort:** XS–S  
+**Classification:** Drift / correctness bug
+**Effort:** XS–S
 **Importance:** High
 
 ---
@@ -286,8 +286,8 @@ new rules engine, but the presentation selector needs to encode the upstream con
 The rules/state path supports 2–6 players, but the current C17 dense allocator is not accepted
 product UX for ordinary 4P–6P. The current `Compact Overview` summary-card fallback remains temporary.
 
-**Status:** Partial  
-**Effort:** L  
+**Status:** Partial
+**Effort:** L
 **Importance:** High
 
 The dedicated diagnosis is in `docs/4P_6P_LAYOUT_RESEARCH.md`.
@@ -392,8 +392,8 @@ Mobile `src/game/client/cardPresentation.ts` still uses the older condition:
 
 without the current-upstream `!finished` qualification.
 
-**Classification:** Drift  
-**Effort:** XS  
+**Classification:** Drift
+**Effort:** XS
 **Importance:** Medium (replay/presentation correctness)
 
 This should be handled as a scoped card-presentation pin update/regression test, not by silently
@@ -708,7 +708,7 @@ Current upstream events missing from the mobile server-event schema include:
 
 | Upstream event | Mobile effect today | Classification | Effort | Importance |
 | --- | --- | --- | ---: | ---: |
-| `name` | ignored | Missing convenience | XS–S | Low | 
+| `name` | ignored | Missing convenience | XS–S | Low |
 | `tableProgress` | ignored; lobby table progress remains at snapshot value | Missing presentation data | S | Low |
 | `pregameSpectators` | ignored | Missing data/UI | S–M | Medium |
 | `chatTyping` | ignored | Missing chat polish | S–M | Low |
@@ -1291,4 +1291,3 @@ mobile spectator schema accept the upstream optional representation and normaliz
 username at the boundary.
 
 ---
-
