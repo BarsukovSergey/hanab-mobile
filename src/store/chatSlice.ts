@@ -9,6 +9,7 @@ export type ReadableChatMessage = Omit<ChatMessage, 'msg' | 'room'> & {
   rawMsg: string;
   room: string;
   localType?: 'info' | 'error';
+  source?: 'live' | 'history';
 };
 
 export type ChatState = {
@@ -96,6 +97,7 @@ export const chatSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       const message = readable(action.payload.message, action.payload.defaultRoom);
       if (message === null) return;
+      message.source = 'live';
       if (
         message.recipient.length > 0
         && message.who.length > 0
@@ -129,6 +131,7 @@ export const chatSlice = createSlice({
       for (const raw of action.payload.messages) {
         const message = readable(raw, action.payload.defaultRoom);
         if (message === null) continue;
+        message.source = 'history';
         (grouped[message.room] ??= []).push(message);
       }
       if (isSupportedRoom(action.payload.defaultRoom)) {
