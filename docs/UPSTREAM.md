@@ -32,6 +32,8 @@ The mobile adaptation is intended to preserve the upstream selector behavior whi
 
 `7a9c601...` is nine commits ahead of the baseline pin and that range includes unrelated client/server changes in addition to the card-presentation extraction. Therefore adopting the selector does **not** by itself mean the entire mobile game/protocol baseline has moved to `7a9c601...`.
 
+The finished-game `note.unclued` presentation behavior deliberately includes the scoped follow-up from `f92dbefaad90894612eff8369e376843ae6b3621` (PR #3116, `Deactivate note.unclued when game is finished`). This is a selector-only semantic follow-up; it does not advance the baseline game/protocol pin or the whole vendored upstream baseline.
+
 The semantic contract and mobile parity notes for this selector live in `docs/CARD_PRESENTATION_PARITY.md`.
 
 ## Hypothetical replay core pin

@@ -133,6 +133,14 @@ describe('card knowledge view model', () => {
     expect(knowledge.borderColor).toBe('aqua');
   });
 
+  test('deactivates an unclued note border override after the game finishes', () => {
+    const positivelyClued = applyClue(freshCard(18), newRankClue(2), true);
+    const note: CardNote = { ...emptyNote, unclued: true };
+
+    expect(getCardKnowledgeViewModel(variant.name, positivelyClued, note, false).borderColor).toBeNull();
+    expect(getCardKnowledgeViewModel(variant.name, positivelyClued, note, true).borderColor).toBe('orange');
+  });
+
   test('does not promote a single best-knowledge possibility into card identity', () => {
     const card = freshCard(15);
     const deduced: CardState = {

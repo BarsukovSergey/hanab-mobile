@@ -1,6 +1,7 @@
 // Adapted from Hanabi-Live packages/client/src/game/ui/cardPresentation.ts at
-// 7a9c601b66f5966f7e33564855e25f82e68a94ed. Only import paths are rewritten
-// to use the vendored game core.
+// 7a9c601b66f5966f7e33564855e25f82e68a94ed (#3115). The finished note.unclued
+// behavior includes the scoped follow-up from f92dbefaad90894612eff8369e376843ae6b3621
+// (#3116). Only import paths are rewritten to use the vendored game core.
 import type { CardIdentity } from '../upstream/interfaces/CardIdentity';
 import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { CardState } from '../upstream/interfaces/CardState';
@@ -106,7 +107,8 @@ export function getCardBorderPresentation(
   finished: boolean,
 ): CardBorderPresentation {
   const canShowBorder = !isCardPlayed(state) && !isCardDiscarded(state);
-  const clued = canShowBorder && !note.unclued && (isCardClued(state) || note.clued);
+  const unclued = note.unclued && !finished;
+  const clued = canShowBorder && !unclued && (isCardClued(state) || note.clued);
   const finessed = note.finessed && canShowBorder && !clued && !finished;
   const discardPermission = note.discardPermission && canShowBorder && !clued && !finessed && !finished;
   const chopMoved = note.chopMoved
