@@ -9,6 +9,9 @@ type Props = {
   onSelectSegment: (segment: number) => void;
 };
 
+export const gestureOriginFromGrant = (pageX: number, locationX: number) => pageX - locationX;
+export const scrubXFromPage = (pageX: number, originX: number) => pageX - originX;
+
 export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSegment }: Props) {
   const { theme } = useHanabTheme();
   const [trackWidth, setTrackWidth] = useState(0);
@@ -18,6 +21,7 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
   const selectedIndex = Math.max(0, timelineSegments.indexOf(selectedSegment));
   const [previewIndex, setPreviewIndex] = useState(selectedIndex);
   const dragging = useRef(false);
+  const gestureOriginX = useRef<number | null>(null);
   const lastEmittedIndex = useRef(selectedIndex);
   const pendingIndex = useRef<number | null>(null);
   const navigationFrame = useRef<number | null>(null);
@@ -90,16 +94,26 @@ export function C17RewindScrubber({ actionSegments, selectedSegment, onSelectSeg
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(event) => {
         dragging.current = true;
-        scrubToX(event.nativeEvent.locationX, true);
+        gestureOriginX.current = gestureOriginFromGrant(event.nativeEvent.pageX, event.nativeEvent.locationX);
+        scrubToX(scrubXFromPage(event.nativeEvent.pageX, gestureOriginX.current), true);
       }}
-      onResponderMove={(event) => scrubToX(event.nativeEvent.locationX, false)}
+      onResponderMove={(event) => {
+        if (gestureOriginX.current === null) return;
+        scrubToX(scrubXFromPage(event.nativeEvent.pageX, gestureOriginX.current), false);
+      }}
       onResponderRelease={(event) => {
-        scrubToX(event.nativeEvent.locationX, true);
+        if (gestureOriginX.current !== null) {
+          scrubToX(scrubXFromPage(event.nativeEvent.pageX, gestureOriginX.current), true);
+        }
         dragging.current = false;
+        gestureOriginX.current = null;
       }}
       onResponderTerminate={(event) => {
-        scrubToX(event.nativeEvent.locationX, true);
+        if (gestureOriginX.current !== null) {
+          scrubToX(scrubXFromPage(event.nativeEvent.pageX, gestureOriginX.current), true);
+        }
         dragging.current = false;
+        gestureOriginX.current = null;
       }}
       onStartShouldSetResponderCapture={() => true}
       onStartShouldSetResponder={() => true}
