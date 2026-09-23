@@ -45,6 +45,8 @@ export function LobbyScreen({
   const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
   const tables = useAppSelector(tableSelectors.selectAll);
   const roomState = useAppSelector((state) => state.room);
+  const randomTableName = useAppSelector((state) => state.session.randomTableName);
+  const effectiveName = tableName.trim() || randomTableName?.trim() || '';
   const {
     yourRunningGames,
     pregameTables,
@@ -145,7 +147,7 @@ export function LobbyScreen({
           {showCreateTable && (
             <Panel>
               <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
-              <Field maxLength={45} onChangeText={setTableName} placeholder="Table name" value={tableName} />
+              <Field maxLength={45} onChangeText={setTableName} placeholder={randomTableName ?? 'Table name'} value={tableName} />
               <Field
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -184,7 +186,7 @@ export function LobbyScreen({
               </View>
               <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
               <ActionButton
-                disabled={attendancePending || tableName.trim().length === 0}
+                disabled={attendancePending || effectiveName.length < 1 || effectiveName.length > 45}
                 title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}
                 tone="primary"
                 onPress={() => {

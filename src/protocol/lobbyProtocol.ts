@@ -356,6 +356,7 @@ const cardPresentationSettingCommandSchema = z.object({
 export const welcomeSchema = z.object({
   userID: idSchema,
   username: z.string().min(1),
+  randomTableName: z.string().optional(),
   totalGames: z.number().int().nonnegative(),
   playingAtTables: z.array(idSchema),
   friends: z.array(z.string().min(1)).optional(),
@@ -392,6 +393,7 @@ export const replayCreateCommandSchema = z.object({
 
 const schemas = {
   welcome: welcomeSchema,
+  name: z.object({ name: z.string() }),
   userList: z.array(lobbyUserSchema),
   user: lobbyUserSchema,
   userLeft: z.object({ userID: idSchema }),
@@ -504,6 +506,10 @@ export function decodeServerFrame(frame: string): DecodeResult {
 
 export function encodeClientFrame(command: string, payload?: unknown): string {
   return payload === undefined ? command : `${command} ${JSON.stringify(payload)}`;
+}
+
+export function encodeGetNameFrame(): string {
+  return encodeClientFrame('getName');
 }
 
 export function encodeCardPresentationSettingFrame(

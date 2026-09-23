@@ -2077,10 +2077,12 @@ describe('deterministic lobby runtime', () => {
     runtime.disconnect();
     await runtime.connect();
     for (const listener of staleMessages) listener({ data: userFrame } as WebSocketMessageEvent);
+    for (const listener of staleMessages) listener({ data: 'name {"name":"Stale Name"}' } as WebSocketMessageEvent);
     for (const listener of staleCloses) listener({ code: 1006 } as WebSocketCloseEvent);
     expect(store.getState().session.connectionEpoch).toBe(2);
     expect(store.getState().session.phase).toBe('connecting');
     expect(userSelectors.selectTotal(store.getState())).toBe(0);
+    expect(store.getState().session.randomTableName).toBeNull();
   });
 
   test('a stale openSocket result is disposed immediately', async () => {
@@ -2574,6 +2576,7 @@ describe('deterministic lobby runtime', () => {
       + '"speedrun":false,"cardCycle":false,"deckPlays":false,"emptyClues":false,'
       + '"oneExtraCard":false,"oneLessCard":false,"allOrNothing":false,'
       + '"detrimentalCharacters":false},"password":"","maxPlayers":5}',
+      'getName',
     ]);
     expect(store.getState().room.room).toEqual({ kind: 'none' });
     expect(store.getState().room.pendingCreate).toMatchObject({
@@ -2582,6 +2585,33 @@ describe('deterministic lobby runtime', () => {
       joinedTableID: null,
       stagedGame: null,
     });
+  });
+
+  test('blank create uses the authoritative name, refreshes it, and custom input wins', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    socket.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"randomTableName":"Server Name"}');
+    expect(store.getState().session.randomTableName).toBe('Server Name');
+    socket.emitMessage('name {"name":"Next Name"}');
+    expect(store.getState().session.randomTableName).toBe('Next Name');
+    expect(runtime.createTable(' ', 5, 'No Variant')).toBe(true);
+    expect(socket.sent[0]).toContain('tableCreate {"name":"Next Name"');
+    expect(socket.sent[1]).toBe('getName');
+    expect(store.getState().room.pendingCreate?.name).toBe('Next Name');
+
+    const custom = await makeReadyRuntime();
+    custom.socket.emitMessage('name {"name":"Server Name"}');
+    expect(custom.runtime.createTable(' Custom ', 5, 'No Variant')).toBe(true);
+    expect(custom.socket.sent[0]).toContain('tableCreate {"name":"Custom"');
+    expect(custom.socket.sent[1]).toBe('getName');
+  });
+
+  test('a failed name refresh does not undo a sent create', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    socket.emitMessage('name {"name":"Server Name"}');
+    socket.failOnSendNumber = 2;
+    expect(runtime.createTable('', 5, 'No Variant')).toBe(true);
+    expect(socket.sent).toHaveLength(1);
+    expect(store.getState().room.pendingCreate?.name).toBe('Server Name');
   });
 
   test('owner edit preserves unavailable and additive options until authoritative game echo', async () => {

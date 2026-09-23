@@ -39,4 +39,12 @@ describe('lobby table details and create selector', () => {
   test('passes the selected maxPlayers unchanged to createTable', () => {
     expect(screen).toContain('lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)');
   });
+
+  test('uses the server name as the blank field placeholder and permits blank create', () => {
+    expect(screen).toContain('state.session.randomTableName');
+    expect(screen).toContain("placeholder={randomTableName ?? 'Table name'}");
+    expect(screen).toContain("const effectiveName = tableName.trim() || randomTableName?.trim() || '';");
+    expect(screen).toContain('effectiveName.length < 1 || effectiveName.length > 45');
+    expect(screen).toContain("setTablePassword('');");
+  });
 });

@@ -56,6 +56,7 @@ export type SessionState = {
   authenticatedUser: AuthenticatedUser | null;
   cardPresentationSettings: CardPresentationSettings;
   friends: string[];
+  randomTableName: string | null;
   resumeHints: ResumeHints | null;
   error: string | null;
   protocolIssueCount: number;
@@ -79,6 +80,7 @@ const initialState: SessionState = {
     styleNumbers: false,
   },
   friends: [],
+  randomTableName: null,
   resumeHints: null,
   error: null,
   protocolIssueCount: 0,
@@ -100,6 +102,7 @@ export const sessionSlice = createSlice({
       state.phase = 'connecting';
       state.authenticatedUser = null;
       state.friends = [];
+      state.randomTableName = null;
       state.resumeHints = null;
       state.error = null;
       state.protocolIssueCount = 0;
@@ -126,6 +129,7 @@ export const sessionSlice = createSlice({
         styleNumbers: welcome.settings?.styleNumbers ?? false,
       };
       state.friends = [...(welcome.friends ?? [])];
+      state.randomTableName = welcome.randomTableName ?? null;
       state.resumeHints = {
         playingAtTables: welcome.playingAtTables,
         disconSpectatingTable: welcome.disconSpectatingTable,
@@ -142,6 +146,10 @@ export const sessionSlice = createSlice({
     friendsReceived(state, action: PayloadAction<{ epoch: number; friends: string[] }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       state.friends = [...action.payload.friends];
+    },
+    randomTableNameReceived(state, action: PayloadAction<{ epoch: number; name: string }>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      state.randomTableName = action.payload.name;
     },
     connectionFailed(state, action: PayloadAction<{ epoch: number; error: string }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
