@@ -100,11 +100,20 @@ The biggest parity gaps are concentrated in five areas:
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and
    detrimental-character tables.
 
-There are also two concrete current-upstream compatibility defects that should not be confused with
-feature backlog:
+The protocol surface is already broad:
 
-- **finished-game `note.unclued` presentation drift** after upstream #3116;
-- **pregame spectator cleanup drift** after upstream #3129.
+- upstream exposes **42** direct client→server WebSocket commands; mobile has **34 full**, **2
+  partial**, and **6 missing** command families;
+- current Go server emits **53** relevant server→client event names; mobile recognizes **40** and
+  safely ignores **13** currently unsupported event families.
+
+The deeper audit found four concrete semantic/interoperability defects that should not be confused
+with general feature backlog:
+
+- **finished-game `note.unclued` presentation drift** after upstream #3116 — #27;
+- **pregame spectator cleanup drift** after upstream #3129 — #26;
+- **dynamic shared-replay efficiency modifier updates are ignored** — #29;
+- **Pace/FRE presentation context differs from upstream** — #30.
 
 ## Highest-value findings
 
@@ -112,11 +121,13 @@ feature backlog:
 | --- | --- | --- | --- | --- |
 | Finished replay `unclued` border behavior | Drift | XS | Medium | Current upstream intentionally disables the `unclued` override after game end; mobile still has the older behavior. |
 | Pregame spectator removed when table disappears | Drift | XS–S | High | Current server now sends an unsolicited `left` when the last player leaves; mobile ignores it unless a local leave/role-switch is pending. |
+| Shared replay efficiency-modifier updates | Interop drift | S | Medium | Initial value is consumed, but later `replayEfficiencyMod` broadcasts are ignored; follower FRE can go stale (#29). |
+| Pace/FRE context semantics | Partial | S | Medium | Underlying stats are present, but final-round/AON/review/shared-modifier presentation differs from web (#30). |
 | 4P–6P dense real-card layout | Partial | L | High | Core state works, but ordinary 4P–6P falls into the temporary Compact Overview path. |
 | Spectator shadowing / player perspective | Wire-only | S–M | High | The protocol already carries `shadowingPlayerIndex`; mobile always requests `-1` and exposes no perspective selector. |
 | Colorblind + styled-number card presentation | Missing | S–M | High | Accessibility/presentation value; assets/tooling already understand upstream card variants. |
 | Lobby sections/create placement | Partial | M | High | Research contract exists; current runtime UI still uses the older grouping. |
-| Add several bots during Create/Pregame | Missing | M | Medium–High | Existing PM + `/join [password]` semantics are sufficient; no new protocol needed. |
+| Add several bots during Create/Pregame | Missing | M | Medium–High | Existing PM join semantics are sufficient; registry must use verified per-bot capabilities because not every reference/community bot supports protected-table joins. |
 | Online users / contextual player actions | Missing UI | M | Medium–High | User data is already stored; currently invisible. Unlocks PM/profile/friend/shadowing discovery. |
 | Pregame player stats | Missing UI | S–M | Medium | Server already sends stats; mobile schema currently discards them. |
 | Seed comparison / Other Scores | Missing | M | Medium | Server has dedicated `historyGetSeed`; history already carries seed and `numGamesOnThisSeed`. |
