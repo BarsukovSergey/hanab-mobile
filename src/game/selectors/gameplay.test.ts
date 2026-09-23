@@ -140,7 +140,7 @@ describe('getGameTableSuits', () => {
 
   it('formats ordinary positive pace with a plus and retains risk', () => {
     expect(getPresentation({ pace: 2.5, paceRisk: PaceRisk.High })).toMatchObject({
-      pace: '+2.5', paceRisk: PaceRisk.High,
+      pace: '+2.5', paceRisk: 'high',
     });
   });
 

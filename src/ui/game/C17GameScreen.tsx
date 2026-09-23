@@ -13,7 +13,6 @@ import {
 
 import type { CardIdentity, CardNote, GameMetadata, GameState } from '../../game/bootstrap/types';
 import type { HypotheticalState } from '../../game/client/types/HypotheticalState';
-import { PaceRisk } from '../../game/upstream/enums/PaceRisk';
 import { canToggleHypotheticalDrawnCards } from '../../game/client/hypotheticalEligibility';
 import { getCardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
 import { getCardStatePresentation } from '../../game/selectors/cardStatePresentation';
@@ -1294,10 +1293,10 @@ function formatEfficiency(value: number | null): string {
   return value === null ? '-' : value.toFixed(2);
 }
 
-function paceRiskColor(theme: ReturnType<typeof useHanabTheme>['theme'], risk: PaceRisk | null): string {
-  if (risk === PaceRisk.Medium) return theme.colors.warning;
-  if (risk === PaceRisk.High) return theme.dark ? '#fbbf24' : '#b45309';
-  if (risk === PaceRisk.Zero) return theme.colors.danger;
+function paceRiskColor(theme: ReturnType<typeof useHanabTheme>['theme'], risk: 'low' | 'medium' | 'high' | 'zero' | null): string {
+  if (risk === 'medium') return theme.colors.warning;
+  if (risk === 'high') return theme.dark ? '#fbbf24' : '#b45309';
+  if (risk === 'zero') return theme.colors.danger;
   return theme.colors.text;
 }
 

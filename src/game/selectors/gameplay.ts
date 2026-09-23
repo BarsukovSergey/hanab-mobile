@@ -135,7 +135,7 @@ export function getDisplayedClueTokens(clueTokens: number, variantName: string):
 
 export type GameplayPresentation = {
   readonly pace: string;
-  readonly paceRisk: PaceRisk | null;
+  readonly paceRisk: GameplayPaceRisk | null;
   readonly futureRequiredEfficiency: number | null;
   readonly minimumRequiredEfficiency: number;
   readonly currentEfficiency: number | null;
@@ -149,6 +149,8 @@ export type GameplayPresentation = {
   readonly shouldModifyEfficiency: boolean;
   readonly finessesRequired: number | null;
 };
+
+export type GameplayPaceRisk = 'low' | 'medium' | 'high' | 'zero';
 
 /** Shared mobile presentation semantics for Pace and efficiency in the game HUD. */
 export function getGameplayPresentation(
@@ -188,7 +190,7 @@ export function getGameplayPresentation(
 
   return {
     pace: paceUnavailable ? '-' : stats.pace > 0 ? `+${stats.pace}` : String(stats.pace),
-    paceRisk: paceUnavailable ? null : stats.paceRisk,
+    paceRisk: paceUnavailable ? null : toGameplayPaceRisk(stats.paceRisk),
     futureRequiredEfficiency: futureRequiredEfficiency !== null
       && Number.isFinite(futureRequiredEfficiency) ? futureRequiredEfficiency : null,
     minimumRequiredEfficiency,
@@ -208,6 +210,15 @@ export function getGameplayPresentation(
       ? null
       : Math.max(cardsRemainingToGet - Math.floor(remainingPossibleClues), 0),
   };
+}
+
+function toGameplayPaceRisk(risk: PaceRisk): GameplayPaceRisk {
+  switch (risk) {
+    case PaceRisk.Low: return 'low';
+    case PaceRisk.Medium: return 'medium';
+    case PaceRisk.High: return 'high';
+    case PaceRisk.Zero: return 'zero';
+  }
 }
 
 export function getGameTableSuits(
