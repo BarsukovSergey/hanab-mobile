@@ -70,3 +70,25 @@ describe('session card presentation settings', () => {
     });
   });
 });
+
+describe('session random table name', () => {
+  test('uses welcome, replaces with name events, and clears across epochs and sign-out', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: {
+      ...welcome(), randomTableName: 'First Name',
+    } }));
+    expect(store.getState().session.randomTableName).toBe('First Name');
+    store.dispatch(sessionActions.randomTableNameReceived({ epoch: 1, name: 'Second Name' }));
+    expect(store.getState().session.randomTableName).toBe('Second Name');
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().session.randomTableName).toBeNull();
+    store.dispatch(sessionActions.randomTableNameReceived({ epoch: 1, name: 'Stale Name' }));
+    expect(store.getState().session.randomTableName).toBeNull();
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 2, welcome: welcome() }));
+    expect(store.getState().session.randomTableName).toBeNull();
+    store.dispatch(sessionActions.randomTableNameReceived({ epoch: 2, name: 'Current Name' }));
+    store.dispatch(sessionActions.signedOut());
+    expect(store.getState().session.randomTableName).toBeNull();
+  });
+});

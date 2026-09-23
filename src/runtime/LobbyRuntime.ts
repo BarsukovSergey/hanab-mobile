@@ -35,6 +35,7 @@ import {
   encodeChatFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
+  encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeClientFrame,
   encodeReplayActionFrame,
@@ -439,6 +440,7 @@ export class LobbyRuntime {
     const state = this.store.getState();
     const creatorUserID = state.session.authenticatedUser?.userID;
     const trimmedName = name.trim();
+    const effectiveName = trimmedName || state.session.randomTableName?.trim() || '';
     const exposed = typeof options === 'string' ? {
       variantName: options,
       timed: false,
@@ -452,8 +454,8 @@ export class LobbyRuntime {
     } : options;
     if (
       creatorUserID === undefined
-      || trimmedName.length < 1
-      || trimmedName.length > 45
+      || effectiveName.length < 1
+      || effectiveName.length > 45
       || !Number.isInteger(maxPlayers)
       || maxPlayers < 2
       || maxPlayers > 6
@@ -469,7 +471,7 @@ export class LobbyRuntime {
 
     let frame: string;
     try {
-      frame = encodeTableCreateFrame(trimmedName, maxPlayers, exposed, password);
+      frame = encodeTableCreateFrame(effectiveName, maxPlayers, exposed, password);
     } catch {
       return false;
     }
@@ -477,9 +479,10 @@ export class LobbyRuntime {
 
     this.store.dispatch(roomActions.createRequested({
       epoch: state.session.connectionEpoch,
-      name: trimmedName,
+      name: effectiveName,
       creatorUserID,
     }));
+    this.sendEncoded(encodeGetNameFrame());
     return true;
   }
 
@@ -1184,6 +1187,9 @@ export class LobbyRuntime {
         this.retryAttempt = 0;
         this.store.dispatch(sessionActions.welcomeReceived({ epoch, welcome: event.data }));
         this.resumeAuthoritativeRoom(epoch, event.data);
+        break;
+      case 'name':
+        this.store.dispatch(sessionActions.randomTableNameReceived({ epoch, name: event.data.name }));
         break;
       case 'userList':
         this.store.dispatch(lobbyActions.userListReceived({ epoch, users: event.data }));

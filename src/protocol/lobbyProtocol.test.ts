@@ -6,6 +6,7 @@ import {
   encodeChatFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
+  encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeReplayActionFrame,
   encodeReplayHypoActionFrame,
@@ -34,6 +35,15 @@ const user = {
 };
 
 describe('lobby protocol decoder', () => {
+  test('retains the welcome random name and decodes the next server name', () => {
+    expect(decodeServerFrame('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"randomTableName":"Lucky Stars"}')).toMatchObject({
+      kind: 'event', event: { command: 'welcome', data: { randomTableName: 'Lucky Stars' } },
+    });
+    expect(decodeServerFrame('name {"name":"Next Name"}')).toEqual({
+      kind: 'event', event: { command: 'name', data: { name: 'Next Name' } },
+    });
+    expect(encodeGetNameFrame()).toBe('getName');
+  });
   test('parses presentation settings, tolerates other settings, and defaults absent settings', () => {
     expect(decodeServerFrame(
       'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"sounds":true}}',
