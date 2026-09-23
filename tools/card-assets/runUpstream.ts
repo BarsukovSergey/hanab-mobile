@@ -18,6 +18,13 @@ type GameModule = {
 };
 
 type VariantCardHashes = Record<string, string>;
+type PresentationMode = 'default' | 'colorblind' | 'styled';
+
+const PRESENTATION_MODES: Readonly<Record<PresentationMode, readonly [boolean, boolean]>> = {
+  default: [false, false],
+  colorblind: [true, false],
+  styled: [false, true],
+};
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -62,33 +69,37 @@ async function main(): Promise<void> {
   const importedGameModule = await import(gameUrl) as GameModule | { default: GameModule };
   const gameModule = asModule(importedGameModule);
 
-  const variantHashes = new Map<string, VariantCardHashes>();
+  const modeVariantHashes = new Map<PresentationMode, Map<string, VariantCardHashes>>();
   const svgByHash = new Map<string, string>();
   const cardKeySet = new Set<string>();
 
-  for (const variantName of [...SUPPORTED_VARIANT_NAMES].sort()) {
-    const variant = gameModule.getVariant(variantName);
-    const images = drawCardsModule.drawCards(
-      variant,
-      false,
-      false,
-      false,
-      createSvgCardRendererBackend(constantsModule.CARD_W, constantsModule.CARD_H),
-    );
-    const hashes: VariantCardHashes = {};
+  for (const [mode, [colorblindMode, styleNumbers]] of Object.entries(PRESENTATION_MODES) as [PresentationMode, readonly [boolean, boolean]][]) {
+    const variantHashes = new Map<string, VariantCardHashes>();
+    for (const variantName of [...SUPPORTED_VARIANT_NAMES].sort()) {
+      const variant = gameModule.getVariant(variantName);
+      const images = drawCardsModule.drawCards(
+        variant,
+        colorblindMode,
+        styleNumbers,
+        false,
+        createSvgCardRendererBackend(constantsModule.CARD_W, constantsModule.CARD_H),
+      );
+      const hashes: VariantCardHashes = {};
 
-    for (const [cardKey, svg] of [...images.entries()].sort(([left], [right]) => (
-      left.localeCompare(right)
-    ))) {
-      const hash = sha256(svg);
-      hashes[cardKey] = hash;
-      cardKeySet.add(cardKey);
-      if (!svgByHash.has(hash)) {
-        svgByHash.set(hash, svg);
+      for (const [cardKey, svg] of [...images.entries()].sort(([left], [right]) => (
+        left.localeCompare(right)
+      ))) {
+        const hash = sha256(svg);
+        hashes[cardKey] = hash;
+        cardKeySet.add(cardKey);
+        if (!svgByHash.has(hash)) {
+          svgByHash.set(hash, svg);
+        }
       }
-    }
 
-    variantHashes.set(variantName, hashes);
+      variantHashes.set(variantName, hashes);
+    }
+    modeVariantHashes.set(mode, variantHashes);
   }
 
   const cardKeys = [...cardKeySet].sort();
@@ -96,12 +107,16 @@ async function main(): Promise<void> {
   const cardKeyIndexes = new Map(cardKeys.map((key, index) => [key, index]));
   const assetIndexes = new Map(assets.map((hash, index) => [hash, index]));
 
-  const manifestVariants: Record<string, readonly (readonly [number, number])[]> = {};
-  for (const [variantName, hashes] of variantHashes) {
-    manifestVariants[variantName] = Object.entries(hashes).map(([cardKey, hash]) => [
-      cardKeyIndexes.get(cardKey)!,
-      assetIndexes.get(hash)!,
-    ] as const);
+  const manifestModes: Record<PresentationMode, Record<string, readonly (readonly [number, number])[]>> = {
+    default: {}, colorblind: {}, styled: {},
+  };
+  for (const [mode, variantHashes] of modeVariantHashes) {
+    for (const [variantName, hashes] of variantHashes) {
+      manifestModes[mode][variantName] = Object.entries(hashes).map(([cardKey, hash]) => [
+        cardKeyIndexes.get(cardKey)!,
+        assetIndexes.get(hash)!,
+      ] as const);
+    }
   }
 
   const manifest = {
@@ -109,13 +124,11 @@ async function main(): Promise<void> {
     renderer: {
       width: constantsModule.CARD_W,
       height: constantsModule.CARD_H,
-      colorblindMode: false,
-      styleNumbers: false,
       enableShadows: false,
     },
     cardKeys,
     assets,
-    variants: manifestVariants,
+    modes: manifestModes,
   } as const;
 
   const chunks = new Map<string, Record<string, string>>();
