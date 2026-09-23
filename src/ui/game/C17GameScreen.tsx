@@ -1244,7 +1244,9 @@ function C17DenseWorkspace({
           {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
         </>}
       </ScrollView>
-    </View> : <View style={[styles.idleWorkbench, usesDenseSideLabels && { minHeight: layout.workbenchHeight }]} />}
+    </View> : <View style={[styles.idleWorkbench, usesDenseSideLabels && { minHeight: layout.workbenchHeight }]}>
+      {canEnterClue && <Text numberOfLines={1} style={[styles.clueEntryHint, { color: theme.colors.textMuted }]}>Tap another player's hand to give a clue</Text>}
+    </View>}
     </View>
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
@@ -1391,6 +1393,7 @@ const styles = StyleSheet.create({
   workbenchContent: { flexGrow: 1, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   denseClueWorkbenchContent: { flexGrow: 0, gap: 0, paddingHorizontal: 0, paddingVertical: 0 },
   idleWorkbench: { alignItems: 'flex-end', flex: 1, justifyContent: 'flex-start', marginTop: 5 },
+  clueEntryHint: { fontSize: 11, fontWeight: '700', lineHeight: 14 },
   workbenchText: { fontSize: 12, lineHeight: 16 },
   noteInspect: { gap: 3 },
   notePreview: { fontSize: 10, lineHeight: 14 },

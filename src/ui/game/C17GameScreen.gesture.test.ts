@@ -209,12 +209,30 @@ test('dense ClueComposer keeps a two-row palette beside explicit Close and Give 
   expect(denseComposer).toContain('hitSlop={{ top: 5, bottom: 5, left: 2, right: 2 }}');
   expect(denseComposer).toContain('styles.denseColorChoice');
   expect(denseComposer).toContain('styles.denseRankChoice');
+  expect(composer).toContain("denseRankChoice: { alignItems: 'center', borderRadius: 6, borderWidth: 2, height: 26, justifyContent: 'center', minWidth: 26");
+  expect(composer).toContain("denseRankChoiceText: { fontSize: 16, fontWeight: '900', lineHeight: 18 }");
+  expect(composer).not.toContain('denseRankChoiceText: { fontSize: 14');
   expect(composer).toContain("previewState?.type === 'color' && previewState.value === choice.value");
   expect(composer).toContain("previewState?.type === 'rank' && previewState.value === choice.value");
   expect(composer).toContain('height: 26');
   expect(composer).toContain('minHeight: 26');
   expect(composer).toContain('>{targetName}</Text>');
   expect(composer).toContain('title="Give clue"');
+});
+
+test('C17 idle Workbench hints at clue entry only when authoritative eligibility allows targeting', () => {
+  const screen = readC17Screen();
+  const idleStart = screen.indexOf('</View> : <View style={[styles.idleWorkbench');
+  const idleWorkbench = screen.slice(idleStart, screen.indexOf('</View>}', idleStart));
+
+  expect(idleWorkbench).toContain('{canEnterClue && <Text numberOfLines={1}');
+  expect(idleWorkbench).toContain("Tap another player's hand to give a clue");
+  expect(idleWorkbench).not.toContain('<ClueComposer');
+  expect(screen).toContain('canEnterClue={enabled || hypotheticalEnabled}');
+  expect(screen).toContain('if (canEnterClue && !isActionHand) onSelectClueTarget(index);');
+  expect(screen).toContain('</> : selectedTarget !== null ? <ClueComposer');
+  expect(screen).toContain('const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null');
+  expect(screen).toContain('styles.idleWorkbench, usesDenseSideLabels && { minHeight: layout.workbenchHeight }');
 });
 
 test('dense clue Workbench reserves content height without moving Ledger hands', () => {
