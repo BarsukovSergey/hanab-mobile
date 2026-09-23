@@ -211,7 +211,8 @@ test('dense ClueComposer keeps a two-row palette beside explicit Close and Give 
   expect(denseComposer).toContain('styles.denseRankChoice');
   expect(composer).toContain("previewState?.type === 'color' && previewState.value === choice.value");
   expect(composer).toContain("previewState?.type === 'rank' && previewState.value === choice.value");
-  expect(composer).toContain('height: 28');
+  expect(composer).toContain('height: 26');
+  expect(composer).toContain('minHeight: 26');
   expect(composer).toContain('>{targetName}</Text>');
   expect(composer).toContain('title="Give clue"');
 });
@@ -219,9 +220,9 @@ test('dense ClueComposer keeps a two-row palette beside explicit Close and Give 
 test('dense clue Workbench reserves content height without moving Ledger hands', () => {
   const screen = readC17Screen();
 
-  expect(screen).toContain('const DENSE_CLUE_WORKBENCH_HEIGHT = 60;');
-  expect(screen).toContain('const workbenchReserveHeight = usesDenseSideLabels\n    ? Math.max(workbenchHeight, DENSE_CLUE_WORKBENCH_HEIGHT)\n    : workbenchHeight;');
-  expect(screen).toContain('getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchReserveHeight)');
+  expect(screen).not.toContain('DENSE_CLUE_WORKBENCH_HEIGHT');
+  expect(screen).toContain('getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight)');
+  expect(screen).toContain('workbenchHeight,');
   expect(screen).toContain('const denseClueWorkbench = usesDenseSideLabels && selectedTarget !== null');
   expect(screen).toContain('denseClueWorkbench\n        ? [styles.denseClueWorkbench, { maxHeight: denseClueAvailableHeight }]');
   expect(screen).toContain('contentContainerStyle={denseClueWorkbench ? styles.denseClueWorkbenchContent : styles.workbenchContent}');

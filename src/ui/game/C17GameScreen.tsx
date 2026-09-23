@@ -81,7 +81,6 @@ const END_CONDITIONS: Record<number, string> = {
 const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
-const DENSE_CLUE_WORKBENCH_HEIGHT = 60;
 
 export function C17GameScreen() {
   const { theme } = useHanabTheme();
@@ -694,10 +693,7 @@ function C17DenseWorkspace({
   const usesSideLabelRows = usesSideLabels || usesDenseSideLabels;
   const usesCompactWorkbench = usesSideLabels;
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight, opponents.length);
-  const workbenchReserveHeight = usesDenseSideLabels
-    ? Math.max(workbenchHeight, DENSE_CLUE_WORKBENCH_HEIGHT)
-    : workbenchHeight;
-  const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchReserveHeight}`;
+  const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
     shellKey: '',
     ambientBodyHeight: 0,
@@ -710,7 +706,7 @@ function C17DenseWorkspace({
   const shellMeasured = layoutMetrics.shellKey === shellKey
     && layoutMetrics.ambientBodyHeight > 0
     && layoutMetrics.ambientBodyWidth > 0;
-  const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchReserveHeight);
+  const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
   const cardLaneWidth = getC17CardLaneWidth(
     layoutMetrics.ambientBodyWidth,
     usesSideLabelRows ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
@@ -721,7 +717,7 @@ function C17DenseWorkspace({
     ownCardLaneWidth: cardLaneWidth,
     opponentCount: opponents.length,
     cardsPerHand,
-    workbenchHeight: workbenchReserveHeight,
+    workbenchHeight,
   });
   const captureAmbientBody = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((currentMetrics) => {
