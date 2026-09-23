@@ -689,6 +689,9 @@ function C17DenseWorkspace({
   const committedClue = getLastCluePresentationFromState(game);
   const opponents = getC17HandRows(metadata.playerNames.length, seatingAnchorIndex, actionHandIndex).opponentIndices;
   const usesSideLabels = opponents.length <= 2;
+  const usesDenseSideLabels = opponents.length >= 3;
+  const usesSideLabelRows = usesSideLabels || usesDenseSideLabels;
+  const usesCompactWorkbench = usesSideLabels;
   const workbenchHeight = getC17WorkbenchHeight(viewportHeight, opponents.length);
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
@@ -706,7 +709,7 @@ function C17DenseWorkspace({
   const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
   const cardLaneWidth = getC17CardLaneWidth(
     layoutMetrics.ambientBodyWidth,
-    usesSideLabels ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
+    usesSideLabelRows ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
   );
   const layout = getC17DenseLayout({
     opponentCardLaneWidth: cardLaneWidth,
@@ -777,14 +780,14 @@ function C17DenseWorkspace({
     : (notes[order]?.text.trim().length ?? 0) > 0;
   const showWorkbench = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedActionCard !== null || noteCard !== null || pendingText !== null;
-  const compactOrdinaryWorkbench = usesSideLabels
+  const compactOrdinaryWorkbench = usesCompactWorkbench
     && hypothetical === null
     && !reviewActive
     && !finishedReplay
     && sharedReplay === null
     && selectedTarget === null
     && (selectedActionCard !== null || noteCard !== null);
-  const compactCappedWorkbench = usesSideLabels && (compactOrdinaryWorkbench
+  const compactCappedWorkbench = usesCompactWorkbench && (compactOrdinaryWorkbench
     || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);
   const showRewindScrubber = reviewActive;
   const finishedReason = result?.reason;
@@ -872,19 +875,19 @@ function C17DenseWorkspace({
             style={[
               styles.opponentRow,
               compact && styles.compactOpponentRow,
-              !compact && usesSideLabels && styles.sideLabelRow,
+              !compact && usesSideLabelRows && styles.sideLabelRow,
               { height: layout.opponentRowHeight },
-              currentActor && (usesSideLabels
+              currentActor && (usesSideLabelRows
                 ? { backgroundColor: theme.colors.surfaceMuted }
                 : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }),
               target && { borderColor: theme.colors.accent },
             ]}
           >
-            <View style={compact ? styles.compactOpponentNameLane : usesSideLabels ? styles.sideLabelLane : styles.opponentMeta}>
-              <View style={[styles.namePeekArea, usesSideLabels && styles.sideLabelPeekArea]}>
-                {usesSideLabels && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
+            <View style={compact ? styles.compactOpponentNameLane : usesSideLabelRows ? styles.sideLabelLane : styles.opponentMeta}>
+              <View style={[styles.namePeekArea, usesSideLabelRows && styles.sideLabelPeekArea]}>
+                {usesSideLabelRows && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
                 <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
-                  {playerName}{!usesSideLabels && currentActor ? ' · TURN' : ''}
+                  {playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}
                 </Text>
                 {liveClock !== null && <C17LiveClockText
                   clock={liveClock}
@@ -893,7 +896,7 @@ function C17DenseWorkspace({
                 />}
               </View>
             </View>
-            <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
+            <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
               {getDisplayedHandOrders(game.hands[index]).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
@@ -985,17 +988,17 @@ function C17DenseWorkspace({
         onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}
         onPress={() => { if (canEnterClue && !anchoredIsActionHand) onSelectClueTarget(seatingAnchorIndex); }}
         onPressOut={() => onHoldEmpathy(null)}
-        style={[styles.ownHand, usesSideLabels && styles.sideLabelRow, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+        style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
       >
-        <View style={[styles.ownTitleLane, usesSideLabels && styles.sideLabelLane]}>
-          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? 'OBSERVED' : usesSideLabels ? 'YOU' : 'YOUR HAND'}</Text>
+        <View style={[styles.ownTitleLane, usesSideLabelRows && styles.sideLabelLane]}>
+          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? 'OBSERVED' : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
           {liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
             playerIndex={seatingAnchorIndex}
           />}
         </View>
-        <View style={[styles.ownCards, usesSideLabels && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
+        <View style={[styles.ownCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
           {anchoredHand.map((order, position) => {
             const card = game.deck[order];
             if (card === undefined) return null;
