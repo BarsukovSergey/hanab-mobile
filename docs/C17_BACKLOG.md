@@ -2,7 +2,9 @@
 
 Date: 2026-09-24
 
-Last reconciled with `main` at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84, beta.2 candidate).
+Last reconciled with `main` at `42eea2430eea7a7b2a02669b571f25189f448877` (PR #88 merge).
+
+This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
 These items were explicitly removed from the C17 release gate during product review. They must not silently re-enter C17 acceptance work unless separately reprioritized.
 
