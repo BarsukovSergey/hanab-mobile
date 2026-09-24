@@ -85,11 +85,11 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
     <Panel>
       <SectionHeading
         title="Account"
-        detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Passwords are never stored by Hanab Mobile.`}
+        detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Passwords are not persisted by Hanab Mobile.`}
       />
       {accountNotice !== null && <Notice tone={accountNotice.tone}>{accountNotice.message}</Notice>}
       {changePasswordOpen ? <>
-        <Notice>Use a password unique to hanab.live. Do not reuse a password from another site.</Notice>
+        <Notice>Use a new, unique password for hanab.live. Do not reuse one of your existing or previous passwords.</Notice>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setCurrentPassword} placeholder="Current password" secureTextEntry value={currentPassword} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setNewPassword} placeholder="New password" secureTextEntry value={newPassword} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setConfirmNewPassword} placeholder="Confirm new password" secureTextEntry value={confirmNewPassword} />
