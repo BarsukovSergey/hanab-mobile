@@ -2,7 +2,7 @@
 
 Date: 2026-09-24
 
-Status: **research / planning snapshot refreshed against current `main`; the distributed beta.1 build remains a historical tester artifact, not the current runtime baseline**
+Status: **research / planning snapshot refreshed after the beta.2 release-candidate merge; beta.1 remains historical and beta.2 is the current tester line**
 
 ## Scope and source of truth
 
@@ -22,9 +22,9 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- runtime/code snapshot: `f6f71737c8ba4f9c63993f06bcb9a4072c917bba` (PR #73 merge; this audit refresh is docs-only)
-- distributed beta.1 runtime remains frozen at
-  `d297ad71153095f18fba3101f760e306ed69e214`
+- runtime/code snapshot: `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84, frozen beta.2 runtime candidate)
+- current `main` additionally contains docs-only beta.2 release-packet reconciliation from PR #85
+- distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
 The audit uses:
 
@@ -91,13 +91,13 @@ already present:
 
 The biggest remaining parity gaps are now concentrated in five areas:
 
-1. **Replay/review power features**: shared replay creation from History, receive/UI support for turn suggestions, replay arrows/annotations, JSON import, `/copy`, and selected leader controls.
-2. **Tags and richer history/profile workflows**: first-class tag presentation/management, arbitrary-player history, and richer profile/best-score surfaces.
+1. **Replay/review power features**: replay arrows/annotations, JSON import, `/copy`, efficiency-mod origin controls, and other advanced review tools. Shared replay creation and turn-suggestion receive/UI are already implemented.
+2. **Tags and richer history/profile workflows**: Add/display tag UI exists; richer tag search/delete management, arbitrary-player history, and richer profile/best-score surfaces remain.
 3. **Product/account/bot surfaces**: multi-bot invite UI, account-management entry points, and optional linked-account UX.
-4. **Chat/presentation long tail**: unread/read/typing polish, sounds, reverse-hand preference, and other non-core presentation settings.
+4. **Chat/presentation long tail**: table-chat unread state and session PM dialogs now exist; typing/server-backed read-state, sounds, reverse-hand preference, and other non-core presentation settings remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), and same-seed Other Scores (#73). Spectator perspective switching is also now first-class in the live Game menu.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), and session PM Dialogs (#82/#83). Spectator perspective switching is also first-class in the live Game menu.
 
 The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
@@ -113,18 +113,19 @@ with general feature backlog. All three have since been resolved:
 Recently completed high-value parity work:
 - spectator perspective / player shadow selector;
 - colorblind + styled-number card presentation;
-- People/Pregame contextual Message and Friend/Unfriend actions;
+- People/Pregame/live-game contextual Friend/Unfriend and session PM Dialog actions;
 - compact Pregame player stats and spectator list;
 - random table-name parity and friend-aware Lobby discovery;
-- Friends history and same-seed Other Scores.
+- Friends history and same-seed Other Scores;
+- game tag display/Add flow;
+- shared replay creation from History and turn-suggestion receive/UI;
+- live table-chat unread state and direct `/r` submission handling.
 
 The highest-value remaining items are:
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
-| Game/replay tags workflow | Command/data support | S–M | Medium | History already carries tags and raw tag commands work; the missing piece is a first-class mobile workflow. |
-| Shared replay creation from History | Missing | S–M | Medium | Solo database replay creation exists; shared visibility is the remaining History action. |
-| Shared-replay turn suggestion receive/UI | Partial | S–M | Medium | Send path exists, but suggestion receive/presentation is incomplete. |
+| Richer tag management/search/delete | Partial | S–M | Medium | Add/display UI is implemented; structured search/delete/list management remains. |
 | Add several bots during Create/Pregame | Missing | M | Medium–High | Existing join semantics are sufficient; registry must use verified per-bot capabilities. |
 | Arbitrary JSON replay import | Missing | M | Medium | Useful for research/bots; current upstream expanded JSON seed/deck/player-name semantics. |
 | Hypothetical morph UI | Wire/state-only | M | Medium | Reducers/rendering understand morph/unmorph, but mobile cannot originate one. |
@@ -1016,7 +1017,10 @@ A useful way to describe current parity is:
 - supported option/variant rules;
 - generated upstream card presentation with colorblind/styled-number server settings;
 - own History, Friends history, and same-seed Other Scores;
-- People/Pregame contextual friend/message actions and compact Pregame stats;
+- People/Pregame/live-game contextual friend/session-PM actions and compact Pregame stats;
+- shared replay creation and turn-suggestion receive/UI;
+- game tag display/Add flow;
+- live table-chat unread state and direct `/r` handling;
 - core chat and most command transport.
 
 ### Functionally present but product-incomplete
@@ -1042,11 +1046,11 @@ A useful way to describe current parity is:
 
 - broader account-management/settings beyond the implemented card appearance settings;
 - rich profiles and arbitrary-player history beyond existing People/context actions;
-- first-class game/replay tags workflow;
-- shared replay creation from History;
+- richer tag search/delete/management beyond the current Add/display flow;
 - JSON import/export;
+- replay arrows/annotations/sounds and other advanced review tools;
 - sounds and reverse-hand preference;
-- typing/read/unread chat polish;
+- server-backed typing/read-state chat polish;
 - bot picker.
 
 That distinction matters: most remaining high-value work does **not** require a second Hanabi engine
@@ -1054,18 +1058,17 @@ or a protocol rewrite.
 
 ## Final recommendation
 
-Wait for the current beta.1 feedback window before merging large runtime changes.
+During the beta.2 tester window, keep runtime work in isolated slices so tester-confirmed defects can still be hotfixed without unrelated churn.
 
 For the current feature cycle, the most defensible order is:
 
-1. fix any tester-confirmed runtime defects;
-2. finish the first-class game/replay tags workflow;
-3. add shared replay creation from History;
-4. complete useful shared-review power tools such as suggestion receive/UI;
-5. add the multi-bot Create/Pregame picker;
-6. tackle JSON/`copy` and other replay power features deliberately;
-7. expand profiles/account/social/settings only where mobile context adds value;
-8. only then consider expensive exotic rules/options.
+1. fix any tester-confirmed beta.2 runtime defects;
+2. complete low-risk account-management UX without storing credentials;
+3. add the multi-bot Create/Pregame picker from the already-researched authoritative PM flow;
+4. improve richer tag search/delete management and selected Pregame command conveniences;
+5. tackle JSON/`copy` and advanced replay power features deliberately;
+6. expand profiles/social/settings only where mobile context adds value;
+7. only then consider expensive exotic rules/options.
 
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped
@@ -1101,7 +1104,7 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/timeleft` | **Full through fallback** | server chat command | Proactive shutdown UI is separately missing. | S | Low |
 | `/uptime` | **Full through fallback** | server chat command | No native UI needed. | — | Low |
 | `/pm [username] [msg]` | **Full command path + contextual UI** | direct `chatPM` | People/Pregame expose a contextual Message action; richer conversation UX remains optional. | — | Medium |
-| `/r [msg]` | **Partial** | input rewrite to `/pm` | Normal typed `/r ` works; direct paste/submit `/r hello` hits the incomplete local handler and fails. | XS | Low |
+| `/r [msg]` | **Full command path** | direct reply handler using authoritative last PM sender | Typed and directly submitted `/r <message>` both reuse the existing PM validation/send path. | — | Low |
 | `/friend [username]` | **Full command path + contextual UI** | direct `chatFriend` | People/Pregame expose Friend action backed by authoritative snapshots. | — | Medium |
 | `/friends` | **Full command path + People surface** | local list from authoritative friends state | People and friend-aware Lobby/History surfaces use the same authoritative state. | — | Medium |
 | `/unfriend [username]` | **Full command path + contextual UI** | direct `chatUnfriend` | People/Pregame expose Unfriend action without optimistic mutation. | — | Medium |
@@ -1128,11 +1131,11 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/pause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Native UI already covers ordinary pause/queue behavior. | — | Medium |
 | `/unpause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Already covered. | — | Medium |
 | `/terminate` | **Full + native UI** | termination runtime | Already covered. | — | Medium |
-| `/tag [tag]` | **Full command path** | direct `tag` | First-class game/replay tags workflow missing. | S–M | Medium |
+| `/tag [tag]` | **Full command path + native Add action** | direct `tag` | Game menu exposes first-class Add tag; richer search/delete management remains. | S | Medium |
 | `/copy` | **Missing** | browser-local upstream command | Mobile fallback sends text to server, which cannot perform the browser-local copy/export behavior. Needs replay JSON/share implementation. | M | Medium |
-| `/suggest [turn]` | **Partial** | direct `tableSuggest` send | Receive-side `suggestion` event/UI is missing, so mobile review interoperability is incomplete. | S–M | Medium |
+| `/suggest [turn]` | **Full shared-review flow** | direct `tableSuggest` send + authoritative `suggestion` receive/UI | Mobile can send and receive turn suggestions; leader-side Accept/Dismiss uses existing replay navigation. | — | Medium |
 | `/tagdelete [tag]` | **Full command path** | direct `tagDelete` | Structured tags UI missing. | S–M | Medium |
-| `/tags` | **Full through fallback** | server replay command | Returns text; structured tag list missing. | S–M | Medium |
+| `/tags` | **Full through fallback** | server replay command | Returns text; first-class tag display exists in History surfaces, while richer structured management remains. | S | Medium |
 | `/tagsdeleteall` | **Full command path** | direct `tagsDeleteAll` | Structured confirmation/UI missing. | S | Medium |
 
 ### Command aliases implemented beyond the documentation
