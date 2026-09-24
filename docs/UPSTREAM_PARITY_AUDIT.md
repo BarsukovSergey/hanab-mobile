@@ -131,7 +131,6 @@ The highest-value remaining items are:
 | Hypothetical morph UI | Wire/state-only | M | Medium | Reducers/rendering understand morph/unmorph, but mobile cannot originate one. |
 | `/copy` replay export | Missing | M | Medium | Browser-local upstream behavior needs a deliberate mobile export/share implementation. |
 | Rich player profile / arbitrary-player history | Partial | M–L | Medium | People/context actions exist; richer profile/history presentation does not. |
-| Account-management UX | Partial | S–M | Medium | Login/session work; change/reset password and broader settings surfaces remain. |
 | Chat unread/read/typing polish | Partial | S–M | Low–Medium | Core chat works; discovery/read-state polish remains. |
 
 ---
@@ -143,9 +142,9 @@ The highest-value remaining items are:
 | Login using existing hanab.live account | **Full** | — | Critical | Uses platform-owned cookies, verifies `/test-cookie`, then requires realtime `welcome`. |
 | Session persistence across relaunch | **Full by platform session** | — | High | No app password persistence is needed. |
 | Logout | **Full** | — | High | Network/session teardown is explicit and conservative. |
-| Account creation | **Full semantics, unclear UX** | XS | Medium | Upstream has no separate register endpoint: an unknown username submitted to `/login` creates an account. Mobile uses the same endpoint, so creation works, but its screen says only “Use your hanab.live account” and does not explain this behavior or the unique-password warning. |
-| Change password | **Missing UI/protocol field** | S | Medium | Upstream login supports `newPassword`; mobile `submitLogin` does not expose/send it. |
-| Password reset | **Missing UI** | XS–S | Medium | Upstream exposes `/password-reset`; mobile has no entry point. |
+| Account creation | **Full** | — | Medium | Upstream has no separate register endpoint: an unknown username submitted to `/login` creates an account. Mobile now explains this behavior and preserves the unique-password warning. |
+| Change password | **Full** | — | Medium | Settings uses the authenticated username plus transient current/new password fields and sends upstream-compatible `newPassword` through `/login`; password values are not stored in Redux/application state. |
+| Password reset | **Full entry point** | — | Medium | Login and Settings open the authoritative upstream `/password-reset` page; mobile does not invent a separate recovery protocol. |
 | First-time tutorial (`firstTimeUser`) | **Missing** | M | Low–Medium | Field is sent in `welcome` but intentionally dropped by mobile schema. |
 | Account mute state (`muted`) | **Missing UI** | XS–S | Low | Server remains authoritative and can reject chat; mobile does not pre-explain mute state. |
 | Server shutdown / maintenance metadata | **Missing UI** | S | Medium | `shuttingDown`, `datetimeShutdownInit`, `maintenanceMode` are dropped from `welcome`. |
@@ -1044,7 +1043,7 @@ A useful way to describe current parity is:
 
 ### Missing largely because mobile has not built the product surface yet
 
-- broader account-management/settings beyond the implemented card appearance settings;
+- broader account/settings beyond the implemented login clarification, password change/reset entry points, and card appearance settings;
 - rich profiles and arbitrary-player history beyond existing People/context actions;
 - richer tag search/delete/management beyond the current Add/display flow;
 - JSON import/export;
@@ -1063,12 +1062,11 @@ During the beta.2 tester window, keep runtime work in isolated slices so tester-
 For the current feature cycle, the most defensible order is:
 
 1. fix any tester-confirmed beta.2 runtime defects;
-2. complete low-risk account-management UX without storing credentials;
-3. add the multi-bot Create/Pregame picker from the already-researched authoritative PM flow;
-4. improve richer tag search/delete management and selected Pregame command conveniences;
-5. tackle JSON/`copy` and advanced replay power features deliberately;
-6. expand profiles/social/settings only where mobile context adds value;
-7. only then consider expensive exotic rules/options.
+2. add the multi-bot Create/Pregame picker from the already-researched authoritative PM flow;
+3. improve richer tag search/delete management and selected Pregame command conveniences;
+4. tackle JSON/`copy` and advanced replay power features deliberately;
+5. expand profiles/social/settings only where mobile context adds value;
+6. only then consider expensive exotic rules/options.
 
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped

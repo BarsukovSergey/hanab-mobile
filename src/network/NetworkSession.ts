@@ -74,14 +74,19 @@ export class HanabNetworkSession implements NetworkSession {
     }
   }
 
-  async submitLogin(username: string, password: string): Promise<void> {
+  async submitLogin(username: string, password: string, newPassword?: string): Promise<void> {
+    const fields: Record<string, string> = { username, password, version: 'bot' };
+    if (newPassword !== undefined && newPassword.length > 0) {
+      fields.newPassword = newPassword;
+    }
+
     let response: Response;
     try {
       response = await boundedFetch(`${HANAB_HTTP_BASE_URL}/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: encodeForm({ username, password, version: 'bot' }),
+        body: encodeForm(fields),
       });
     } catch (error) {
       throw new NetworkRequestError({
