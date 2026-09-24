@@ -83,4 +83,5 @@ npm test
 - Testers: start with [`TESTING.md`](./TESTING.md).
 - Beta.2 release notes: [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
 - Android beta build/release guidance: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
+- Product roadmap: [`docs/PRODUCT_ROADMAP.md`](./docs/PRODUCT_ROADMAP.md).
 - Maintainers: [`docs/README.md`](./docs/README.md) is the documentation map and marks current authority versus historical snapshots.
