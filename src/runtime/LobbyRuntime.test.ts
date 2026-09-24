@@ -170,6 +170,7 @@ function createdPregameFrame(
   name = 'Mobile table',
   options: Record<string, unknown> = tableOptions,
   maxPlayers = 5,
+  passwordProtected = false,
 ): string {
   return `game ${JSON.stringify({
     tableID,
@@ -183,7 +184,7 @@ function createdPregameFrame(
       stats: pregameStats,
     })),
     options,
-    passwordProtected: false,
+    passwordProtected,
     maxPlayers,
   })}`;
 }
@@ -290,6 +291,17 @@ describe('bot invites', () => {
     expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(false);
     expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret')).toBe(true);
     expect(JSON.stringify(store.getState())).not.toContain('private-secret');
+  });
+
+  test('protected room refuses bot PMs even when the bot is online', async () => {
+    const { socket, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
+    socket.emitMessage('joined {"tableID":321}');
+    expect(runtime.inviteBots(321, ['jabot1'])).toBe(0);
+    expect(invites(socket.sent)).toHaveLength(0);
   });
 });
 

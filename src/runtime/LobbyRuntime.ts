@@ -539,7 +539,8 @@ export class LobbyRuntime {
       || state.history.pendingReplayCreate !== null
       || bots.length > maxPlayers - 1
       || new Set(bots.map(normalizedBotName)).size !== bots.length
-      || bots.some((name) => !knownBots.some((bot) => normalizedBotName(bot.username) === normalizedBotName(name) && (!password || bot.passwordJoin)))
+      || (password.length > 0 && bots.length > 0)
+      || bots.some((name) => !knownBots.some((bot) => normalizedBotName(bot.username) === normalizedBotName(name)))
     ) return false;
 
     let frame: string;

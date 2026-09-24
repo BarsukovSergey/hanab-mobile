@@ -36,3 +36,11 @@ export function isBotAtTable(name: string, players: readonly { name: string }[])
 export function freeBotSlots(maxPlayers: number, playerCount: number): number {
   return Math.max(0, maxPlayers - playerCount);
 }
+
+export function isBotPickerDisabled(checked: boolean, eligible: boolean, atCapacity: boolean): boolean {
+  return !checked && (!eligible || atCapacity);
+}
+
+export function isBotAvailableForTable(online: boolean, present: boolean, protectedTable: boolean): boolean {
+  return online && !present && !protectedTable;
+}

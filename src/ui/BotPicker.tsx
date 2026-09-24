@@ -1,6 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { freeBotSlots, isBotAtTable, isBotOnline, knownBots } from '../config/knownBots';
+import {
+  freeBotSlots,
+  isBotAtTable,
+  isBotOnline,
+  isBotPickerDisabled,
+  isBotAvailableForTable,
+  knownBots,
+} from '../config/knownBots';
 import type { LobbyUser } from '../protocol/lobbyProtocol';
 import { useHanabTheme } from './designSystem';
 
@@ -21,8 +28,9 @@ export function BotPicker({ selected, onChange, limit, users, players = [], prot
         const online = isBotOnline(bot.username, users);
         const present = isBotAtTable(bot.username, players);
         const checked = selected.some((name) => name.toLowerCase() === bot.username.toLowerCase());
-        const unsupported = protectedTable && !bot.passwordJoin;
-        const disabled = !online || present || unsupported || (!checked && selected.length >= capacity);
+        const unsupported = protectedTable;
+        const eligible = isBotAvailableForTable(online, present, protectedTable);
+        const disabled = isBotPickerDisabled(checked, eligible, selected.length >= capacity);
         return (
           <Pressable key={bot.username} accessibilityRole="checkbox"
             accessibilityState={{ checked, disabled }} disabled={disabled}
