@@ -2,7 +2,7 @@
 
 Date: **2026-09-24**
 
-Status: **APK built successfully; physical-device smoke pending**
+Status: **prerelease published and APK distributed to testers; physical-device smoke not formally recorded**
 
 ## Frozen candidate
 
@@ -89,8 +89,9 @@ Report the build version, device model, Android version and the first point wher
 
 ## Distribution record
 
-The APK exists and its identity is frozen above.
+- GitHub prerelease: `v1.0.0-beta.2`
+- prerelease published: **2026-09-24**
+- APK distributed to testers: **2026-09-24**
+- runtime candidate and APK identity remain frozen exactly as recorded above
 
-**Not yet marked ready for broad tester distribution:** physical upgrade-over-beta.1 and clean-install smoke have not been recorded as completed.
-
-Once physical smoke is complete, record the distribution date here without changing the candidate SHA or APK hash.
+Physical upgrade-over-beta.1 and clean-install smoke have **not** been formally recorded as completed. Treat tester feedback against the frozen build identity above; do not replace the distributed APK under the same version/hash.
