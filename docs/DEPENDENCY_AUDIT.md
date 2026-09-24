@@ -110,22 +110,18 @@ forward, but the current npm audit does not report additional security findings 
 `uuid@7.0.3` is also deprecated and is the package behind the current moderate security advisory.
 Treat it with the upstream plan above rather than as a separate independent task.
 
-## GitHub Actions deprecation warnings
+## GitHub Actions maintenance
 
-CI currently uses:
+The repository workflows use the current supported majors:
 
-- `actions/checkout@v4`;
-- `actions/setup-node@v4`.
+- `actions/checkout@v7`;
+- `actions/setup-node@v7`.
 
-GitHub now runs those action internals under Node 24 while warning that their Node 20 action runtime
-is deprecated. The same early action phase also emits `punycode` and `url.parse()` deprecation
-warnings before project dependencies are installed.
+This is CI-only maintenance and does not change the Hanab Mobile runtime or npm dependency graph.
+The workflows continue to request Node 24 explicitly and use their existing npm cache configuration.
 
-These warnings are CI-action maintenance, not Hanab Mobile runtime warnings.
-
-A later CI-only maintenance PR should evaluate moving both actions to their current supported major
-versions after reviewing their release notes. This can be done independently from the Expo/npm
-dependency work.
+Keep GitHub Actions upgrades separate from Expo/npm dependency remediation so build-infrastructure
+changes remain easy to validate and revert independently.
 
 ## Recommended maintenance order
 
@@ -139,7 +135,7 @@ During the active beta.1 tester window:
 
 After the feedback window, or when preparing a deliberate maintenance slice:
 
-1. update the low-risk GitHub Actions majors in a CI-only PR;
+1. keep the now-updated GitHub Actions majors current in isolated CI-only maintenance slices;
 2. check the newest compatible Expo SDK-57 patch set and re-run both audit commands;
 3. if the published Expo/xcode chain has adopted the upstream uuid removal, take that compatible
    update and verify Android prebuild/release build;
