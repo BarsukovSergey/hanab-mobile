@@ -57,6 +57,38 @@ describe('HanabNetworkSession HTTP timeouts', () => {
   });
 });
 
+describe('HanabNetworkSession login', () => {
+  test('sends the normal login payload without a new password', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200 } as Response);
+
+    await new HanabNetworkSession().submitLogin('user name', 'old pass');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hanab.live/login',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: 'username=user+name&password=old+pass&version=bot',
+      }),
+    );
+  });
+
+  test('adds newPassword only for an explicit password change', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200 } as Response);
+
+    await new HanabNetworkSession().submitLogin('user', 'old password', 'new password');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hanab.live/login',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: 'username=user&password=old+password&version=bot&newPassword=new+password',
+      }),
+    );
+  });
+});
+
 describe('HanabNetworkSession logout', () => {
   test('uses credentialed GET and allows the caller to verify the missing session', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch')

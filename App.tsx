@@ -4,6 +4,7 @@ import {
   AppState,
   BackHandler,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { HANAB_PASSWORD_RESET_URL } from './src/config/hanab';
 import { chatRuntime, lobbyRuntime, networkSession } from './src/runtime/application';
 import { lobbyActions } from './src/store/lobbySlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
@@ -162,6 +164,14 @@ function AppContent() {
     roomState.pendingUnattendTableID, roomState.rematchTransition,
     roomState.room, session.phase,
   ]);
+
+  const openPasswordReset = async () => {
+    try {
+      await Linking.openURL(HANAB_PASSWORD_RESET_URL);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Could not open the password reset page.');
+    }
+  };
 
   const submitLogin = async () => {
     setLoginPending(true);
@@ -422,14 +432,16 @@ function AppContent() {
       <Panel style={styles.loginCard}>
         <View style={styles.loginIntro}>
           <Text style={[styles.loginEyebrow, { color: theme.colors.accent }]}>HANAB</Text>
-          <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in to play</Text>
-          <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use your hanab.live account.</Text>
+          <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in or create account</Text>
+          <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use an existing hanab.live username, or enter a new username to create an account automatically.</Text>
         </View>
         {statusMessage.length > 0 && <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>}
+        <Notice>Use a password unique to hanab.live. Do not reuse a password from another site.</Notice>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
         <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
           title={loginPending ? 'Logging in…' : 'Login'} tone="primary" onPress={() => void submitLogin()} />
+        <ActionButton title="Forgot password?" tone="ghost" onPress={() => void openPasswordReset()} />
       </Panel>
     );
   } else if (probe === 'indeterminate') {

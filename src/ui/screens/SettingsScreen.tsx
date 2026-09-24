@@ -1,25 +1,113 @@
 import { useState } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { lobbyRuntime } from '../../runtime/application';
+import { HANAB_PASSWORD_RESET_URL } from '../../config/hanab';
+import { lobbyRuntime, networkSession } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
-import { ActionButton, Panel, SectionHeading, ThemeSwitcher, useHanabTheme } from '../designSystem';
+import { ActionButton, Field, Notice, Panel, SectionHeading, ThemeSwitcher, useHanabTheme } from '../designSystem';
 import { GameplayScenarioGallery } from '../game/scenarios/GameplayScenarioGallery';
+
+type AccountNotice = { tone: 'error' | 'success'; message: string };
 
 export function SettingsScreen({ onBack }: { onBack: () => void }) {
   const [scenarioGalleryOpen, setScenarioGalleryOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordPending, setPasswordPending] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<AccountNotice | null>(null);
   const presentation = useAppSelector((state) => state.session.cardPresentationSettings);
+  const authenticatedUsername = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
   const { theme } = useHanabTheme();
+
+  const clearPasswordFields = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+  };
+
+  const submitPasswordChange = async () => {
+    if (authenticatedUsername === null) {
+      setAccountNotice({ tone: 'error', message: 'Your authenticated username is unavailable.' });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setAccountNotice({ tone: 'error', message: 'New passwords do not match.' });
+      return;
+    }
+
+    setPasswordPending(true);
+    setAccountNotice(null);
+    try {
+      await networkSession.submitLogin(authenticatedUsername, currentPassword, newPassword);
+      clearPasswordFields();
+      setChangePasswordOpen(false);
+      setAccountNotice({ tone: 'success', message: 'Password changed.' });
+    } catch (error) {
+      clearPasswordFields();
+      setAccountNotice({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Password change failed.',
+      });
+    } finally {
+      setPasswordPending(false);
+    }
+  };
+
+  const openPasswordReset = async () => {
+    try {
+      await Linking.openURL(HANAB_PASSWORD_RESET_URL);
+    } catch (error) {
+      setAccountNotice({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Could not open the password reset page.',
+      });
+    }
+  };
 
   if (__DEV__ && scenarioGalleryOpen) {
     return <GameplayScenarioGallery onBack={() => setScenarioGalleryOpen(false)} />;
   }
+
+  const passwordMismatch = confirmNewPassword.length > 0 && newPassword !== confirmNewPassword;
+  const passwordChangeDisabled = passwordPending
+    || currentPassword.length === 0
+    || newPassword.length === 0
+    || confirmNewPassword.length === 0
+    || passwordMismatch;
 
   return <View style={styles.screen}>
     <View style={styles.header}>
       <SectionHeading title="Settings" detail="App preferences." />
       <ActionButton compact title="Back" onPress={onBack} />
     </View>
+    <Panel>
+      <SectionHeading
+        title="Account"
+        detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Passwords are never stored by Hanab Mobile.`}
+      />
+      {accountNotice !== null && <Notice tone={accountNotice.tone}>{accountNotice.message}</Notice>}
+      {changePasswordOpen ? <>
+        <Notice>Use a password unique to hanab.live. Do not reuse a password from another site.</Notice>
+        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setCurrentPassword} placeholder="Current password" secureTextEntry value={currentPassword} />
+        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setNewPassword} placeholder="New password" secureTextEntry value={newPassword} />
+        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setConfirmNewPassword} placeholder="Confirm new password" secureTextEntry value={confirmNewPassword} />
+        {passwordMismatch && <Notice tone="error">New passwords do not match.</Notice>}
+        <ActionButton disabled={passwordChangeDisabled} title={passwordPending ? 'Changing password…' : 'Change password'} tone="primary" onPress={() => void submitPasswordChange()} />
+        <ActionButton disabled={passwordPending} title="Cancel" tone="ghost" onPress={() => {
+          clearPasswordFields();
+          setAccountNotice(null);
+          setChangePasswordOpen(false);
+        }} />
+      </> : <>
+        <ActionButton title="Change password" onPress={() => {
+          setAccountNotice(null);
+          setChangePasswordOpen(true);
+        }} />
+        <ActionButton title="Forgot password?" tone="ghost" onPress={() => void openPasswordReset()} />
+      </>}
+    </Panel>
     <Panel>
       <SectionHeading title="Appearance" detail="Choose how Hanab follows the device theme." />
       <ThemeSwitcher />

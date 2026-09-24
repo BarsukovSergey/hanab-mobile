@@ -41,7 +41,6 @@ These items were explicitly removed from the C17 release gate during product rev
 
 - **Native controls for useful slash-command actions:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. People/Pregame/live-game contexts already expose Friend/Unfriend and session Dialog actions; shared-replay turn suggestions and Add tag also have first-class UI. Remaining candidates include pregame kick and selected score/variant helpers where structured mobile context improves on command typing. Existing leader/variant/pause/termination controls remain first-class UI. Preserve slash-command support as the parity/fallback path.
 - **Simple bot invite UI:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. Use a **multi-select** bot picker in Create table so the creator can choose several bots up to available player capacity. Back it with an explicit registry of verified bot usernames **and per-bot invite capabilities**: the official reference bot only demonstrates open-table `/join`, while maintained community bots may also support `/join <password>`. For a newly created protected table, reuse the still-transient create-form password only for selected bots whose verified capability set includes protected-table join; visibly disable incompatible bots instead of guessing. Keep the same multi-select `Add bot` action in Pregame for existing tables. Do not persist table passwords or create a bot-only protocol.
-- **Account-management UX:** clarify on the login screen that a new username creates an account (matching upstream), preserve the unique-password warning, and provide deliberate Change password / Forgot password entry points without storing credentials in app state.
 - Rich/compact profiles beyond the existing People/context-action surfaces.
 - Broader friends/social UX beyond current People/Friend actions, friend-aware Lobby ordering, Friends history, Other Scores, and session PM Dialogs.
 - **Chat presence/read-state polish:** local live-table unread counts already exist without server read receipts. Future work may research typing indicators or richer read-state semantics only if authoritative server/client capability is worth exposing on mobile.
@@ -78,6 +77,7 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Spectator perspective switching between all hands and an authoritative player shadow seat.
 - Colorblind and styled-number card presentation using generated pinned-upstream assets and server settings.
 - People/Pregame/live-game contextual session Dialog and Friend/Unfriend actions, plus friend-aware Lobby ordering.
+- Account creation is explicit on the login screen; Change password and Forgot password entry points preserve the no-credential-storage boundary.
 - Compact authoritative Pregame player stats and spectator list.
 - Own History, Friends history, and same-seed Other Scores comparison.
 - Authoritative game tag display and first-class Add tag action.
