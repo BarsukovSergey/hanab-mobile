@@ -544,6 +544,24 @@ describe('deterministic lobby runtime', () => {
     ]);
   });
 
+  test('pregame native helper commands use ordinary table chat frames', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob'], 321));
+    socket.emitMessage('joined {"tableID":321}');
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/kick Bob')).toBe(true);
+    expect(chat.submit('/findvariant')).toBe(true);
+    expect(chat.submit('/missing')).toBe(true);
+
+    expect(socket.sent.slice(-3)).toEqual([
+      'chat {"msg":"/kick Bob","room":"table321"}',
+      'chat {"msg":"/findvariant","room":"table321"}',
+      'chat {"msg":"/missing","room":"table321"}',
+    ]);
+  });
+
   test('termination slash commands use the termination runtime without raw-chat fallback', async () => {
     const { socket, store, runtime } = await makeLiveRuntime('player');
     const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);

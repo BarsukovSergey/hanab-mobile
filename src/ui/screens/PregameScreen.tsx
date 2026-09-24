@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
-import { lobbyRuntime } from '../../runtime/application';
+import { chatRuntime, lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { ChatPanel } from '../ChatPanel';
 import { UserContextActions } from '../UserContextActions';
@@ -54,6 +54,9 @@ export function PregameScreen() {
   const isOwner = room.role === 'player' && session.authenticatedUser?.userID === room.data.owner;
   const canTakeLeadership = room.role === 'player' && !isOwner;
   const roleSwitchPending = roomState.pendingRoleSwitch !== null;
+  const roomTransitionPending = roleSwitchPending
+    || roomState.pendingLeaveTableID !== null
+    || roomState.pendingStart !== null;
   const canSwitchToSpectator = room.role === 'player' && room.data.players.length >= 2;
   const canJoinAsPlayer = room.role === 'spectator' && room.data.players.length < room.data.maxPlayers;
   const spectators = roomState.pregameSpectators?.tableID === room.tableID
@@ -115,10 +118,51 @@ export function PregameScreen() {
                       username={player.name}
                       isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
                       room={`table${room.tableID}`}
-                    />
+                    >
+                      {isOwner && (
+                        <ActionButton
+                          compact
+                          disabled={roomTransitionPending}
+                          title="Kick"
+                          tone="danger"
+                          onPress={() => Alert.alert(
+                            `Kick ${player.name}?`,
+                            'They will be removed from this pregame and cannot rejoin this table.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Kick',
+                                style: 'destructive',
+                                onPress: () => { chatRuntime.submit(`/kick ${player.name}`); },
+                              },
+                            ],
+                          )}
+                        />
+                      )}
+                    </UserContextActions>
                   )}
                 </View>
               ))}
+            </View>
+            <View style={styles.teamTools}>
+              <SectionHeading
+                title="Team tools"
+                detail="Server-backed helpers. Results appear in pre-game chat."
+              />
+              <View style={styles.actionsRow}>
+                <ActionButton
+                  compact
+                  disabled={room.data.players.length < 2 || roomTransitionPending}
+                  title="Find variant"
+                  onPress={() => chatRuntime.submit('/findvariant')}
+                />
+                <ActionButton
+                  compact
+                  disabled={room.data.players.length < 2 || roomTransitionPending}
+                  title="Missing scores"
+                  onPress={() => chatRuntime.submit('/missing')}
+                />
+              </View>
             </View>
             <View style={styles.spectators}>
               <SectionHeading title="Spectators" detail={`${spectators.length}`} />
@@ -223,6 +267,7 @@ const styles = StyleSheet.create({
   columnsWide: { alignItems: 'flex-start', flexDirection: 'row' },
   column: { flex: 1, gap: 16, minWidth: 0 },
   players: { gap: 8 },
+  teamTools: { gap: 8, marginTop: 12 },
   spectators: { gap: 8, marginTop: 12 },
   spectatorRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
   roleSwitch: { gap: 10 },
