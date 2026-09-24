@@ -1,12 +1,11 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   freeBotSlots,
-  isBotAtTable,
-  isBotOnline,
-  isBotPickerDisabled,
+  getVisibleBotSections,
   isBotAvailableForTable,
-  knownBots,
+  pruneBotSelection,
 } from '../config/knownBots';
 import type { LobbyUser } from '../protocol/lobbyProtocol';
 import { useHanabTheme } from './designSystem';
@@ -21,30 +20,39 @@ export function BotPicker({ selected, onChange, limit, users, players = [], prot
 }) {
   const { theme } = useHanabTheme();
   const capacity = freeBotSlots(limit, 0);
+  const { available, busy } = getVisibleBotSections(users, players);
+
+  useEffect(() => {
+    const next = pruneBotSelection(selected, users, players, protectedTable, capacity);
+    if (next.length !== selected.length || next.some((name, index) => name !== selected[index])) onChange(next);
+  }, [selected, users, players, protectedTable, capacity, onChange]);
+
+  const renderBot = ({ bot, user }: (typeof available)[number]) => {
+    const checked = selected.some((name) => name.toLowerCase() === bot.username.toLowerCase());
+    const eligible = isBotAvailableForTable(user, bot, protectedTable);
+    const disabled = !eligible || (!checked && selected.length >= capacity);
+    return (
+      <Pressable key={bot.username} accessibilityRole="checkbox"
+        accessibilityState={{ checked, disabled }} disabled={disabled}
+        onPress={() => onChange(checked
+          ? selected.filter((name) => name.toLowerCase() !== bot.username.toLowerCase())
+          : [...selected, bot.username])}
+        style={[styles.row, { borderColor: theme.colors.border, opacity: disabled ? 0.5 : 1 }]}>
+        <Text style={{ color: theme.colors.text }}>{checked ? '☑' : '☐'} {bot.username}</Text>
+        <Text style={{ color: theme.colors.textMuted }}>
+          {user.status !== 0 ? 'Busy' : !eligible ? 'Password join unavailable' : 'Available'}
+        </Text>
+      </Pressable>
+    );
+  };
   return (
     <View style={styles.root}>
       <Text style={{ color: theme.colors.textMuted }}>Bots selected: {selected.length}/{capacity}</Text>
-      {knownBots.map((bot) => {
-        const online = isBotOnline(bot.username, users);
-        const present = isBotAtTable(bot.username, players);
-        const checked = selected.some((name) => name.toLowerCase() === bot.username.toLowerCase());
-        const unsupported = protectedTable;
-        const eligible = isBotAvailableForTable(online, present, protectedTable);
-        const disabled = isBotPickerDisabled(checked, eligible, selected.length >= capacity);
-        return (
-          <Pressable key={bot.username} accessibilityRole="checkbox"
-            accessibilityState={{ checked, disabled }} disabled={disabled}
-            onPress={() => onChange(checked
-              ? selected.filter((name) => name.toLowerCase() !== bot.username.toLowerCase())
-              : [...selected, bot.username])}
-            style={[styles.row, { borderColor: theme.colors.border, opacity: disabled ? 0.5 : 1 }]}>
-            <Text style={{ color: theme.colors.text }}>{checked ? '☑' : '☐'} {bot.username}</Text>
-            <Text style={{ color: theme.colors.textMuted }}>
-              {present ? 'At table' : unsupported ? 'Unavailable for private tables' : online ? 'Online' : 'Offline'}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {available.length + busy.length === 0 && <Text style={{ color: theme.colors.textMuted }}>No known bots online.</Text>}
+      {available.length > 0 && <Text style={{ color: theme.colors.text }}>Available</Text>}
+      {available.map(renderBot)}
+      {busy.length > 0 && <Text style={{ color: theme.colors.text }}>Busy</Text>}
+      {busy.map(renderBot)}
     </View>
   );
 }

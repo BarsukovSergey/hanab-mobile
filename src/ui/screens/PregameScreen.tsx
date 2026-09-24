@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
+import { freeBotSlots, pruneBotSelection } from '../../config/knownBots';
 import { chatRuntime, lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { userSelectors } from '../../store/store';
@@ -29,6 +30,7 @@ export function PregameScreen() {
   const users = useAppSelector(userSelectors.selectAll);
   const [selectedBots, setSelectedBots] = useState<string[]>([]);
   const [showBotPicker, setShowBotPicker] = useState(false);
+  const [botInvitePassword, setBotInvitePassword] = useState('');
   const [editName, setEditName] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState(5);
@@ -54,6 +56,28 @@ export function PregameScreen() {
       allOrNothing: room.data.options.allOrNothing,
     });
   }, [room?.data]);
+
+  useEffect(() => {
+    setSelectedBots([]);
+    setShowBotPicker(false);
+    setBotInvitePassword('');
+  }, [room?.tableID]);
+
+  useEffect(() => {
+    setSelectedBots((current) => {
+      const next = pruneBotSelection(current, users, room?.data.players ?? [],
+        room?.data.passwordProtected ?? false,
+        room === null ? 0 : freeBotSlots(room.data.maxPlayers, room.data.players.length));
+      return next.length === current.length && next.every((name, index) => name === current[index]) ? current : next;
+    });
+  }, [users, room?.data]);
+
+  useEffect(() => {
+    if (room === null || freeBotSlots(room.data.maxPlayers, room.data.players.length) === 0) {
+      setBotInvitePassword('');
+      setShowBotPicker(false);
+    }
+  }, [room?.tableID, room?.data.maxPlayers, room?.data.players.length]);
 
   if (room === null) return null;
   const isOwner = room.role === 'player' && session.authenticatedUser?.userID === room.data.owner;
@@ -152,13 +176,27 @@ export function PregameScreen() {
             </View>
             {freeSlots > 0 && (
               <View style={styles.teamTools}>
-                <ActionButton title="Add bot" onPress={() => { setSelectedBots([]); setShowBotPicker(!showBotPicker); }} />
+                <ActionButton title="Add bot" onPress={() => {
+                  setSelectedBots([]);
+                  setBotInvitePassword('');
+                  setShowBotPicker(!showBotPicker);
+                }} />
                 {showBotPicker && (
                   <>
                     <BotPicker selected={selectedBots} onChange={setSelectedBots} limit={freeSlots}
                       users={users} players={room.data.players} protectedTable={room.data.passwordProtected} />
-                    <ActionButton title="Invite selected bots" disabled={selectedBots.length === 0}
-                      onPress={() => { lobbyRuntime.inviteBots(room.tableID, selectedBots); setSelectedBots([]); setShowBotPicker(false); }} />
+                    {room.data.passwordProtected && (
+                      <Field autoCapitalize="none" autoCorrect={false} secureTextEntry
+                        placeholder="Table password" value={botInvitePassword} onChangeText={setBotInvitePassword} />
+                    )}
+                    <ActionButton title="Invite selected bots"
+                      disabled={selectedBots.length === 0 || (room.data.passwordProtected && botInvitePassword.length === 0)}
+                      onPress={() => {
+                        lobbyRuntime.inviteBots(room.tableID, selectedBots, botInvitePassword);
+                        setBotInvitePassword('');
+                        setSelectedBots([]);
+                        setShowBotPicker(false);
+                      }} />
                   </>
                 )}
               </View>

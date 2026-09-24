@@ -6,6 +6,7 @@ import type {
   SessionCheckResult,
 } from '../network/types';
 import type { LobbyTable } from '../protocol/lobbyProtocol';
+import { knownBots } from '../config/knownBots';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
@@ -215,9 +216,11 @@ async function makeReadyRuntime() {
 }
 
 describe('bot invites', () => {
-  const botUser = (userID: number, name: string) =>
-    `user ${JSON.stringify({ userID, name, status: 0, hyphenated: false, inactive: false })}`;
+  const botUser = (userID: number, name: string, status = 0) =>
+    `user ${JSON.stringify({ userID, name, status, hyphenated: false, inactive: false })}`;
   const invites = (sent: readonly string[]) => sent.filter((frame) => frame.startsWith('chatPM '));
+  const pendingPassword = (runtime: LobbyRuntime) =>
+    (runtime as unknown as { pendingBotCreate: { password: string } | null }).pendingBotCreate?.password;
 
   test.each(['game-first', 'joined-first'])('create waits for both events and invites once: %s', async (order) => {
     const { socket, store, runtime } = await makeReadyRuntime();
@@ -262,9 +265,10 @@ describe('bot invites', () => {
     const { session, socket, runtime } = await makeReadyRuntime();
     socket.emitMessage('userList []');
     socket.emitMessage(botUser(7, 'jabot1'));
-    expect(runtime.createTable('Mobile table', 5, 'No Variant', '', ['jabot1'])).toBe(true);
-    socket.emitMessage(createdPregameFrame());
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
     runtime.disconnect();
+    expect(pendingPassword(runtime)).toBeUndefined();
     const next = new FakeSocket();
     session.sockets.push(Promise.resolve(next));
     await runtime.connect();
@@ -286,14 +290,36 @@ describe('bot invites', () => {
     expect(invites(socket.sent)).toEqual(['chatPM {"msg":"/join","recipient":"jabot3","room":"table321"}']);
   });
 
-  test('a create password never enters Redux, and unverified bots cannot be selected', async () => {
-    const { store, runtime } = await makeReadyRuntime();
-    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(false);
-    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret')).toBe(true);
+  test.each(['game-first', 'joined-first'])('protected Create waits, invites once, and clears its secret: %s', async (order) => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'JaBoT1'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(true);
+    expect(pendingPassword(runtime)).toBe('private-secret');
     expect(JSON.stringify(store.getState())).not.toContain('private-secret');
+    const game = createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true);
+    const joined = 'joined {"tableID":321}';
+    socket.emitMessage(order === 'game-first' ? game : joined);
+    expect(invites(socket.sent)).toHaveLength(0);
+    socket.emitMessage(order === 'game-first' ? joined : game);
+    expect(invites(socket.sent)).toEqual([
+      'chatPM {"msg":"/join private-secret","recipient":"JaBoT1","room":"table321"}',
+    ]);
+    expect(pendingPassword(runtime)).toBeUndefined();
+    expect(JSON.stringify(store.getState())).not.toContain('private-secret');
+    const echo = {
+      msg: '/join private-secret', who: 'Ada', recipient: 'JaBoT1',
+      discord: false, server: false, datetime: '2026-09-01T10:00:00Z', room: '',
+    };
+    socket.emitMessage(`chat ${JSON.stringify(echo)}`);
+    socket.emitMessage(`chatList ${JSON.stringify({ list: [echo], unread: 0 })}`);
+    expect(JSON.stringify(store.getState())).not.toContain('private-secret');
+    socket.emitMessage(game);
+    socket.emitMessage(joined);
+    expect(invites(socket.sent)).toHaveLength(1);
   });
 
-  test('protected room refuses bot PMs even when the bot is online', async () => {
+  test('protected existing Pregame requires a password and sends the exact PM', async () => {
     const { socket, runtime } = await makeReadyRuntime();
     socket.emitMessage('userList []');
     socket.emitMessage(botUser(7, 'jabot1'));
@@ -301,7 +327,62 @@ describe('bot invites', () => {
     socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
     socket.emitMessage('joined {"tableID":321}');
     expect(runtime.inviteBots(321, ['jabot1'])).toBe(0);
-    expect(invites(socket.sent)).toHaveLength(0);
+    expect(runtime.inviteBots(321, ['jabot1'], 'table-secret')).toBe(1);
+    expect(invites(socket.sent)).toEqual([
+      'chatPM {"msg":"/join table-secret","recipient":"jabot1","room":"table321"}',
+    ]);
+  });
+
+  test('protected Pregame rejects a bot without password-join capability', async () => {
+    const { socket, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
+    socket.emitMessage('joined {"tableID":321}');
+    const bot = knownBots.find((entry) => entry.username === 'jabot1')!;
+    const capability = bot.passwordJoin;
+    bot.passwordJoin = false;
+    try {
+      expect(runtime.inviteBots(321, ['jabot1'], 'table-secret')).toBe(0);
+      expect(invites(socket.sent)).toHaveLength(0);
+    } finally {
+      bot.passwordJoin = capability;
+    }
+  });
+
+  test('Busy and departed bots are skipped while the later available bot is invited', async () => {
+    const { socket, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1', 3));
+    socket.emitMessage(botUser(8, 'jabot2'));
+    socket.emitMessage(botUser(9, 'jabot3'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame());
+    socket.emitMessage('joined {"tableID":321}');
+    socket.emitMessage('userLeft {"userID":8}');
+    expect(runtime.inviteBots(321, ['jabot1', 'jabot2', 'jabot3'])).toBe(1);
+    expect(invites(socket.sent)).toEqual([
+      'chatPM {"msg":"/join","recipient":"jabot3","room":"table321"}',
+    ]);
+  });
+
+  test('failed create, disconnect, and sign-out discard pending create passwords', async () => {
+    const failed = await makeReadyRuntime();
+    expect(failed.runtime.createTable('Mobile table', 5, 'No Variant', 'first-secret', ['jabot1'])).toBe(true);
+    failed.socket.emitMessage('warning {"warning":"Create failed"}');
+    expect(pendingPassword(failed.runtime)).toBeUndefined();
+
+    const disconnected = await makeReadyRuntime();
+    expect(disconnected.runtime.createTable('Mobile table', 5, 'No Variant', 'second-secret', ['jabot1'])).toBe(true);
+    disconnected.runtime.disconnect();
+    expect(pendingPassword(disconnected.runtime)).toBeUndefined();
+
+    const signedOut = await makeReadyRuntime();
+    expect(signedOut.runtime.createTable('Mobile table', 5, 'No Variant', 'third-secret', ['jabot1'])).toBe(true);
+    signedOut.session.sessionCheckResult = { kind: 'missing' };
+    await expect(signedOut.runtime.signOut()).resolves.toEqual({ kind: 'signedOut' });
+    expect(pendingPassword(signedOut.runtime)).toBeUndefined();
   });
 });
 

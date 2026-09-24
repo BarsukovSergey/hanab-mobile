@@ -5,9 +5,10 @@ const registryPath = fileURLToPath(new URL('../src/config/knownBots.ts', import.
 const args = process.argv.slice(2);
 const check = args.length === 1 && args[0] === '--check';
 const username = check ? null : args[0];
-const valid = args.length === 1;
+const passwordJoin = args[1] === '--password-join';
+const valid = args.length === 1 || (args.length === 2 && passwordJoin);
 if (!valid || (!check && (!username || !/^[A-Za-z0-9_-]+$/.test(username)))) {
-  console.error('Usage: npm run bot:add -- <username>');
+  console.error('Usage: npm run bot:add -- <username> [--password-join]');
   process.exit(1);
 }
 
@@ -24,7 +25,7 @@ if (!check) {
     console.error(`Bot already exists: ${username}`);
     process.exit(1);
   }
-  entries.push({ username, passwordJoin: false });
+  entries.push({ username, passwordJoin });
 }
 entries.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase(), 'en'));
 const lines = entries.map((entry) => `  { username: '${entry.username}', passwordJoin: ${entry.passwordJoin} },`).join('\n');

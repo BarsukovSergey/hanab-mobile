@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
+import { pruneBotSelection } from '../../config/knownBots';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { tableSelectors, userSelectors } from '../../store/store';
@@ -51,6 +52,12 @@ export function LobbyScreen({
   const roomState = useAppSelector((state) => state.room);
   const randomTableName = useAppSelector((state) => state.session.randomTableName);
   const friends = useAppSelector((state) => state.session.friends);
+  useEffect(() => {
+    setSelectedBots((current) => {
+      const next = pruneBotSelection(current, users, [], tablePassword.length > 0, maxPlayers - 1);
+      return next.length === current.length && next.every((name, index) => name === current[index]) ? current : next;
+    });
+  }, [users, tablePassword, maxPlayers]);
   const effectiveName = tableName.trim() || randomTableName?.trim() || '';
   const {
     yourRunningGames,
@@ -158,7 +165,7 @@ export function LobbyScreen({
               <Field
                 autoCapitalize="none"
                 autoCorrect={false}
-                onChangeText={(value) => { setTablePassword(value); if (value) setSelectedBots([]); }}
+                onChangeText={setTablePassword}
                 placeholder="Table password (optional)"
                 secureTextEntry
                 value={tablePassword}
