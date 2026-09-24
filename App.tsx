@@ -436,7 +436,7 @@ function AppContent() {
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use an existing hanab.live username, or enter a new username to create an account automatically.</Text>
         </View>
         {statusMessage.length > 0 && <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>}
-        <Notice>Use a password unique to hanab.live. Do not reuse a password from another site.</Notice>
+        <Notice>Use a new, unique password for hanab.live. Do not reuse one of your existing or previous passwords.</Notice>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
         <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
