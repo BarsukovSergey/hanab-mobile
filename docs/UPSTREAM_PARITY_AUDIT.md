@@ -198,8 +198,8 @@ PM, friend/unfriend, spectator perspective and bot discovery without changing th
 | Timed auto-start `/startin` | **Chat fallback only** | S | Low | Native countdown controls are optional. |
 | Split / splitauto | **Chat fallback only** | S–M | Low | Useful mainly for large community pregames. |
 | Find variant / missing scores helpers | **Chat fallback only** | S | Medium | Native pregame actions would be useful. |
-| Multi-bot invite during Create | **Missing; researched** | M | Medium–High | Use explicit verified bot registry + PM `/join [password]`. |
-| Multi-bot invite in Pregame | **Missing; researched** | M | Medium | Same picker, capped by current free seats. |
+| Multi-bot invite during Create | **Implemented for open tables** | M | Medium–High | Reconciled `game` + `joined` triggers one PM `/join` batch. |
+| Multi-bot invite in Pregame | **Implemented for open tables** | M | Medium | Picker is capped by current free seats. |
 
 ## Current upstream drift: spectator table deletion
 
@@ -764,10 +764,10 @@ spectate correctness.
 | Capability | Status | Effort | Importance | Notes |
 | --- | --- | ---: | ---: | --- |
 | Reference bot protocol compatibility | **Server-native** | — | Medium | Bots are ordinary users; no special bot API exists. |
-| Add bot by PM `/join` | Missing native UI | M | Medium–High | Already researched. |
-| Several bots at once | Missing native UI | M | Medium–High | Multi-select design recorded. |
-| Protected-table bot invite | Missing native UI | M | Medium | Reuse transient create password or re-request in existing table. |
-| Verified bot registry | Missing | S | Medium | Upstream reference bots do not define authoritative production usernames. |
+| Add bot by PM `/join` | Implemented for open tables | M | Medium–High | Uses existing `chatPM` transport. |
+| Several bots at once | Implemented for open tables | M | Medium–High | Create and Pregame use the same picker. |
+| Protected-table bot invite | Pending verification | M | Medium | Current registered accounts have no verified password-join capability. |
+| Known bot registry | Implemented | S | Medium | 19 exact supplied usernames; no server discovery or prefix detection. |
 | Arbitrary replay JSON import | Missing | M | Medium | Research/bot workflow. |
 | Replay JSON export | Missing | M | Medium | Needed for `/copy` parity. |
 | JSON URL compression/share format | Missing | M | Low–Medium | Current upstream now preserves seed metadata. |

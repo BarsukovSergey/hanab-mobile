@@ -213,6 +213,86 @@ async function makeReadyRuntime() {
   return { session, socket, store, runtime };
 }
 
+describe('bot invites', () => {
+  const botUser = (userID: number, name: string) =>
+    `user ${JSON.stringify({ userID, name, status: 0, hyphenated: false, inactive: false })}`;
+  const invites = (sent: readonly string[]) => sent.filter((frame) => frame.startsWith('chatPM '));
+
+  test.each(['game-first', 'joined-first'])('create waits for both events and invites once: %s', async (order) => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', '', ['jabot1'])).toBe(true);
+    expect(invites(socket.sent)).toHaveLength(0);
+    const first = order === 'game-first' ? createdPregameFrame() : 'joined {"tableID":321}';
+    const second = order === 'game-first' ? 'joined {"tableID":321}' : createdPregameFrame();
+    socket.emitMessage(first);
+    expect(invites(socket.sent)).toHaveLength(0);
+    socket.emitMessage(second);
+    expect(invites(socket.sent)).toEqual(['chatPM {"msg":"/join","recipient":"jabot1","room":"table321"}']);
+    socket.emitMessage(first);
+    socket.emitMessage(second);
+    expect(invites(socket.sent)).toHaveLength(1);
+    expect(store.getState().room.pendingCreate).toBeNull();
+  });
+
+  test('rechecks capacity and continues past offline or failed sends', async () => {
+    const { socket, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    socket.emitMessage(botUser(8, 'jabot2'));
+    socket.emitMessage(botUser(9, 'jabot3'));
+    expect(runtime.createTable('Mobile table', 3, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob'], 321, 'Mobile table', tableOptions, 3));
+    socket.emitMessage('joined {"tableID":321}');
+    const send = socket.send.bind(socket);
+    let failOnce = true;
+    socket.send = (frame) => {
+      if (failOnce) { failOnce = false; throw new Error('send failed'); }
+      send(frame);
+    };
+    expect(runtime.inviteBots(321, ['jabot1', 'jabot2', 'jabot3'])).toBe(1);
+    expect(invites(socket.sent)).toEqual(['chatPM {"msg":"/join","recipient":"jabot2","room":"table321"}']);
+    socket.emitMessage(createdPregameFrame(['Ada', 'Bob', 'jabot2'], 321, 'Mobile table', tableOptions, 3));
+    expect(runtime.inviteBots(321, ['jabot3'])).toBe(0);
+  });
+
+  test('disconnect removes pending create invitations', async () => {
+    const { session, socket, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', '', ['jabot1'])).toBe(true);
+    socket.emitMessage(createdPregameFrame());
+    runtime.disconnect();
+    const next = new FakeSocket();
+    session.sockets.push(Promise.resolve(next));
+    await runtime.connect();
+    next.emitOpen();
+    next.emitMessage(welcomeFrame);
+    next.emitMessage('joined {"tableID":321}');
+    expect(invites(next.sent)).toHaveLength(0);
+  });
+
+  test('offline and already seated bots do not stop an eligible invitation', async () => {
+    const { socket, runtime } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    socket.emitMessage(botUser(8, 'jabot3'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant')).toBe(true);
+    socket.emitMessage(createdPregameFrame(['Ada', 'jabot1']));
+    socket.emitMessage('joined {"tableID":321}');
+    expect(runtime.inviteBots(321, ['jabot1', 'jabot2', 'jabot3'])).toBe(1);
+    expect(invites(socket.sent)).toEqual(['chatPM {"msg":"/join","recipient":"jabot3","room":"table321"}']);
+  });
+
+  test('a create password never enters Redux, and unverified bots cannot be selected', async () => {
+    const { store, runtime } = await makeReadyRuntime();
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(false);
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret')).toBe(true);
+    expect(JSON.stringify(store.getState())).not.toContain('private-secret');
+  });
+});
+
 function addRunningTable(store: ReturnType<typeof createAppStore>, epoch = 1): void {
   store.dispatch(lobbyActions.tableReceived({ epoch, table: runningTable }));
 }

@@ -4,6 +4,8 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { chatRuntime, lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
+import { userSelectors } from '../../store/store';
+import { BotPicker } from '../BotPicker';
 import { ChatPanel } from '../ChatPanel';
 import { UserContextActions } from '../UserContextActions';
 import {
@@ -24,6 +26,9 @@ export function PregameScreen() {
   const session = useAppSelector((state) => state.session);
   const roomState = useAppSelector((state) => state.room);
   const room = roomState.room.kind === 'pregame' ? roomState.room : null;
+  const users = useAppSelector(userSelectors.selectAll);
+  const [selectedBots, setSelectedBots] = useState<string[]>([]);
+  const [showBotPicker, setShowBotPicker] = useState(false);
   const [editName, setEditName] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState(5);
@@ -61,6 +66,7 @@ export function PregameScreen() {
   const canJoinAsPlayer = room.role === 'spectator' && room.data.players.length < room.data.maxPlayers;
   const spectators = roomState.pregameSpectators?.tableID === room.tableID
     ? roomState.pregameSpectators.spectators : [];
+  const freeSlots = Math.max(0, room.data.maxPlayers - room.data.players.length);
 
   return (
     <View style={styles.root}>
@@ -144,6 +150,19 @@ export function PregameScreen() {
                 </View>
               ))}
             </View>
+            {freeSlots > 0 && (
+              <View style={styles.teamTools}>
+                <ActionButton title="Add bot" onPress={() => { setSelectedBots([]); setShowBotPicker(!showBotPicker); }} />
+                {showBotPicker && (
+                  <>
+                    <BotPicker selected={selectedBots} onChange={setSelectedBots} limit={freeSlots}
+                      users={users} players={room.data.players} protectedTable={room.data.passwordProtected} />
+                    <ActionButton title="Invite selected bots" disabled={selectedBots.length === 0}
+                      onPress={() => { lobbyRuntime.inviteBots(room.tableID, selectedBots); setSelectedBots([]); setShowBotPicker(false); }} />
+                  </>
+                )}
+              </View>
+            )}
             <View style={styles.teamTools}>
               <SectionHeading
                 title="Team tools"

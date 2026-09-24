@@ -2,7 +2,9 @@
 
 Date: 2026-09-22
 
-Status: research only. This document does not change runtime behavior or the distributed beta.1 APK.
+Status: research plus mobile implementation. The shipped picker uses the 19 exact usernames supplied for this feature. All currently have open-table `/join` only; password join remains unverified.
+
+Implementation: `src/config/knownBots.ts` is the maintained registry; `npm run bot:add -- <username>` adds an exact account and `npm run bot:check` checks sorting and case-insensitive uniqueness. Create collects multiple bots, waits for the reconciled `game` and `joined` room, and sends one invitation batch. Pregame rechecks authoritative capacity, attendance, and online users before each `/join` PM. No invite is replayed after a connection change. Protected tables currently disable every registry entry until its password capability is explicitly verified.
 
 ## Scope
 

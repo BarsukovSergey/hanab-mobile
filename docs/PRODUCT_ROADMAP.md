@@ -110,7 +110,7 @@ require redesigning core gameplay.
 
 ## Multi-bot Create/Pregame picker
 
-This is the best-prepared next feature slice.
+Implemented for open tables with a maintained 19-name registry and multi-select Create/Pregame controls. Protected-table invites await per-account password-join verification.
 
 Use the existing research in `COMMANDS_AND_BOTS_RESEARCH.md`:
 

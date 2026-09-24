@@ -31,13 +31,13 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;');
     expect(screen).toContain('accessibilityRole="button"');
     expect(screen).toContain('accessibilityState={{ selected }}');
-    expect(screen).toContain('onPress={() => setMaxPlayers(value)}');
+    expect(screen).toContain('setMaxPlayers(value)');
     expect(screen).not.toContain('stepperRow');
     expect(screen).not.toContain('stepperValue');
   });
 
   test('passes the selected maxPlayers unchanged to createTable', () => {
-    expect(screen).toContain('lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)');
+    expect(screen).toContain('lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword, selectedBots)');
   });
 
   test('uses authoritative friends for compact table context and running progress', () => {
