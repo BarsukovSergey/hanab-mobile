@@ -141,7 +141,7 @@ describe('C17 hypothetical seating and action-hand separation', () => {
     const hypotheticalComposer = screen.slice(hypotheticalClueStart, screen.indexOf('/> : canPlayGameplay', hypotheticalClueStart));
     const ordinaryComposer = screen.slice(ordinaryClueStart, screen.indexOf('/> : canPlayGameplay', ordinaryClueStart));
 
-    expect(hypotheticalComposer).toContain('\n            dense\n');
+    expect(hypotheticalComposer.replaceAll('\r\n', '\n')).toContain('\n            dense\n');
     expect(ordinaryComposer).toContain('dense={usesDenseSideLabels}');
   });
 });

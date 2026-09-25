@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,11 +22,18 @@ function executable(name) {
 }
 
 function run(command, args, cwd = ROOT) {
-  execFileSync(command, args, {
+  const needsShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+  const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
+    shell: needsShell,
   });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`${command} exited with status ${result.status ?? 'unknown'}`);
+  }
 }
 
 async function exists(target) {
