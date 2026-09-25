@@ -103,7 +103,7 @@ export function HistoryScreen({
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setTagInput} placeholder="Exact tag" value={tagInput} />
         <ActionButton compact title="Search" disabled={history.tagSearchPending || tagInput.trim() === ''}
           onPress={() => lobbyRuntime.searchTag(tagInput)} />
-        <ActionButton compact title="Clear search" tone="secondary" disabled={history.tagSearchItems === null && !history.tagSearchPending}
+        <ActionButton compact title="Clear search" tone="secondary" disabled={!history.tagSearchActive}
           onPress={() => lobbyRuntime.clearTagSearch()} />
       </Panel>}
 
@@ -112,7 +112,7 @@ export function HistoryScreen({
         && !history.tagSearchActive && history.taggedError === null
         && <Notice>Select Tagged games to load.</Notice>}
       {!comparing && showingTagged && history.tagSearchPending && <Notice>Searching for tag…</Notice>}
-      {!comparing && showingTagged && history.taggedError !== null && <Notice tone="error">{history.taggedError}</Notice>}
+      {!comparing && showingTagged && !history.tagSearchActive && history.taggedError !== null && <Notice tone="error">{history.taggedError}</Notice>}
       {!comparing && showingTagged && history.tagSearchActive && history.tagSearchError !== null
         && <Notice tone="error">{history.tagSearchError}</Notice>}
       {!comparing && !showingTagged && !initialPageReceived && <Notice>{showingFriends ? 'Loading friends history…' : 'Loading game history…'}</Notice>}

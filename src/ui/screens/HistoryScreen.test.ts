@@ -62,6 +62,12 @@ describe('History screen source contract', () => {
     expect(screen).toContain('!history.tagSearchActive && history.taggedLoaded');
   });
 
+  test('keeps failed searches clearable and hides Tagged Games errors until search is cleared', () => {
+    expect(screen).toContain('title="Clear search" tone="secondary" disabled={!history.tagSearchActive}');
+    expect(screen).toContain('showingTagged && !history.tagSearchActive && history.taggedError !== null');
+    expect(screen).toContain('history.tagSearchActive && history.tagSearchError !== null');
+  });
+
   test('resets selection to My history on an empty friends list without auto-selecting on re-add', () => {
     expect(screen).toMatch(/useEffect\(\(\) => \{[\s\S]*?session\.friends\.length === 0[\s\S]*?selection\.mode === 'friends'[\s\S]*?setSelection\(\{ epoch: session\.connectionEpoch, mode: 'mine' \}\);[\s\S]*?\}, \[selection, session\.connectionEpoch, session\.friends\.length\]\);/);
     expect(screen).toContain("const showingFriends = mode === 'friends' && session.friends.length > 0;");
