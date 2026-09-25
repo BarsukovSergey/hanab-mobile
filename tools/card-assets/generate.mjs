@@ -112,7 +112,10 @@ async function assertDirectoriesEqual(expectedDir, actualDir) {
       readFile(path.join(expectedDir, relative)),
       readFile(path.join(actualDir, relative)),
     ]);
-    if (!expected.equals(actual)) {
+    const filesMatch = relative.endsWith('.json')
+      ? expected.toString('utf8').replace(/\r\n/g, '\n') === actual.toString('utf8').replace(/\r\n/g, '\n')
+      : expected.equals(actual);
+    if (!filesMatch) {
       throw new Error(`Generated card asset differs: ${relative}. Run npm run cards:generate.`);
     }
   }
