@@ -22,12 +22,12 @@ describe('known bots', () => {
     const registry = readFileSync('src/config/knownBots.ts', 'utf8');
     const executable = source.replace(/^import .*;\r?\n/gm, '')
       .replace(/^const registryPath = .*;$/m, "const registryPath = 'fixture';");
-    const add = (args: string[]) => {
+    const add = (args: string[], registrySource = registry) => {
       let written = '';
       runInNewContext(executable, {
         process: { argv: ['node', 'add-bot.mjs', ...args], exit: () => { throw new Error('rejected'); } },
         console: { error: () => undefined },
-        readFileSync: () => registry,
+        readFileSync: () => registrySource,
         writeFileSync: (_path: string, value: string) => { written = value; },
       });
       return written;
@@ -35,5 +35,23 @@ describe('known bots', () => {
     expect(add(['fresh_bot'])).toContain("username: 'fresh_bot', passwordJoin: false");
     expect(add(['fresh_bot', '--password-join'])).toContain("username: 'fresh_bot', passwordJoin: true");
     expect(() => add(['JABOT1'])).toThrow('rejected');
+  });
+
+  test('preserves CRLF when updating a CRLF registry', () => {
+    const source = readFileSync('tools/add-bot.mjs', 'utf8');
+    const registry = readFileSync('src/config/knownBots.ts', 'utf8');
+    const crlfRegistry = registry.replace(/\r?\n/g, '\r\n');
+    const executable = source.replace(/^import .*;\r?\n/gm, '')
+      .replace(/^const registryPath = .*;$/m, "const registryPath = 'fixture';");
+    let updated = '';
+    runInNewContext(executable, {
+      process: { argv: ['node', 'add-bot.mjs', 'fresh_bot'], exit: () => { throw new Error('rejected'); } },
+      console: { error: () => undefined },
+      readFileSync: () => crlfRegistry,
+      writeFileSync: (_path: string, value: string) => { updated = value; },
+    });
+
+    expect(updated).toContain("\r\n  { username: 'fresh_bot', passwordJoin: false },\r\n");
+    expect(updated).not.toMatch(/(?<!\r)\n/);
   });
 });

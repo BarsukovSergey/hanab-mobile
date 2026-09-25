@@ -13,7 +13,7 @@ if (!valid || (!check && (!username || !/^[A-Za-z0-9_-]+$/.test(username)))) {
 }
 
 const source = readFileSync(registryPath, 'utf8');
-const entryPattern = /^  \{ username: '([^']+)', passwordJoin: (true|false) \},$/gm;
+const entryPattern = /^  \{ username: '([^']+)', passwordJoin: (true|false) \},\r?$/gm;
 const entries = [...source.matchAll(entryPattern)].map((match) => ({ username: match[1], passwordJoin: match[2] === 'true' }));
 const keys = entries.map((entry) => entry.username.toLowerCase());
 if (new Set(keys).size !== keys.length) {
@@ -28,8 +28,10 @@ if (!check) {
   entries.push({ username, passwordJoin });
 }
 entries.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase(), 'en'));
-const lines = entries.map((entry) => `  { username: '${entry.username}', passwordJoin: ${entry.passwordJoin} },`).join('\n');
-const updated = source.replace(/(?<=export const knownBots: readonly KnownBot\[\] = \[\n)[\s\S]*?(?=\n\];)/, lines);
+const newline = source.includes('\r\n') ? '\r\n' : '\n';
+const lines = entries.map((entry) => `  { username: '${entry.username}', passwordJoin: ${entry.passwordJoin} },`).join(newline);
+const registryBlockPattern = /(export const knownBots: readonly KnownBot\[\] = \[\r?\n)[\s\S]*?(\r?\n\];)/;
+const updated = source.replace(registryBlockPattern, (_match, start, end) => `${start}${lines}${end}`);
 if (updated === source && !check) throw new Error('Registry update failed');
 if (check) {
   if (updated !== source) {

@@ -40,6 +40,7 @@
     "preset": "jest-expo",
     "testPathIgnorePatterns": [
       "/node_modules/",
+      "/\\.cache/",
       "/src/game/upstream/"
     ],
     "transformIgnorePatterns": [

@@ -66,7 +66,16 @@ async function ensureUpstreamCheckout() {
   const gameDist = path.join(CACHE_DIR, 'packages', 'game', 'dist', 'index.js');
   if (readyCommit !== UPSTREAM_COMMIT || !(await exists(gameDist))) {
     run(executable('npm'), ['ci'], CACHE_DIR);
-    run(executable('npm'), ['--prefix', 'packages/game', 'run', 'build'], CACHE_DIR);
+    const gameDistDir = path.dirname(gameDist);
+    await rm(gameDistDir, { recursive: true, force: true });
+    run(process.execPath, [
+      path.join(CACHE_DIR, 'node_modules', 'typescript', 'bin', 'tsc'),
+      '--project',
+      path.join(CACHE_DIR, 'packages', 'game', 'tsconfig.npm.json'),
+    ], CACHE_DIR);
+    if (!(await exists(gameDist))) {
+      throw new Error('Pinned upstream game build did not produce packages/game/dist/index.js.');
+    }
     await writeFile(READY_MARKER, `${UPSTREAM_COMMIT}\n`, 'utf8');
   }
 }
@@ -103,7 +112,10 @@ async function assertDirectoriesEqual(expectedDir, actualDir) {
       readFile(path.join(expectedDir, relative)),
       readFile(path.join(actualDir, relative)),
     ]);
-    if (!expected.equals(actual)) {
+    const filesMatch = relative.endsWith('.json')
+      ? expected.toString('utf8').replace(/\r\n/g, '\n') === actual.toString('utf8').replace(/\r\n/g, '\n')
+      : expected.equals(actual);
+    if (!filesMatch) {
       throw new Error(`Generated card asset differs: ${relative}. Run npm run cards:generate.`);
     }
   }
