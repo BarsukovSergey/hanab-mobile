@@ -66,7 +66,16 @@ async function ensureUpstreamCheckout() {
   const gameDist = path.join(CACHE_DIR, 'packages', 'game', 'dist', 'index.js');
   if (readyCommit !== UPSTREAM_COMMIT || !(await exists(gameDist))) {
     run(executable('npm'), ['ci'], CACHE_DIR);
-    run(executable('npm'), ['--prefix', 'packages/game', 'run', 'build'], CACHE_DIR);
+    const gameDistDir = path.dirname(gameDist);
+    await rm(gameDistDir, { recursive: true, force: true });
+    run(process.execPath, [
+      path.join(CACHE_DIR, 'node_modules', 'typescript', 'bin', 'tsc'),
+      '--project',
+      path.join(CACHE_DIR, 'packages', 'game', 'tsconfig.npm.json'),
+    ], CACHE_DIR);
+    if (!(await exists(gameDist))) {
+      throw new Error('Pinned upstream game build did not produce packages/game/dist/index.js.');
+    }
     await writeFile(READY_MARKER, `${UPSTREAM_COMMIT}\n`, 'utf8');
   }
 }
