@@ -9,6 +9,8 @@
     "android:release": "expo run:android --variant release",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
+    "bot:add": "node tools/add-bot.mjs",
+    "bot:check": "node tools/add-bot.mjs --check",
     "cards:generate": "node tools/card-assets/generate.mjs",
     "cards:check": "node tools/card-assets/generate.mjs --check",
     "android:beta-apk": "node tools/build-android-beta.mjs"

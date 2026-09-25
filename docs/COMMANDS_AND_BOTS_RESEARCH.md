@@ -2,7 +2,9 @@
 
 Date: 2026-09-22
 
-Status: research only. This document does not change runtime behavior or the distributed beta.1 APK.
+Status: research plus mobile implementation. The shipped picker uses the 19 exact usernames supplied for this feature. All 19 are verified for both open-table `/join` and password-protected `/join <password>`.
+
+Implementation: `src/config/knownBots.ts` is the maintained registry; `npm run bot:add -- <username> [--password-join]` adds an exact account with explicit capability metadata, and `npm run bot:check` checks sorting and case-insensitive uniqueness. The picker shows only registry accounts currently present in the authoritative lobby user list, splits them into Available (`status === 0`) and Busy, and omits bots already seated at the current table. Create collects multiple bots, waits for the reconciled `game` and `joined` room, then sends one invitation batch. Pregame rechecks authoritative capacity, attendance, status, and capability before each PM. Protected-table passwords are transient and never enter Redux/persistence, and no invite is replayed after a connection change.
 
 ## Scope
 
@@ -59,14 +61,14 @@ Several command-backed capabilities already have first-class mobile UI and shoul
 These have useful structured context in the mobile UI and should not require the user to remember
 command syntax:
 
-- **Add bot** — dedicated pregame flow described below.
+- **Add bot** — implemented multi-select Create/Pregame flow described below.
 - **PM user** — action from a user/player/spectator surface that opens a recipient-bound composer.
 - **Player info / profile entry** — use existing player-info capability or a richer profile surface
   when that work is implemented.
 - **Friend / unfriend** — contextual user action; the existing command transport already exists.
-- **Kick player** — pregame owner action on a player row, backed by the existing server-side
-  `/kick [username]` semantics unless/until a typed command is deliberately added.
-- **Find needed variant / missing max scores** — pregame convenience actions backed by
+- **Kick player** — implemented pregame owner action on a player row, backed by the existing server-side
+  `/kick [username]` semantics.
+- **Find needed variant / missing max scores** — implemented Pregame convenience actions backed by
   `/findvariant` and `/missing`.
 - **Suggest current turn** — shared replay action that sends the currently selected turn rather than
   requiring `/suggest [turn]` text entry.
@@ -131,8 +133,10 @@ example a small source-controlled data file containing:
 - explicit capabilities such as `passwordJoin`, rather than assuming every bot accepts the same PM
   commands.
 
-The actual production usernames must be verified before entries are added. Online/offline state can
-then be derived by matching those exact usernames against the authoritative lobby user list.
+The actual production usernames must be verified before entries are added. Online/offline and Busy state are
+then derived by matching those exact usernames against the authoritative lobby user list. The current 19
+accounts are ordinary usernames rather than the upstream `Bot-` multi-table exception, so mobile only treats
+`status === 0` (Lobby) as invite-eligible.
 
 ## Password handling
 
@@ -163,9 +167,9 @@ body `/join <password>`, and that transient password is cleared after the attemp
 This keeps the common create-and-invite path one-pass while preserving the current no-password-
 retention boundary.
 
-## Proposed mobile shape
+## Implemented mobile shape
 
-A later implementation can stay small:
+The implemented flow stays small:
 
 1. add a source-controlled `knownBots` registry with only verified exact usernames and verified
    per-bot capabilities such as open-table join and protected-table join;
@@ -178,9 +182,10 @@ A later implementation can stay small:
    its verified capability set supports; protected tables require `passwordJoin`; then clear that
    form state;
 5. also show `Add bot` in pregame when there is room for another player;
-6. open the same multi-select bot picker showing known bots and their current online/offline state;
-7. disable bots already present at the table and prevent selecting more bots than currently free
-   player slots;
+6. open the same multi-select bot picker showing only currently online known bots, grouped into
+   Available (`status === 0`) and Busy;
+7. omit bots already present at the table, disable Busy/incompatible bots, reconcile stale selections,
+   and prevent selecting more bots than currently free player slots;
 8. when inviting from an already-existing protected table, request the password transiently because
    mobile intentionally does not retain it in room state;
 9. treat each bot invitation independently: one offline/failing bot must not suppress the remaining
@@ -189,15 +194,8 @@ A later implementation can stay small:
 
 No password persistence, bot-only socket protocol, or special table mutation path is needed.
 
-## Suggested implementation order
+## Follow-up order
 
-For the command-to-UI backlog, the lowest-risk useful sequence is:
-
-1. Add bot with multi-select create/pregame flow;
-2. contextual PM + player info + friend/unfriend;
-3. pregame kick + findvariant/missing;
-4. shared-replay Suggest current turn;
-5. tags/history workflow;
-6. only then consider auto-start/split/linked-account conveniences.
+The multi-bot flow, contextual PM/friend actions, Pregame Kick/Find/Missing, and shared-replay Suggest now have first-class UI. The next command-adjacent product work starts with richer tags/history management, followed only by selective auto-start/split/linked-account conveniences where native UI clearly adds value.
 
 The slash-command path should remain available as fallback/parity even after a native control exists.

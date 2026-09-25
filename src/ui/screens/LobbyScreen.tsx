@@ -1,10 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
+import { pruneBotSelection } from '../../config/knownBots';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
-import { tableSelectors } from '../../store/store';
+import { tableSelectors, userSelectors } from '../../store/store';
+import { BotPicker } from '../BotPicker';
 import { ChatPanel } from '../ChatPanel';
 import {
   ActionButton,
@@ -39,14 +41,23 @@ export function LobbyScreen({
   const { wide } = useResponsiveLayout();
   const [tableName, setTableName] = useState('');
   const [tablePassword, setTablePassword] = useState('');
+  const [selectedBots, setSelectedBots] = useState<string[]>([]);
+  const [showBotPicker, setShowBotPicker] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [createOptions, setCreateOptions] = useState<MobileTableOptions>(DEFAULT_OPTIONS);
   const [joinPassword, setJoinPassword] = useState('');
   const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
   const tables = useAppSelector(tableSelectors.selectAll);
+  const users = useAppSelector(userSelectors.selectAll);
   const roomState = useAppSelector((state) => state.room);
   const randomTableName = useAppSelector((state) => state.session.randomTableName);
   const friends = useAppSelector((state) => state.session.friends);
+  useEffect(() => {
+    setSelectedBots((current) => {
+      const next = pruneBotSelection(current, users, [], tablePassword.length > 0, maxPlayers - 1);
+      return next.length === current.length && next.every((name, index) => name === current[index]) ? current : next;
+    });
+  }, [users, tablePassword, maxPlayers]);
   const effectiveName = tableName.trim() || randomTableName?.trim() || '';
   const {
     yourRunningGames,
@@ -170,7 +181,7 @@ export function LobbyScreen({
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                         hitSlop={6}
-                        onPress={() => setMaxPlayers(value)}
+                        onPress={() => { setMaxPlayers(value); setSelectedBots((names) => names.slice(0, value - 1)); }}
                         style={[
                           styles.playerOption,
                           {
@@ -187,14 +198,19 @@ export function LobbyScreen({
                   })}
                 </View>
               </View>
+              <ActionButton title={showBotPicker ? 'Hide bots' : 'Choose bots'}
+                onPress={() => setShowBotPicker(!showBotPicker)} />
+              {showBotPicker && <BotPicker selected={selectedBots} onChange={setSelectedBots}
+                limit={maxPlayers - 1} users={users} protectedTable={tablePassword.length > 0} />}
               <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
               <ActionButton
                 disabled={attendancePending || effectiveName.length < 1 || effectiveName.length > 45}
                 title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}
                 tone="primary"
                 onPress={() => {
-                  if (lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword)) {
+                  if (lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword, selectedBots)) {
                     setTablePassword('');
+                    setSelectedBots([]);
                   }
                 }}
               />

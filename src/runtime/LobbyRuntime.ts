@@ -59,6 +59,7 @@ import {
   encodeTableUpdateFrame,
   encodeTableUnattendFrame,
   type LobbyTable,
+  type ChatMessage,
   type CardPresentationSettingName,
   type MobileTableOptions,
   type ServerEvent,
@@ -73,6 +74,7 @@ import { sessionActions } from '../store/sessionSlice';
 import { terminationActions } from '../store/terminationSlice';
 import { historyActions } from '../store/historySlice';
 import type { AppStore } from '../store/store';
+import { findKnownBotUser, freeBotSlots, isBotAtTable, knownBots, normalizedBotName } from '../config/knownBots';
 import { isEditableLiveNoteOrder } from './notePolicy';
 
 const SOCKET_OPEN = 1;
@@ -115,6 +117,13 @@ function safeStatus(value: unknown, fallback: string): string {
 }
 
 export class LobbyRuntime {
+  private pendingBotCreate: {
+    epoch: number;
+    name: string;
+    creatorUserID: number;
+    bots: string[];
+    password: string;
+  } | null = null;
   private current: OwnedConnection | null = null;
   private connectionEpoch: number;
   private connectPromise: Promise<void> | null = null;
@@ -161,6 +170,7 @@ export class LobbyRuntime {
       return this.connectPromise ?? Promise.resolve();
     }
 
+    this.pendingBotCreate = null;
     const previous = this.current;
     const epoch = this.connectionEpoch + 1;
     this.connectionEpoch = epoch;
@@ -191,6 +201,7 @@ export class LobbyRuntime {
   }
 
   disconnect(): void {
+    this.pendingBotCreate = null;
     this.maintainConnection = false;
     this.retryAttempt = 0;
     this.cancelRetry();
@@ -501,6 +512,7 @@ export class LobbyRuntime {
     maxPlayers: number,
     options: MobileTableOptions | string,
     password = '',
+    bots: readonly string[] = [],
   ): boolean {
     const state = this.store.getState();
     const creatorUserID = state.session.authenticatedUser?.userID;
@@ -532,6 +544,10 @@ export class LobbyRuntime {
       || state.room.pendingJoin !== null
       || state.room.pendingCreate !== null
       || state.history.pendingReplayCreate !== null
+      || bots.length > maxPlayers - 1
+      || new Set(bots.map(normalizedBotName)).size !== bots.length
+      || bots.some((name) => !knownBots.some((bot) => normalizedBotName(bot.username) === normalizedBotName(name)
+        && (password.length === 0 || bot.passwordJoin)))
     ) return false;
 
     let frame: string;
@@ -547,8 +563,57 @@ export class LobbyRuntime {
       name: effectiveName,
       creatorUserID,
     }));
+    this.pendingBotCreate = bots.length === 0 ? null : {
+      epoch: state.session.connectionEpoch, name: effectiveName, creatorUserID,
+      bots: [...bots], password,
+    };
     this.sendEncoded(encodeGetNameFrame());
     return true;
+  }
+
+  inviteBots(tableID: number, names: readonly string[], password = ''): number {
+    let sent = 0;
+    for (const name of names) {
+      const state = this.store.getState();
+      const room = state.room.room;
+      if (room.kind !== 'pregame' || room.tableID !== tableID || state.session.phase !== 'ready') break;
+      const free = freeBotSlots(room.data.maxPlayers, room.data.players.length);
+      if (sent >= free) break;
+      const bot = knownBots.find((entry) => normalizedBotName(entry.username) === normalizedBotName(name));
+      if (bot === undefined || isBotAtTable(name, room.data.players)
+        || (room.data.passwordProtected && (!bot.passwordJoin || password.length === 0))
+        || !state.lobby.userListReceived) continue;
+      const user = findKnownBotUser(name, Object.values(state.lobby.users.entities).filter(
+        (entry): entry is NonNullable<typeof entry> => entry !== undefined,
+      ));
+      if (user?.status !== 0) continue;
+      const msg = room.data.passwordProtected ? `/join ${password}` : '/join';
+      if (this.send('chatPM', { msg, recipient: user.name, room: `table${tableID}` })) sent += 1;
+    }
+    return sent;
+  }
+
+  private finishPendingBotCreate(epoch: number): void {
+    const pending = this.pendingBotCreate;
+    if (pending === null || pending.epoch !== epoch) return;
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (room.kind === 'pregame' && room.role === 'player'
+      && room.data.name === pending.name && room.data.owner === pending.creatorUserID
+      && room.data.players.some((player) => player.you)) {
+      this.pendingBotCreate = null;
+      this.inviteBots(room.tableID, pending.bots, pending.password);
+    } else if (state.room.pendingCreate === null) {
+      this.pendingBotCreate = null;
+    }
+  }
+
+  private isBotJoinEcho(message: ChatMessage): boolean {
+    const username = this.store.getState().session.authenticatedUser?.username;
+    return username !== undefined
+      && normalizedBotName(message.who) === normalizedBotName(username)
+      && /^\/join(?:\s|$)/.test(message.msg)
+      && knownBots.some((bot) => normalizedBotName(bot.username) === normalizedBotName(message.recipient));
   }
 
   startGame(): boolean {
@@ -1296,9 +1361,11 @@ export class LobbyRuntime {
       case 'game':
         if (this.rejectUnsupportedRoom(epoch, event.data.tableID, event.data.options)) break;
         this.store.dispatch(roomActions.gameReceived({ epoch, game: event.data }));
+        this.finishPendingBotCreate(epoch);
         break;
       case 'joined':
         this.store.dispatch(roomActions.joinedReceived({ epoch, joined: event.data }));
+        this.finishPendingBotCreate(epoch);
         break;
       case 'left':
         this.store.dispatch(roomActions.leftReceived({ epoch, left: event.data }));
@@ -1553,6 +1620,7 @@ export class LobbyRuntime {
         }
         break;
       case 'chat':
+        if (this.isBotJoinEcho(event.data)) break;
         this.store.dispatch(chatActions.messageReceived({
           epoch,
           defaultRoom: this.currentChatRoom(),
@@ -1564,7 +1632,7 @@ export class LobbyRuntime {
         this.store.dispatch(chatActions.historyReceived({
           epoch,
           defaultRoom: this.currentHistoryRoom(),
-          messages: event.data.list,
+          messages: event.data.list.filter((message) => !this.isBotJoinEcho(message)),
         }));
         break;
       case 'friends':
@@ -1574,6 +1642,7 @@ export class LobbyRuntime {
         }));
         break;
       case 'warning':
+        if (this.store.getState().room.pendingCreate !== null) this.pendingBotCreate = null;
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
         this.clearCurrentHistoryPending(epoch, event.data.warning);
@@ -1583,6 +1652,7 @@ export class LobbyRuntime {
         }));
         break;
       case 'error':
+        if (this.store.getState().room.pendingCreate !== null) this.pendingBotCreate = null;
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
         this.clearCurrentHistoryPending(epoch, event.data.error);
@@ -1597,6 +1667,7 @@ export class LobbyRuntime {
   private onClose(owned: OwnedConnection, event: WebSocketCloseEvent): void {
     if (!this.isCurrent(owned)) return;
     this.current = null;
+    this.pendingBotCreate = null;
     this.gameBootstrap.invalidate();
     this.dispose(owned, false);
     this.store.dispatch(sessionActions.connectionClosed({
@@ -1623,6 +1694,7 @@ export class LobbyRuntime {
   private failCurrent(owned: OwnedConnection, error: string): void {
     if (!this.isCurrent(owned)) return;
     this.current = null;
+    this.pendingBotCreate = null;
     this.gameBootstrap.invalidate();
     this.dispose(owned, true);
     this.store.dispatch(sessionActions.connectionFailed({
@@ -1865,6 +1937,7 @@ export class LobbyRuntime {
   }
 
   private resetConfirmedMissingSession(): void {
+    this.pendingBotCreate = null;
     this.maintainConnection = false;
     this.retryAttempt = 0;
     this.cancelRetry();

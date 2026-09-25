@@ -93,11 +93,11 @@ The biggest remaining parity gaps are now concentrated in five areas:
 
 1. **Replay/review power features**: replay arrows/annotations, JSON import, `/copy`, efficiency-mod origin controls, and other advanced review tools. Shared replay creation and turn-suggestion receive/UI are already implemented.
 2. **Tags and richer history/profile workflows**: Add/display tag UI exists; richer tag search/delete management, arbitrary-player history, and richer profile/best-score surfaces remain.
-3. **Product/account/bot surfaces**: multi-bot invite UI, account-management entry points, and optional linked-account UX.
+3. **Product/social surfaces**: optional linked-account UX and richer profile/settings workflows; account-management entry points and multi-bot invite UI are already implemented.
 4. **Chat/presentation long tail**: table-chat unread state and session PM dialogs now exist; typing/server-backed read-state, sounds, reverse-hand preference, and other non-core presentation settings remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), and session PM Dialogs (#82/#83). Spectator perspective switching is also first-class in the live Game menu.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), and the multi-bot Create/Pregame picker including transient protected-table joins (#91). Spectator perspective switching is also first-class in the live Game menu.
 
 The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
@@ -126,7 +126,6 @@ The highest-value remaining items are:
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
 | Richer tag management/search/delete | Partial | S–M | Medium | Add/display UI is implemented; structured search/delete/list management remains. |
-| Add several bots during Create/Pregame | Missing | M | Medium–High | Existing join semantics are sufficient; registry must use verified per-bot capabilities. |
 | Arbitrary JSON replay import | Missing | M | Medium | Useful for research/bots; current upstream expanded JSON seed/deck/player-name semantics. |
 | Hypothetical morph UI | Wire/state-only | M | Medium | Reducers/rendering understand morph/unmorph, but mobile cannot originate one. |
 | `/copy` replay export | Missing | M | Medium | Browser-local upstream behavior needs a deliberate mobile export/share implementation. |
@@ -193,13 +192,13 @@ PM, friend/unfriend, spectator perspective and bot discovery without changing th
 | Pregame spectators list | **Full basic** | — | Medium | Authoritative `pregameSpectators` snapshots are retained and displayed. |
 | Pregame player stats | **Full compact** | — | Medium | Authoritative total/variant games, average, strikeout rate, and player-count best score are preserved and shown. |
 | Pregame player profile shortcut | **Missing** | S–M | Medium | Depends on People/profile work. |
-| Kick player native action | **Chat fallback only** | S | Medium | Server `/kick` already works through chat. |
+| Kick player native action | **Implemented + chat fallback** | — | Medium | Owner-only Pregame action sends the authoritative `/kick [username]` command. |
 | Auto-start next join / N players | **Chat fallback only** | S | Low–Medium | `/s`, `/s2`…`/s6`. |
 | Timed auto-start `/startin` | **Chat fallback only** | S | Low | Native countdown controls are optional. |
 | Split / splitauto | **Chat fallback only** | S–M | Low | Useful mainly for large community pregames. |
-| Find variant / missing scores helpers | **Chat fallback only** | S | Medium | Native pregame actions would be useful. |
-| Multi-bot invite during Create | **Missing; researched** | M | Medium–High | Use explicit verified bot registry + PM `/join [password]`. |
-| Multi-bot invite in Pregame | **Missing; researched** | M | Medium | Same picker, capped by current free seats. |
+| Find variant / missing scores helpers | **Implemented + chat fallback** | — | Medium | Pregame Team tools send authoritative `/findvariant` and `/missing` commands. |
+| Multi-bot invite during Create | **Implemented** | — | Medium–High | Reconciled `game` + `joined` triggers one PM batch; protected tables use transient `/join <password>` only for capability-verified bots. |
+| Multi-bot invite in Pregame | **Implemented** | — | Medium | Online registry bots are grouped Available/Busy, selection is capped by free seats, and protected-table passwords are requested transiently. |
 
 ## Current upstream drift: spectator table deletion
 
@@ -764,10 +763,10 @@ spectate correctness.
 | Capability | Status | Effort | Importance | Notes |
 | --- | --- | ---: | ---: | --- |
 | Reference bot protocol compatibility | **Server-native** | — | Medium | Bots are ordinary users; no special bot API exists. |
-| Add bot by PM `/join` | Missing native UI | M | Medium–High | Already researched. |
-| Several bots at once | Missing native UI | M | Medium–High | Multi-select design recorded. |
-| Protected-table bot invite | Missing native UI | M | Medium | Reuse transient create password or re-request in existing table. |
-| Verified bot registry | Missing | S | Medium | Upstream reference bots do not define authoritative production usernames. |
+| Add bot by PM `/join` | Implemented | — | Medium–High | Uses existing `chatPM` transport. |
+| Several bots at once | Implemented | — | Medium–High | Create and Pregame use the same authoritative picker/eligibility model. |
+| Protected-table bot invite | Implemented | — | Medium | All current 19 registry accounts are verified for `/join <password>`; passwords remain transient and capability-gated for future entries. |
+| Known bot registry | Implemented | S | Medium | 19 exact supplied usernames; no server discovery or prefix detection. |
 | Arbitrary replay JSON import | Missing | M | Medium | Research/bot workflow. |
 | Replay JSON export | Missing | M | Medium | Needed for `/copy` parity. |
 | JSON URL compression/share format | Missing | M | Low–Medium | Current upstream now preserves seed metadata. |
@@ -851,9 +850,9 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Linked Accounts | **Command-complete / UI missing** | Link/unlink/linked commands work; native explanation/workflow absent. |
 | Tags | **Command-complete / workflow missing** | Add/delete/search/list command paths exist; history/tag browser UI absent. |
 | Website Endpoints | **Audited individually** | See endpoint matrix. |
-| Research & Bots | **Partial** | Same server protocol can host bots; native bot picker and arbitrary JSON replay are missing. |
+| Research & Bots | **Strong partial** | Native multi-bot Create/Pregame picker is implemented for open and protected tables; arbitrary JSON replay remains missing. |
 | JSON Endpoints | **Audited individually** | See endpoint matrix. |
-| Password Reset | **Missing entry point** | Web reset page exists. |
+| Password Reset | **Full entry point** | Login and Settings open the authoritative upstream reset page. |
 | Project History | **N/A** | Documentation/community information, not a mobile runtime feature. |
 
 This coverage table is intentionally redundant with the deeper sections: its purpose is completeness,
@@ -961,11 +960,9 @@ usage reprioritizes them.
 
 ## B. High-value, relatively low-risk next work
 
-1. Game/replay tags presentation and a small first-class mutation flow.
-2. Shared replay creation from History.
-3. Shared-replay Suggest receive/UI parity.
-4. Multi-bot Create/Pregame picker.
-5. Direct `/r` submission edge-case cleanup when convenient.
+1. Richer game/replay tag search/delete/list management beyond current Add/display support.
+2. Direct `/r` submission edge-case cleanup when convenient.
+3. Carefully selected Pregame auto-start helpers only if they prove useful.
 
 ## C. Medium product slices
 
@@ -1062,11 +1059,10 @@ During the beta.2 tester window, keep runtime work in isolated slices so tester-
 For the current feature cycle, the most defensible order is:
 
 1. fix any tester-confirmed beta.2 runtime defects;
-2. add the multi-bot Create/Pregame picker from the already-researched authoritative PM flow;
-3. improve richer tag search/delete management and selected Pregame command conveniences;
-4. tackle JSON/`copy` and advanced replay power features deliberately;
-5. expand profiles/social/settings only where mobile context adds value;
-6. only then consider expensive exotic rules/options.
+2. improve richer tag search/delete management and only selected remaining Pregame conveniences such as auto-start;
+3. tackle JSON/`copy` and advanced replay power features deliberately;
+4. expand profiles/social/settings only where mobile context adds value;
+5. only then consider expensive exotic rules/options.
 
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped
