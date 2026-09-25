@@ -268,9 +268,10 @@ export type ReplayEfficiencyMod = z.infer<typeof replayEfficiencyModSchema>;
 
 export const spectatorSchema = z.object({
   name: z.string().min(1),
-  shadowingPlayerIndex: z.number().int().min(-1),
-  // The Go server emits an empty string when the spectator is not shadowing.
-  shadowingPlayerUsername: z.string(),
+  // Go emits -1 / "" for no shadowing. The TypeScript server contract makes
+  // both fields optional, so normalize missing values at the protocol boundary.
+  shadowingPlayerIndex: z.number().int().min(-1).default(-1),
+  shadowingPlayerUsername: z.string().default(''),
 }).strict();
 
 export type Spectator = z.infer<typeof spectatorSchema>;
