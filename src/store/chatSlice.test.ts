@@ -16,6 +16,55 @@ const message = (msg: string, room = 'lobby') => ({
 });
 
 describe('chat state and plain-text conversion', () => {
+  test('keeps drafts independent per room and preserves them across reconnect', () => {
+    const store = createAppStore();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'table draft' }));
+    store.dispatch(chatActions.draftChanged({ room: 'table456', draft: 'other draft' }));
+
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    expect(store.getState().chat.draftByRoom).toEqual({
+      table123: 'table draft',
+      table456: 'other draft',
+    });
+  });
+
+  test('clears only a successfully submitted room draft and preserves failed submissions', () => {
+    const store = createAppStore();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'keep me' }));
+    store.dispatch(chatActions.draftChanged({ room: 'table456', draft: 'other room' }));
+
+    store.dispatch(chatActions.draftSubmissionFinished({ room: 'table123', succeeded: false }));
+    expect(store.getState().chat.draftByRoom).toEqual({
+      table123: 'keep me',
+      table456: 'other room',
+    });
+
+    store.dispatch(chatActions.draftSubmissionFinished({ room: 'table123', succeeded: true }));
+    expect(store.getState().chat.draftByRoom).toEqual({ table456: 'other room' });
+  });
+
+  test('migrates a rematch draft to its new table and removes the old room draft', () => {
+    const store = createAppStore();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'unsent' }));
+
+    store.dispatch(chatActions.draftRoomMigrated({ oldTableID: 123, newTableID: 456 }));
+
+    expect(store.getState().chat.draftByRoom).toEqual({ table456: 'unsent' });
+  });
+
+  test('preserves both drafts when a rematch destination already has a non-empty draft', () => {
+    const store = createAppStore();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'old table' }));
+    store.dispatch(chatActions.draftChanged({ room: 'table456', draft: 'destination' }));
+
+    store.dispatch(chatActions.draftRoomMigrated({ oldTableID: 123, newTableID: 456 }));
+
+    expect(store.getState().chat.draftByRoom).toEqual({
+      table123: 'old table',
+      table456: 'destination',
+    });
+  });
+
   test('removes server markup before decoding escaped user input', () => {
     expect(chatMarkupToPlainText(
       '<span class="red">Notice</span><br>&lt;script&gt;safe&lt;/script&gt; &amp; &#9731;',
@@ -191,9 +240,10 @@ describe('chat state and plain-text conversion', () => {
     store.dispatch(chatActions.messageReceived({
       epoch: 2, defaultRoom: 'lobby', message: message('current'),
     }));
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'unsent' }));
     store.dispatch(sessionActions.signedOut());
     expect(store.getState().chat).toEqual({
-      connectionEpoch: 0, lastPM: null, messagesByRoom: {}, unreadByRoom: {},
+      connectionEpoch: 0, draftByRoom: {}, lastPM: null, messagesByRoom: {}, unreadByRoom: {},
     });
   });
 

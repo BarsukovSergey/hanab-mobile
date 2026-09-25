@@ -12,6 +12,7 @@ import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
 import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import type { ActionIncludingHypothetical } from '../game/client/types/actions';
+import { chatActions } from '../store/chatSlice';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
 import { historyActions } from '../store/historySlice';
@@ -1869,6 +1870,7 @@ describe('deterministic lobby runtime', () => {
 
   test('quick rematch follows boot to a new table across reordered duplicate events', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'rematch draft' }));
     const sentBefore = socket.sent.length;
     expect(runtime.quickRematch()).toBe(true);
     expect(runtime.quickRematch()).toBe(false);
@@ -1885,6 +1887,13 @@ describe('deterministic lobby runtime', () => {
       role: 'player',
     });
 
+    socket.emitMessage(
+      'user {"userID":2,"name":"Bob","status":1,"tableID":456,'
+      + '"hyphenated":false,"inactive":false}',
+    );
+    expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 123 });
+    expect(store.getState().chat.draftByRoom).toEqual({ table123: 'rematch draft' });
+
     const newGame = createdPregameFrame(['Ada', 'Bob'], 456, 'Running table (#2)');
     socket.emitMessage(newGame);
     socket.emitMessage('joined {"tableID":456}');
@@ -1893,6 +1902,7 @@ describe('deterministic lobby runtime', () => {
       'user {"userID":1,"name":"Ada","status":1,"tableID":456,'
       + '"hyphenated":false,"inactive":false}',
     );
+    expect(store.getState().chat.draftByRoom).toEqual({ table456: 'rematch draft' });
     socket.emitMessage(newGame);
     socket.emitMessage('joined {"tableID":456}');
     socket.emitMessage('joined {"tableID":456}');
@@ -1990,6 +2000,7 @@ describe('deterministic lobby runtime', () => {
 
   test('shared replay boot stages migration but own lobby status does not confirm it', async () => {
     const { socket, store } = await makeSharedReplayRuntime();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'keep on old table' }));
 
     socket.emitMessage('boot {"TableID":999}');
     expect(store.getState().room.room).toMatchObject({
@@ -2005,6 +2016,7 @@ describe('deterministic lobby runtime', () => {
     });
     socket.emitMessage(userFrame);
     expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 123 });
+    expect(store.getState().chat.draftByRoom).toEqual({ table123: 'keep on old table' });
   });
 
   test('OPEN is not READY; only a valid welcome makes it ready', async () => {

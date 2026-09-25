@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { chatRuntime, lobbyRuntime } from '../runtime/application';
@@ -19,10 +19,10 @@ const EMPTY_MESSAGES: readonly never[] = [];
 export function ChatPanel({ room, title }: Props) {
   const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
-  const [draft, setDraft] = useState('');
   const historyRef = useRef<ScrollView>(null);
   const ready = useAppSelector((state) => state.session.phase === 'ready');
   const lastPM = useAppSelector((state) => state.chat.lastPM);
+  const draft = useAppSelector((state) => state.chat.draftByRoom[room] ?? '');
   const messages = useAppSelector((state) => state.chat.messagesByRoom[room] ?? EMPTY_MESSAGES);
   const pregameRoom = useAppSelector((state) => state.room.room.kind === 'pregame'
     ? state.room.room : null);
@@ -34,7 +34,10 @@ export function ChatPanel({ room, title }: Props) {
   const trimmed = draft.trim();
 
   const send = () => {
-    if (chatRuntime.submit(draft)) setDraft('');
+    dispatch(chatActions.draftSubmissionFinished({
+      room,
+      succeeded: chatRuntime.submit(draft),
+    }));
   };
 
   useEffect(() => {
@@ -96,10 +99,15 @@ export function ChatPanel({ room, title }: Props) {
         editable={ready}
         maxLength={300}
         multiline
-        onChangeText={(value) => setDraft(transformChatInput(value, lastPM))}
+        onChangeText={(value) => dispatch(chatActions.draftChanged({
+          room,
+          draft: transformChatInput(value, lastPM),
+        }))}
         onSubmitEditing={send}
         placeholder={ready ? 'Message' : 'Chat reconnecting…'}
         style={styles.input}
+        returnKeyType="send"
+        submitBehavior="submit"
         value={draft}
       />
       <View style={styles.footer}>

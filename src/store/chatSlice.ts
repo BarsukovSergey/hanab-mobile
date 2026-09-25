@@ -14,6 +14,7 @@ export type ReadableChatMessage = Omit<ChatMessage, 'msg' | 'room'> & {
 
 export type ChatState = {
   connectionEpoch: number;
+  draftByRoom: Record<string, string>;
   lastPM: string | null;
   messagesByRoom: Record<string, ReadableChatMessage[]>;
   unreadByRoom: Record<string, number>;
@@ -23,6 +24,7 @@ const MAX_MESSAGES_PER_ROOM = 1000;
 
 const initialState: ChatState = {
   connectionEpoch: 0,
+  draftByRoom: {},
   lastPM: null,
   messagesByRoom: {},
   unreadByRoom: {},
@@ -55,6 +57,30 @@ export const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
+    draftChanged(state, action: PayloadAction<{ room: string; draft: string }>) {
+      state.draftByRoom[action.payload.room] = action.payload.draft;
+    },
+    draftSubmissionFinished(
+      state,
+      action: PayloadAction<{ room: string; succeeded: boolean }>,
+    ) {
+      if (action.payload.succeeded) delete state.draftByRoom[action.payload.room];
+    },
+    draftRoomMigrated(
+      state,
+      action: PayloadAction<{ oldTableID: number; newTableID: number }>,
+    ) {
+      const { oldTableID, newTableID } = action.payload;
+      if (oldTableID <= 0 || newTableID <= 0 || oldTableID === newTableID) return;
+      const oldRoom = `table${oldTableID}`;
+      const newRoom = `table${newTableID}`;
+      const draft = state.draftByRoom[oldRoom];
+      if (draft === undefined) return;
+      const destinationDraft = state.draftByRoom[newRoom];
+      if (destinationDraft !== undefined && destinationDraft.length > 0) return;
+      state.draftByRoom[newRoom] = draft;
+      delete state.draftByRoom[oldRoom];
+    },
     roomRead(state, action: PayloadAction<{ room: string }>) {
       delete state.unreadByRoom[action.payload.room];
     },
