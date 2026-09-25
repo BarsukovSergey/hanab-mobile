@@ -43,6 +43,28 @@ describe('chat state and plain-text conversion', () => {
     expect(store.getState().chat.draftByRoom).toEqual({ table456: 'other room' });
   });
 
+  test('migrates a rematch draft to its new table and removes the old room draft', () => {
+    const store = createAppStore();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'unsent' }));
+
+    store.dispatch(chatActions.draftRoomMigrated({ oldTableID: 123, newTableID: 456 }));
+
+    expect(store.getState().chat.draftByRoom).toEqual({ table456: 'unsent' });
+  });
+
+  test('preserves both drafts when a rematch destination already has a non-empty draft', () => {
+    const store = createAppStore();
+    store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'old table' }));
+    store.dispatch(chatActions.draftChanged({ room: 'table456', draft: 'destination' }));
+
+    store.dispatch(chatActions.draftRoomMigrated({ oldTableID: 123, newTableID: 456 }));
+
+    expect(store.getState().chat.draftByRoom).toEqual({
+      table123: 'old table',
+      table456: 'destination',
+    });
+  });
+
   test('removes server markup before decoding escaped user input', () => {
     expect(chatMarkupToPlainText(
       '<span class="red">Notice</span><br>&lt;script&gt;safe&lt;/script&gt; &amp; &#9731;',

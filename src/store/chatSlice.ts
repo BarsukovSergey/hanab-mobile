@@ -66,6 +66,21 @@ export const chatSlice = createSlice({
     ) {
       if (action.payload.succeeded) delete state.draftByRoom[action.payload.room];
     },
+    draftRoomMigrated(
+      state,
+      action: PayloadAction<{ oldTableID: number; newTableID: number }>,
+    ) {
+      const { oldTableID, newTableID } = action.payload;
+      if (oldTableID <= 0 || newTableID <= 0 || oldTableID === newTableID) return;
+      const oldRoom = `table${oldTableID}`;
+      const newRoom = `table${newTableID}`;
+      const draft = state.draftByRoom[oldRoom];
+      if (draft === undefined) return;
+      const destinationDraft = state.draftByRoom[newRoom];
+      if (destinationDraft !== undefined && destinationDraft.length > 0) return;
+      state.draftByRoom[newRoom] = draft;
+      delete state.draftByRoom[oldRoom];
+    },
     roomRead(state, action: PayloadAction<{ room: string }>) {
       delete state.unreadByRoom[action.payload.room];
     },

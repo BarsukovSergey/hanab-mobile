@@ -1377,6 +1377,10 @@ export class LobbyRuntime {
               epoch, tableID: event.data.tableID, role,
             }));
             if (before.kind === 'live_game' && this.store.getState().room.room.kind === 'none') {
+              this.store.dispatch(chatActions.draftRoomMigrated({
+                oldTableID: before.tableID,
+                newTableID: event.data.tableID,
+              }));
               this.gameBootstrap.invalidate();
             }
           }
