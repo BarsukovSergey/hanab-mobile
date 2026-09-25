@@ -127,15 +127,13 @@ No bot-only server protocol should be invented.
 
 ## Selected native Pregame conveniences
 
-After/beside the bot picker, consider small contextual controls where mobile UI clearly beats command
-typing:
+The first small contextual controls are implemented where mobile UI clearly beats command typing:
 
-- Kick player for an eligible owner/leader;
+- Kick player for an eligible owner;
 - Find needed variant;
-- Missing max scores;
-- carefully selected auto-start helpers if they prove useful.
+- Missing max scores.
 
-Do **not** turn every slash command into an icon/button.
+Possible follow-up is limited to carefully selected auto-start helpers if they prove useful. Do **not** turn every slash command into an icon/button.
 
 ## Tag management completion
 

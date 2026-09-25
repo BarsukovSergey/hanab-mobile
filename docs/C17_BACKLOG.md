@@ -41,8 +41,8 @@ These items were explicitly removed from the C17 release gate during product rev
 
 ## Product shell / social
 
-- **Native controls for useful slash-command actions:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. People/Pregame/live-game contexts already expose Friend/Unfriend and session Dialog actions; shared-replay turn suggestions and Add tag also have first-class UI. Remaining candidates include pregame kick and selected score/variant helpers where structured mobile context improves on command typing. Existing leader/variant/pause/termination controls remain first-class UI. Preserve slash-command support as the parity/fallback path.
-- **Bot invite follow-up:** the multi-select Create/Pregame picker and exact 19-name registry are implemented for open tables. Verify individual password-join capability before enabling protected-table invites; all current entries are disabled there. Do not persist table passwords or create a bot-only protocol.
+- **Native controls for useful slash-command actions:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. People/Pregame/live-game contexts already expose Friend/Unfriend and session Dialog actions; shared-replay turn suggestions, Add tag, Pregame Kick, Find variant, and Missing scores also have first-class UI. Remaining candidates are selective conveniences such as auto-start where structured mobile context clearly improves on command typing. Existing leader/variant/pause/termination controls remain first-class UI. Preserve slash-command support as the parity/fallback path.
+- **Bot invite follow-up:** the multi-select Create/Pregame picker and exact 19-name registry are implemented for open and password-protected tables. The current 19 entries have verified password-join capability; future registry entries remain capability-gated. Only authoritative online Lobby-status bots are selectable, Busy bots are shown but disabled, and table passwords remain transient rather than entering Redux/persistence. Do not create a bot-only protocol.
 - Rich/compact profiles beyond the existing People/context-action surfaces.
 - Broader friends/social UX beyond current People/Friend actions, friend-aware Lobby ordering, Friends history, Other Scores, and session PM Dialogs.
 - **Chat presence/read-state polish:** local live-table unread counts already exist without server read receipts. Future work may research typing indicators or richer read-state semantics only if authoritative server/client capability is worth exposing on mobile.
@@ -81,6 +81,8 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - People/Pregame/live-game contextual session Dialog and Friend/Unfriend actions, plus friend-aware Lobby ordering.
 - Account creation is explicit on the login screen; Change password and Forgot password entry points preserve the no-credential-storage boundary.
 - Compact authoritative Pregame player stats and spectator list.
+- Native Pregame Kick, Find variant, and Missing scores actions with slash-command fallback.
+- Multi-bot Create/Pregame picker for open and password-protected tables with transient password handling.
 - Own History, Friends history, and same-seed Other Scores comparison.
 - Authoritative game tag display and first-class Add tag action.
 - Live table-chat unread indicator and direct `/r` reply handling.
