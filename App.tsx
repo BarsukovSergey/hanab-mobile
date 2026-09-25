@@ -7,6 +7,7 @@ import {
   Linking,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -325,17 +326,17 @@ function AppContent() {
         </ScrollView>
         </SafeAreaView>
         <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
-          <View style={styles.sheetBackdrop}>
-            <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+          <Pressable onPress={() => setLiveSheet(null)} style={styles.sheetBackdrop}>
+            <Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
               {liveSheet === 'menu'
                 ? <>
                   <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
                   <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions}>
-                    <ActionButton title="Table chat" onPress={() => setLiveSheet('chat')} />
                     <ActionButton title="Add tag" onPress={() => {
                       setTagDraft('');
                       setLiveSheet('tag');
                     }} />
+                    <ActionButton title="Show tags" onPress={() => chatRuntime.submit('/tags')} />
                     <SectionHeading title={`Players (${liveClientState.metadata.playerNames.length})`} />
                     {liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))}
                     <SectionHeading
@@ -386,7 +387,7 @@ function AppContent() {
                 : liveSheet === 'chat'
                   ? <>
                     <ChatPanel room={`table${liveTableID}`} title="Table chat" />
-                    <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
+                    <ActionButton title="Back" onPress={() => setLiveSheet(null)} />
                   </>
                   : liveSheet === 'settings'
                     ? <SettingsScreen onBack={() => setLiveSheet('menu')} />
@@ -415,8 +416,8 @@ function AppContent() {
                         <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
                       </>
                     : null}
-            </View>
-          </View>
+            </Pressable>
+          </Pressable>
         </Modal>
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
         </SafeAreaView>
