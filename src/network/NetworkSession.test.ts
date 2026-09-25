@@ -111,3 +111,36 @@ describe('HanabNetworkSession logout', () => {
     );
   });
 });
+
+describe('HanabNetworkSession tag discovery', () => {
+  const validItem = {
+    id: 1, options: { numPlayers: 2, startingPlayer: 0, variantID: 0, variantName: 'No Variant',
+      timed: false, timeBase: 0, timePerTurn: 0, speedrun: false, cardCycle: false, deckPlays: false,
+      emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+      detrimentalCharacters: false },
+    seed: 's', score: 1, numTurns: 1, endCondition: 1, datetimeStarted: 'start', datetimeFinished: 'end',
+    numGamesOnThisSeed: 1, playerNames: ['Ada'], incrementNumGames: true, tags: 'a,b',
+  };
+
+  test('sends encoded authenticated GET paths and validates schema', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, status: 200, json: async () => [validItem],
+    } as Response);
+    const session = new HanabNetworkSession();
+    await expect(session.fetchTaggedGames('A/B')).resolves.toEqual([validItem]);
+    await expect(session.searchTag('tag / ?')).resolves.toEqual([validItem]);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://hanab.live/api/v1/tags/A%2FB',
+      expect.objectContaining({ method: 'GET', credentials: 'include' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://hanab.live/api/v1/tag/tag%20%2F%20%3F',
+      expect.objectContaining({ method: 'GET', credentials: 'include' }));
+  });
+
+  test('rejects HTTP and malformed response failures', async () => {
+    jest.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [{ tags: 7 }] } as Response);
+    const session = new HanabNetworkSession();
+    await expect(session.fetchTaggedGames('Ada')).rejects.toMatchObject({ detail: { kind: 'http', status: 404 } });
+    await expect(session.searchTag('x')).rejects.toMatchObject({ message: 'Invalid game history response' });
+  });
+});

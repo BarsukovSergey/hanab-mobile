@@ -32,6 +32,76 @@ function readyStore(totalGames = 30) {
 }
 
 describe('C15 history state', () => {
+  test('tag loads/searches remain isolated, preserve order and ignore stale epochs', () => {
+    const store = readyStore();
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    expect(store.getState().history.taggedPending).toBe(true);
+    const tagged = [{ ...item(3), tags: 'one,two' }, item(1)];
+    store.dispatch(historyActions.taggedReceived({ connectionEpoch: 1, history: tagged }));
+    expect(store.getState().history.taggedItems).toEqual(tagged);
+    expect(store.getState().history.items).toEqual([]);
+    expect(store.getState().history.taggedLoaded).toBe(true);
+    store.dispatch(historyActions.replayCreateRequested({ connectionEpoch: 1, databaseID: 3 }));
+    expect(store.getState().history.pendingReplayCreate?.databaseID).toBe(3);
+    store.dispatch(historyActions.replayCreateAccepted({ connectionEpoch: 1, databaseID: 3 }));
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    expect(store.getState().history.taggedPending).toBe(false);
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'x' }));
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'x' }));
+    expect(store.getState().history.tagSearchPending).toBe(true);
+    const searchID = store.getState().history.tagSearchRequestId!;
+    store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: 1, requestId: searchID, tag: 'x', history: [item(8)] }));
+    expect(store.getState().history.tagSearchItems).toEqual([item(8)]);
+    store.dispatch(historyActions.tagSearchCleared());
+    expect(store.getState().history.tagSearchItems).toBeNull();
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    store.dispatch(historyActions.taggedReceived({ connectionEpoch: 1, history: tagged }));
+    expect(store.getState().history).toMatchObject({ taggedItems: [], taggedPending: false, taggedLoaded: false });
+  });
+
+  test('cleared and superseded search completions cannot change the current request', () => {
+    const store = readyStore();
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'A' }));
+    const requestA = store.getState().history.tagSearchRequestId!;
+    store.dispatch(historyActions.tagSearchCleared());
+    store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: 1, requestId: requestA, tag: 'A', history: [item(1)] }));
+    store.dispatch(historyActions.tagFailed({ connectionEpoch: 1, request: 'search', requestId: requestA, tag: 'A', message: 'late A failure' }));
+    expect(store.getState().history).toMatchObject({
+      tagSearchActive: false, tagSearchItems: null, tagSearchPending: false, tagSearchError: null,
+    });
+
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'A' }));
+    const secondA = store.getState().history.tagSearchRequestId!;
+    store.dispatch(historyActions.tagSearchCleared());
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'B' }));
+    const requestB = store.getState().history.tagSearchRequestId!;
+    expect(requestB).not.toBe(secondA);
+    store.dispatch(historyActions.tagFailed({ connectionEpoch: 1, request: 'search', requestId: secondA, tag: 'A', message: 'late A failure' }));
+    expect(store.getState().history.tagSearchPending).toBe(true);
+    expect(store.getState().history.tagSearchError).toBeNull();
+    store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: 1, requestId: requestB, tag: 'B', history: [] }));
+    expect(store.getState().history).toMatchObject({
+      tagSearchActive: true, tagSearchPending: false, tagSearchQuery: 'B', tagSearchItems: [], tagSearchError: null,
+    });
+  });
+
+  test('tagged load and tag search keep independent pending and error state', () => {
+    const store = readyStore();
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'search' }));
+    const requestId = store.getState().history.tagSearchRequestId!;
+    store.dispatch(historyActions.tagFailed({ connectionEpoch: 1, request: 'search', requestId, tag: 'search', message: 'search failed' }));
+    expect(store.getState().history).toMatchObject({ taggedPending: true, taggedError: null, tagSearchPending: false, tagSearchError: 'search failed' });
+    store.dispatch(historyActions.tagFailed({ connectionEpoch: 1, request: 'tagged', message: 'tagged failed' }));
+    expect(store.getState().history).toMatchObject({ taggedPending: false, taggedError: 'tagged failed', tagSearchError: 'search failed' });
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'next' }));
+    const nextID = store.getState().history.tagSearchRequestId!;
+    store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: 1, requestId: nextID, tag: 'next', history: [item(9)] }));
+    expect(store.getState().history).toMatchObject({ taggedError: 'tagged failed', tagSearchError: null, tagSearchItems: [item(9)] });
+  });
+
   test('same-seed results require matching pending context and preserve server order', () => {
     const store = readyStore();
     const source = { ...item(1), numGamesOnThisSeed: 3 };

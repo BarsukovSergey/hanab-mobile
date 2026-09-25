@@ -5,6 +5,7 @@ import type {
   NetworkSocket,
   SessionCheckResult,
 } from '../network/types';
+import type { GameHistory } from '../protocol/gameProtocol';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
@@ -73,6 +74,8 @@ class FakeSession implements NetworkSession {
   checkSession(): Promise<SessionCheckResult> { return Promise.resolve({ kind: 'valid' }); }
   submitLogin(): Promise<void> { return Promise.resolve(); }
   logout(): Promise<void> { return Promise.resolve(); }
+  fetchTaggedGames(): Promise<GameHistory> { return Promise.resolve([]); }
+  searchTag(): Promise<GameHistory> { return Promise.resolve([]); }
   openSocket(): Promise<NetworkSocket> {
     const socket = this.sockets[this.nextSocket++];
     if (socket === undefined) throw new Error('Missing fake socket');

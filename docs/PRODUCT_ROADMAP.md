@@ -110,7 +110,7 @@ require redesigning core gameplay.
 
 ## Multi-bot Create/Pregame picker
 
-Implemented for open tables with a maintained 19-name registry and multi-select Create/Pregame controls. Protected-table invites await per-account password-join verification.
+Implemented in PR #91, including protected-table invites.
 
 Use the existing research in `COMMANDS_AND_BOTS_RESEARCH.md`:
 
@@ -135,14 +135,11 @@ The first small contextual controls are implemented where mobile UI clearly beat
 
 Possible follow-up is limited to carefully selected auto-start helpers if they prove useful. Do **not** turn every slash command into an icon/button.
 
-## Tag management completion
+## Read-only tag discovery
 
-Current Add/display support is enough for beta.2. A later small slice can add:
-
-- structured tag list/search;
-- tag removal;
-- delete-all confirmation if worth exposing;
-- navigation from tag results to History/replay.
+This slice adds authenticated user's Tagged Games and exact tag search to History, reusing the
+existing history cards and replay flow. The availability of these read APIs on production is not
+established here. Tag removal and delete-all remain deferred; this slice has no tag mutation UI.
 
 ---
 

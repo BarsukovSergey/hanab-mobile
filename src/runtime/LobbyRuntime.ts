@@ -337,6 +337,46 @@ export class LobbyRuntime {
     return this.store.getState().history.friendPendingRequest?.offset === 0;
   }
 
+  ensureTaggedGames(): boolean {
+    const state = this.store.getState();
+    const username = state.session.authenticatedUser?.username;
+    const history = state.history;
+    if (state.session.phase !== 'ready' || username === undefined
+      || history.connectionEpoch !== state.session.connectionEpoch
+      || history.taggedLoaded || history.taggedPending) return false;
+    const epoch = state.session.connectionEpoch;
+    this.store.dispatch(historyActions.taggedRequested({ connectionEpoch: epoch }));
+    void this.networkSession.fetchTaggedGames(username).then((items) => {
+      if (this.store.getState().session.connectionEpoch !== epoch) return;
+      this.store.dispatch(historyActions.taggedReceived({ connectionEpoch: epoch, history: items }));
+    }).catch((error: unknown) => {
+      if (this.store.getState().session.connectionEpoch !== epoch) return;
+      this.store.dispatch(historyActions.tagFailed({ connectionEpoch: epoch, request: 'tagged', message: safeStatus(error, 'Unable to load tagged games.') }));
+    });
+    return true;
+  }
+
+  searchTag(tag: string): boolean {
+    const state = this.store.getState();
+    if (tag.trim() === '' || state.session.phase !== 'ready'
+      || state.history.connectionEpoch !== state.session.connectionEpoch
+      || state.history.tagSearchPending) return false;
+    const epoch = state.session.connectionEpoch;
+    this.store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: epoch, tag }));
+    const requestId = this.store.getState().history.tagSearchRequestId;
+    if (requestId === null) return false;
+    void this.networkSession.searchTag(tag).then((items) => {
+      if (this.store.getState().session.connectionEpoch !== epoch) return;
+      this.store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: epoch, requestId, tag, history: items }));
+    }).catch((error: unknown) => {
+      if (this.store.getState().session.connectionEpoch !== epoch) return;
+      this.store.dispatch(historyActions.tagFailed({ connectionEpoch: epoch, request: 'search', requestId, tag, message: safeStatus(error, 'Unable to search this tag.') }));
+    });
+    return true;
+  }
+
+  clearTagSearch(): void { this.store.dispatch(historyActions.tagSearchCleared()); }
+
   loadMoreFriendsHistory(): boolean {
     const state = this.store.getState();
     const history = state.history;
@@ -382,8 +422,8 @@ export class LobbyRuntime {
 
   watchHistoricalGame(databaseID: number, visibility: 'solo' | 'shared' = 'solo'): boolean {
     const state = this.store.getState();
-    const item = [...state.history.items, ...state.history.friendItems,
-      ...(state.history.otherScores?.games ?? [])]
+    const item = [...state.history.items, ...state.history.friendItems, ...state.history.taggedItems,
+      ...(state.history.tagSearchItems ?? []), ...(state.history.otherScores?.games ?? [])]
       .find((candidate) => candidate.id === databaseID);
     const room = state.room;
     if (

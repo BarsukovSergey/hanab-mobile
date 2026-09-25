@@ -27,6 +27,17 @@ export type HistoryState = {
   totalGames: number;
   items: GameHistoryItem[];
   friendItems: GameHistoryItem[];
+  taggedItems: GameHistoryItem[];
+  taggedLoaded: boolean;
+  taggedPending: boolean;
+  taggedError: string | null;
+  tagSearchPending: boolean;
+  tagSearchQuery: string;
+  tagSearchItems: GameHistoryItem[] | null;
+  tagSearchActive: boolean;
+  tagSearchSequence: number;
+  tagSearchRequestId: number | null;
+  tagSearchError: string | null;
   initialPageReceived: boolean;
   friendInitialPageReceived: boolean;
   pendingRequest: PendingHistoryRequest | null;
@@ -44,6 +55,9 @@ const initialState: HistoryState = {
   totalGames: 0,
   items: [],
   friendItems: [],
+  taggedItems: [], taggedLoaded: false, taggedPending: false, taggedError: null,
+  tagSearchItems: null, tagSearchActive: false, tagSearchSequence: 0,
+  tagSearchRequestId: null, tagSearchPending: false, tagSearchQuery: '', tagSearchError: null,
   initialPageReceived: false,
   friendInitialPageReceived: false,
   pendingRequest: null,
@@ -69,6 +83,49 @@ export const historySlice = createSlice({
   name: 'history',
   initialState,
   reducers: {
+    taggedRequested(state, action: PayloadAction<{ connectionEpoch: number }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || state.taggedLoaded || state.taggedPending) return;
+      state.taggedPending = true; state.taggedError = null;
+    },
+    taggedReceived(state, action: PayloadAction<{ connectionEpoch: number; history: GameHistory }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || !state.taggedPending) return;
+      state.taggedItems = action.payload.history; state.taggedLoaded = true; state.taggedPending = false; state.taggedError = null;
+    },
+    tagSearchRequested(state, action: PayloadAction<{ connectionEpoch: number; tag: string }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || state.tagSearchPending || action.payload.tag.trim() === '') return;
+      state.tagSearchSequence += 1;
+      state.tagSearchRequestId = state.tagSearchSequence;
+      state.tagSearchActive = true;
+      state.tagSearchQuery = action.payload.tag;
+      state.tagSearchItems = null;
+      state.tagSearchPending = true;
+      state.tagSearchError = null;
+    },
+    tagSearchReceived(state, action: PayloadAction<{ connectionEpoch: number; requestId: number; tag: string; history: GameHistory }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || !state.tagSearchPending
+        || state.tagSearchRequestId !== action.payload.requestId || state.tagSearchQuery !== action.payload.tag) return;
+      state.tagSearchItems = action.payload.history; state.tagSearchPending = false; state.tagSearchError = null;
+    },
+    tagSearchCleared(state) {
+      state.tagSearchItems = null; state.tagSearchPending = false; state.tagSearchActive = false;
+      state.tagSearchQuery = ''; state.tagSearchRequestId = null; state.tagSearchError = null;
+    },
+    tagFailed(state, action: PayloadAction<
+      | { connectionEpoch: number; message: string; request: 'tagged' }
+      | { connectionEpoch: number; message: string; request: 'search'; requestId: number; tag: string }
+    >) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch) return;
+      if (action.payload.request === 'tagged') {
+        if (!state.taggedPending) return;
+        state.taggedPending = false;
+        state.taggedError = action.payload.message;
+        return;
+      }
+      if (!state.tagSearchPending || state.tagSearchRequestId !== action.payload.requestId
+        || state.tagSearchQuery !== action.payload.tag) return;
+      state.tagSearchPending = false;
+      state.tagSearchError = action.payload.message;
+    },
     pageRequested(state, action: PayloadAction<PendingHistoryRequest>) {
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
@@ -154,7 +211,8 @@ export const historySlice = createSlice({
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
         || state.pendingReplayCreate !== null
-        || ![...state.items, ...state.friendItems, ...(state.otherScores?.games ?? [])]
+        || ![...state.items, ...state.friendItems, ...state.taggedItems,
+          ...(state.tagSearchItems ?? []), ...(state.otherScores?.games ?? [])]
           .some((item) => item.id === action.payload.databaseID)
       ) return;
       state.pendingReplayCreate = action.payload;
@@ -220,6 +278,8 @@ export const historySlice = createSlice({
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
       state.pendingOtherScores = null;
+      state.taggedPending = false;
+      state.tagSearchPending = false;
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -227,6 +287,8 @@ export const historySlice = createSlice({
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
       state.pendingOtherScores = null;
+      state.taggedPending = false;
+      state.tagSearchPending = false;
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
   },

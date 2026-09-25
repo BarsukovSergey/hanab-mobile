@@ -1,4 +1,5 @@
 import { HANAB_HTTP_BASE_URL, HANAB_WEBSOCKET_URL } from '../config/hanab';
+import { gameHistorySchema } from '../protocol/gameProtocol';
 import {
   NetworkRequestError,
   type NetworkSession,
@@ -7,6 +8,25 @@ import {
 } from './types';
 
 const HTTP_REQUEST_TIMEOUT_MS = 10_000;
+
+async function fetchGameHistory(path: string): Promise<ReturnType<typeof gameHistorySchema.parse>> {
+  let response: Response;
+  try {
+    response = await boundedFetch(`${HANAB_HTTP_BASE_URL}${path}`, {
+      method: 'GET', credentials: 'include',
+    });
+  } catch (error) {
+    throw new NetworkRequestError({ kind: 'transport', message: transportMessage(error) });
+  }
+  if (!response.ok) throw new NetworkRequestError({
+    kind: 'http', status: response.status, message: `Request returned HTTP ${response.status}`,
+  });
+  try {
+    return gameHistorySchema.parse(await response.json());
+  } catch {
+    throw new NetworkRequestError({ kind: 'transport', message: 'Invalid game history response' });
+  }
+}
 
 async function boundedFetch(
   input: RequestInfo | URL,
@@ -45,6 +65,14 @@ function transportMessage(error: unknown): string {
 }
 
 export class HanabNetworkSession implements NetworkSession {
+  fetchTaggedGames(username: string) {
+    return fetchGameHistory(`/api/v1/tags/${encodeURIComponent(username)}`);
+  }
+
+  searchTag(tag: string) {
+    return fetchGameHistory(`/api/v1/tag/${encodeURIComponent(tag)}`);
+  }
+
   async checkSession(): Promise<SessionCheckResult> {
     try {
       const response = await boundedFetch(`${HANAB_HTTP_BASE_URL}/test-cookie`, {
