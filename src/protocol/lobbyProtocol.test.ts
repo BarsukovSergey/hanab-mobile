@@ -556,6 +556,21 @@ describe('lobby protocol decoder', () => {
     for (const [command, payload] of [['table', table], ['tableList', [table]]] as const) {
       const result = decodeServerFrame(`${command} ${JSON.stringify(payload)}`);
       expect(result).toMatchObject({ kind: 'event', event: { command, data: payload } });
+
+      const noShadow = { ...table, spectators: [{ name: 'Cy' }] };
+      const normalizedNoShadow = {
+        ...noShadow,
+        spectators: [{ name: 'Cy', shadowingPlayerIndex: -1, shadowingPlayerUsername: '' }],
+      };
+      expect(decodeServerFrame(`${command} ${JSON.stringify(command === 'table' ? noShadow : [noShadow])}`))
+        .toEqual({
+          kind: 'event',
+          event: {
+            command,
+            data: command === 'table' ? normalizedNoShadow : [normalizedNoShadow],
+          },
+        });
+
       const invalid = { ...table, spectators: [{ name: 'Cy', shadowingPlayerIndex: -2, shadowingPlayerUsername: '' }] };
       expect(decodeServerFrame(`${command} ${JSON.stringify(command === 'table' ? invalid : [invalid])}`))
         .toEqual({ kind: 'malformed', command, issue: 'invalid-payload' });
@@ -572,8 +587,21 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: { command: 'spectators', data: JSON.parse(payload) },
     });
-    expect(decodeServerFrame('pregameSpectators {"tableID":123,"spectators":[{"name":"Cy"}]}'))
-      .toMatchObject({ kind: 'malformed', issue: 'invalid-payload' });
+    const noShadowPayload = '{"tableID":123,"spectators":[{"name":"Cy"}]}';
+    for (const command of ['pregameSpectators', 'spectators'] as const) {
+      expect(decodeServerFrame(`${command} ${noShadowPayload}`)).toEqual({
+        kind: 'event',
+        event: {
+          command,
+          data: {
+            tableID: 123,
+            spectators: [{
+              name: 'Cy', shadowingPlayerIndex: -1, shadowingPlayerUsername: '',
+            }],
+          },
+        },
+      });
+    }
   });
 
   test('encodes exact replay navigation and quick-rematch commands', () => {
