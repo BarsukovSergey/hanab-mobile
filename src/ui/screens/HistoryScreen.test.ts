@@ -49,6 +49,19 @@ describe('History screen source contract', () => {
     expect(screen).toContain('!comparing && !showingTagged && <ActionButton');
   });
 
+  test('keeps previous search results hidden while a new exact tag request loads', () => {
+    expect(screen).toContain('history.tagSearchActive');
+    expect(screen).toContain('? history.tagSearchItems ?? [] : history.taggedItems');
+    expect(screen).toContain('history.tagSearchPending && <Notice>Searching for tag…</Notice>');
+    expect(screen).toContain('history.tagSearchItems !== null');
+  });
+
+  test('shows a search-specific empty state distinct from empty Tagged Games', () => {
+    expect(screen).toContain('No games found for this tag.');
+    expect(screen).toContain('No tagged games found.');
+    expect(screen).toContain('!history.tagSearchActive && history.taggedLoaded');
+  });
+
   test('resets selection to My history on an empty friends list without auto-selecting on re-add', () => {
     expect(screen).toMatch(/useEffect\(\(\) => \{[\s\S]*?session\.friends\.length === 0[\s\S]*?selection\.mode === 'friends'[\s\S]*?setSelection\(\{ epoch: session\.connectionEpoch, mode: 'mine' \}\);[\s\S]*?\}, \[selection, session\.connectionEpoch, session\.friends\.length\]\);/);
     expect(screen).toContain("const showingFriends = mode === 'friends' && session.friends.length > 0;");

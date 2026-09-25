@@ -363,12 +363,14 @@ export class LobbyRuntime {
       || state.history.tagSearchPending) return false;
     const epoch = state.session.connectionEpoch;
     this.store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: epoch, tag }));
+    const requestId = this.store.getState().history.tagSearchRequestId;
+    if (requestId === null) return false;
     void this.networkSession.searchTag(tag).then((items) => {
       if (this.store.getState().session.connectionEpoch !== epoch) return;
-      this.store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: epoch, tag, history: items }));
+      this.store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: epoch, requestId, tag, history: items }));
     }).catch((error: unknown) => {
       if (this.store.getState().session.connectionEpoch !== epoch) return;
-      this.store.dispatch(historyActions.tagFailed({ connectionEpoch: epoch, request: 'search', message: safeStatus(error, 'Unable to search this tag.') }));
+      this.store.dispatch(historyActions.tagFailed({ connectionEpoch: epoch, request: 'search', requestId, tag, message: safeStatus(error, 'Unable to search this tag.') }));
     });
     return true;
   }

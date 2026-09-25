@@ -46,9 +46,11 @@ export function HistoryScreen({
   const mode = selection.epoch === session.connectionEpoch ? selection.mode : 'mine';
   const showingFriends = mode === 'friends' && session.friends.length > 0;
   const showingTagged = mode === 'tagged';
-  const tagItems = history.tagSearchItems ?? history.taggedItems;
+  const tagItems = history.tagSearchActive
+    ? history.tagSearchItems ?? [] : history.taggedItems;
   const items = showingTagged ? tagItems : showingFriends ? history.friendItems : history.items;
-  const initialPageReceived = showingTagged ? history.tagSearchItems !== null || history.taggedLoaded
+  const initialPageReceived = showingTagged ? history.tagSearchActive
+    ? history.tagSearchItems !== null : history.taggedLoaded
     : showingFriends ? history.friendInitialPageReceived : history.initialPageReceived;
   const hasMore = !showingTagged && (showingFriends ? history.friendHasMore : history.hasMore);
   const pendingRequest = showingTagged ? null : showingFriends ? history.friendPendingRequest : history.pendingRequest;
@@ -105,13 +107,27 @@ export function HistoryScreen({
           onPress={() => lobbyRuntime.clearTagSearch()} />
       </Panel>}
 
-      {!comparing && !initialPageReceived && <Notice>{showingTagged ? (history.taggedPending || history.tagSearchPending ? 'Loading tagged games…' : 'Select Tagged games to load.') : showingFriends ? 'Loading friends history…' : 'Loading game history…'}</Notice>}
-      {!comparing && history.tagError !== null && showingTagged && <Notice tone="error">{history.tagError}</Notice>}
+      {!comparing && showingTagged && history.taggedPending && !history.tagSearchActive && <Notice>Loading tagged games…</Notice>}
+      {!comparing && showingTagged && !history.taggedLoaded && !history.taggedPending
+        && !history.tagSearchActive && history.taggedError === null
+        && <Notice>Select Tagged games to load.</Notice>}
+      {!comparing && showingTagged && history.tagSearchPending && <Notice>Searching for tag…</Notice>}
+      {!comparing && showingTagged && history.taggedError !== null && <Notice tone="error">{history.taggedError}</Notice>}
+      {!comparing && showingTagged && history.tagSearchActive && history.tagSearchError !== null
+        && <Notice tone="error">{history.tagSearchError}</Notice>}
+      {!comparing && !showingTagged && !initialPageReceived && <Notice>{showingFriends ? 'Loading friends history…' : 'Loading game history…'}</Notice>}
       {!comparing && !showingTagged && history.error !== null && <Notice tone="error">{history.error}</Notice>}
-      {!comparing && initialPageReceived && items.length === 0 && (
+      {!comparing && !showingTagged && initialPageReceived && items.length === 0 && (
         <Panel><EmptyState>{showingFriends
-          ? 'None of your friends have played any games yet.' : showingTagged ? 'No tagged games found.' : 'No finished games yet.'}</EmptyState></Panel>
+          ? 'None of your friends have played any games yet.' : 'No finished games yet.'}</EmptyState></Panel>
       )}
+      {!comparing && showingTagged && history.tagSearchActive && !history.tagSearchPending
+        && history.tagSearchError === null && history.tagSearchItems !== null
+        && history.tagSearchItems.length === 0
+        && <Panel><EmptyState>No games found for this tag.</EmptyState></Panel>}
+      {!comparing && showingTagged && !history.tagSearchActive && history.taggedLoaded
+        && history.taggedItems.length === 0
+        && <Panel><EmptyState>No tagged games found.</EmptyState></Panel>}
 
       <View style={[styles.grid, wide && styles.gridWide]}>
         {(comparing ? history.otherScores?.games ?? [] : items).map((item) => {

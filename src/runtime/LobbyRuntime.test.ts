@@ -106,8 +106,8 @@ class FakeSession implements NetworkSession {
   }
   submitLogin(): Promise<void> { return Promise.resolve(); }
   logout(): Promise<void> { this.logoutCalls += 1; return Promise.resolve(); }
-  fetchTaggedGames(): Promise<GameHistory> { return Promise.resolve([]); }
-  searchTag(): Promise<GameHistory> { return Promise.resolve([]); }
+  fetchTaggedGames(_username: string): Promise<GameHistory> { return Promise.resolve([]); }
+  searchTag(_tag: string): Promise<GameHistory> { return Promise.resolve([]); }
   openSocket(): Promise<NetworkSocket> {
     const socket = this.sockets[this.openCalls++];
     if (socket === undefined) throw new Error('No fake socket configured');
@@ -3834,6 +3834,29 @@ describe('deterministic lobby runtime', () => {
     await Promise.resolve();
     expect(store.getState().history.taggedItems).toEqual([]);
     expect(store.getState().history.error).toBeNull();
+  });
+
+  test('late failed search A cannot cancel a newer search B after clear', async () => {
+    const { session, store, runtime } = await makeReadyRuntime();
+    let rejectA!: (error: Error) => void;
+    const searchA = new Promise<GameHistory>((_resolve, reject) => { rejectA = reject; });
+    const searchB = deferred<GameHistory>();
+    jest.spyOn(session, 'searchTag').mockImplementation((tag) => tag === 'A' ? searchA : searchB.promise);
+
+    expect(runtime.searchTag('A')).toBe(true);
+    runtime.clearTagSearch();
+    expect(runtime.searchTag('B')).toBe(true);
+    const requestB = store.getState().history.tagSearchRequestId;
+    rejectA(new Error('A failed late'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.getState().history).toMatchObject({
+      tagSearchPending: true, tagSearchRequestId: requestB, tagSearchQuery: 'B', tagSearchError: null,
+    });
+
+    searchB.resolve([historicalGame(81) as unknown as GameHistory[number]]);
+    await Promise.resolve();
+    expect(store.getState().history.tagSearchItems?.map(({ id }) => id)).toEqual([81]);
   });
 
   test('friend-only game uses the existing solo replay path', async () => {
