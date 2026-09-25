@@ -8,6 +8,7 @@ describe('History screen source contract', () => {
   test('renders authoritative tags only when non-empty', () => {
     expect(screen).toContain("item.tags !== '' && <Text");
     expect(screen).toContain('>{item.tags}</Text>');
+    expect(screen).not.toMatch(/item\.tags\.split/);
   });
 
   test('same-seed comparison keeps source context and server order', () => {
@@ -17,7 +18,7 @@ describe('History screen source contract', () => {
     expect(screen).toContain('comparing ? history.otherScores?.games ?? [] : items');
     expect(screen).toContain("item.playerNames.includes(session.authenticatedUser?.username ?? '')");
     expect(screen).toContain('title="Return to history" onPress={returnFromComparison}');
-    expect(screen).toContain('friends: friends && session.friends.length > 0');
+    expect(screen).toContain("mode: friends && session.friends.length > 0 ? 'friends' : 'mine'");
     expect(screen).toContain('lobbyRuntime.dismissOtherScores()');
   });
   test('offers Friends history only for authoritative friends and uses its independent pages', () => {
@@ -37,13 +38,23 @@ describe('History screen source contract', () => {
     expect(screen).toContain('(comparing ? history.otherScores?.games ?? [] : items).map((item) => {');
   });
 
+  test('offers tagged games and exact tag search without other scores', () => {
+    expect(screen).toContain('title="Tagged games"');
+    expect(screen).toContain('lobbyRuntime.ensureTaggedGames()');
+    expect(screen).toContain('placeholder="Exact tag"');
+    expect(screen).toContain('title="Search"');
+    expect(screen).toContain('lobbyRuntime.searchTag(tagInput)');
+    expect(screen).toContain('title="Clear search"');
+    expect(screen).toContain('lobbyRuntime.clearTagSearch()');
+    expect(screen).toContain('!comparing && !showingTagged && <ActionButton');
+  });
+
   test('resets selection to My history on an empty friends list without auto-selecting on re-add', () => {
-    expect(screen).toMatch(/useEffect\(\(\) => \{[\s\S]*?session\.friends\.length === 0[\s\S]*?selection\.friends[\s\S]*?setSelection\(\{ epoch: session\.connectionEpoch, friends: false \}\);[\s\S]*?\}, \[selection, session\.connectionEpoch, session\.friends\.length\]\);/);
-    expect(screen).toContain('const showingFriends = selection.epoch === session.connectionEpoch');
-    expect(screen).toContain('&& selection.friends && session.friends.length > 0;');
-    const resetEffect = screen.slice(screen.indexOf('useEffect('), screen.indexOf('const showingFriends'));
+    expect(screen).toMatch(/useEffect\(\(\) => \{[\s\S]*?session\.friends\.length === 0[\s\S]*?selection\.mode === 'friends'[\s\S]*?setSelection\(\{ epoch: session\.connectionEpoch, mode: 'mine' \}\);[\s\S]*?\}, \[selection, session\.connectionEpoch, session\.friends\.length\]\);/);
+    expect(screen).toContain("const showingFriends = mode === 'friends' && session.friends.length > 0;");
+    const resetEffect = screen.slice(screen.indexOf('useEffect('), screen.indexOf('const mode'));
     expect(resetEffect).not.toContain('ensureFriendsHistory');
-    expect(screen).toContain('setSelection({ epoch: session.connectionEpoch, friends: true });');
+    expect(screen).toContain("setSelection({ epoch: session.connectionEpoch, mode: 'friends' });");
     expect(screen).toContain('lobbyRuntime.ensureFriendsHistory();');
   });
 });

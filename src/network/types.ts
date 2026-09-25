@@ -1,3 +1,5 @@
+import type { GameHistory } from '../protocol/gameProtocol';
+
 export type NetworkOrHttpError = {
   kind: 'http' | 'transport';
   message: string;
@@ -28,6 +30,8 @@ export interface NetworkSession {
   submitLogin(username: string, password: string, newPassword?: string): Promise<void>;
   logout(): Promise<void>;
   openSocket(): Promise<NetworkSocket>;
+  fetchTaggedGames(username: string): Promise<GameHistory>;
+  searchTag(tag: string): Promise<GameHistory>;
 }
 
 export class NetworkRequestError extends Error {

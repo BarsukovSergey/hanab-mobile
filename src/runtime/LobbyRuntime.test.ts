@@ -6,6 +6,7 @@ import type {
   SessionCheckResult,
 } from '../network/types';
 import type { LobbyTable } from '../protocol/lobbyProtocol';
+import type { GameHistory } from '../protocol/gameProtocol';
 import { knownBots } from '../config/knownBots';
 import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { noteCommandSchema } from '../protocol/gameProtocol';
@@ -13,6 +14,7 @@ import { getCardKnowledgeViewModel } from '../game/selectors/cardKnowledge';
 import type { ActionIncludingHypothetical } from '../game/client/types/actions';
 import { lobbyActions } from '../store/lobbySlice';
 import { roomActions } from '../store/roomSlice';
+import { historyActions } from '../store/historySlice';
 import { sessionActions } from '../store/sessionSlice';
 import { createAppStore, userSelectors } from '../store/store';
 import { ChatRuntime, getVariantFromArgs } from './ChatRuntime';
@@ -104,6 +106,8 @@ class FakeSession implements NetworkSession {
   }
   submitLogin(): Promise<void> { return Promise.resolve(); }
   logout(): Promise<void> { this.logoutCalls += 1; return Promise.resolve(); }
+  fetchTaggedGames(): Promise<GameHistory> { return Promise.resolve([]); }
+  searchTag(): Promise<GameHistory> { return Promise.resolve([]); }
   openSocket(): Promise<NetworkSocket> {
     const socket = this.sockets[this.openCalls++];
     if (socket === undefined) throw new Error('No fake socket configured');
@@ -3798,6 +3802,40 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().history.friendPendingRequest).toBeNull();
   });
 
+  test('tagged and exact search loads are isolated, deduplicated, clearable and epoch guarded', async () => {
+    const { session, store, runtime } = await makeReadyRuntime();
+    const tagged = deferred<GameHistory>();
+    const search = deferred<GameHistory>();
+    const fetchTagged = jest.spyOn(session, 'fetchTaggedGames').mockReturnValue(tagged.promise);
+    jest.spyOn(session, 'searchTag').mockReturnValue(search.promise);
+    expect(runtime.ensureTaggedGames()).toBe(true);
+    expect(runtime.ensureTaggedGames()).toBe(false);
+    expect(store.getState().history.initialPageReceived).toBe(false);
+    tagged.resolve([historicalGame(12) as unknown as GameHistory[number]]);
+    await Promise.resolve();
+    expect(store.getState().history.taggedItems.map(({ id }) => id)).toEqual([12]);
+    expect(runtime.ensureTaggedGames()).toBe(false);
+    expect(runtime.searchTag('  ')).toBe(false);
+    expect(runtime.searchTag('a,b')).toBe(true);
+    expect(runtime.searchTag('another')).toBe(false);
+    search.resolve([]);
+    await Promise.resolve();
+    expect(store.getState().history.tagSearchItems).toEqual([]);
+    runtime.clearTagSearch();
+    expect(store.getState().history.tagSearchItems).toBeNull();
+
+    const stale = deferred<GameHistory>();
+    fetchTagged.mockReturnValue(stale.promise);
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 2, welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] } }));
+    expect(runtime.ensureTaggedGames()).toBe(true);
+    store.dispatch(sessionActions.connectionStarted({ epoch: 3 }));
+    stale.resolve([historicalGame(99) as unknown as GameHistory[number]]);
+    await Promise.resolve();
+    expect(store.getState().history.taggedItems).toEqual([]);
+    expect(store.getState().history.error).toBeNull();
+  });
+
   test('friend-only game uses the existing solo replay path', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     socket.emitMessage(`gameHistoryFriends ${JSON.stringify([historicalGame(77)])}`);
@@ -3806,6 +3844,24 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toEqual([
       'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
     ]);
+  });
+
+  test('tag search games reuse the existing replay path', async () => {
+    const { session, socket, runtime } = await makeReadyRuntime();
+    jest.spyOn(session, 'searchTag').mockResolvedValue([historicalGame(70) as unknown as GameHistory[number]]);
+    expect(runtime.searchTag('exact,tag')).toBe(true);
+    await Promise.resolve();
+    expect(runtime.watchHistoricalGame(70)).toBe(true);
+    expect(socket.sent).toEqual(['replayCreate {"source":"id","databaseID":70,"visibility":"solo"}']);
+  });
+
+  test('unsupported tagged games remain ineligible for replay', async () => {
+    const { store, runtime } = await makeReadyRuntime();
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    store.dispatch(historyActions.taggedReceived({ connectionEpoch: 1, history: [
+      historicalGame(71, { variantName: 'Unsupported Variant' }) as unknown as GameHistory[number],
+    ] }));
+    expect(runtime.watchHistoricalGame(71)).toBe(false);
   });
 
   test('same-seed comparison uses authoritative own or friends source and enables result replay', async () => {

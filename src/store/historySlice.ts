@@ -27,6 +27,13 @@ export type HistoryState = {
   totalGames: number;
   items: GameHistoryItem[];
   friendItems: GameHistoryItem[];
+  taggedItems: GameHistoryItem[];
+  tagSearchItems: GameHistoryItem[] | null;
+  taggedLoaded: boolean;
+  taggedPending: boolean;
+  tagSearchPending: boolean;
+  tagSearchQuery: string;
+  tagError: string | null;
   initialPageReceived: boolean;
   friendInitialPageReceived: boolean;
   pendingRequest: PendingHistoryRequest | null;
@@ -44,6 +51,8 @@ const initialState: HistoryState = {
   totalGames: 0,
   items: [],
   friendItems: [],
+  taggedItems: [], tagSearchItems: null, taggedLoaded: false, taggedPending: false,
+  tagSearchPending: false, tagSearchQuery: '', tagError: null,
   initialPageReceived: false,
   friendInitialPageReceived: false,
   pendingRequest: null,
@@ -69,6 +78,29 @@ export const historySlice = createSlice({
   name: 'history',
   initialState,
   reducers: {
+    taggedRequested(state, action: PayloadAction<{ connectionEpoch: number }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || state.taggedLoaded || state.taggedPending) return;
+      state.taggedPending = true; state.tagError = null;
+    },
+    taggedReceived(state, action: PayloadAction<{ connectionEpoch: number; history: GameHistory }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || !state.taggedPending) return;
+      state.taggedItems = action.payload.history; state.taggedLoaded = true; state.taggedPending = false; state.tagError = null;
+    },
+    tagSearchRequested(state, action: PayloadAction<{ connectionEpoch: number; tag: string }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || state.tagSearchPending || action.payload.tag.trim() === '') return;
+      state.tagSearchQuery = action.payload.tag; state.tagSearchPending = true; state.tagError = null;
+    },
+    tagSearchReceived(state, action: PayloadAction<{ connectionEpoch: number; tag: string; history: GameHistory }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch || !state.tagSearchPending || state.tagSearchQuery !== action.payload.tag) return;
+      state.tagSearchItems = action.payload.history; state.tagSearchPending = false; state.tagError = null;
+    },
+    tagSearchCleared(state) { state.tagSearchItems = null; state.tagSearchPending = false; state.tagSearchQuery = ''; state.tagError = null; },
+    tagFailed(state, action: PayloadAction<{ connectionEpoch: number; message: string; request: 'tagged' | 'search' }>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch) return;
+      if (action.payload.request === 'tagged') state.taggedPending = false;
+      else state.tagSearchPending = false;
+      state.tagError = action.payload.message;
+    },
     pageRequested(state, action: PayloadAction<PendingHistoryRequest>) {
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
@@ -154,7 +186,8 @@ export const historySlice = createSlice({
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
         || state.pendingReplayCreate !== null
-        || ![...state.items, ...state.friendItems, ...(state.otherScores?.games ?? [])]
+        || ![...state.items, ...state.friendItems, ...state.taggedItems,
+          ...(state.tagSearchItems ?? []), ...(state.otherScores?.games ?? [])]
           .some((item) => item.id === action.payload.databaseID)
       ) return;
       state.pendingReplayCreate = action.payload;
@@ -220,6 +253,8 @@ export const historySlice = createSlice({
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
       state.pendingOtherScores = null;
+      state.taggedPending = false;
+      state.tagSearchPending = false;
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -227,6 +262,8 @@ export const historySlice = createSlice({
       state.friendPendingRequest = null;
       state.pendingReplayCreate = null;
       state.pendingOtherScores = null;
+      state.taggedPending = false;
+      state.tagSearchPending = false;
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
   },

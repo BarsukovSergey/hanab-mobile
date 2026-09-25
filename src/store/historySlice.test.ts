@@ -32,6 +32,34 @@ function readyStore(totalGames = 30) {
 }
 
 describe('C15 history state', () => {
+  test('tag loads/searches remain isolated, preserve order and ignore stale epochs', () => {
+    const store = readyStore();
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    expect(store.getState().history.taggedPending).toBe(true);
+    const tagged = [{ ...item(3), tags: 'one,two' }, item(1)];
+    store.dispatch(historyActions.taggedReceived({ connectionEpoch: 1, history: tagged }));
+    expect(store.getState().history.taggedItems).toEqual(tagged);
+    expect(store.getState().history.items).toEqual([]);
+    expect(store.getState().history.taggedLoaded).toBe(true);
+    store.dispatch(historyActions.replayCreateRequested({ connectionEpoch: 1, databaseID: 3 }));
+    expect(store.getState().history.pendingReplayCreate?.databaseID).toBe(3);
+    store.dispatch(historyActions.replayCreateAccepted({ connectionEpoch: 1, databaseID: 3 }));
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    expect(store.getState().history.taggedPending).toBe(false);
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'x' }));
+    store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'x' }));
+    expect(store.getState().history.tagSearchPending).toBe(true);
+    store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: 1, tag: 'x', history: [item(8)] }));
+    expect(store.getState().history.tagSearchItems).toEqual([item(8)]);
+    store.dispatch(historyActions.tagSearchCleared());
+    expect(store.getState().history.tagSearchItems).toBeNull();
+    store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    store.dispatch(historyActions.taggedReceived({ connectionEpoch: 1, history: tagged }));
+    expect(store.getState().history).toMatchObject({ taggedItems: [], taggedPending: false, taggedLoaded: false });
+  });
+
   test('same-seed results require matching pending context and preserve server order', () => {
     const store = readyStore();
     const source = { ...item(1), numGamesOnThisSeed: 3 };
