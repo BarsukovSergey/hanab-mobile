@@ -152,7 +152,7 @@ The highest-value remaining items are:
 | Online user model | **Full data + People UI** | — | Medium–High | `userList/user/userLeft` state backs the People/context-action surface. |
 | User list rendering | **Full basic** | — | Medium–High | People exposes the online registry with contextual actions. |
 | Friend-aware lobby sorting | **Full** | — | Medium | PR #69 adds friend-aware Lobby discovery/order and friend context. |
-| Friend visual highlighting | **Partial** | S | Low–Medium | Friend context/actions and friend-aware ordering exist; dedicated visual styling remains limited. |
+| Friend visual highlighting | **Full basic** | — | Medium | People renders an explicit `Friend` pill and Lobby discovery carries friend context. |
 | Current lobby restructure | **Full** | — | High | PR #32 implements Your running game → Pregame → Create → Running → Shared replays, without duplicating the own reattendable game. |
 | Hide Create while own game is reattendable | **Full** | — | High | PR #32 hides Create while the user has a reattendable own running game. |
 | Distinct Shared replay lobby section | **Full** | — | Medium–High | PR #32 renders shared replays separately from ordinary Running tables. |
@@ -193,30 +193,24 @@ PM, friend/unfriend, spectator perspective and bot discovery without changing th
 | Pregame player stats | **Full compact** | — | Medium | Authoritative total/variant games, average, strikeout rate, and player-count best score are preserved and shown. |
 | Pregame player profile shortcut | **Missing** | S–M | Medium | Depends on People/profile work. |
 | Kick player native action | **Implemented + chat fallback** | — | Medium | Owner-only Pregame action sends the authoritative `/kick [username]` command. |
-| Auto-start next join / N players | **Chat fallback only** | S | Low–Medium | `/s`, `/s2`…`/s6`. |
-| Timed auto-start `/startin` | **Chat fallback only** | S | Low | Native countdown controls are optional. |
+| Auto-start next join / N players | **Chat fallback only** | — | Low–Medium | `/s`, `/s2`…`/s6`; native controls are intentionally not planned. |
+| Timed auto-start `/startin` | **Chat fallback only** | — | Low | Keep slash-command fallback; native countdown controls are intentionally not planned. |
 | Split / splitauto | **Chat fallback only** | S–M | Low | Useful mainly for large community pregames. |
 | Find variant / missing scores helpers | **Implemented + chat fallback** | — | Medium | Pregame Team tools send authoritative `/findvariant` and `/missing` commands. |
 | Multi-bot invite during Create | **Implemented** | — | Medium–High | Reconciled `game` + `joined` triggers one PM batch; protected tables use transient `/join <password>` only for capability-verified bots. |
 | Multi-bot invite in Pregame | **Implemented** | — | Medium | Online registry bots are grouped Available/Busy, selection is capped by free seats, and protected-table passwords are requested transiently. |
 
-## Current upstream drift: spectator table deletion
+## Resolved upstream drift: spectator table deletion
 
 Upstream commit `86257b4dec36b1d36b3a61beaaf3e1a5aa053bbe` (#3129) changed the server so that
 when the last player leaves an unstarted table it actively removes remaining pregame spectators and
 sends them a `left` event.
 
-Mobile currently processes `left` for a pregame only when:
+PR #26 reconciled mobile with that behavior: unsolicited authoritative pregame `left` cleanup is
+handled instead of leaving a spectator stranded on a deleted table.
 
-- a local leave is pending; or
-- a player→spectator role switch is in progress.
-
-An unsolicited server `left` for a spectator is therefore ignored. `tableGone` also does not
-normally clear an arbitrary pregame room. The likely visible failure is a spectator remaining on a
-deleted pregame screen.
-
-**Classification:** Drift / correctness bug
-**Effort:** XS–S
+**Classification:** Resolved drift / correctness fix
+**Effort:** —
 **Importance:** High
 
 ---
@@ -546,7 +540,7 @@ same-seed count** before implementing new server commands.
 | Lobby chat | **Full basic** | — | Medium |
 | Pregame/table chat | **Full basic** | — | High |
 | PM send/receive | **Full basic** | — | Medium |
-| Dedicated PM conversation UI | **Full session dialogs** | — | Low–Medium |
+| PM conversation surface | **Partial** | S | Low–Medium | Session PM Dialogs are first-class; a dedicated threaded inbox/conversation surface is not. |
 | Reply-to-last-PM `/r` | **Full** | — | Low | Direct `/r` submission handling landed in #80 while preserving the existing reply target semantics. |
 | Unread count | **Full for table chat** | — | Medium | PR #105 applies authoritative `chatList.unread` to the current table room while preserving local live-message increments. |
 | Mark chat read | **Full for table chat** | — | Low–Medium | PR #105 sends best-effort table-only `chatRead` through `LobbyRuntime` while visible. |
@@ -563,7 +557,7 @@ same-seed count** before implementing new server commands.
 | --- | --- | ---: | ---: |
 | `/friend`, `/unfriend`, `/friends` | **Full command path** | — | Medium |
 | Friends list state | **Full data** | — | Medium |
-| Friends UI | **Full basic** | — | Medium |
+| Friends UI | **Partial** | S–M | Medium | People marks friends and exposes Friend/Unfriend actions; there is no dedicated friends-only list. |
 | Friend-aware sorting | **Full** | — | Medium |
 | `/link`, `/unlink`, `/linked` | **Full command path** | — | Low–Medium |
 | Linked-account native UI | Missing | M | Low | Seed-avoidance purpose should be explained before exposing casually. |
@@ -639,7 +633,7 @@ Current upstream server command map versus mobile:
 | `tableSpectate` | Full | Typed encoder supports shadow index and live spectator perspective switching exposes authoritative player-shadow selection. |
 | `tableRestart` | Full | Quick rematch/remake. |
 | `tableUpdate` | Full exposed option subset | Preserves complete authoritative options on edit. |
-| `tableSuggest` | Full command path | Native review action not yet exposed. |
+| `tableSuggest` | Full | Shared-review suggestion send/receive and leader Accept/Dismiss UI are implemented. |
 | `setting` | **Partial** | Card-presentation settings are supported; unrelated upstream settings remain out of scope. |
 | `chat` | Full | — |
 | `chatPM` | Full | — |
@@ -960,9 +954,9 @@ usage reprioritizes them.
 
 ## B. High-value, relatively low-risk next work
 
-1. Richer game/replay tag search/delete/list management beyond current Add/display support.
-2. Keep native Pregame auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) out of scope; slash-command fallback remains the supported path.
-3. Continue small authoritative-state/parity fixes only when independently useful.
+1. Continue small authoritative-state/parity fixes only when independently useful.
+2. Revisit read-only tag discovery only after upstream #3136 merges and production availability is verified.
+3. Keep native Pregame auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) out of scope; slash-command fallback remains the supported path.
 
 ## C. Medium product slices
 
@@ -1107,7 +1101,7 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/tagsearch [tag]` | **Full raw command path** | direct `tagSearch` | Results are server chat text; no structured results/history UI. | M | Medium |
 | `/version` | **Full mobile-local** | local mobile package version | Correctly reports mobile version rather than browser bundle version. | — | Low |
 | `/impostor` | **Full through fallback** | pregame server command | Novelty/power-user command; native UI unnecessary. | — | Low |
-| `/kick [username]` | **Full through fallback** | pregame server command | Good native owner action candidate on player row. | S | Medium |
+| `/kick [username]` | **Full + native UI** | pregame server command | Native owner action is implemented on eligible Pregame player rows. | — | Medium |
 | `/s` | **Full through fallback** | server auto-start | Native control intentionally not planned; keep slash-command fallback. | — | Low–Medium |
 | `/s2` | **Full through fallback** | server auto-start | Same fallback-only policy. | — | Low |
 | `/s3` | **Full through fallback** | server auto-start | Same fallback-only policy. | — | Low |
@@ -1118,8 +1112,8 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/startin [minutes]` | **Full through fallback** | server pregame command | Native control intentionally not planned; keep slash-command fallback. | — | Low |
 | `/split [username1] [username2] ...` | **Full through fallback** | server pregame command | Native UI only useful for large community tables. | M | Low |
 | `/splitauto`, `/sa` | **Full through fallback** | server pregame command | Same. | M | Low |
-| `/findvariant` | **Full through fallback** | server command | Strong native Pregame convenience candidate. | S | Medium |
-| `/missing` | **Full through fallback** | server command | Strong native Pregame convenience candidate. | S | Medium |
+| `/findvariant` | **Full + native UI** | server command | Native Pregame Team action is implemented with slash-command fallback. | — | Medium |
+| `/missing` | **Full + native UI** | server command | Native Pregame Team action is implemented with slash-command fallback. | — | Medium |
 | `/setleader` | **Full + native UI** | direct `tableSetLeader` | Already first-class in Pregame/shared review. | — | Medium |
 | `/pause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Native UI already covers ordinary pause/queue behavior. | — | Medium |
 | `/unpause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Already covered. | — | Medium |
