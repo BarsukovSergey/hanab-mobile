@@ -52,7 +52,14 @@ describe('player context actions', () => {
     const composerIndex = shared.indexOf('{composing && (');
     expect(actionsIndex).toBeGreaterThanOrEqual(0);
     expect(composerIndex).toBeGreaterThan(actionsIndex);
-    expect(shared).toContain('root: { gap: 8 }');
+    expect(shared.slice(actionsIndex, composerIndex)).toContain('<ActionButton compact title="Dialog"');
+    expect(shared.slice(composerIndex)).toContain('<View style={styles.composer}>');
+    expect(shared.slice(composerIndex)).toContain('<ScrollView style={[styles.transcript');
+    expect(shared).toContain("root: { alignSelf: 'stretch', gap: 8, width: '100%' }");
+    expect(shared).toContain("composer: { alignSelf: 'stretch', gap: 8, width: '100%' }");
+    expect(shared).toContain("transcript: { alignSelf: 'stretch', borderRadius: 8, borderWidth: 1, maxHeight: 240, padding: 8, width: '100%' }");
+    expect(shared).toContain("messageField: { alignSelf: 'stretch', width: '100%' }");
+    expect(shared).toContain('style={styles.messageField}');
     expect(people).toContain('<UserContextActions');
     expect(people).toContain('styles.userRow');
     expect(pregame).toContain('styles.playerRow');

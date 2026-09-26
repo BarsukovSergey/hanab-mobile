@@ -74,6 +74,7 @@ export function UserContextActions({
             multiline
             onChangeText={setMessage}
             placeholder={`Message ${username}`}
+            style={styles.messageField}
             value={message}
           />
           <View style={styles.actions}>
@@ -95,9 +96,10 @@ export function UserContextActions({
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 8 },
+  root: { alignSelf: 'stretch', gap: 8, width: '100%' },
   actions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  composer: { gap: 8 },
-  transcript: { borderRadius: 8, borderWidth: 1, maxHeight: 240, padding: 8 },
+  composer: { alignSelf: 'stretch', gap: 8, width: '100%' },
+  transcript: { alignSelf: 'stretch', borderRadius: 8, borderWidth: 1, maxHeight: 240, padding: 8, width: '100%' },
+  messageField: { alignSelf: 'stretch', width: '100%' },
   transcriptMessage: { gap: 2, paddingVertical: 6 },
 });

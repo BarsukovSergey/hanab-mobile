@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
   menuActions: { gap: 7 },
   liveUserRow: { alignItems: 'flex-start', gap: 4, paddingVertical: 2 },
-  menuScroll: { flexShrink: 1 },
+  menuScroll: { flex: 1 },
   perspectiveChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   loginIntro: { gap: 4, marginBottom: 4 },
