@@ -16,6 +16,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { HANAB_PASSWORD_RESET_URL } from './src/config/hanab';
+import { forgetAccount, getPasswordCredential, listRecentAccounts, rememberAccount, savePasswordCredential } from './src/platform/credentialAccounts';
 import { chatRuntime, lobbyRuntime, networkSession } from './src/runtime/application';
 import { lobbyActions } from './src/store/lobbySlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
@@ -67,6 +68,9 @@ function AppContent() {
   const [signOutPending, setSignOutPending] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [recentAccounts, setRecentAccounts] = useState<string[]>([]);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [showManualLogin, setShowManualLogin] = useState(false);
   const [localScreen, setLocalScreen] = useState<LocalScreen>('lobby');
   const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
@@ -96,6 +100,17 @@ function AppContent() {
   }, []);
 
   useEffect(() => { void runProbe(); }, [runProbe]);
+
+  useEffect(() => {
+    let active = true;
+    void listRecentAccounts().then((accounts) => {
+      if (!active) return;
+      setRecentAccounts(accounts);
+      setShowManualLogin(accounts.length === 0);
+      setAccountsLoaded(true);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     lobbyRuntime.setAppActive(AppState.currentState === 'active');
@@ -174,30 +189,53 @@ function AppContent() {
     }
   };
 
-  const submitLogin = async () => {
+  const submitCredentials = async (loginUsername: string, loginPassword: string, offerCredentialSave: boolean) => {
     setLoginPending(true);
     setStatusMessage('');
     try {
-      await networkSession.submitLogin(username, password);
+      await networkSession.submitLogin(loginUsername, loginPassword);
       setPassword('');
       const result = await lobbyRuntime.checkSession();
       if (result.kind === 'valid') {
+        if (offerCredentialSave) {
+          const accounts = await rememberAccount(loginUsername);
+          if (accounts.length > 0) setRecentAccounts(accounts);
+          await savePasswordCredential(loginUsername, loginPassword);
+        }
         setProbe('valid');
         setLocalScreen('lobby');
         setReturnAfterUnattend(null);
         void lobbyRuntime.connect();
       } else {
         setProbe(result.kind === 'missing' ? 'missing' : 'indeterminate');
+        setShowManualLogin(true);
         setStatusMessage(result.kind === 'indeterminate'
           ? result.error.message
           : 'Login was not accepted. Check your username and password.');
       }
     } catch (error) {
       setPassword('');
+      setShowManualLogin(true);
       setStatusMessage(error instanceof Error ? error.message : 'Login request failed');
     } finally {
       setLoginPending(false);
     }
+  };
+
+  const submitManualLogin = () => submitCredentials(username, password, true);
+
+  const chooseRecentAccount = async (account: string) => {
+    setUsername(account);
+    setPassword('');
+    setStatusMessage('');
+    setLoginPending(true);
+    const result = await getPasswordCredential(account);
+    if (result.kind === 'credential') {
+      await submitCredentials(result.username, result.password, false);
+      return;
+    }
+    setLoginPending(false);
+    setShowManualLogin(true);
   };
 
   const signOut = async () => {
@@ -211,6 +249,7 @@ function AppContent() {
       setLiveSheet(null);
       setUsername('');
       setPassword('');
+      setShowManualLogin(recentAccounts.length === 0);
     } else {
       setProbe(result.sessionValid ? 'valid' : 'indeterminate');
       setStatusMessage(result.message);
@@ -435,13 +474,32 @@ function AppContent() {
           <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Sign in or create account</Text>
           <Text style={[styles.loginDetail, { color: theme.colors.textMuted }]}>Use an existing hanab.live username, or enter a new username to create an account automatically.</Text>
         </View>
-        {statusMessage.length > 0 && <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>}
+        {statusMessage.length > 0 && <Notice tone="error">{statusMessage}</Notice>}
+        {!accountsLoaded ? <SectionHeading title="Loading accounts…" /> : recentAccounts.length > 0 && !showManualLogin ? <>
+          <SectionHeading title="Choose account" />
+          {recentAccounts.map((account) => <View key={account} style={styles.accountChoice}>
+            <ActionButton disabled={loginPending} title={account} onPress={() => void chooseRecentAccount(account)} style={styles.accountName} />
+            <ActionButton compact disabled={loginPending} title="Forget" onPress={() => {
+              void forgetAccount(account).then((accounts) => {
+                setRecentAccounts(accounts);
+                if (accounts.length === 0) setShowManualLogin(true);
+              });
+            }} />
+          </View>)}
+          <ActionButton disabled={loginPending} title="Use another account" onPress={() => {
+            setUsername(''); setPassword(''); setStatusMessage(''); setShowManualLogin(true);
+          }} />
+        </> : <>
         <Notice>Use a new, unique password for hanab.live. Do not reuse one of your existing or previous passwords.</Notice>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setUsername} placeholder="Username" value={username} />
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setPassword} placeholder="Password" secureTextEntry value={password} />
         <ActionButton disabled={loginPending || username.trim().length === 0 || password.length === 0}
-          title={loginPending ? 'Logging in…' : 'Login'} tone="primary" onPress={() => void submitLogin()} />
+          title={loginPending ? 'Logging in…' : 'Login'} tone="primary" onPress={() => void submitManualLogin()} />
         <ActionButton title="Forgot password?" tone="ghost" onPress={() => void openPasswordReset()} />
+        {recentAccounts.length > 0 && <ActionButton title="Back to accounts" tone="ghost" onPress={() => {
+          setUsername(''); setPassword(''); setStatusMessage(''); setShowManualLogin(false);
+        }} />}
+        </>}
       </Panel>
     );
   } else if (probe === 'indeterminate') {
@@ -537,6 +595,8 @@ const styles = StyleSheet.create({
   menuScroll: { flex: 1 },
   perspectiveChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
+  accountChoice: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  accountName: { flex: 1 },
   loginIntro: { gap: 4, marginBottom: 4 },
   loginEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   loginTitle: { fontSize: 30, fontWeight: '900', letterSpacing: -0.6 },
