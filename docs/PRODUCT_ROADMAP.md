@@ -1,6 +1,6 @@
 # Hanab Mobile product roadmap
 
-Date: 2026-09-24
+Date: 2026-09-26
 
 Status: **current sequencing authority for post-beta product work**
 
@@ -133,13 +133,14 @@ The first small contextual controls are implemented where mobile UI clearly beat
 - Find needed variant;
 - Missing max scores.
 
-Possible follow-up is limited to carefully selected auto-start helpers if they prove useful. Do **not** turn every slash command into an icon/button.
+Native auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) are not planned in the current roadmap. Keep those commands as slash-command fallback rather than creating mobile controls.
 
 ## Read-only tag discovery
 
-This slice adds authenticated user's Tagged Games and exact tag search to History, reusing the
-existing history cards and replay flow. The availability of these read APIs on production is not
-established here. Tag removal and delete-all remain deferred; this slice has no tag mutation UI.
+This slice is gated on upstream Hanabi-Live PR #3136. Do not implement mobile tag-list/search UI
+before that upstream read-only API merges and production availability is verified. When available,
+reuse the existing History cards and replay flow. Tag removal and delete-all remain deferred; this
+slice has no tag mutation UI.
 
 ---
 
@@ -322,8 +323,8 @@ Potential push notifications belong here only after verifying authoritative serv
 capability and permission UX. Do not invent local notifications that imply state the server cannot
 reliably deliver.
 
-Server-backed typing/read-state features should likewise wait for real capability rather than local
-fiction.
+Additional server-backed typing/presence features should likewise wait for real capability rather
+than local fiction; table-chat unread/read synchronization is already implemented.
 
 ---
 
@@ -445,9 +446,9 @@ While beta.2 feedback is active:
 
 1. respond to tester-confirmed correctness/safety defects;
 2. keep unrelated feature work isolated;
-3. implement the prepared multi-bot Create/Pregame slice;
-4. optionally complete small Pregame/tag conveniences;
-5. begin the Mobile App Design **research/design** work: IA map, navigation contract and wireframes.
+3. keep read-only tag discovery blocked until upstream #3136 merges and production availability is verified;
+4. keep native auto-start helpers out of scope; existing slash-command fallback is sufficient;
+5. keep the major Mobile App Design pass deferred until it is explicitly reprioritized.
 
 When the beta.2 defect picture is reasonably stable:
 
