@@ -44,6 +44,7 @@ export function getPeopleRows(
       tableAction,
     };
   }).sort((left, right) => {
+    if (left.isOwnUser !== right.isOwnUser) return left.isOwnUser ? -1 : 1;
     if (left.isFriend !== right.isFriend) return left.isFriend ? -1 : 1;
     const nameOrder = left.user.name.localeCompare(right.user.name, undefined, {
       sensitivity: 'base',

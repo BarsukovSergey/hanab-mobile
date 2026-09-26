@@ -35,17 +35,18 @@ const table = (id: number, changes: Partial<LobbyTable> = {}): LobbyTable => ({
 });
 
 describe('People presentation', () => {
-  test('sorts authoritative friends first and alphabetically within both groups', () => {
+  test('sorts own user first, then friends, then others alphabetically with user ID tie breaks', () => {
     const rows = getPeopleRows(
-      [user(1, 'zoe'), user(2, 'bob'), user(3, 'Amy'), user(4, 'cy')],
+      [user(8, 'zoe'), user(7, 'bob'), user(3, 'Amy'), user(4, 'cy'), user(5, 'Ada'), user(6, 'ada')],
       ['CY', 'Bob'],
-      { userID: 9, username: 'Ada' },
+      { userID: 3, username: 'Amy' },
       [],
     );
 
     expect(rows.map((row) => [row.user.name, row.isFriend])).toEqual([
-      ['bob', true], ['cy', true], ['Amy', false], ['zoe', false],
+      ['Amy', false], ['bob', true], ['cy', true], ['Ada', false], ['ada', false], ['zoe', false],
     ]);
+    expect(rows.slice(3).map(({ user: item }) => item.userID)).toEqual([5, 6, 8]);
   });
 
   test('presents authoritative flags and known or unknown table context', () => {

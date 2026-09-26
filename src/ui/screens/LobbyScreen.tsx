@@ -19,7 +19,7 @@ import {
   useResponsiveLayout,
 } from '../designSystem';
 import { getLobbySections } from '../lobbySections';
-import { formatLobbyRoster, getLobbyFriendContext } from '../lobbyTablePresentation';
+import { getLobbyFriendContext } from '../lobbyTablePresentation';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 
 const DEFAULT_OPTIONS: MobileTableOptions = {
@@ -110,21 +110,24 @@ export function LobbyScreen({
           <Panel>
             <SectionHeading title="Pregame tables" detail="Join as a player or watch the room before it starts." />
             {pregameTables.length === 0 && <EmptyState>No pregame tables.</EmptyState>}
-            {pregameTables.map((table) => (
-              <View key={table.id} style={[styles.tableCard, { borderColor: theme.colors.border }]}>
+            {pregameTables.map((table) => {
+              const friendContext = getLobbyFriendContext(table, friends);
+              return (
+              <View key={table.id} style={[
+                styles.tableCard,
+                { borderColor: friendContext.hasFriends ? theme.colors.accent : theme.colors.border },
+                friendContext.hasFriends && styles.friendTableCard,
+              ]}>
                 <View style={styles.tableHeader}>
                   <View style={styles.tableCopy}>
                     <Text style={[styles.tableName, { color: theme.colors.text }]}>{table.name}</Text>
                     <Text style={[styles.tableMeta, { color: theme.colors.textMuted }]}>
                       {table.variant} · {table.numPlayers}/{table.maxPlayers}
                     </Text>
-                    {formatLobbyRoster(table.players) !== null && (
-                      <Text numberOfLines={2} style={[styles.tableRoster, { color: theme.colors.textMuted }]}>
-                        {formatLobbyRoster(table.players)}
-                      </Text>
-                    )}
+                    <LobbyRoster table={table} friends={friends} />
                     <TableFriendContext table={table} friends={friends} />
                   </View>
+                  {friendContext.hasFriends && <Pill active>{new Set([...friendContext.playing, ...friendContext.watching].map((name) => name.toLowerCase())).size > 1 ? 'Friends here' : 'Friend here'}</Pill>}
                   {table.passwordProtected && <Pill>Private</Pill>}
                 </View>
                 {table.passwordProtected && (
@@ -155,7 +158,8 @@ export function LobbyScreen({
                   />
                 </View>
               </View>
-            ))}
+              );
+            })}
           </Panel>
 
           {showCreateTable && (
@@ -264,25 +268,29 @@ function TableSection({
     <Panel>
       <SectionHeading title={title} />
       {tables.length === 0 && <EmptyState>{empty}</EmptyState>}
-      {tables.map((table) => (
-        <View key={table.id} style={[styles.tableCard, { borderColor: theme.colors.border }]}>
+      {tables.map((table) => {
+        const friendContext = getLobbyFriendContext(table, friends);
+        return (
+        <View key={table.id} style={[
+          styles.tableCard,
+          { borderColor: friendContext.hasFriends ? theme.colors.accent : theme.colors.border },
+          friendContext.hasFriends && styles.friendTableCard,
+        ]}>
           <View style={styles.tableHeader}>
             <View style={styles.tableCopy}>
               <Text style={[styles.tableName, { color: theme.colors.text }]}>{table.name}</Text>
               <Text style={[styles.tableMeta, { color: theme.colors.textMuted }]}>
                 {table.variant} · {table.numPlayers}/{table.maxPlayers}
               </Text>
-              {formatLobbyRoster(table.players) !== null && (
-                <Text numberOfLines={2} style={[styles.tableRoster, { color: theme.colors.textMuted }]}>
-                  {formatLobbyRoster(table.players)}
-                </Text>
-              )}
+              <LobbyRoster table={table} friends={friends} />
               <TableFriendContext table={table} friends={friends} />
             </View>
+            {friendContext.hasFriends && <Pill active>{new Set([...friendContext.playing, ...friendContext.watching].map((name) => name.toLowerCase())).size > 1 ? 'Friends here' : 'Friend here'}</Pill>}
             {action(table)}
           </View>
         </View>
-      ))}
+        );
+      })}
     </Panel>
   );
 }
@@ -298,6 +306,21 @@ function TableFriendContext({ table, friends }: { table: LobbyTable; friends: re
   return (
     <Text numberOfLines={2} style={[styles.tableFriendContext, { color: theme.colors.accent }]}>
       {details.join(' · ')}{table.running ? ` · ${table.progress}%` : ''}
+    </Text>
+  );
+}
+
+function LobbyRoster({ table, friends }: { table: LobbyTable; friends: readonly string[] }) {
+  const { theme } = useHanabTheme();
+  if (table.players.length === 0) return null;
+  const friendNames = new Set(getLobbyFriendContext(table, friends).playing.map((name) => name.toLowerCase()));
+  return (
+    <Text numberOfLines={2} style={[styles.tableRoster, { color: theme.colors.textMuted }]}>
+      {table.players.map((name, index) => (
+        <Text key={`${name}-${index}`} style={friendNames.has(name.toLowerCase()) ? { color: theme.colors.accent, fontWeight: '800' } : undefined}>
+          {index > 0 ? ' · ' : ''}{name}
+        </Text>
+      ))}
     </Text>
   );
 }
@@ -322,6 +345,7 @@ const styles = StyleSheet.create({
   playerOptionText: { fontSize: 15, fontWeight: '800' },
   actionsRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tableCard: { borderTopWidth: 1, gap: 10, paddingTop: 12 },
+  friendTableCard: { borderLeftWidth: 3, paddingLeft: 8 },
   tableHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   tableCopy: { flex: 1, gap: 2, minWidth: 0 },
   tableName: { fontSize: 15, fontWeight: '800' },
