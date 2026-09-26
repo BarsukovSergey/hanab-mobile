@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
+import type { DiscardResourceCue } from '../../game/selectors/gameResourcePresentation';
 import { getDiscardSummary } from '../../game/selectors/discardSummary';
 import { getGameTableSuits } from '../../game/selectors/gameplay';
 import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
@@ -18,6 +19,7 @@ import {
 
 export function CompactTable({
   game,
+  discardResourceCue = 'default',
   variantName,
   onOpenDiscards,
   dense = false,
@@ -27,6 +29,7 @@ export function CompactTable({
   pulsePlay,
 }: {
   game: GameState;
+  discardResourceCue?: DiscardResourceCue;
   variantName: string;
   onOpenDiscards?: () => void;
   dense?: boolean;
@@ -102,12 +105,16 @@ export function CompactTable({
     </View>
     <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseDiscard ?? null}><Pressable
       accessibilityRole={onOpenDiscards === undefined ? undefined : 'button'}
+      accessibilityLabel={discardResourceCue === 'blocked'
+        ? 'Discards. Unavailable because clues are at maximum'
+        : discardResourceCue === 'double-discard' ? 'Discards. Potential Double Discard' : 'Discards'}
       disabled={onOpenDiscards === undefined}
       onPress={onOpenDiscards}
       style={({ pressed }) => [
         styles.discard,
         landscapePhone && styles.discardLandscape,
-        { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+        { backgroundColor: theme.colors.surfaceMuted, borderColor: discardResourceCue === 'blocked'
+          ? '#ff5555' : discardResourceCue === 'double-discard' ? '#ffd54f' : theme.colors.border },
         pressed && styles.pressed,
       ]}
     >
