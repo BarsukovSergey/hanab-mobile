@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 
-Status: **planning snapshot reconciled with mobile `main` through PR #105; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #108; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -12,7 +12,7 @@ mobile repository state.
 Upstream repositories reviewed:
 
 - `Hanabi-Live/hanabi-live`
-  - current `main`: `c1d970bd610395087958fe7d1bb96f52244f7b04`
+  - current `main`: `aed0d81d02b32136d6136c8ddd386d529ab04415`
   - mobile baseline game/protocol pin: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`
   - mobile card-presentation pin: `7a9c601b66f5966f7e33564855e25f82e68a94ed`
   - mobile Hypothetical replay-core pin: `8be709c48145ad56a1891307663ed3bec2cd4175`
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `2af57482dc5fda47754fa5f88632f0f2d1e1d9a5` (PR #105 merge)
+- current `main`: `38ceb5b51b7fd796e3d681101f8273587ff9936a` (PR #108 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -97,7 +97,7 @@ The biggest remaining parity gaps are now concentrated in five areas:
 4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, reverse-hand preference, and other non-core presentation settings remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), and live lobby table-progress plus server-backed table-chat read-state synchronization (#105). Spectator perspective switching is also first-class in the live Game menu.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), and variant-aware clue/discard resource-state cues (#108). Spectator perspective switching is also first-class in the live Game menu.
 
 The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
@@ -120,6 +120,8 @@ Recently completed high-value parity work:
 - game tag display/Add flow;
 - shared replay creation from History and turn-suggestion receive/UI;
 - live table-chat unread state and direct `/r` submission handling.
+- H-group Low Score, locked-hand and Double Discard presentation cues (#107).
+- variant-aware clue availability and discard-state presentation cues (#108).
 
 The highest-value remaining items are:
 
@@ -157,7 +159,7 @@ The highest-value remaining items are:
 | Hide Create while own game is reattendable | **Full** | — | High | PR #32 hides Create while the user has a reattendable own running game. |
 | Distinct Shared replay lobby section | **Full** | — | Medium–High | PR #32 renders shared replays separately from ordinary Running tables. |
 | Lobby chat | **Full basic** | — | Medium | Send/receive/history works. |
-| Discord-replicated lobby chat | **Partial** | XS | Low | Messages arrive, but mobile metadata does not visually distinguish Discord origin. |
+| Discord-replicated lobby chat | **Full basic** | — | Low | Replicated messages render normally; pinned web likewise does not add a distinct Discord-origin marker. Rich Discord emoji rendering remains optional presentation polish rather than a provenance-parity requirement. |
 
 ### Authentication protocol difference
 
@@ -238,12 +240,13 @@ handled instead of leaving a spectator stranded on a deleted table.
 | Discard viewer | **Full mobile adaptation** | — | High | Uses authoritative identities and suit piles. |
 | Fireworks/play stacks | **Full** | — | High | Variant-aware suit count. |
 | Current player / YOUR TURN | **Full** | — | High | Stable seating; no hand reordering. |
-| Score / Max / Clues / Strikes / Deck | **Full semantics** | S for polish | High | Presentation hierarchy is still a polish backlog item. |
+| Score / Max / Clues / Strikes / Deck | **Full semantics** | S for hierarchy polish | High | Core values are implemented; PR #108 adds pinned-upstream clue availability coloring while broader HUD hierarchy remains polish. |
 | Pace | **Full presentation semantics** | — | Medium | Final-round/All-or-Nothing suppression, signed display and PaceRisk treatment match upstream. |
 | Future Required Efficiency | **Full presentation semantics** | — | Medium | FRE uses upstream review/shared modifier policy and exposes calculation details on tap. |
 | Minimum Required Efficiency | **Full presentation semantics** | — | Medium | Immutable `metadata.minEfficiency` is shown alongside FRE in the compact Eff HUD. |
-| Low-score-phase warning | **Missing explicit UI** | S | Low–Medium | Upstream H-group presentation has special score treatment. |
-| Locked-hand warning | **Missing explicit UI** | S–M | Medium | Underlying upstream rule helper exists. |
+| Low-score-phase warning | **Full presentation semantics** | — | Low–Medium | PR #107 applies the variant-derived H-group Low Score treatment and suppresses it during Hypothetical. |
+| Locked-hand / Double Discard current-player warning | **Full presentation semantics** | — | Medium | PR #107 reuses vendored locked-hand state and authoritative Double Discard state with pinned-upstream priority and gating. |
+| Clue/discard resource-state cues | **Full presentation semantics** | — | Medium | PR #108 adds variant-aware no/one/max clue coloring plus blocked/Double Discard discard borders, suppressed in real-life mode and Hypothetical. |
 | Full clue log | **Partial** | M | Medium | Mobile has Last Action + Recent timeline, not the full web clue-log behavior. |
 | Hover clue/card cross-highlighting | **N/A as hover**, mobile equivalent missing | M | Low–Medium | Could become tap/press contextual highlighting. |
 | Card-specific replay jump shortcuts | **Missing mobile equivalents** | M | Medium | Web can jump to draw/first-clue/play/discard/strike via different clicks. |
@@ -267,8 +270,9 @@ Current upstream web:
 Mobile now routes Pace/Eff through one presentation selector matching those upstream context rules.
 The compact HUD keeps Pace visible as `-` when suppressed, presents `Eff` as `FRE | MRE`, applies
 note/manual/shared efficiency adjustments only in the authoritative contexts where upstream does,
-and exposes the calculation context in a read-only details surface. This resolves #30. The broader
-visual-HUD hierarchy remains a separate polish backlog item.
+and exposes the calculation context in a read-only details surface. This resolves #30. PRs #107 and
+#108 additionally restore pinned-upstream H-group and clue/discard resource-state cues without
+changing gameplay legality. The broader visual-HUD hierarchy remains a separate polish backlog item.
 
 ## 4P–6P
 
@@ -949,8 +953,7 @@ The three concrete semantic/interoperability defects identified by this audit ar
 - Pace/FRE/MRE presentation context — #30.
 
 No unresolved high-priority current-server drift item remains from this audit. Keep replay scrubber
-jank (#4) and the direct `/r` submission edge case (#31) as non-blocking defect backlog unless real
-usage reprioritizes them.
+jank (#4) as non-blocking defect backlog unless real usage reprioritizes it.
 
 ## B. High-value, relatively low-risk next work
 
@@ -1006,6 +1009,7 @@ A useful way to describe current parity is:
 - spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
 - generated upstream card presentation with colorblind/styled-number server settings;
+- pinned-upstream H-group and clue/discard resource-state presentation cues for supported gameplay;
 - own History, Friends history, and same-seed Other Scores;
 - People/Pregame/live-game contextual friend/session-PM actions and compact Pregame stats;
 - shared replay creation and turn-suggestion receive/UI;
@@ -1023,7 +1027,6 @@ A useful way to describe current parity is:
 - friends/social;
 - tags;
 - slash-command discoverability;
-- H-group presentation;
 
 ### Intentionally unsupported
 
@@ -1218,7 +1221,7 @@ than turning into connection failures.
 
 Safe field dropping is responsible for several parity gaps documented elsewhere:
 
-- welcome fields still not surfaced broadly, including `muted`, `firstTimeUser`, and maintenance/shutdown UX; card presentation settings and random table names are now retained;
+- welcome fields still not surfaced broadly, including `muted` and `firstTimeUser`; card presentation settings, `realLifeMode`, random table names, and maintenance/shutdown metadata are now retained where the mobile product uses them;
 - lobby `ownerID` and redundant timing fields remain omitted where unused; spectator data is now retained;
 - other evolving fields not needed by supported mobile flows continue to be dropped at permissive boundaries.
 
