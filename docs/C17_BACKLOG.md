@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 
-Last reconciled with `main` at `38ceb5b51b7fd796e3d681101f8273587ff9936a` (PR #108 merge).
+Last reconciled with `main` at `a89f209fc0335f9e46505da6cf47ec50726609ba` (PR #112 merge).
 
 This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
@@ -33,7 +33,7 @@ These items were explicitly removed from the C17 release gate during product rev
 ## Layout / presentation
 
 - **2P portrait space allocation:** reduce the large dead vertical band that can appear between the hand/table region and Workbench without destabilizing denser player-count layouts.
-- **Live HUD hierarchy / compact notation:** revisit the dense Score/Max/Clues/Strikes/Deck/Pace/Eff presentation, including compact score/max notation and whether some metrics belong closer to their table context. Issue #30 corrected Pace/Eff context semantics; PRs #107/#108 added pinned-upstream Low Score, locked-hand, Double Discard, clue-availability, and discard-state cues. Preserve those semantic boundaries during later visual redesign and do not invent mobile-only stats.
+- **Live HUD hierarchy / compact notation:** revisit the dense Score/Max/Clues/Strikes/Deck/Pace/Eff presentation, including compact score/max notation and whether some metrics belong closer to their table context. Issue #30 corrected Pace/Eff context semantics; PRs #107/#108 added pinned-upstream Low Score, locked-hand, Double Discard, clue-availability, and discard-state cues. Preserve those semantic boundaries during later visual redesign and do not invent mobile-only stats; PR #110 additionally makes H-group/Real-life presentation gating user-controllable through authoritative server-backed settings.
 - **Live-game header chrome:** reduce the visual prominence/cost of rarely used Lobby navigation during active play while keeping exit/navigation discoverable and safe.
 - Dedicated two-column landscape composition.
 - Dedicated tablet / large-screen persistent side-pane composition and polish.
@@ -44,8 +44,8 @@ These items were explicitly removed from the C17 release gate during product rev
 - **Native controls for useful slash-command actions:** research is recorded in `docs/COMMANDS_AND_BOTS_RESEARCH.md`. People/Pregame/live-game contexts already expose Friend/Unfriend and session Dialog actions; shared-replay turn suggestions, Add tag, Pregame Kick, Find variant, and Missing scores also have first-class UI. Native auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) are explicitly out of scope; preserve the existing slash-command fallback instead. Existing leader/variant/pause/termination controls remain first-class UI.
 - **Bot invite follow-up:** the multi-select Create/Pregame picker and exact 19-name registry are implemented for open and password-protected tables. The current 19 entries have verified password-join capability; future registry entries remain capability-gated. Only authoritative online Lobby-status bots are selectable, Busy bots are shown but disabled, and table passwords remain transient rather than entering Redux/persistence. Do not create a bot-only protocol.
 - Rich/compact profiles beyond the existing People/context-action surfaces.
-- Broader friends/social UX beyond current People/Friend actions, friend-aware Lobby ordering, Friends history, Other Scores, and session PM Dialogs.
-- **Chat presence/presentation polish:** authoritative table-chat unread counts and best-effort `chatRead` acknowledgements are implemented. Future work may research typing indicators or other presentation polish only if authoritative server/client capability is worth exposing on mobile.
+- Broader friends/social UX beyond current People/Friend actions, friends-first People ordering, friend-highlighted Lobby discovery, Friends history, Other Scores, and session PM Dialogs.
+- **Chat presence/presentation polish:** authoritative table-chat unread counts, best-effort `chatRead` acknowledgements, direct `/r`, and authoritative mute-state guarding are implemented. Future work may research typing indicators or other presentation polish only if authoritative server/client capability is worth exposing on mobile.
 - **Push notifications:** research mobile notifications for genuinely useful events (for example turn/table/social events) only after verifying server/background-delivery capability and notification permission UX.
 - **Linked hanab.live accounts:** optional native UI for the already-supported `/link` / `/linked` / `/unlink` semantics. Upstream linking is **not Discord account linking**; it is asymmetric hanab.live account linkage used when choosing seeds so linked accounts do not receive deals the linked user has already played. Discord is a separate lobby-chat/community integration.
 
@@ -78,15 +78,15 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Live spectator C17 workspace.
 - Pregame player/spectator role switching where authoritative capability permits.
 - Spectator perspective switching between all hands and an authoritative player shadow seat.
-- Colorblind and styled-number card presentation using generated pinned-upstream assets and server settings.
+- Colorblind and styled-number card presentation using generated pinned-upstream assets and server settings, plus server-backed H-group features and Real-life mode presentation toggles.
 - Pinned-upstream H-group and resource-state gameplay cues: Low Score, locked hand, Double Discard, clue availability, and discard-state emphasis with real-life/Hypothetical gating.
-- People/Pregame/live-game contextual session Dialog and Friend/Unfriend actions, plus friend-aware Lobby ordering.
+- People/Pregame/live-game contextual session Dialog and Friend/Unfriend actions, plus friends-first People ordering and visible friend emphasis in Lobby discovery.
 - Account creation is explicit on the login screen; Change password and Forgot password entry points preserve the no-credential-storage boundary.
 - Compact authoritative Pregame player stats and spectator list.
 - Native Pregame Kick, Find variant, and Missing scores actions with slash-command fallback.
 - Multi-bot Create/Pregame picker for open and password-protected tables with transient password handling.
 - Own History, Friends history, and same-seed Other Scores comparison.
 - Authoritative game tag display and first-class Add tag action.
-- Live table-chat unread indicator, server-backed read acknowledgement, and direct `/r` reply handling.
+- Live table-chat unread indicator, server-backed read acknowledgement, direct `/r` reply handling, and authoritative mute-state guarding.
 - Minimal functional state-change animation.
 - Adaptive 4P–6P real-card portrait allocation with the 46 dp opponent floor and emergency-only Compact Overview fallback; current physical evidence covers 5P, true 6P, and 6P + One Extra Card on the tested Android class.
