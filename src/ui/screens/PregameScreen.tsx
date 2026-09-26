@@ -166,6 +166,7 @@ export function PregameScreen() {
                                 onPress: () => { chatRuntime.submit(`/kick ${player.name}`); },
                               },
                             ],
+                            { cancelable: false },
                           )}
                         />
                       )}

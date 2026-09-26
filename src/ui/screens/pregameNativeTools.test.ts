@@ -10,8 +10,10 @@ describe('pregame native tools', () => {
     expect(source).toContain('isOwner && (');
     expect(source).toContain('{!player.you && (');
     expect(source).toContain('Alert.alert(');
+    expect(source).toContain("{ text: 'Cancel', style: 'cancel' }");
     expect(source).toContain('style: \'destructive\'');
     expect(source).toContain('onPress: () => { chatRuntime.submit(`/kick ${player.name}`); }');
+    expect(source).toContain('{ cancelable: false }');
   });
 
   test('exposes server chat team tools disabled during transitions or with fewer than two players', () => {
