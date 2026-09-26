@@ -49,6 +49,7 @@ export function TerminationControls() {
               onPress: () => { terminationRuntime.terminateGame(); },
             },
           ],
+          { cancelable: false },
         )}
       />
     </View>
