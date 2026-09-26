@@ -25,6 +25,7 @@ Hanab Mobile already has the difficult gameplay foundation:
 - authoritative table create/join/leave/reconnect behavior;
 - serious 2P/3P live gameplay and adaptive 4P–6P real-card presentation;
 - explicit safe Play/Discard/Clue actions;
+- pinned-upstream H-group and clue/discard resource-state presentation cues without changing action legality;
 - notes, knowledge/empathy, Last Action / Recent and live Rewind;
 - finished replay, shared review, turn suggestions and Hypothetical;
 - spectator mode with perspective switching;
@@ -230,7 +231,7 @@ Revisit:
 - dense 4P–6P presentation;
 - safe explicit action affordances.
 
-Do not change authoritative Pace/Eff semantics just to make the HUD prettier.
+Do not change authoritative Pace/Eff semantics or the #107/#108 H-group/resource-state thresholds and gating just to make the HUD prettier.
 
 ## 2.5 History, People, Profile and Settings
 
