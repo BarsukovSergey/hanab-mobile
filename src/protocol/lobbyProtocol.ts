@@ -54,7 +54,7 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
 export const chatListSchema = z.object({
   list: z.array(chatMessageSchema).readonly(),
-  unread: z.number().int(),
+  unread: z.number().int().nonnegative(),
 }).strict().readonly();
 
 export type ChatList = z.infer<typeof chatListSchema>;

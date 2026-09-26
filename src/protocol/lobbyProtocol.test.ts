@@ -164,6 +164,9 @@ describe('lobby protocol decoder', () => {
     });
     expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 0, extra: 1 })}`))
       .toMatchObject({ kind: 'malformed', command: 'chatList', issue: 'invalid-payload' });
+    expect(decodeServerFrame('chatList {"list":[],"unread":-1}')).toEqual({
+      kind: 'malformed', command: 'chatList', issue: 'invalid-payload',
+    });
 
     const serverChat = {
       ...chat,
