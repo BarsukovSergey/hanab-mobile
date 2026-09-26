@@ -92,3 +92,40 @@ describe('session random table name', () => {
     expect(store.getState().session.randomTableName).toBeNull();
   });
 });
+
+describe('authoritative server status', () => {
+  test('welcome initializes it and connection epochs clear and guard live updates', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: {
+      ...welcome(), shuttingDown: true, datetimeShutdownInit: 'shutdown-at', maintenanceMode: true,
+    } }));
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: true, datetimeShutdownInit: 'shutdown-at', maintenanceMode: true,
+    });
+    store.dispatch(sessionActions.shutdownReceived({
+      epoch: 1, shuttingDown: false, datetimeShutdownInit: 'ignored-when-cancelled',
+    }));
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: true,
+    });
+    store.dispatch(sessionActions.maintenanceReceived({ epoch: 1, maintenanceMode: false }));
+    expect(store.getState().session.serverStatus.maintenanceMode).toBe(false);
+
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false,
+    });
+    store.dispatch(sessionActions.shutdownReceived({
+      epoch: 1, shuttingDown: true, datetimeShutdownInit: 'stale',
+    }));
+    store.dispatch(sessionActions.maintenanceReceived({ epoch: 1, maintenanceMode: true }));
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false,
+    });
+    store.dispatch(sessionActions.signedOut());
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false,
+    });
+  });
+});

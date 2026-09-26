@@ -43,6 +43,7 @@ import { PeopleScreen } from './src/ui/screens/PeopleScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 import { UserContextActions } from './src/ui/UserContextActions';
+import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | null;
@@ -83,6 +84,8 @@ function AppContent() {
     ? state.chat.unreadByRoom[`table${state.room.room.tableID}`] ?? 0
     : 0);
   const pendingReplayCreate = useAppSelector((state) => state.history.pendingReplayCreate);
+  const serverStatusMessage = session.authenticatedUser === null
+    ? null : getServerStatusNoticeMessage(session.serverStatus);
 
   const runProbe = useCallback(async () => {
     setProbe('checking');
@@ -346,6 +349,11 @@ function AppContent() {
             <ActionButton compact title="Reconnect" tone="primary" onPress={() => void lobbyRuntime.connect()} />
           </View>
         )}
+        {serverStatusMessage !== null && (
+          <View style={styles.liveConnectionNotice}>
+            <Notice>{serverStatusMessage}</Notice>
+          </View>
+        )}
         <SafeAreaView edges={['bottom']} style={styles.flex}>
         <ScrollView
           contentContainerStyle={[
@@ -549,6 +557,7 @@ function AppContent() {
             </>}
           </View>
         </View>
+        {probe === 'valid' && serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
         {content}
       </ScrollView>
       {lobbyNotice !== null && (

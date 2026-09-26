@@ -55,6 +55,7 @@ export type SessionState = {
   phase: ConnectionPhase;
   authenticatedUser: AuthenticatedUser | null;
   cardPresentationSettings: CardPresentationSettings;
+  serverStatus: { shuttingDown: boolean; datetimeShutdownInit: string | null; maintenanceMode: boolean };
   friends: string[];
   randomTableName: string | null;
   resumeHints: ResumeHints | null;
@@ -79,6 +80,7 @@ const initialState: SessionState = {
     colorblindMode: false,
     styleNumbers: false,
   },
+  serverStatus: { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false },
   friends: [],
   randomTableName: null,
   resumeHints: null,
@@ -101,6 +103,7 @@ export const sessionSlice = createSlice({
       state.connectionEpoch = action.payload.epoch;
       state.phase = 'connecting';
       state.authenticatedUser = null;
+      state.serverStatus = { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false };
       state.friends = [];
       state.randomTableName = null;
       state.resumeHints = null;
@@ -120,6 +123,11 @@ export const sessionSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       const { welcome } = action.payload;
       state.phase = 'ready';
+      state.serverStatus = {
+        shuttingDown: welcome.shuttingDown ?? false,
+        datetimeShutdownInit: welcome.shuttingDown ? welcome.datetimeShutdownInit ?? null : null,
+        maintenanceMode: welcome.maintenanceMode ?? false,
+      };
       state.authenticatedUser = {
         userID: welcome.userID,
         username: welcome.username,
@@ -142,6 +150,16 @@ export const sessionSlice = createSlice({
       action: PayloadAction<{ name: CardPresentationSettingName; enabled: boolean }>,
     ) {
       state.cardPresentationSettings[action.payload.name] = action.payload.enabled;
+    },
+    shutdownReceived(state, action: PayloadAction<{ epoch: number; shuttingDown: boolean; datetimeShutdownInit: string }>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      state.serverStatus.shuttingDown = action.payload.shuttingDown;
+      state.serverStatus.datetimeShutdownInit = action.payload.shuttingDown
+        ? action.payload.datetimeShutdownInit : null;
+    },
+    maintenanceReceived(state, action: PayloadAction<{ epoch: number; maintenanceMode: boolean }>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      state.serverStatus.maintenanceMode = action.payload.maintenanceMode;
     },
     friendsReceived(state, action: PayloadAction<{ epoch: number; friends: string[] }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;

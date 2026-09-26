@@ -1358,6 +1358,12 @@ export class LobbyRuntime {
         this.store.dispatch(sessionActions.welcomeReceived({ epoch, welcome: event.data }));
         this.resumeAuthoritativeRoom(epoch, event.data);
         break;
+      case 'shutdown':
+        this.store.dispatch(sessionActions.shutdownReceived({ epoch, ...event.data }));
+        break;
+      case 'maintenance':
+        this.store.dispatch(sessionActions.maintenanceReceived({ epoch, ...event.data }));
+        break;
       case 'name':
         this.store.dispatch(sessionActions.randomTableNameReceived({ epoch, name: event.data.name }));
         break;
