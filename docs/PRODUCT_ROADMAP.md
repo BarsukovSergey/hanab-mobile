@@ -26,11 +26,12 @@ Hanab Mobile already has the difficult gameplay foundation:
 - serious 2P/3P live gameplay and adaptive 4P–6P real-card presentation;
 - explicit safe Play/Discard/Clue actions;
 - pinned-upstream H-group and clue/discard resource-state presentation cues without changing action legality;
+- server-backed H-group features and Real-life mode gameplay-presentation settings;
 - notes, knowledge/empathy, Last Action / Recent and live Rewind;
 - finished replay, shared review, turn suggestions and Hypothetical;
 - spectator mode with perspective switching;
 - History, Friends history, Other Scores and game tags;
-- People/Friend actions, table chat, session PM Dialogs and direct `/r`;
+- People/Friend actions with friends-first visual emphasis, table chat, session PM Dialogs, direct `/r`, and authoritative mute-state guarding;
 - account creation clarification plus Change password / Forgot password entry points;
 - standalone Android beta APK/release flow.
 
@@ -138,7 +139,7 @@ Native auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) are not planned in t
 
 ## Read-only tag discovery
 
-This slice is gated on upstream Hanabi-Live PR #3136. Do not implement mobile tag-list/search UI
+This slice is gated on upstream Hanabi-Live PR #3136, which remains open as of 2026-09-26. Do not implement mobile tag-list/search UI
 before that upstream read-only API merges and production availability is verified. When available,
 reuse the existing History cards and replay flow. Tag removal and delete-all remain deferred; this
 slice has no tag mutation UI.
@@ -231,7 +232,7 @@ Revisit:
 - dense 4P–6P presentation;
 - safe explicit action affordances.
 
-Do not change authoritative Pace/Eff semantics or the #107/#108 H-group/resource-state thresholds and gating just to make the HUD prettier.
+Do not change authoritative Pace/Eff semantics, the #107/#108 H-group/resource-state thresholds, or the #110 server-backed presentation-setting gates just to make the HUD prettier.
 
 ## 2.5 History, People, Profile and Settings
 
@@ -240,7 +241,7 @@ Bring non-game surfaces into one coherent product system:
 - History / Friends history / Other Scores;
 - People, friends and PM entry points;
 - richer player/profile surface;
-- account/security and appearance settings;
+- account/security, card appearance and gameplay-presentation settings;
 - tag workflows;
 - replay entry/sharing actions.
 
