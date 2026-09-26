@@ -36,6 +36,7 @@ import { roomActions } from '../../store/roomSlice';
 import { ActionButton, Notice, useHanabTheme } from '../designSystem';
 import { C17RewindScrubber } from './C17RewindScrubber';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
+import { getPaceRiskColor, PaceDetailsModal } from './PaceDetailsModal';
 import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
@@ -713,6 +714,7 @@ function C17DenseWorkspace({
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
   const [efficiencyDetailsOpen, setEfficiencyDetailsOpen] = useState(false);
+  const [paceDetailsOpen, setPaceDetailsOpen] = useState(false);
   const committedClue = getLastCluePresentationFromState(game);
   const opponents = getC17HandRows(metadata.playerNames.length, seatingAnchorIndex, actionHandIndex).opponentIndices;
   const usesSideLabels = opponents.length <= 2;
@@ -846,9 +848,12 @@ function C17DenseWorkspace({
         <HudStat label="Strikes" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.strikes.length, game.strikes.length)} value={game.strikes.length} />
         <HudStat label="Deck" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)} value={game.cardsRemainingInTheDeck} />
         <HudStat label="Pace" value={gameplayPresentation.pace}
-          valueColor={paceRiskColor(theme, gameplayPresentation.paceRisk)} />
+          valueColor={getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)}
+          accessibilityLabel={`Pace ${gameplayPresentation.pace}`}
+          accessibilityHint="Opens read-only Pace details"
+          onPress={() => setPaceDetailsOpen(true)} />
         <HudStat label="Eff" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
-          valueColor={gameplayPresentation.appliesEfficiencyModifier ? theme.colors.accent : undefined}
+          valueColor={gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined}
           accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
           accessibilityHint="Opens read-only efficiency calculation details"
           onPress={() => setEfficiencyDetailsOpen(true)} />
@@ -1311,6 +1316,12 @@ function C17DenseWorkspace({
       presentation={gameplayPresentation}
       visible={efficiencyDetailsOpen}
     />
+    <PaceDetailsModal
+      onClose={() => setPaceDetailsOpen(false)}
+      pace={gameplayPresentation.pace}
+      paceRisk={gameplayPresentation.paceRisk}
+      visible={paceDetailsOpen}
+    />
   </View>;
 }
 
@@ -1347,19 +1358,18 @@ function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, onPress, ac
     {onPress === undefined
       ? <View style={styles.hudStat}>{contents}</View>
       : <Pressable accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel}
-        accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>{contents}</Pressable>}
+        accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>
+        {contents}
+        <View pointerEvents="none" style={[styles.hudStatOutline, { borderColor: theme.colors.borderStrong }]} />
+        <View pointerEvents="none" style={[styles.hudStatInfo, { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.hudStatInfoText, { color: theme.colors.textMuted }]}>i</Text>
+        </View>
+      </Pressable>}
   </AuthoritativePulse>;
 }
 
 function formatEfficiency(value: number | null): string {
   return value === null ? '-' : value.toFixed(2);
-}
-
-function paceRiskColor(theme: ReturnType<typeof useHanabTheme>['theme'], risk: 'low' | 'medium' | 'high' | 'zero' | null): string {
-  if (risk === 'medium') return theme.colors.warning;
-  if (risk === 'high') return theme.dark ? '#fbbf24' : '#b45309';
-  if (risk === 'zero') return theme.colors.danger;
-  return theme.colors.text;
 }
 
 function getCardLabel(game: GameState, playerNames: readonly string[], order: number): string {
@@ -1379,7 +1389,10 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   hud: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   turn: { fontSize: 13, fontWeight: '900' },
-  hudStat: { alignItems: 'center', minWidth: 34 },
+  hudStat: { alignItems: 'center', minWidth: 34, position: 'relative' },
+  hudStatOutline: { ...StyleSheet.absoluteFill, borderRadius: 4, borderWidth: 1 },
+  hudStatInfo: { alignItems: 'center', borderRadius: 5, borderWidth: 1, height: 10, justifyContent: 'center', position: 'absolute', right: 0, top: 0, width: 10 },
+  hudStatInfoText: { fontSize: 7, fontWeight: '900', lineHeight: 8 },
   hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
   hudLabel: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
   lastAction: { borderRadius: 8, borderWidth: 1, gap: 3, minHeight: 37, paddingHorizontal: 7, paddingVertical: 4 },
