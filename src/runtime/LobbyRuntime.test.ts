@@ -505,6 +505,22 @@ afterEach(() => {
 });
 
 describe('deterministic lobby runtime', () => {
+  test('dispatches shutdown and maintenance updates into session state', async () => {
+    const { socket, store } = await makeReadyRuntime();
+    socket.emitMessage('shutdown {"shuttingDown":true,"datetimeShutdownInit":"2026-09-26T12:00:00Z"}');
+    socket.emitMessage('maintenance {"maintenanceMode":true}');
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: true,
+      datetimeShutdownInit: '2026-09-26T12:00:00Z',
+      maintenanceMode: true,
+    });
+    socket.emitMessage('shutdown {"shuttingDown":false,"datetimeShutdownInit":""}');
+    socket.emitMessage('maintenance {"maintenanceMode":false}');
+    expect(store.getState().session.serverStatus).toEqual({
+      shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false,
+    });
+  });
+
   test.each(['player', 'spectator'] as const)(
     '%s live game sends one exact unattend without optimistic exit',
     async (role) => {

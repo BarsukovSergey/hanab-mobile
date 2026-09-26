@@ -386,6 +386,9 @@ export const welcomeSchema = z.object({
   disconSpectatingTable: idSchema.optional(),
   disconShadowingSeat: z.number().int().optional(),
   settings: cardPresentationSettingsSchema,
+  shuttingDown: z.boolean().default(false),
+  datetimeShutdownInit: z.string().optional(),
+  maintenanceMode: z.boolean().default(false),
 });
 
 // Input typing keeps hand-authored fixtures compatible with the optional-on-wire settings field;
@@ -427,8 +430,16 @@ export const replayCreateCommandSchema = z.object({
   visibility: z.enum(['solo', 'shared']),
 }).strict();
 
+const shutdownSchema = z.object({
+  shuttingDown: z.boolean(),
+  datetimeShutdownInit: z.string(),
+}).strict();
+const maintenanceSchema = z.object({ maintenanceMode: z.boolean() }).strict();
+
 const schemas = {
   welcome: welcomeSchema,
+  shutdown: shutdownSchema,
+  maintenance: maintenanceSchema,
   name: z.object({ name: z.string() }),
   userList: z.array(lobbyUserSchema),
   user: lobbyUserSchema,

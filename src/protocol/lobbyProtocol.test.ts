@@ -67,6 +67,29 @@ describe('lobby protocol decoder', () => {
     });
   });
 
+  test('decodes authoritative server status with deterministic inactive defaults', () => {
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"shuttingDown":true,"datetimeShutdownInit":"2026-09-26T12:00:00Z","maintenanceMode":true}',
+    )).toMatchObject({ kind: 'event', event: { command: 'welcome', data: {
+      shuttingDown: true, datetimeShutdownInit: '2026-09-26T12:00:00Z', maintenanceMode: true,
+    } } });
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}',
+    )).toMatchObject({ kind: 'event', event: { command: 'welcome', data: {
+      shuttingDown: false, maintenanceMode: false,
+    } } });
+    expect(decodeServerFrame('shutdown {"shuttingDown":false,"datetimeShutdownInit":""}'))
+      .toEqual({ kind: 'event', event: { command: 'shutdown', data: {
+        shuttingDown: false, datetimeShutdownInit: '',
+      } } });
+    expect(decodeServerFrame('maintenance {"maintenanceMode":true}'))
+      .toEqual({ kind: 'event', event: { command: 'maintenance', data: { maintenanceMode: true } } });
+    expect(decodeServerFrame('shutdown {"shuttingDown":true}'))
+      .toMatchObject({ kind: 'malformed', command: 'shutdown' });
+    expect(decodeServerFrame('maintenance {"maintenanceMode":true,"extra":1}'))
+      .toMatchObject({ kind: 'malformed', command: 'maintenance' });
+  });
+
   test('encodes exact supported presentation setting frames', () => {
     expect(encodeCardPresentationSettingFrame('colorblindMode', true)).toBe(
       'setting {"name":"colorblindMode","setting":"true"}',
