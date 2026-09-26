@@ -70,6 +70,8 @@ export class ChatRuntime {
     const trimmed = message.trim();
     if (trimmed.length === 0 || trimmed.length > 300) return false;
 
+    if (this.store.getState().session.muted) return this.mutedError(this.currentRoom());
+
     const result = this.routeLocalCommand(trimmed);
     if (result.kind === 'not-handled') return this.lobbyRuntime.sendChat(message);
     return result.kind === 'handled-success';
@@ -88,6 +90,7 @@ export class ChatRuntime {
   }
 
   sendPrivateMessage(recipient: string, message: string, room = 'lobby'): boolean {
+    if (this.store.getState().session.muted) return this.mutedError(room);
     const normalizedRecipient = recipient.trim();
     const msg = message.trim();
     if (normalizedRecipient === '' || msg === '' || msg.length > 300) {
@@ -301,6 +304,11 @@ export class ChatRuntime {
       type,
       datetime: this.now().toISOString(),
     }));
+  }
+
+  private mutedError(room: string): false {
+    this.localMessage(room, 'You have been muted by an administrator.', 'error');
+    return false;
   }
 
   private handled(success: boolean): LocalChatCommandResult {

@@ -89,6 +89,14 @@ describe('lobby protocol decoder', () => {
       },
     });
   });
+  test('retains authoritative welcome mute state and defaults it when absent', () => {
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"muted":true}',
+    )).toMatchObject({ kind: 'event', event: { command: 'welcome', data: { muted: true } } });
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}',
+    )).toMatchObject({ kind: 'event', event: { command: 'welcome', data: { muted: false } } });
+  });
 
   test('decodes authoritative server status with deterministic inactive defaults', () => {
     expect(decodeServerFrame(
