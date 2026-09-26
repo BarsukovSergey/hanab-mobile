@@ -68,9 +68,10 @@ export class ChatRuntime {
 
   submit(message: string): boolean {
     const trimmed = message.trim();
-    if (trimmed.length === 0 || trimmed.length > 300) return false;
+    if (trimmed.length === 0) return false;
 
     if (this.store.getState().session.muted) return this.mutedError(this.currentRoom());
+    if (trimmed.length > 300) return false;
 
     const result = this.routeLocalCommand(trimmed);
     if (result.kind === 'not-handled') return this.lobbyRuntime.sendChat(message);

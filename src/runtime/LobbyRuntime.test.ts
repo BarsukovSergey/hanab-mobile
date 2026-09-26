@@ -2514,6 +2514,22 @@ describe('deterministic lobby runtime', () => {
       })));
   });
 
+  test('muted chat reports mute before rejecting a message over 300 characters', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: store.getState().session.connectionEpoch,
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [], muted: true },
+    }));
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('x'.repeat(301))).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().chat.messagesByRoom.lobby?.map(({ msg, localType }) => ({ msg, localType })))
+      .toEqual([{
+        msg: 'You have been muted by an administrator.', localType: 'error',
+      }]);
+  });
+
   test('unmuted version command remains local and PM command still sends', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     socket.emitMessage(bobUserFrame);
