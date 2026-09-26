@@ -19,6 +19,7 @@ import { getCardStatePresentation } from '../../game/selectors/cardStatePresenta
 import { getCluePreview } from '../../game/selectors/cluePreview';
 import { getNoteImpossibilityWarning } from '../../game/selectors/noteImpossibility';
 import { getLastCluePresentationFromState } from '../../game/selectors/lastClue';
+import { getGameResourcePresentation } from '../../game/selectors/gameResourcePresentation';
 import {
   canDiscardForVariant,
   getDisplayedClueTokens,
@@ -720,6 +721,13 @@ function C17DenseWorkspace({
   variantName: string;
 }) {
   const { theme } = useHanabTheme();
+  const resourcePresentation = getGameResourcePresentation({
+    game,
+    variantName,
+    hyphenatedConventions,
+    realLifeMode,
+    showResourceCues: hypothetical === null,
+  });
   const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
   const [recentOpen, setRecentOpen] = useState(false);
   const [efficiencyDetailsOpen, setEfficiencyDetailsOpen] = useState(false);
@@ -867,7 +875,9 @@ function C17DenseWorkspace({
           valueColor={hGroupStatus.lowScorePhase ? '#00ffff' : undefined}
           valueEmphasized={hGroupStatus.lowScorePhase && colorblindMode} />
         <HudStat label="Max" value={game.stats.maxScore} />
-        <HudStat label="Clues" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(getDisplayedClueTokens(liveBefore.clueTokens, variantName), getDisplayedClueTokens(game.clueTokens, variantName))} value={getDisplayedClueTokens(game.clueTokens, variantName)} />
+        <HudStat label="Clues" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(getDisplayedClueTokens(liveBefore.clueTokens, variantName), getDisplayedClueTokens(game.clueTokens, variantName))} value={getDisplayedClueTokens(game.clueTokens, variantName)}
+          valueColor={resourcePresentation.clueCue === 'no-clues' ? '#ff5555' : resourcePresentation.clueCue === 'one-clue' ? '#ffd54f' : resourcePresentation.clueCue === 'max-clues' ? '#aaff00' : undefined}
+          accessibilityLabel={`Clues ${getDisplayedClueTokens(game.clueTokens, variantName)}${resourcePresentation.clueCue === 'no-clues' ? ', no clues available' : resourcePresentation.clueCue === 'one-clue' ? ', one clue available' : resourcePresentation.clueCue === 'max-clues' ? ', maximum clues' : ''}`} />
         <HudStat label="Strikes" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.strikes.length, game.strikes.length)} value={game.strikes.length} />
         <HudStat label="Deck" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)} value={game.cardsRemainingInTheDeck} />
         <HudStat label="Pace" value={gameplayPresentation.pace}
@@ -882,7 +892,7 @@ function C17DenseWorkspace({
           onPress={() => setEfficiencyDetailsOpen(true)} />
       </View>
 
-      <CompactTable dense tightChrome={usesDenseSideLabels} game={game} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
+      <CompactTable dense tightChrome={usesDenseSideLabels} game={game} discardResourceCue={resourcePresentation.discardCue} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
 
       <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, usesDenseSideLabels && styles.denseLastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
         {usesDenseSideLabels ? <View style={styles.denseLastActionRow}>
@@ -1380,7 +1390,7 @@ function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, valueEmphas
   </>;
   return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}>
     {onPress === undefined
-      ? <View style={styles.hudStat}>{contents}</View>
+      ? <View accessible={accessibilityLabel !== undefined} accessibilityLabel={accessibilityLabel} style={styles.hudStat}>{contents}</View>
       : <Pressable accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel}
         accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>
         {contents}
