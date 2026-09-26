@@ -27,3 +27,23 @@ test('bounds the More scroll viewport to the sheet so dynamic content remains re
   expect(app).toContain("menuScroll: { flex: 1 }");
   expect(app).toContain("sheet: { borderRadius: 16, borderWidth: 1, gap: 10, maxHeight: '90%'");
 });
+
+test('keeps live-game header actions outlined, matched, and tall enough to tap', () => {
+  const headerStart = app.indexOf('<View style={[styles.headerActions');
+  const headerEnd = app.indexOf('</View>', headerStart);
+  const headerActions = app.slice(headerStart, headerEnd);
+  const buttons = headerActions.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
+
+  expect(buttons).toHaveLength(2);
+  const [chat, more] = buttons;
+  expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
+  expect(chat).toContain("onPress={() => setLiveSheet('chat')}");
+  expect(more).toContain('title="More"');
+  expect(more).toContain("onPress={() => setLiveSheet('menu')}");
+  for (const button of buttons) {
+    expect(button).toContain('compact');
+    expect(button).toContain('tone="secondary"');
+    expect(button).toContain('style={styles.liveHeaderAction}');
+  }
+  expect(app).toMatch(/liveHeaderAction:\s*\{[^}]*minHeight:\s*40[^}]*paddingHorizontal:\s*12/);
+});
