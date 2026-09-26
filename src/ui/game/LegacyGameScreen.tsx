@@ -28,6 +28,7 @@ import { DiscardViewer } from './DiscardViewer';
 import { CardKnowledgeDetails, GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
+import { getPaceRiskColor, PaceDetailsModal } from './PaceDetailsModal';
 import { getCommittedClueMarkerForMetadata } from './clueIndication';
 import {
   gameplayInteractionReducer,
@@ -660,6 +661,7 @@ function C17DenseWorkspace({
   const { theme } = useHanabTheme();
   const [recentOpen, setRecentOpen] = useState(false);
   const [efficiencyDetailsOpen, setEfficiencyDetailsOpen] = useState(false);
+  const [paceDetailsOpen, setPaceDetailsOpen] = useState(false);
   const [layoutMetrics, setLayoutMetrics] = useState({
     opponentCardLaneWidth: 0,
     handsRegionHeight: 0,
@@ -705,9 +707,12 @@ function C17DenseWorkspace({
         <HudStat label="Strikes" value={game.strikes.length} />
         <HudStat label="Deck" value={game.cardsRemainingInTheDeck} />
         <HudStat label="Pace" value={gameplayPresentation.pace}
-          valueColor={paceRiskColor(theme, gameplayPresentation.paceRisk)} />
+          valueColor={getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)}
+          accessibilityLabel={`Pace ${gameplayPresentation.pace}`}
+          accessibilityHint="Opens read-only Pace details"
+          onPress={() => setPaceDetailsOpen(true)} />
         <HudStat label="Eff" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
-          valueColor={gameplayPresentation.appliesEfficiencyModifier ? theme.colors.accent : undefined}
+          valueColor={gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined}
           accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
           accessibilityHint="Opens read-only efficiency calculation details"
           onPress={() => setEfficiencyDetailsOpen(true)} />
@@ -896,6 +901,12 @@ function C17DenseWorkspace({
       presentation={gameplayPresentation}
       visible={efficiencyDetailsOpen}
     />
+    <PaceDetailsModal
+      onClose={() => setPaceDetailsOpen(false)}
+      pace={gameplayPresentation.pace}
+      paceRisk={gameplayPresentation.paceRisk}
+      visible={paceDetailsOpen}
+    />
   </>;
 }
 
@@ -962,18 +973,17 @@ function HudStat({ label, value, valueColor, onPress, accessibilityLabel, access
   return onPress === undefined
     ? <View style={styles.hudStat}>{contents}</View>
     : <Pressable accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>{contents}</Pressable>;
+      accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>
+      {contents}
+      <View pointerEvents="none" style={[styles.hudStatOutline, { borderColor: theme.colors.borderStrong }]} />
+      <View pointerEvents="none" style={[styles.hudStatInfo, { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.hudStatInfoText, { color: theme.colors.textMuted }]}>i</Text>
+      </View>
+    </Pressable>;
 }
 
 function formatEfficiency(value: number | null): string {
   return value === null ? '-' : value.toFixed(2);
-}
-
-function paceRiskColor(theme: ReturnType<typeof useHanabTheme>['theme'], risk: 'low' | 'medium' | 'high' | 'zero' | null): string {
-  if (risk === 'medium') return theme.colors.warning;
-  if (risk === 'high') return theme.dark ? '#fbbf24' : '#b45309';
-  if (risk === 'zero') return theme.colors.danger;
-  return theme.colors.text;
 }
 
 function LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; playerIndex: number; paused: boolean }) {
@@ -1016,7 +1026,10 @@ const styles = StyleSheet.create({
   hud: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 7, paddingHorizontal: 9, paddingVertical: 7 },
   hudTurn: { flex: 1, minWidth: 70 },
   hudCurrent: { fontSize: 14, fontWeight: '900' },
-  hudStat: { alignItems: 'center', minWidth: 34 },
+  hudStat: { alignItems: 'center', minWidth: 34, position: 'relative' },
+  hudStatOutline: { ...StyleSheet.absoluteFill, borderRadius: 4, borderWidth: 1 },
+  hudStatInfo: { alignItems: 'center', borderRadius: 5, borderWidth: 1, height: 10, justifyContent: 'center', position: 'absolute', right: 0, top: 0, width: 10 },
+  hudStatInfoText: { fontSize: 7, fontWeight: '900', lineHeight: 8 },
   hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
   hudLabel: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
   handSurface: { borderRadius: 14, borderWidth: 1, gap: 8, padding: 9 },
