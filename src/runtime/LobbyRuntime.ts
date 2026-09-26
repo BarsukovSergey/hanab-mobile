@@ -32,6 +32,7 @@ import {
 import {
   decodeServerFrame,
   encodeCardPresentationSettingFrame,
+  encodeGameplayPresentationSettingFrame,
   encodeChatFrame,
   encodeChatReadFrame,
   encodeInactiveFrame,
@@ -39,6 +40,7 @@ import {
   encodeHistoryFriendsGetFrame,
   encodeHistoryGetSeedFrame,
   historyGetSeedCommandSchema,
+  type GameplayPresentationSettingName,
   encodeGetNameFrame,
   encodeReplayCreateFrame,
   encodeClientFrame,
@@ -315,6 +317,19 @@ export class LobbyRuntime {
 
     if (!this.sendEncoded(encodeCardPresentationSettingFrame(name, enabled))) return false;
     this.store.dispatch(sessionActions.cardPresentationSettingUpdated({ name, enabled }));
+    return true;
+  }
+
+  setGameplayPresentationSetting(
+    name: GameplayPresentationSettingName,
+    enabled: boolean,
+  ): boolean {
+    const state = this.store.getState();
+    if (state.session.phase !== 'ready') return false;
+    if (state.session[name] === enabled) return true;
+
+    if (!this.sendEncoded(encodeGameplayPresentationSettingFrame(name, enabled))) return false;
+    this.store.dispatch(sessionActions.gameplayPresentationSettingUpdated({ name, enabled }));
     return true;
   }
 

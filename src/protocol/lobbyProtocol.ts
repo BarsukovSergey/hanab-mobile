@@ -370,14 +370,23 @@ export const cardPresentationSettingNameSchema = z.enum([
 
 export type CardPresentationSettingName = z.infer<typeof cardPresentationSettingNameSchema>;
 
+export const gameplayPresentationSettingNameSchema = z.enum([
+  'realLifeMode',
+  'hyphenatedConventions',
+]);
+
+export type GameplayPresentationSettingName = z.infer<typeof gameplayPresentationSettingNameSchema>;
+
 const cardPresentationSettingsSchema = z.object({
   colorblindMode: z.boolean().default(false),
   styleNumbers: z.boolean().default(false),
   realLifeMode: z.boolean().default(false),
+  hyphenatedConventions: z.boolean().default(false),
 }).passthrough().default({
   colorblindMode: false,
   styleNumbers: false,
   realLifeMode: false,
+  hyphenatedConventions: false,
 });
 
 const cardPresentationSettingCommandSchema = z.object({
@@ -437,6 +446,11 @@ export const replayCreateCommandSchema = z.object({
   source: z.literal('id'),
   databaseID: z.number().int().positive(),
   visibility: z.enum(['solo', 'shared']),
+}).strict();
+
+const gameplayPresentationSettingCommandSchema = z.object({
+  name: gameplayPresentationSettingNameSchema,
+  setting: z.enum(['true', 'false']),
 }).strict();
 
 const shutdownSchema = z.object({
@@ -713,6 +727,17 @@ export function encodeTableStartFrame(
 export function encodeChatFrame(msg: string, room: string): string {
   const payload = chatCommandSchema.parse({ msg, room });
   return encodeClientFrame('chat', payload);
+}
+
+export function encodeGameplayPresentationSettingFrame(
+  name: GameplayPresentationSettingName,
+  enabled: boolean,
+): string {
+  const payload = gameplayPresentationSettingCommandSchema.parse({
+    name,
+    setting: enabled ? 'true' : 'false',
+  });
+  return encodeClientFrame('setting', payload);
 }
 
 export function encodeChatReadFrame(tableID: number): string {

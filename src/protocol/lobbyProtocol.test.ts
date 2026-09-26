@@ -3,6 +3,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   decodeServerFrame,
   encodeCardPresentationSettingFrame,
+  encodeGameplayPresentationSettingFrame,
   encodeChatFrame,
   encodeChatReadFrame,
   encodeInactiveFrame,
@@ -70,12 +71,12 @@ describe('lobby protocol decoder', () => {
   });
   test('parses presentation settings, tolerates other settings, and defaults absent settings', () => {
     expect(decodeServerFrame(
-      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"realLifeMode":true,"sounds":true}}',
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"realLifeMode":true,"hyphenatedConventions":true,"sounds":true}}',
     )).toMatchObject({
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: true, styleNumbers: false, realLifeMode: true, sounds: true } },
+        data: { settings: { colorblindMode: true, styleNumbers: false, realLifeMode: true, hyphenatedConventions: true, sounds: true } },
       },
     });
     expect(decodeServerFrame(
@@ -84,7 +85,7 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: false, styleNumbers: false, realLifeMode: false } },
+        data: { settings: { colorblindMode: false, styleNumbers: false, realLifeMode: false, hyphenatedConventions: false } },
       },
     });
   });
@@ -118,6 +119,15 @@ describe('lobby protocol decoder', () => {
     );
     expect(encodeCardPresentationSettingFrame('styleNumbers', false)).toBe(
       'setting {"name":"styleNumbers","setting":"false"}',
+    );
+  });
+
+  test('encodes exact gameplay presentation setting frames', () => {
+    expect(encodeGameplayPresentationSettingFrame('realLifeMode', true)).toBe(
+      'setting {"name":"realLifeMode","setting":"true"}',
+    );
+    expect(encodeGameplayPresentationSettingFrame('hyphenatedConventions', false)).toBe(
+      'setting {"name":"hyphenatedConventions","setting":"false"}',
     );
   });
 

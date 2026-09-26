@@ -2493,6 +2493,43 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toEqual([]);
   });
 
+  test('gameplay presentation settings send once and update local state after success', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+
+    expect(runtime.setGameplayPresentationSetting('realLifeMode', true)).toBe(true);
+    expect(runtime.setGameplayPresentationSetting('hyphenatedConventions', true)).toBe(true);
+    expect(socket.sent).toEqual([
+      'setting {"name":"realLifeMode","setting":"true"}',
+      'setting {"name":"hyphenatedConventions","setting":"true"}',
+    ]);
+    expect(store.getState().session.realLifeMode).toBe(true);
+    expect(store.getState().session.hyphenatedConventions).toBe(true);
+
+    expect(runtime.setGameplayPresentationSetting('realLifeMode', true)).toBe(true);
+    expect(socket.sent).toHaveLength(2);
+  });
+
+  test('gameplay presentation setting send failure leaves local state unchanged', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    socket.failSend = true;
+
+    expect(runtime.setGameplayPresentationSetting('hyphenatedConventions', true)).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().session.hyphenatedConventions).toBe(false);
+  });
+
+  test('gameplay presentation settings require a ready connection', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const runtime = new LobbyRuntime(session, createAppStore());
+    await runtime.connect();
+    socket.emitOpen();
+
+    expect(runtime.setGameplayPresentationSetting('realLifeMode', true)).toBe(false);
+    expect(socket.sent).toEqual([]);
+  });
+
   test('spectate sends exactly once and does not transition before tableStart', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
