@@ -373,9 +373,11 @@ export type CardPresentationSettingName = z.infer<typeof cardPresentationSetting
 const cardPresentationSettingsSchema = z.object({
   colorblindMode: z.boolean().default(false),
   styleNumbers: z.boolean().default(false),
+  realLifeMode: z.boolean().default(false),
 }).passthrough().default({
   colorblindMode: false,
   styleNumbers: false,
+  realLifeMode: false,
 });
 
 const cardPresentationSettingCommandSchema = z.object({

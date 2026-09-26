@@ -70,12 +70,12 @@ describe('lobby protocol decoder', () => {
   });
   test('parses presentation settings, tolerates other settings, and defaults absent settings', () => {
     expect(decodeServerFrame(
-      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"sounds":true}}',
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"realLifeMode":true,"sounds":true}}',
     )).toMatchObject({
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: true, styleNumbers: false, sounds: true } },
+        data: { settings: { colorblindMode: true, styleNumbers: false, realLifeMode: true, sounds: true } },
       },
     });
     expect(decodeServerFrame(
@@ -84,7 +84,7 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: false, styleNumbers: false } },
+        data: { settings: { colorblindMode: false, styleNumbers: false, realLifeMode: false } },
       },
     });
   });
