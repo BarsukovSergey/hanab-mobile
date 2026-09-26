@@ -288,8 +288,7 @@ function AppContent() {
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
           {!landscapePhone && <View style={styles.brandCopy}>
-            <Text style={[styles.gameBrand, { color: theme.colors.text }]}>Hanab</Text>
-            <Text numberOfLines={1} style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser?.username ?? 'Hanab'}</Text>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, { color: theme.colors.text }]}>{session.authenticatedUser?.username}</Text>
           </View>}
           <View style={[styles.headerActions, landscapePhone && styles.headerActionsLandscape]}>
             <ActionButton
@@ -381,7 +380,6 @@ function AppContent() {
                     {pauseEligible && <ActionButton title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />}
                     <TerminationControls />
                     <ActionButton title="Settings" onPress={() => setLiveSheet('settings')} />
-                    <ActionButton title="Sign out" tone="ghost" onPress={() => void signOut()} />
                   </ScrollView>
                   <ActionButton title="Close" tone="ghost" onPress={() => setLiveSheet(null)} />
                 </>
@@ -391,7 +389,7 @@ function AppContent() {
                     <ActionButton title="Back" onPress={() => setLiveSheet(null)} />
                   </>
                   : liveSheet === 'settings'
-                    ? <SettingsScreen onBack={() => setLiveSheet('menu')} />
+                    ? <SettingsScreen onBack={() => setLiveSheet('menu')} onSignOut={() => void signOut()} />
                     : liveSheet === 'tag'
                       ? <>
                         <SectionHeading title="Add tag" detail="Tags are attached to this game." />
@@ -466,7 +464,7 @@ function AppContent() {
     content = <HistoryScreen onBack={() => { setReturnAfterUnattend(null); setLocalScreen('lobby'); }}
       onWatchReplay={(databaseID, visibility) => { if (lobbyRuntime.watchHistoricalGame(databaseID, visibility)) setReturnAfterUnattend('history'); }} />;
   } else if (localScreen === 'settings') {
-    content = <SettingsScreen onBack={() => setLocalScreen('lobby')} />;
+    content = <SettingsScreen onBack={() => setLocalScreen('lobby')} onSignOut={() => void signOut()} />;
   } else if (localScreen === 'people') {
     content = <PeopleScreen onBack={() => setLocalScreen('lobby')} />;
   } else {
@@ -490,7 +488,6 @@ function AppContent() {
           <View style={styles.headerActions}>
             {probe === 'valid' && session.authenticatedUser !== null && <>
               <ActionButton compact title="Settings" tone="ghost" onPress={() => setLocalScreen('settings')} />
-              <ActionButton compact title="Sign out" tone="ghost" onPress={() => void signOut()} />
             </>}
           </View>
         </View>
@@ -530,7 +527,7 @@ const styles = StyleSheet.create({
   gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: 8, paddingTop: 5 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
-  gameBrand: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
+  gameIdentity: { fontSize: 18, fontWeight: '800', minWidth: 0 },
   authName: { fontSize: 11, fontWeight: '700' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
