@@ -150,6 +150,7 @@ export const chatSlice = createSlice({
         epoch: number;
         defaultRoom: string;
         messages: readonly ChatMessage[];
+        authoritativeTableUnread?: { room: string; unread: number };
       }>,
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
@@ -166,6 +167,14 @@ export const chatSlice = createSlice({
       for (const [room, messages] of Object.entries(grouped)) {
         cap(messages);
         state.messagesByRoom[room] = messages;
+      }
+      const authoritativeUnread = action.payload.authoritativeTableUnread;
+      if (authoritativeUnread !== undefined && /^table[1-9]\d*$/.test(authoritativeUnread.room)) {
+        if (authoritativeUnread.unread > 0) {
+          state.unreadByRoom[authoritativeUnread.room] = authoritativeUnread.unread;
+        } else if (authoritativeUnread.unread === 0) {
+          delete state.unreadByRoom[authoritativeUnread.room];
+        }
       }
     },
   },

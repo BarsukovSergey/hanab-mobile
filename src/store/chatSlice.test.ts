@@ -205,6 +205,36 @@ describe('chat state and plain-text conversion', () => {
     expect(store.getState().chat.unreadByRoom).toEqual({});
   });
 
+  test('applies authoritative unread only to the explicitly supplied table room', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1, defaultRoom: 'table123', messages: [],
+      authoritativeTableUnread: { room: 'table123', unread: 7 },
+    }));
+    expect(store.getState().chat.unreadByRoom).toEqual({ table123: 7 });
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1, defaultRoom: 'table123', messages: [],
+      authoritativeTableUnread: { room: 'table123', unread: 0 },
+    }));
+    expect(store.getState().chat.unreadByRoom).toEqual({});
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1, defaultRoom: 'lobby', messages: [],
+      authoritativeTableUnread: { room: 'lobby', unread: 5 },
+    }));
+    expect(store.getState().chat.unreadByRoom).toEqual({});
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1, defaultRoom: 'table123', messages: [],
+      authoritativeTableUnread: { room: 'table123', unread: 2 },
+    }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1, defaultRoom: 'table123', message: message('inbound', 'table123'),
+    }));
+    expect(store.getState().chat.unreadByRoom).toEqual({ table123: 3 });
+    store.dispatch(chatActions.roomRead({ room: 'table123' }));
+    expect(store.getState().chat.unreadByRoom).toEqual({});
+  });
+
   test('keeps ordinary room routing and drops unsupported garbage rooms', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));

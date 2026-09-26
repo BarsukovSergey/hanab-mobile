@@ -46,7 +46,8 @@ export function ChatPanel({ room, title }: Props) {
 
   useEffect(() => {
     dispatch(chatActions.roomRead({ room }));
-  }, [dispatch, messages.length, room]);
+    if (/^table[1-9]\d*$/.test(room)) lobbyRuntime.markChatRead(room);
+  }, [dispatch, messages.length, ready, room]);
 
   return (
     <Panel>

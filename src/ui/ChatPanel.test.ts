@@ -15,3 +15,14 @@ describe('chat composer keyboard submission', () => {
     expect(input).not.toMatch(/submitBehavior="newline"/);
   });
 });
+
+describe('table chat read contract', () => {
+  test('reads table chat on room/message transitions and never sends for lobby', () => {
+    const source = readFileSync(join(__dirname, 'ChatPanel.tsx'), 'utf8');
+    const effect = source.match(/useEffect\(\(\) => \{\s*dispatch\(chatActions\.roomRead\([\s\S]*?\n  \}, \[dispatch, messages\.length, ready, room\]\);/)?.[0] ?? '';
+    expect(effect).toMatch(/lobbyRuntime\.markChatRead\(room\)/);
+    expect(effect).toMatch(/\^table\[1-9\]/);
+    expect(effect).toMatch(/\[dispatch, messages\.length, ready, room\]/);
+    expect(effect).not.toMatch(/render/);
+  });
+});

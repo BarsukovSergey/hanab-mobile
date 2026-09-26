@@ -61,6 +61,18 @@ export const lobbySlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       tablesAdapter.upsertOne(state.tables, action.payload.table);
     },
+    tableProgressReceived(
+      state,
+      action: PayloadAction<{ epoch: number; tableID: number; progress: number }>,
+    ) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      const table = state.tables.entities[action.payload.tableID];
+      if (table === undefined) return;
+      tablesAdapter.updateOne(state.tables, {
+        id: action.payload.tableID,
+        changes: { progress: action.payload.progress },
+      });
+    },
     tableGone(state, action: PayloadAction<{ epoch: number; tableID: number }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;
       tablesAdapter.removeOne(state.tables, action.payload.tableID);
