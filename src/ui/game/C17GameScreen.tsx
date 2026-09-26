@@ -784,6 +784,7 @@ function C17DenseWorkspace({
     hyphenatedConventions,
     colorblindMode,
     realLifeMode,
+    showLowScorePhase: hypothetical === null,
     showCurrentPlayerCue: !hypothetical && !reviewActive && !finishedReplay && sharedReplay === null,
   });
   const actorPulse = liveBefore !== undefined && liveBefore.turn.currentPlayerIndex !== current ? livePulseSegment : null;

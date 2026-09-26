@@ -17,11 +17,12 @@ export function getHGroupStatusPresentation(input: {
   readonly hyphenatedConventions: boolean;
   readonly colorblindMode: boolean;
   readonly realLifeMode: boolean;
+  readonly showLowScorePhase: boolean;
   readonly showCurrentPlayerCue: boolean;
 }): HGroupStatusPresentation {
   const { game, variantName, hyphenatedConventions } = input;
   const variant = getVariant(variantName);
-  const lowScorePhase = hyphenatedConventions
+  const lowScorePhase = input.showLowScorePhase && hyphenatedConventions
     && game.score < variant.suits.length * 2;
 
   let currentPlayerCue: HGroupCurrentPlayerCue | null = null;

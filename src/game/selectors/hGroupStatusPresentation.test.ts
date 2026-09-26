@@ -19,6 +19,7 @@ function present(state: GameState, options: Partial<{
   hyphenatedConventions: boolean;
   realLifeMode: boolean;
   showCurrentPlayerCue: boolean;
+  showLowScorePhase: boolean;
 }> = {}) {
   return getHGroupStatusPresentation({
     game: state,
@@ -26,6 +27,7 @@ function present(state: GameState, options: Partial<{
     hyphenatedConventions: options.hyphenatedConventions ?? true,
     colorblindMode: false,
     realLifeMode: options.realLifeMode ?? false,
+    showLowScorePhase: options.showLowScorePhase ?? true,
     showCurrentPlayerCue: options.showCurrentPlayerCue ?? true,
   });
 }
@@ -36,6 +38,7 @@ describe('H-group status presentation', () => {
     expect(present(game({ score: 7 })).lowScorePhase).toBe(true);
     expect(present(game({ score: 8 })).lowScorePhase).toBe(false);
     expect(present(game({ score: 9 })).lowScorePhase).toBe(false);
+    expect(present(game({ score: 7 }), { showLowScorePhase: false }).lowScorePhase).toBe(false);
   });
 
   test('shows locked status only for the authoritative locked current hand', () => {
