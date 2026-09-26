@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 
-Status: **planning snapshot reconciled with mobile `main` through PR #108; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #112; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `38ceb5b51b7fd796e3d681101f8273587ff9936a` (PR #108 merge)
+- current `main`: `a89f209fc0335f9e46505da6cf47ec50726609ba` (PR #112 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -97,7 +97,7 @@ The biggest remaining parity gaps are now concentrated in five areas:
 4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, reverse-hand preference, and other non-core presentation settings remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), and variant-aware clue/discard resource-state cues (#108). Spectator perspective switching is also first-class in the live Game menu.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), variant-aware clue/discard resource-state cues (#108), server-backed gameplay presentation settings (#110), stronger friend visibility in People/Lobby (#111), and authoritative mute-state chat guarding (#112). Spectator perspective switching is also first-class in the live Game menu.
 
 The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
@@ -122,6 +122,9 @@ Recently completed high-value parity work:
 - live table-chat unread state and direct `/r` submission handling.
 - H-group Low Score, locked-hand and Double Discard presentation cues (#107).
 - variant-aware clue availability and discard-state presentation cues (#108).
+- server-backed H-group features and Real-life mode presentation settings (#110).
+- friends-first People ordering plus visible friend emphasis in People and Lobby tables (#111).
+- authoritative mute-state retention and source-faithful local chat/PM guard (#112).
 
 The highest-value remaining items are:
 
@@ -147,14 +150,14 @@ The highest-value remaining items are:
 | Change password | **Full** | — | Medium | Settings uses the authenticated username plus transient current/new password fields and sends upstream-compatible `newPassword` through `/login`; password values are not stored in Redux/application state. |
 | Password reset | **Full entry point** | — | Medium | Login and Settings open the authoritative upstream `/password-reset` page; mobile does not invent a separate recovery protocol. |
 | First-time tutorial (`firstTimeUser`) | **Missing** | M | Low–Medium | Field is sent in `welcome` but intentionally dropped by mobile schema. |
-| Account mute state (`muted`) | **Missing UI** | XS–S | Low | Server remains authoritative and can reject chat; mobile does not pre-explain mute state. |
+| Account mute state (`muted`) | **Full mobile guard** | — | Low | PR #112 retains authoritative `welcome.muted` and blocks non-empty chat/slash/direct-PM sends locally with the pinned-web warning while the server remains authoritative. |
 | Server shutdown / maintenance metadata | **Full mobile status UI** | — | Medium | PR #104 retains authoritative welcome/live status and surfaces bounded maintenance/shutdown notices. |
 | Random default table name | **Full** | — | Low | PR #63 uses authoritative `randomTableName` and `getName` for Create-table name generation/refresh. |
 | Inactive/active session status | **Full transport** | — | Medium | Mobile sends `inactive` on app lifecycle and consumes user inactivity state. |
 | Online user model | **Full data + People UI** | — | Medium–High | `userList/user/userLeft` state backs the People/context-action surface. |
 | User list rendering | **Full basic** | — | Medium–High | People exposes the online registry with contextual actions. |
 | Friend-aware lobby sorting | **Full** | — | Medium | PR #69 adds friend-aware Lobby discovery/order and friend context. |
-| Friend visual highlighting | **Full basic** | — | Medium | People renders an explicit `Friend` pill and Lobby discovery carries friend context. |
+| Friend visual highlighting | **Full mobile presentation** | — | Medium | PR #111 puts the current user first, emphasizes friends in People, and accents friend-bearing Lobby tables/player names while preserving player/spectator friend semantics. |
 | Current lobby restructure | **Full** | — | High | PR #32 implements Your running game → Pregame → Create → Running → Shared replays, without duplicating the own reattendable game. |
 | Hide Create while own game is reattendable | **Full** | — | High | PR #32 hides Create while the user has a reattendable own running game. |
 | Distinct Shared replay lobby section | **Full** | — | Medium–High | PR #32 renders shared replays separately from ordinary Running tables. |
@@ -380,11 +383,12 @@ closed. The current 2242 variants already represent the overwhelming majority of
 
 # 6. Per-user settings
 
-The server sends the complete upstream settings object in `welcome`. Mobile currently parses only
-identity/resume/friends fields and drops the settings object.
+The server sends the complete upstream settings object in `welcome`. Mobile deliberately retains a
+bounded subset needed by supported product flows instead of mirroring every web preference.
 
-The mobile Settings screen contains theme/accent/developer controls, not the hanab.live account
-settings below.
+The mobile Settings screen now exposes server-backed card appearance plus H-group/Real-life gameplay
+presentation controls alongside its local theme/accent/developer and account controls. Other upstream
+settings remain intentionally unelevated until they have a useful mobile workflow.
 
 | Upstream setting | Mobile status | Effort | Importance | Recommendation |
 | --- | --- | ---: | ---: | --- |
@@ -393,14 +397,14 @@ settings below.
 | `soundTimer` | Missing | M | Low | Same. |
 | `volume` | Missing | S once sound exists | Low | Same. |
 | `keldonMode` | Missing | L | Low | Mobile layout should not chase desktop table geometry unless requested. |
-| `colorblindMode` | **Missing** | S–M | **High** | Strong accessibility candidate. |
-| `realLifeMode` | Missing | M | Low | Niche presentation preference. |
+| `colorblindMode` | **Full** | — | **High** | Server-backed switch with generated pinned-upstream card presentation. |
+| `realLifeMode` | **Full** | — | Low | PR #110 exposes the server-backed switch; #107/#108 presentation cues honor it. |
 | `reverseHands` | Missing | S–M | Medium | Useful player preference; current display direction is fixed. |
-| `styleNumbers` | **Missing** | S–M | **High** | Accessibility/readability candidate. |
+| `styleNumbers` | **Full** | — | **High** | Server-backed switch with generated pinned-upstream styled-number assets. |
 | `showTimerInUntimed` | Missing | S | Low | Optional. |
 | `speedrunPreplay` | Missing + speedrun unsupported | L | Low | Defer. |
 | `speedrunMode` | Missing + speedrun unsupported | L | Low | Defer. |
-| `hyphenatedConventions` | **Partial** | S | Medium | Mobile reads effective H-group status through lobby user state but cannot change it. |
+| `hyphenatedConventions` | **Full for mobile presentation** | — | Medium | PR #110 exposes the server-backed H-group features switch and C17 consumes the authoritative welcome/session setting for presentation. |
 | `createTableVariant` | Missing persistence | S | Low–Medium | Mobile hardcodes defaults. |
 | `createTableTimed` | Missing persistence | S | Low | Same. |
 | `createTableTimeBaseMinutes` | Missing persistence | S | Low | Same. |
@@ -415,8 +419,8 @@ settings below.
 | `createTableDetrimentalCharacters` | N/A while unsupported | — | Low | — |
 | `createTableMaxPlayers` | Missing persistence | S | Low | Mobile defaults to 5. |
 
-A settings implementation should use the existing authoritative `setting` command and not create
-mobile-only server preference storage.
+Any additional server-backed setting should continue to use the authoritative `setting` command and
+must not create mobile-only server preference storage.
 
 ---
 
@@ -424,14 +428,14 @@ mobile-only server preference storage.
 
 | H-Group feature from upstream docs | Mobile status | Effort | Importance |
 | --- | --- | ---: | ---: |
-| H indicator in online user list | Missing because People UI missing | S after People | Low |
+| H indicator in online user list | **Full basic** | — | Low | People exposes an `H-group` pill from authoritative lobby-user state. |
 | DDA card indication | **Full card-level semantics** | — | Medium |
 | Empathy-based DDA card semantics | **Full card-level semantics** | — | Medium |
-| Global double-discard situation warning | **Missing UI** | S | Medium | Upstream also marks the discard-pile/current-player area while DDA is active; mobile only renders affected-card markers. |
-| Locked-hand notification | **Missing UI** | S–M | Medium |
-| Low Score Phase score treatment | **Missing UI** | S | Low–Medium |
+| Global double-discard situation warning | **Full presentation semantics** | — | Medium | PRs #107/#108 expose current-player Double Discard warning and discard-surface emphasis without changing legality. |
+| Locked-hand notification | **Full presentation semantics** | — | Medium | PR #107 reuses vendored locked-hand state with pinned-upstream priority/gating. |
+| Low Score Phase score treatment | **Full presentation semantics** | — | Low–Medium | PR #107 applies the variant-derived H-group treatment with Hypothetical suppression. |
 | Discard-clued / DDA / order-chop-move sounds | **Missing** | M | Low |
-| Hyphenated-convention-dependent card behavior | **Full effective state, no toggle** | S | Medium |
+| Hyphenated-convention-dependent card behavior | **Full effective state + toggle** | — | Medium | PR #110 adds the authoritative server-backed H-group features toggle used by the existing presentation semantics. |
 
 ---
 
@@ -561,7 +565,7 @@ same-seed count** before implementing new server commands.
 | --- | --- | ---: | ---: |
 | `/friend`, `/unfriend`, `/friends` | **Full command path** | — | Medium |
 | Friends list state | **Full data** | — | Medium |
-| Friends UI | **Partial** | S–M | Medium | People marks friends and exposes Friend/Unfriend actions; there is no dedicated friends-only list. |
+| Friends UI | **Strong partial** | S–M | Medium | PR #111 orders current user → friends → others and visibly emphasizes friends in People/Lobby; there is still no dedicated friends-only list or rich profile/social hub. |
 | Friend-aware sorting | **Full** | — | Medium |
 | `/link`, `/unlink`, `/linked` | **Full command path** | — | Low–Medium |
 | Linked-account native UI | Missing | M | Low | Seed-avoidance purpose should be explained before exposing casually. |
@@ -1008,13 +1012,13 @@ A useful way to describe current parity is:
 - Hypothetical core;
 - spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
-- generated upstream card presentation with colorblind/styled-number server settings;
+- generated upstream card presentation with colorblind/styled-number server settings plus server-backed H-group/Real-life presentation toggles;
 - pinned-upstream H-group and clue/discard resource-state presentation cues for supported gameplay;
 - own History, Friends history, and same-seed Other Scores;
-- People/Pregame/live-game contextual friend/session-PM actions and compact Pregame stats;
+- People/Pregame/live-game contextual friend/session-PM actions, friends-first visual emphasis, and compact Pregame stats;
 - shared replay creation and turn-suggestion receive/UI;
 - game tag display/Add flow;
-- live table-chat unread state, server-backed read acknowledgements, and direct `/r` handling;
+- live table-chat unread state, server-backed read acknowledgements, direct `/r` handling, and authoritative mute-state guarding;
 - core chat and most command transport.
 
 ### Functionally present but product-incomplete
@@ -1037,7 +1041,7 @@ A useful way to describe current parity is:
 
 ### Missing largely because mobile has not built the product surface yet
 
-- broader account/settings beyond the implemented login clarification, password change/reset entry points, and card appearance settings;
+- broader account/settings beyond the implemented login clarification, password change/reset entry points, card appearance settings, and H-group/Real-life presentation settings;
 - rich profiles and arbitrary-player history beyond existing People/context actions;
 - richer tag search/delete/management beyond the current Add/display flow;
 - JSON import/export;
@@ -1221,7 +1225,7 @@ than turning into connection failures.
 
 Safe field dropping is responsible for several parity gaps documented elsewhere:
 
-- welcome fields still not surfaced broadly, including `muted` and `firstTimeUser`; card presentation settings, `realLifeMode`, random table names, and maintenance/shutdown metadata are now retained where the mobile product uses them;
+- welcome fields still not surfaced broadly, notably `firstTimeUser`; `muted`, card presentation settings, `realLifeMode`, `hyphenatedConventions`, random table names, and maintenance/shutdown metadata are retained where the mobile product uses them;
 - lobby `ownerID` and redundant timing fields remain omitted where unused; spectator data is now retained;
 - other evolving fields not needed by supported mobile flows continue to be dropped at permissive boundaries.
 
