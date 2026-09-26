@@ -64,6 +64,7 @@ import {
   initialGameplayInteractionState,
 } from './gameplayInteraction';
 import { getDisplayedHandOrders } from './gamePresentation';
+import { getHGroupStatusPresentation } from '../../game/selectors/hGroupStatusPresentation';
 import { getLiveNoteOrders } from './liveNoteOrders';
 import { getCommittedClueMarkerForMetadata, getPreviewClueMarker } from './clueIndication';
 
@@ -90,6 +91,8 @@ export function C17GameScreen() {
   const orientationRef = useRef(orientation);
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
+  const colorblindMode = useAppSelector((state) => state.session.cardPresentationSettings.colorblindMode);
+  const realLifeMode = useAppSelector((state) => state.session.realLifeMode);
   const username = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
   const hyphenatedConventions = useAppSelector((state) => {
     const userID = state.session.authenticatedUser?.userID;
@@ -428,6 +431,8 @@ export function C17GameScreen() {
       globalEmpathy={interaction.globalEmpathy}
       historyAvailable={recentActions.length > 0}
       hyphenatedConventions={hyphenatedConventions}
+      colorblindMode={colorblindMode}
+      realLifeMode={realLifeMode}
       isSpectator={isSpectator}
       lastAction={reviewTemporal.last.summary}
       liveBefore={liveBefore}
@@ -621,6 +626,8 @@ function C17DenseWorkspace({
   speedrun,
   targetName,
   variantName,
+  colorblindMode,
+  realLifeMode,
 }: {
   actionSegments: readonly number[];
   actionHandIndex: number | null;
@@ -650,6 +657,8 @@ function C17DenseWorkspace({
   globalEmpathy: boolean;
   historyAvailable: boolean;
   hyphenatedConventions: boolean;
+  colorblindMode: boolean;
+  realLifeMode: boolean;
   isSpectator: boolean;
   lastAction: string;
   liveBefore: GameState | undefined;
@@ -769,6 +778,15 @@ function C17DenseWorkspace({
   };
 
   const current = game.turn.currentPlayerIndex;
+  const hGroupStatus = getHGroupStatusPresentation({
+    game,
+    variantName,
+    hyphenatedConventions,
+    colorblindMode,
+    realLifeMode,
+    showLowScorePhase: hypothetical === null,
+    showCurrentPlayerCue: !hypothetical && !reviewActive && !finishedReplay && sharedReplay === null,
+  });
   const actorPulse = liveBefore !== undefined && liveBefore.turn.currentPlayerIndex !== current ? livePulseSegment : null;
   const resourcePulse = (before: number, after: number) => before !== after ? livePulseSegment : null;
   const playPulse = livePulseSegment !== null && liveTransition.actionType === 'play' && liveTransition.cardOrder !== null
@@ -841,8 +859,13 @@ function C17DenseWorkspace({
             ? finishedStatus
             : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
           <AuthoritativePulse enabled={livePulseEnabled} pulseKey={actorPulse}><Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName}</Text></AuthoritativePulse>
+          {hGroupStatus.currentPlayerCue !== null && <Text numberOfLines={1} style={[styles.hGroupCue, { color: theme.colors.textMuted }]}>
+            {hGroupStatus.currentPlayerCue === 'locked' ? 'Locked · may not be able to discard' : 'Potential Double Discard'}
+          </Text>}
         </View>
-        <HudStat label="Score" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.score, game.score)} value={game.score} />
+        <HudStat label="Score" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.score, game.score)} value={game.score}
+          valueColor={hGroupStatus.lowScorePhase ? '#00ffff' : undefined}
+          valueEmphasized={hGroupStatus.lowScorePhase && colorblindMode} />
         <HudStat label="Max" value={game.stats.maxScore} />
         <HudStat label="Clues" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(getDisplayedClueTokens(liveBefore.clueTokens, variantName), getDisplayedClueTokens(game.clueTokens, variantName))} value={getDisplayedClueTokens(game.clueTokens, variantName)} />
         <HudStat label="Strikes" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.strikes.length, game.strikes.length)} value={game.strikes.length} />
@@ -1339,19 +1362,20 @@ function C17LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; pl
   return <Text style={[styles.clock, { color: theme.colors.text }]}>{display}</Text>;
 }
 
-function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, onPress, accessibilityLabel, accessibilityHint }: {
+function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, valueEmphasized, onPress, accessibilityLabel, accessibilityHint }: {
   label: string;
   pulseEnabled?: boolean;
   pulseKey?: number | null;
   value: number | string;
   valueColor?: string;
+  valueEmphasized?: boolean;
   onPress?: () => void;
   accessibilityLabel?: string;
   accessibilityHint?: string;
 }) {
   const { theme } = useHanabTheme();
   const contents = <>
-    <Text style={[styles.hudValue, { color: valueColor ?? theme.colors.text }]}>{value}</Text>
+    <Text style={[styles.hudValue, valueEmphasized && styles.hudValueEmphasized, { color: valueColor ?? theme.colors.text }]}>{value}</Text>
     <Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text>
   </>;
   return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}>
@@ -1389,11 +1413,13 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   hud: { alignItems: 'center', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   turn: { fontSize: 13, fontWeight: '900' },
+  hGroupCue: { fontSize: 9, fontWeight: '700' },
   hudStat: { alignItems: 'center', minWidth: 34, position: 'relative' },
   hudStatOutline: { ...StyleSheet.absoluteFill, borderRadius: 4, borderWidth: 1 },
   hudStatInfo: { alignItems: 'center', borderRadius: 5, borderWidth: 1, height: 10, justifyContent: 'center', position: 'absolute', right: 0, top: 0, width: 10 },
   hudStatInfoText: { fontSize: 7, fontWeight: '900', lineHeight: 8 },
   hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
+  hudValueEmphasized: { fontWeight: '900', textDecorationLine: 'underline' },
   hudLabel: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
   lastAction: { borderRadius: 8, borderWidth: 1, gap: 3, minHeight: 37, paddingHorizontal: 7, paddingVertical: 4 },
   denseLastAction: { gap: 0, paddingHorizontal: 5, paddingVertical: 2 },

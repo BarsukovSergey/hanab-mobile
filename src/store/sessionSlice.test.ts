@@ -17,6 +17,7 @@ function welcome(settings?: Welcome['settings']): Welcome {
 describe('session card presentation settings', () => {
   test('defaults to the standard presentation and updates one local setting', () => {
     const store = createAppStore();
+    expect(store.getState().session.realLifeMode).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,
@@ -37,10 +38,13 @@ describe('session card presentation settings', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 1,
-      welcome: welcome({ colorblindMode: true, styleNumbers: false }),
+      welcome: welcome({ colorblindMode: true, styleNumbers: false, realLifeMode: true }),
     }));
 
+    expect(store.getState().session.realLifeMode).toBe(true);
+
     store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().session.realLifeMode).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: true,
       styleNumbers: false,
@@ -64,6 +68,7 @@ describe('session card presentation settings', () => {
     }));
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: welcome() }));
+    expect(store.getState().session.realLifeMode).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,

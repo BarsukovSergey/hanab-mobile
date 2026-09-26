@@ -55,6 +55,7 @@ export type SessionState = {
   phase: ConnectionPhase;
   authenticatedUser: AuthenticatedUser | null;
   cardPresentationSettings: CardPresentationSettings;
+  realLifeMode: boolean;
   serverStatus: { shuttingDown: boolean; datetimeShutdownInit: string | null; maintenanceMode: boolean };
   friends: string[];
   randomTableName: string | null;
@@ -80,6 +81,7 @@ const initialState: SessionState = {
     colorblindMode: false,
     styleNumbers: false,
   },
+  realLifeMode: false,
   serverStatus: { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false },
   friends: [],
   randomTableName: null,
@@ -103,6 +105,7 @@ export const sessionSlice = createSlice({
       state.connectionEpoch = action.payload.epoch;
       state.phase = 'connecting';
       state.authenticatedUser = null;
+      state.realLifeMode = false;
       state.serverStatus = { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false };
       state.friends = [];
       state.randomTableName = null;
@@ -136,6 +139,7 @@ export const sessionSlice = createSlice({
         colorblindMode: welcome.settings?.colorblindMode ?? false,
         styleNumbers: welcome.settings?.styleNumbers ?? false,
       };
+      state.realLifeMode = welcome.settings?.realLifeMode ?? false;
       state.friends = [...(welcome.friends ?? [])];
       state.randomTableName = welcome.randomTableName ?? null;
       state.resumeHints = {
