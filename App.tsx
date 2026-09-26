@@ -295,10 +295,11 @@ function AppContent() {
             <ActionButton
               compact
               title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
-              tone="ghost"
+              tone="secondary"
+              style={styles.liveHeaderAction}
               onPress={() => setLiveSheet('chat')}
             />
-            <ActionButton compact title="More" tone="ghost" onPress={() => setLiveSheet('menu')} />
+            <ActionButton compact title="More" tone="secondary" style={styles.liveHeaderAction} onPress={() => setLiveSheet('menu')} />
           </View>
         </View>
         {liveConnectionProblem && (
@@ -533,6 +534,7 @@ const styles = StyleSheet.create({
   authName: { fontSize: 11, fontWeight: '700' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
+  liveHeaderAction: { justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },
   menuActions: { gap: 7 },
   liveUserRow: { alignItems: 'flex-start', gap: 4, paddingVertical: 2 },
   menuScroll: { flex: 1 },
