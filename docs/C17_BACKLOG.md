@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 
-Last reconciled with `main` at `2af57482dc5fda47754fa5f88632f0f2d1e1d9a5` (PR #105 merge).
+Last reconciled with `main` at `38ceb5b51b7fd796e3d681101f8273587ff9936a` (PR #108 merge).
 
 This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
@@ -33,7 +33,7 @@ These items were explicitly removed from the C17 release gate during product rev
 ## Layout / presentation
 
 - **2P portrait space allocation:** reduce the large dead vertical band that can appear between the hand/table region and Workbench without destabilizing denser player-count layouts.
-- **Live HUD hierarchy / compact notation:** revisit the dense Score/Max/Clues/Strikes/Deck/Pace/Eff presentation, including compact score/max notation and whether some metrics belong closer to their table context. Issue #30 has corrected the upstream Pace/Eff context semantics (final-round/All-or-Nothing suppression, pace risk, Minimum Required Efficiency, and review-mode modifier policy); preserve that semantic boundary during later visual redesign and do not invent mobile-only stats.
+- **Live HUD hierarchy / compact notation:** revisit the dense Score/Max/Clues/Strikes/Deck/Pace/Eff presentation, including compact score/max notation and whether some metrics belong closer to their table context. Issue #30 corrected Pace/Eff context semantics; PRs #107/#108 added pinned-upstream Low Score, locked-hand, Double Discard, clue-availability, and discard-state cues. Preserve those semantic boundaries during later visual redesign and do not invent mobile-only stats.
 - **Live-game header chrome:** reduce the visual prominence/cost of rarely used Lobby navigation during active play while keeping exit/navigation discoverable and safe.
 - Dedicated two-column landscape composition.
 - Dedicated tablet / large-screen persistent side-pane composition and polish.
@@ -79,6 +79,7 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Pregame player/spectator role switching where authoritative capability permits.
 - Spectator perspective switching between all hands and an authoritative player shadow seat.
 - Colorblind and styled-number card presentation using generated pinned-upstream assets and server settings.
+- Pinned-upstream H-group and resource-state gameplay cues: Low Score, locked hand, Double Discard, clue availability, and discard-state emphasis with real-life/Hypothetical gating.
 - People/Pregame/live-game contextual session Dialog and Friend/Unfriend actions, plus friend-aware Lobby ordering.
 - Account creation is explicit on the login screen; Change password and Forgot password entry points preserve the no-credential-storage boundary.
 - Compact authoritative Pregame player stats and spectator list.
