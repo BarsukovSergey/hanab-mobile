@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Linking, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { HANAB_PASSWORD_RESET_URL } from '../../config/hanab';
+import { savePasswordCredential } from '../../platform/credentialAccounts';
 import { lobbyRuntime, networkSession } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { ActionButton, Field, Notice, Panel, SectionHeading, ThemeSwitcher, useHanabTheme } from '../designSystem';
@@ -41,6 +42,11 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
     setAccountNotice(null);
     try {
       await networkSession.submitLogin(authenticatedUsername, currentPassword, newPassword);
+      try {
+        await savePasswordCredential(authenticatedUsername, newPassword);
+      } catch {
+        // Credential Manager is best-effort and must not change password-change success.
+      }
       clearPasswordFields();
       setChangePasswordOpen(false);
       setAccountNotice({ tone: 'success', message: 'Password changed.' });
@@ -93,7 +99,7 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
     <Panel>
       <SectionHeading
         title="Account"
-        detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Passwords are not persisted by Hanab Mobile.`}
+        detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Hanab Mobile does not store your account password. Saved passwords are handled by your system password manager.`}
       />
       {accountNotice !== null && <Notice tone={accountNotice.tone}>{accountNotice.message}</Notice>}
       {authenticatedUsername !== null && <ActionButton title="Sign out" tone="danger" onPress={confirmSignOut} />}
