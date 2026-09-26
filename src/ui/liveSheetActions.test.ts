@@ -16,6 +16,12 @@ test('submits Show tags as a normal chat command', () => {
   expect(liveSheet).toContain('<ActionButton title="Show tags" onPress={() => chatRuntime.submit(\'/tags\')} />');
 });
 
+test('keeps Settings in More and removes Sign out', () => {
+  expect(liveSheet).toContain('<ActionButton title="Settings" onPress={() => setLiveSheet(\'settings\')} />');
+  const menuBranch = liveSheet.slice(liveSheet.indexOf("liveSheet === 'menu'"), liveSheet.indexOf(": liveSheet === 'chat'"));
+  expect(menuBranch).not.toContain('<ActionButton title="Sign out"');
+});
+
 test('dismisses on backdrop taps and stops dismissal inside the sheet', () => {
   expect(liveSheet).toContain('onRequestClose={() => setLiveSheet(null)}');
   expect(liveSheet).toContain('<Pressable onPress={() => setLiveSheet(null)} style={styles.sheetBackdrop}>');

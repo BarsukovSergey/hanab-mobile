@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { HANAB_PASSWORD_RESET_URL } from '../../config/hanab';
 import { lobbyRuntime, networkSession } from '../../runtime/application';
@@ -9,7 +9,7 @@ import { GameplayScenarioGallery } from '../game/scenarios/GameplayScenarioGalle
 
 type AccountNotice = { tone: 'error' | 'success'; message: string };
 
-export function SettingsScreen({ onBack }: { onBack: () => void }) {
+export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSignOut: () => void }) {
   const [scenarioGalleryOpen, setScenarioGalleryOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -66,6 +66,14 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const confirmSignOut = () => {
+    if (authenticatedUsername === null) return;
+    Alert.alert('Sign out?', `Are you sure you want to sign out of ${authenticatedUsername}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: onSignOut },
+    ], { cancelable: false });
+  };
+
   if (__DEV__ && scenarioGalleryOpen) {
     return <GameplayScenarioGallery onBack={() => setScenarioGalleryOpen(false)} />;
   }
@@ -79,8 +87,8 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
 
   return <View style={styles.screen}>
     <View style={styles.header}>
-      <SectionHeading title="Settings" detail="App preferences." />
       <ActionButton compact title="Back" onPress={onBack} />
+      <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Settings</Text>
     </View>
     <Panel>
       <SectionHeading
@@ -88,6 +96,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Passwords are not persisted by Hanab Mobile.`}
       />
       {accountNotice !== null && <Notice tone={accountNotice.tone}>{accountNotice.message}</Notice>}
+      {authenticatedUsername !== null && <ActionButton title="Sign out" tone="danger" onPress={confirmSignOut} />}
       {changePasswordOpen ? <>
         <Notice>Use a new, unique password for hanab.live. Do not reuse one of your existing or previous passwords.</Notice>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setCurrentPassword} placeholder="Current password" secureTextEntry value={currentPassword} />
@@ -149,7 +158,8 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { gap: 14 },
-  header: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'flex-start' },
+  headerTitle: { fontSize: 20, fontWeight: '800' },
   settingLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
   settingRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between', minHeight: 44 },
 });
