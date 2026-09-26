@@ -42,10 +42,14 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
         {rows.map((row) => {
           const tableAction = row.tableAction;
           return (
-            <View key={row.user.userID} style={[styles.userRow, { borderColor: theme.colors.border }]}>
+            <View key={row.user.userID} style={[
+              styles.userRow,
+              { borderColor: row.isFriend ? theme.colors.accent : theme.colors.border },
+              row.isFriend && styles.friendUserRow,
+            ]}>
               <View style={styles.userHeader}>
                 <View style={styles.userCopy}>
-                  <Text style={[styles.username, { color: theme.colors.text }]}>{row.user.name}</Text>
+                  <Text style={[styles.username, { color: row.isFriend ? theme.colors.accent : theme.colors.text }]}>{row.user.name}</Text>
                   <Text style={[styles.location, { color: theme.colors.textMuted }]}>{row.location}</Text>
                 </View>
                 <View style={styles.indicators}>
@@ -84,6 +88,7 @@ const styles = StyleSheet.create({
   root: { gap: 16 },
   hero: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   userRow: { borderTopWidth: 1, gap: 10, paddingTop: 12 },
+  friendUserRow: { borderLeftWidth: 3, paddingLeft: 8 },
   userHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   userCopy: { flex: 1, gap: 2, minWidth: 0 },
   username: { fontSize: 16, fontWeight: '800' },

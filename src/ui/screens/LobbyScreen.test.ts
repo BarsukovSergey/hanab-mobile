@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from '@jest/globals';
 
-import { formatLobbyRoster } from '../lobbyTablePresentation';
+import { formatLobbyRoster, getLobbyFriendContext } from '../lobbyTablePresentation';
 
 const screen = readFileSync(resolve(__dirname, 'LobbyScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
@@ -15,16 +15,16 @@ describe('lobby table details and create selector', () => {
   test('formats authoritative players in server order and omits an empty roster', () => {
     expect(formatLobbyRoster(['Ada', 'Bob', 'Cy'])).toBe('Ada · Bob · Cy');
     expect(formatLobbyRoster([])).toBeNull();
-    expect(screen.match(/formatLobbyRoster\(table\.players\)/g)).toHaveLength(4);
+    expect(screen).toContain('table.players.map((name, index) =>');
   });
 
   test('renders roster in both manual Pregame and shared TableSection card paths', () => {
     const pregamePath = screen.slice(screen.indexOf('{pregameTables.map'), screen.indexOf('{showCreateTable'));
     const sectionPath = screen.slice(screen.indexOf('function TableSection'), screen.indexOf('const styles'));
 
-    expect(pregamePath).toContain('formatLobbyRoster(table.players)');
-    expect(sectionPath).toContain('formatLobbyRoster(table.players)');
-    expect(screen).toContain('<Text numberOfLines={2} style={[styles.tableRoster');
+    expect(pregamePath).toContain('<LobbyRoster table={table} friends={friends} />');
+    expect(sectionPath).toContain('<LobbyRoster table={table} friends={friends} />');
+    expect(screen).toContain('friendNames.has(name.toLowerCase())');
   });
 
   test('exposes exactly max player options 2 through 6 with selected button state', () => {
@@ -45,6 +45,22 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('getLobbySections(tables, friends)');
     expect(screen).toContain('getLobbyFriendContext(table, friends)');
     expect(screen).toContain('<TableFriendContext table={table} friends={friends} />');
+    expect(screen).toContain('friendContext.hasFriends && styles.friendTableCard');
+    expect(screen).toContain("'Friends here' : 'Friend here'");
+    expect(screen).toContain('new Set([...friendContext.playing, ...friendContext.watching]');
+    const replayWithPlayer = {
+      id: 1, name: 'Replay', numPlayers: 1, maxPlayers: 5, running: true, variant: 'No Variant',
+      options: { variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0, speedrun: false,
+        cardCycle: false, deckPlays: false, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+        allOrNothing: false, detrimentalCharacters: false },
+      passwordProtected: false, joined: false, progress: 31, players: ['Friend'],
+      spectators: [], sharedReplay: true,
+    };
+    expect(getLobbyFriendContext(replayWithPlayer, ['friend']).hasFriends).toBe(false);
+    expect(getLobbyFriendContext({
+      ...replayWithPlayer,
+      spectators: [{ name: 'FRIEND', shadowingPlayerIndex: -1, shadowingPlayerUsername: '' }],
+    }, ['friend']).hasFriends).toBe(true);
     expect(screen).toContain("if (!context.hasFriends) return null;");
     expect(screen).toContain('table.running ? ` · ${table.progress}%`');
     expect(screen).toContain('title="Return to game"');
