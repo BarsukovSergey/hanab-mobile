@@ -104,6 +104,21 @@ describe('session random table name', () => {
   });
 });
 
+describe('authoritative mute state', () => {
+  test('defaults false, follows welcome, and resets on a new connection epoch', () => {
+    const store = createAppStore();
+    expect(store.getState().session.muted).toBe(false);
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: { ...welcome(), muted: true } }));
+    expect(store.getState().session.muted).toBe(true);
+
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().session.muted).toBe(false);
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 2, welcome: welcome() }));
+    expect(store.getState().session.muted).toBe(false);
+  });
+});
+
 describe('authoritative server status', () => {
   test('welcome initializes it and connection epochs clear and guard live updates', () => {
     const store = createAppStore();

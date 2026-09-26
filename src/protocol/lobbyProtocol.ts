@@ -397,6 +397,7 @@ const cardPresentationSettingCommandSchema = z.object({
 export const welcomeSchema = z.object({
   userID: idSchema,
   username: z.string().min(1),
+  muted: z.boolean().default(false),
   randomTableName: z.string().optional(),
   totalGames: z.number().int().nonnegative(),
   playingAtTables: z.array(idSchema),

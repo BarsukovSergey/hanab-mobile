@@ -2493,6 +2493,56 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toEqual([]);
   });
 
+  test('muted chat submissions block ordinary chat, all slash commands, and direct PM sends', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: store.getState().session.connectionEpoch,
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [], muted: true },
+    }));
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('hello')).toBe(false);
+    expect(chat.submit('/version')).toBe(false);
+    expect(chat.submit('/pm Bob hello')).toBe(false);
+    expect(chat.submit('/r hello')).toBe(false);
+    expect(chat.sendPrivateMessage('Bob', 'direct hello')).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().chat.messagesByRoom.lobby?.map(({ msg, localType }) => ({ msg, localType })))
+      .toEqual(Array.from({ length: 5 }, () => ({
+        msg: 'You have been muted by an administrator.', localType: 'error',
+      })));
+  });
+
+  test('muted chat reports mute before rejecting a message over 300 characters', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: store.getState().session.connectionEpoch,
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [], muted: true },
+    }));
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('x'.repeat(301))).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().chat.messagesByRoom.lobby?.map(({ msg, localType }) => ({ msg, localType })))
+      .toEqual([{
+        msg: 'You have been muted by an administrator.', localType: 'error',
+      }]);
+  });
+
+  test('unmuted version command remains local and PM command still sends', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(bobUserFrame);
+    const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
+
+    expect(chat.submit('/version')).toBe(true);
+    expect(chat.submit('/pm Bob hello')).toBe(true);
+    expect(socket.sent).toEqual(['chatPM {"msg":"hello","recipient":"Bob","room":"lobby"}']);
+    expect(store.getState().chat.messagesByRoom.lobby?.[0]).toMatchObject({
+      msg: 'You are running version 1.0.0-beta.2 of the client.', localType: 'info',
+    });
+  });
+
   test('gameplay presentation settings send once and update local state after success', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
 

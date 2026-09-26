@@ -54,6 +54,7 @@ export type SessionState = {
   connectionEpoch: number;
   phase: ConnectionPhase;
   authenticatedUser: AuthenticatedUser | null;
+  muted: boolean;
   cardPresentationSettings: CardPresentationSettings;
   realLifeMode: boolean;
   hyphenatedConventions: boolean;
@@ -78,6 +79,7 @@ const initialState: SessionState = {
   connectionEpoch: 0,
   phase: 'idle',
   authenticatedUser: null,
+  muted: false,
   cardPresentationSettings: {
     colorblindMode: false,
     styleNumbers: false,
@@ -107,6 +109,7 @@ export const sessionSlice = createSlice({
       state.connectionEpoch = action.payload.epoch;
       state.phase = 'connecting';
       state.authenticatedUser = null;
+      state.muted = false;
       state.realLifeMode = false;
       state.hyphenatedConventions = false;
       state.serverStatus = { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false };
@@ -142,6 +145,7 @@ export const sessionSlice = createSlice({
         colorblindMode: welcome.settings?.colorblindMode ?? false,
         styleNumbers: welcome.settings?.styleNumbers ?? false,
       };
+      state.muted = welcome.muted ?? false;
       state.realLifeMode = welcome.settings?.realLifeMode ?? false;
       state.hyphenatedConventions = welcome.settings?.hyphenatedConventions ?? false;
       state.friends = [...(welcome.friends ?? [])];
