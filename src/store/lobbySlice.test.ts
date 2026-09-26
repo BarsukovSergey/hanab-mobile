@@ -89,6 +89,17 @@ describe('lobby Redux state', () => {
     expect(tableSelectors.selectTotal(store.getState())).toBe(0);
   });
 
+  test('table progress updates only an existing table in the current epoch', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: table(1) }));
+    store.dispatch(lobbyActions.tableProgressReceived({ epoch: 1, tableID: 1, progress: 42 }));
+    store.dispatch(lobbyActions.tableProgressReceived({ epoch: 1, tableID: 2, progress: 99 }));
+    store.dispatch(lobbyActions.tableProgressReceived({ epoch: 0, tableID: 1, progress: 88 }));
+    expect(store.getState().lobby.tables.entities[1]?.progress).toBe(42);
+    expect(store.getState().lobby.tables.entities[2]).toBeUndefined();
+  });
+
   test('hydration requires welcome and both snapshots', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));

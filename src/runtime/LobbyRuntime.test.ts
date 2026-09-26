@@ -391,6 +391,48 @@ describe('bot invites', () => {
   });
 });
 
+describe('authoritative progress and table chat reads', () => {
+  test('applies live table progress and table chat unread to the current table history room', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: joinableTable }));
+    socket.emitMessage('tableProgress {"tableID":123,"progress":42}');
+    expect(store.getState().lobby.tables.entities[123]?.progress).toBe(42);
+
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    socket.emitMessage('chatList {"list":[],"unread":4}');
+    expect(store.getState().chat.unreadByRoom).toEqual({ table123: 4 });
+    socket.emitMessage('chatList {"list":[],"unread":0}');
+    expect(store.getState().chat.unreadByRoom).toEqual({});
+  });
+
+  test('sends one exact chatRead only for the ready current table and reports send failures', async () => {
+    const { socket, runtime, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    expect(runtime.markChatRead('table123')).toBe(true);
+    expect(socket.sent.filter((frame) => frame.startsWith('chatRead ')))
+      .toEqual(['chatRead {"tableID":123}']);
+    expect(runtime.markChatRead('lobby')).toBe(false);
+    expect(runtime.markChatRead('table0')).toBe(false);
+    expect(runtime.markChatRead('table-nope')).toBe(false);
+    expect(runtime.markChatRead('table456')).toBe(false);
+    const beforeSendFailure = store.getState();
+    socket.failSend = true;
+    expect(() => runtime.markChatRead('table123')).not.toThrow();
+    expect(runtime.markChatRead('table123')).toBe(false);
+    expect(store.getState()).toBe(beforeSendFailure);
+    expect(socket.sent.filter((frame) => frame.startsWith('chatRead '))).toHaveLength(1);
+    socket.failSend = false;
+    store.dispatch(sessionActions.connectionClosed({ epoch: 1, error: null }));
+    expect(runtime.markChatRead('table123')).toBe(false);
+    expect(socket.sent.filter((frame) => frame.startsWith('chatRead '))).toHaveLength(1);
+  });
+});
+
 function addRunningTable(store: ReturnType<typeof createAppStore>, epoch = 1): void {
   store.dispatch(lobbyActions.tableReceived({ epoch, table: runningTable }));
 }

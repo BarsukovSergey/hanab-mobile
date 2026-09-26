@@ -33,6 +33,7 @@ import {
   decodeServerFrame,
   encodeCardPresentationSettingFrame,
   encodeChatFrame,
+  encodeChatReadFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
   encodeHistoryFriendsGetFrame,
@@ -285,6 +286,23 @@ export class LobbyRuntime {
       return false;
     }
     return this.sendEncoded(frame);
+  }
+
+  markChatRead(room: string): boolean {
+    const match = /^table([1-9]\d*)$/.exec(room);
+    if (match === null) return false;
+    const tableID = Number(match[1]);
+    if (!Number.isInteger(tableID)) return false;
+    const state = this.store.getState();
+    const currentRoom = state.room.room;
+    if (state.session.phase !== 'ready'
+      || (currentRoom.kind !== 'pregame' && currentRoom.kind !== 'live_game')
+      || currentRoom.tableID !== tableID) return false;
+    try {
+      return this.sendEncoded(encodeChatReadFrame(tableID));
+    } catch {
+      return false;
+    }
   }
 
   setCardPresentationSetting(
@@ -1405,6 +1423,11 @@ export class LobbyRuntime {
       case 'table':
         this.store.dispatch(lobbyActions.tableReceived({ epoch, table: event.data }));
         break;
+      case 'tableProgress':
+        this.store.dispatch(lobbyActions.tableProgressReceived({
+          epoch, tableID: event.data.tableID, progress: event.data.progress,
+        }));
+        break;
       case 'tableGone':
         this.store.dispatch(lobbyActions.tableGone({ epoch, tableID: event.data.tableID }));
         break;
@@ -1679,12 +1702,18 @@ export class LobbyRuntime {
         }));
         break;
       case 'chatList':
-        this.store.dispatch(chatActions.historyReceived({
-          epoch,
-          defaultRoom: this.currentHistoryRoom(),
-          messages: event.data.list.filter((message) => !this.isBotJoinEcho(message)),
-        }));
-        break;
+        {
+          const historyRoom = this.currentHistoryRoom();
+          this.store.dispatch(chatActions.historyReceived({
+            epoch,
+            defaultRoom: historyRoom,
+            messages: event.data.list.filter((message) => !this.isBotJoinEcho(message)),
+            ...(/^table[1-9]\d*$/.test(historyRoom)
+              ? { authoritativeTableUnread: { room: historyRoom, unread: event.data.unread } }
+              : {}),
+          }));
+          break;
+        }
       case 'friends':
         this.store.dispatch(sessionActions.friendsReceived({
           epoch,

@@ -4,6 +4,7 @@ import {
   decodeServerFrame,
   encodeCardPresentationSettingFrame,
   encodeChatFrame,
+  encodeChatReadFrame,
   encodeInactiveFrame,
   encodeHistoryGetFrame,
   encodeHistoryFriendsGetFrame,
@@ -37,6 +38,27 @@ const user = {
 };
 
 describe('lobby protocol decoder', () => {
+  test('decodes strict authoritative table progress updates', () => {
+    expect(decodeServerFrame('tableProgress {"tableID":123,"progress":42}')).toEqual({
+      kind: 'event', event: { command: 'tableProgress', data: { tableID: 123, progress: 42 } },
+    });
+    for (const payload of [
+      { tableID: 123, progress: -1 },
+      { tableID: 123, progress: 1.5 },
+      { tableID: 123, progress: 1, extra: true },
+    ]) {
+      expect(decodeServerFrame(`tableProgress ${JSON.stringify(payload)}`))
+        .toMatchObject({ kind: 'malformed', command: 'tableProgress', issue: 'invalid-payload' });
+    }
+  });
+
+  test('encodes table chat read with a validated exact payload', () => {
+    expect(encodeChatReadFrame(123)).toBe('chatRead {"tableID":123}');
+    for (const tableID of [-1, 1.5, Number.NaN]) {
+      expect(() => encodeChatReadFrame(tableID)).toThrow();
+    }
+  });
+
   test('retains the welcome random name and decodes the next server name', () => {
     expect(decodeServerFrame('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"randomTableName":"Lucky Stars"}')).toMatchObject({
       kind: 'event', event: { command: 'welcome', data: { randomTableName: 'Lucky Stars' } },
@@ -142,6 +164,9 @@ describe('lobby protocol decoder', () => {
     });
     expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 0, extra: 1 })}`))
       .toMatchObject({ kind: 'malformed', command: 'chatList', issue: 'invalid-payload' });
+    expect(decodeServerFrame('chatList {"list":[],"unread":-1}')).toEqual({
+      kind: 'malformed', command: 'chatList', issue: 'invalid-payload',
+    });
 
     const serverChat = {
       ...chat,

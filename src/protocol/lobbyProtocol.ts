@@ -54,10 +54,17 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
 export const chatListSchema = z.object({
   list: z.array(chatMessageSchema).readonly(),
-  unread: z.number().int(),
+  unread: z.number().int().nonnegative(),
 }).strict().readonly();
 
 export type ChatList = z.infer<typeof chatListSchema>;
+
+export const tableProgressSchema = z.object({
+  tableID: idSchema,
+  progress: z.number().int().nonnegative(),
+}).strict();
+
+export const chatReadCommandSchema = tableIDCommandSchema.strict();
 
 const supportedVariantNameSchema = z.string().min(1).refine(isVariantNameSupported);
 
@@ -447,6 +454,7 @@ const schemas = {
   tableList: z.array(lobbyTableSchema),
   table: lobbyTableSchema,
   tableGone: z.object({ tableID: idSchema }),
+  tableProgress: tableProgressSchema,
   game: pregameGameSchema,
   joined: tableJoinedSchema,
   left: tableLeftSchema,
@@ -703,6 +711,10 @@ export function encodeTableStartFrame(
 export function encodeChatFrame(msg: string, room: string): string {
   const payload = chatCommandSchema.parse({ msg, room });
   return encodeClientFrame('chat', payload);
+}
+
+export function encodeChatReadFrame(tableID: number): string {
+  return encodeClientFrame('chatRead', chatReadCommandSchema.parse({ tableID }));
 }
 
 export function encodeInactiveFrame(inactive: boolean): string {
