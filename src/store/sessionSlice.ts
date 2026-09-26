@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { CardPresentationSettingName, Welcome } from '../protocol/lobbyProtocol';
+import type { CardPresentationSettingName, GameplayPresentationSettingName, Welcome } from '../protocol/lobbyProtocol';
 
 export type ConnectionPhase =
   | 'idle'
@@ -56,6 +56,7 @@ export type SessionState = {
   authenticatedUser: AuthenticatedUser | null;
   cardPresentationSettings: CardPresentationSettings;
   realLifeMode: boolean;
+  hyphenatedConventions: boolean;
   serverStatus: { shuttingDown: boolean; datetimeShutdownInit: string | null; maintenanceMode: boolean };
   friends: string[];
   randomTableName: string | null;
@@ -82,6 +83,7 @@ const initialState: SessionState = {
     styleNumbers: false,
   },
   realLifeMode: false,
+  hyphenatedConventions: false,
   serverStatus: { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false },
   friends: [],
   randomTableName: null,
@@ -106,6 +108,7 @@ export const sessionSlice = createSlice({
       state.phase = 'connecting';
       state.authenticatedUser = null;
       state.realLifeMode = false;
+      state.hyphenatedConventions = false;
       state.serverStatus = { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false };
       state.friends = [];
       state.randomTableName = null;
@@ -140,6 +143,7 @@ export const sessionSlice = createSlice({
         styleNumbers: welcome.settings?.styleNumbers ?? false,
       };
       state.realLifeMode = welcome.settings?.realLifeMode ?? false;
+      state.hyphenatedConventions = welcome.settings?.hyphenatedConventions ?? false;
       state.friends = [...(welcome.friends ?? [])];
       state.randomTableName = welcome.randomTableName ?? null;
       state.resumeHints = {
@@ -154,6 +158,12 @@ export const sessionSlice = createSlice({
       action: PayloadAction<{ name: CardPresentationSettingName; enabled: boolean }>,
     ) {
       state.cardPresentationSettings[action.payload.name] = action.payload.enabled;
+    },
+    gameplayPresentationSettingUpdated(
+      state,
+      action: PayloadAction<{ name: GameplayPresentationSettingName; enabled: boolean }>,
+    ) {
+      state[action.payload.name] = action.payload.enabled;
     },
     shutdownReceived(state, action: PayloadAction<{ epoch: number; shuttingDown: boolean; datetimeShutdownInit: string }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;

@@ -18,6 +18,7 @@ describe('session card presentation settings', () => {
   test('defaults to the standard presentation and updates one local setting', () => {
     const store = createAppStore();
     expect(store.getState().session.realLifeMode).toBe(false);
+    expect(store.getState().session.hyphenatedConventions).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,
@@ -38,13 +39,15 @@ describe('session card presentation settings', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 1,
-      welcome: welcome({ colorblindMode: true, styleNumbers: false, realLifeMode: true }),
+      welcome: welcome({ colorblindMode: true, styleNumbers: false, realLifeMode: true, hyphenatedConventions: true }),
     }));
 
     expect(store.getState().session.realLifeMode).toBe(true);
+    expect(store.getState().session.hyphenatedConventions).toBe(true);
 
     store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
     expect(store.getState().session.realLifeMode).toBe(false);
+    expect(store.getState().session.hyphenatedConventions).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: true,
       styleNumbers: false,
@@ -58,6 +61,8 @@ describe('session card presentation settings', () => {
       colorblindMode: false,
       styleNumbers: true,
     });
+    expect(store.getState().session.realLifeMode).toBe(false);
+    expect(store.getState().session.hyphenatedConventions).toBe(false);
   });
 
   test('an absent settings object safely restores welcome defaults', () => {
@@ -69,6 +74,7 @@ describe('session card presentation settings', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: welcome() }));
     expect(store.getState().session.realLifeMode).toBe(false);
+    expect(store.getState().session.hyphenatedConventions).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,

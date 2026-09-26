@@ -95,10 +95,7 @@ export function C17GameScreen() {
   const colorblindMode = useAppSelector((state) => state.session.cardPresentationSettings.colorblindMode);
   const realLifeMode = useAppSelector((state) => state.session.realLifeMode);
   const username = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
-  const hyphenatedConventions = useAppSelector((state) => {
-    const userID = state.session.authenticatedUser?.userID;
-    return userID !== undefined && state.lobby.users.entities[userID]?.hyphenated === true;
-  });
+  const hyphenatedConventions = useAppSelector((state) => state.session.hyphenatedConventions);
   const roomState = useAppSelector((state) => state.room);
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
   const clientState = liveRoom?.clientState ?? null;

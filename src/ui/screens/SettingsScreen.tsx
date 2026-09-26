@@ -19,6 +19,8 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
   const [passwordPending, setPasswordPending] = useState(false);
   const [accountNotice, setAccountNotice] = useState<AccountNotice | null>(null);
   const presentation = useAppSelector((state) => state.session.cardPresentationSettings);
+  const hyphenatedConventions = useAppSelector((state) => state.session.hyphenatedConventions);
+  const realLifeMode = useAppSelector((state) => state.session.realLifeMode);
   const authenticatedUsername = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
   const { theme } = useHanabTheme();
 
@@ -152,6 +154,31 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
             lobbyRuntime.setCardPresentationSetting('styleNumbers', enabled);
           }}
           value={presentation.styleNumbers}
+        />
+      </View>
+    </Panel>
+    <Panel>
+      <SectionHeading title="Gameplay presentation" />
+      <View style={styles.settingRow}>
+        <Text style={[styles.settingLabel, { color: theme.colors.text }]}>H-group features</Text>
+        <Switch
+          accessibilityLabel="H-group features"
+          accessibilityRole="switch"
+          onValueChange={(enabled) => {
+            lobbyRuntime.setGameplayPresentationSetting('hyphenatedConventions', enabled);
+          }}
+          value={hyphenatedConventions}
+        />
+      </View>
+      <View style={styles.settingRow}>
+        <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Real-life mode</Text>
+        <Switch
+          accessibilityLabel="Real-life mode"
+          accessibilityRole="switch"
+          onValueChange={(enabled) => {
+            lobbyRuntime.setGameplayPresentationSetting('realLifeMode', enabled);
+          }}
+          value={realLifeMode}
         />
       </View>
     </Panel>
