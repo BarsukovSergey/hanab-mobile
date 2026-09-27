@@ -339,10 +339,10 @@ Candidates:
 - replay arrows / annotations;
 - replay sounds where useful;
 - user-facing shared replay efficiency-modifier origin controls;
-- richer replay-link opening/import, including ordinary ID replay URLs and compressed JSON replay URLs;
+- live-table link opening/import where it can reuse authoritative Lobby/spectate paths;
 - replay scrubber performance work if issue #4 remains material.
 
-Hypothetical card morph/unmorph controls landed in PR #114, arbitrary JSON replay import landed in PR #116, and `/copy` export/share landed in PR #118; none is a remaining Phase 4 candidate.
+Hypothetical card morph/unmorph controls landed in PR #114, arbitrary JSON replay import landed in PR #116, `/copy` export/share landed in PR #118, and canonical replay-link opening/import landed in PR #120; none is a remaining Phase 4 candidate.
 
 Treat import/export and annotations as a designed workflow, not a collection of raw command ports.
 
