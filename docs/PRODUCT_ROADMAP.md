@@ -30,7 +30,7 @@ Hanab Mobile already has the difficult gameplay foundation:
 - notes, knowledge/empathy, Last Action / Recent and live Rewind;
 - finished replay, shared review, turn suggestions and Hypothetical including card morph/unmorph;
 - spectator mode with perspective switching;
-- History, Friends history, Other Scores and game tags;
+- History, Friends history, Other Scores, authoritative seed/turn metadata with Copy seed, and game tags;
 - People/Friend actions with friends-first visual emphasis, table chat, session PM Dialogs, direct `/r`, and authoritative mute-state guarding;
 - account creation clarification plus Change password / Forgot password entry points;
 - standalone Android beta APK/release flow.
@@ -136,6 +136,10 @@ The first small contextual controls are implemented where mobile UI clearly beat
 - Missing max scores.
 
 Native auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) are not planned in the current roadmap. Keep those commands as slash-command fallback rather than creating mobile controls.
+
+## Specific-seed creation discoverability
+
+Add a native Create-table `Use specific seed` workflow as a thin UI over the existing upstream `!seed [suffix]` table-name semantics. The server still owns seed interpretation and game creation. A later History `Play this seed` shortcut may prefill that same Create flow only when the authoritative History seed has the canonical `p{players}v{variant}s{suffix}` prefix matching the game's options; do not blindly pass a full History seed as the `!seed` suffix.
 
 ## Read-only tag discovery
 

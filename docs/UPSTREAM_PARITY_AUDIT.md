@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Status: **planning snapshot reconciled with mobile `main` through PR #124; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #126; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `652376592ada206fa23a0ef38f32a0bb1487f1b7` (PR #124 merge)
+- current `main`: `fd4f8b7c9aa62ef6279f344af0bb3b48b55764cb` (PR #126 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -131,6 +131,7 @@ Recently completed high-value parity work:
 - unified History replay input for raw JSON plus canonical ID/compressed hanab.live replay links, including clipboard paste and a separate arbitrary-ID replay request path that preserves known-History guards (#120).
 - bounded Lobby opening for canonical running-game `/game/<tableID>` links, reusing authoritative Lobby eligibility plus existing reattend/spectate paths and a shared clipboard boundary (#122).
 - bounded `/pre-game/<tableID>` opening with authoritative Lobby membership/eligibility, player-only join semantics, and transient password handling through the existing `join` path (#124).
+- authoritative History seed/turn metadata plus exact Copy seed through the shared clipboard boundary, with stale async copy feedback guarded locally (#126).
 
 The highest-value remaining items are:
 
@@ -524,7 +525,7 @@ cards off preserves morphs, and `Original` unmorphs an individual card.
 | --- | --- | ---: | ---: | --- |
 | Own game history | **Full basic** | — | High | Pagination and replay opening. |
 | History displays players/score/variant/end condition/date | **Full basic** | — | High | — |
-| History displays seed | Missing UI | XS | Medium | Data already present. |
+| History displays seed | **Full** | — | Medium | PR #126 renders the authoritative seed and turn count on every History card source and supports exact Copy seed. |
 | History displays tags | Missing UI | XS–S | Medium | Data already present. |
 | History shows count played on same seed | **Full** | — | Medium | History cards expose `Other scores · N` from authoritative `numGamesOnThisSeed - 1`. |
 | Other Scores / same-seed comparison | **Full** | — | Medium | Uses authoritative `historyGetSeed` / `gameHistoryOtherScores` and preserves server score ordering. |
@@ -539,8 +540,7 @@ cards off preserves morphs, and `Original` unmorphs an individual card.
 | Force seed via `!seed` table name | **Server path available** | S for discoverability | Medium | Mobile table-name field can pass server special syntax; no native helper. |
 | Partial replay via `!replay` table name | **Server path available but undiscoverable** | S–M | Low–Medium | Better represented as replay tooling rather than teaching magic names. |
 
-The easiest useful history improvements are displaying the already-received **seed, tags, and
-same-seed count** before implementing new server commands.
+History now displays the already-received **seed, tags, turns, and same-seed count**. Remaining seed work is discoverability: a native specific-seed Create workflow can reuse upstream `!seed` semantics without introducing a new server command.
 
 ---
 
@@ -851,7 +851,7 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Pace | **Full presentation semantics** | Final-round/AON suppression, signed value display and risk treatment match upstream. |
 | Efficiency | **Full presentation semantics** | FRE/MRE and review/shared modifier policy match upstream; editing the manual modifier is not exposed in this presentation slice. |
 | Keyboard Shortcuts | **N/A literally** | Native controls/gestures should cover valuable actions rather than reproducing desktop key chords. |
-| Similar Deals and Competitive Play | **Partial+** | Server seed selection works automatically; magic `!seed`/`!replay` table names pass through; native Other Scores is implemented, while broader seed browsing remains web-oriented. |
+| Similar Deals and Competitive Play | **Partial+** | Server seed selection works automatically; magic `!seed`/`!replay` table names pass through; native Other Scores plus authoritative History seed/turn display and Copy seed are implemented. Native specific-seed creation remains undiscoverable. |
 | Chat | **Full basic / partial rich features** | Text/PM/history/commands work; read/unread/typing/emotes/link richness/zen are incomplete. |
 | Friends | **Strong partial** | Commands/state, People contextual actions, friend-aware Lobby ordering, and Friends history are implemented; richer profiles/social flows remain. |
 | Linked Accounts | **Command-complete / UI missing** | Link/unlink/linked commands work; native explanation/workflow absent. |
