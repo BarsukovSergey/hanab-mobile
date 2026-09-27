@@ -602,6 +602,27 @@ export class LobbyRuntime {
     return this.store.getState().room.pendingRecovery?.tableID === tableID;
   }
 
+  openLiveGameByID(tableID: number): boolean {
+    const state = this.store.getState();
+    const table = state.lobby.tables.entities[tableID];
+    const room = state.room;
+    if (state.session.phase !== 'ready' || table === undefined || !table.running
+      || room.room.kind !== 'none'
+      || room.pendingRecovery !== null || room.pendingSpectateTableID !== null
+      || room.pendingJoin !== null || room.pendingCreate !== null
+      || room.pendingLeaveTableID !== null || room.pendingUnattendTableID !== null
+      || room.pendingStart !== null || room.pendingUpdate !== null
+      || room.pendingLeaderName !== null || room.pendingRestartTableID !== null
+      || room.pendingRestartHidePregame !== null || room.rematchTransition !== null
+      || room.pendingRoleSwitch !== null || room.pendingGameplayAction !== null
+      || room.pendingHypotheticalOperation !== null || room.pendingReplaySuggestion !== null
+      || state.history.pendingReplayCreate !== null) return false;
+
+    if (isReattendEligible(table)) return this.reattend(tableID);
+    if (isSpectateEligible(table)) return this.spectate(tableID);
+    return false;
+  }
+
   createTable(
     name: string,
     maxPlayers: number,

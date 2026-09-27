@@ -391,6 +391,56 @@ describe('bot invites', () => {
   });
 });
 
+describe('open running game link', () => {
+  test('spectates a known supported running table through existing path', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addRunningTable(store);
+    expect(runtime.openLiveGameByID(123)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}');
+    expect(store.getState().room.pendingSpectateTableID).toBe(123);
+  });
+
+  test('reattends our joined running table through existing path', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: { ...runningTable, joined: true } }));
+    expect(runtime.openLiveGameByID(123)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableReattend {"tableID":123}');
+    expect(store.getState().room.pendingRecovery?.tableID).toBe(123);
+  });
+
+  test.each([
+    ['unknown', undefined],
+    ['not running', { ...runningTable, running: false }],
+    ['unsupported options', { ...runningTable, options: { ...tableOptions, variantName: 'Unsupported' } }],
+  ])('does not send for %s table', async (_label, table) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    if (table !== undefined) store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: table as LobbyTable }));
+    const before = socket.sent.length;
+    expect(runtime.openLiveGameByID(123)).toBe(false);
+    expect(socket.sent).toHaveLength(before);
+  });
+
+  test('does not send while another attendance transition is pending', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addRunningTable(store);
+    store.dispatch(roomActions.spectateRequested({ epoch: 1, tableID: 456 }));
+    const before = socket.sent.length;
+    expect(runtime.openLiveGameByID(123)).toBe(false);
+    expect(socket.sent).toHaveLength(before);
+  });
+
+  test('does not send while replay creation is pending', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addRunningTable(store);
+    store.dispatch(historyActions.externalReplayCreateRequested({
+      connectionEpoch: 1, source: 'id', databaseID: 88, visibility: 'solo',
+    }));
+    const before = socket.sent.length;
+    expect(runtime.openLiveGameByID(123)).toBe(false);
+    expect(socket.sent).toHaveLength(before);
+  });
+});
+
 describe('authoritative progress and table chat reads', () => {
   test('applies live table progress and table chat unread to the current table history room', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
