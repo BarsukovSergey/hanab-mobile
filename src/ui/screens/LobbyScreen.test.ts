@@ -36,8 +36,21 @@ describe('lobby table details and create selector', () => {
     expect(screen).not.toContain('stepperValue');
   });
 
-  test('passes the selected maxPlayers unchanged to createTable', () => {
-    expect(screen).toContain('lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword, selectedBots)');
+  test('passes the selected name, maxPlayers, options, password, and bots unchanged to createTable', () => {
+    expect(screen).toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)');
+    expect(screen).toContain("const submittedName = useSpecificSeed ? specificSeedTableName ?? '' : tableName;");
+    expect(screen).toContain('const effectiveName = tableName.trim() || randomTableName?.trim() || \'\';');
+    expect(screen).not.toContain('maxPlayers}v');
+  });
+
+  test('keeps ordinary and seed drafts local and exposes only the active name field', () => {
+    expect(screen).toContain("const [useSpecificSeed, setUseSpecificSeed] = useState(false);");
+    expect(screen).toContain("const [seedSuffix, setSeedSuffix] = useState('');");
+    expect(screen).toContain('title={useSpecificSeed ? \'Use specific seed: On\' : \'Use specific seed\'}');
+    expect(screen).toContain('placeholder="Seed suffix"');
+    expect(screen).toContain('placeholder={randomTableName ?? \'Table name\'} value={tableName}');
+    expect(screen).toContain('actual player count and variant when the game starts.');
+    expect(screen).toContain('disabled={attendancePending || !createNameIsValid}');
   });
 
   test('uses authoritative friends for compact table context and running progress', () => {
@@ -75,7 +88,7 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('state.session.randomTableName');
     expect(screen).toContain("placeholder={randomTableName ?? 'Table name'}");
     expect(screen).toContain("const effectiveName = tableName.trim() || randomTableName?.trim() || '';");
-    expect(screen).toContain('effectiveName.length < 1 || effectiveName.length > 45');
+    expect(screen).toContain('effectiveName.length >= 1 && effectiveName.length <= 45');
     expect(screen).toContain("setTablePassword('');");
   });
 

@@ -23,6 +23,7 @@ import { getLobbyFriendContext } from '../lobbyTablePresentation';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 import { parseLiveGameInput } from '../../game/client/liveGameInput';
 import { clipboardActions, type ClipboardActions } from '../../platform/replayInputActions';
+import { createSpecificSeedTableName } from '../specificSeedName';
 
 const DEFAULT_OPTIONS: MobileTableOptions = {
   variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
@@ -44,6 +45,8 @@ export function LobbyScreen({
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
   const [tableName, setTableName] = useState('');
+  const [useSpecificSeed, setUseSpecificSeed] = useState(false);
+  const [seedSuffix, setSeedSuffix] = useState('');
   const [tablePassword, setTablePassword] = useState('');
   const [selectedBots, setSelectedBots] = useState<string[]>([]);
   const [showBotPicker, setShowBotPicker] = useState(false);
@@ -67,6 +70,11 @@ export function LobbyScreen({
     });
   }, [users, tablePassword, maxPlayers]);
   const effectiveName = tableName.trim() || randomTableName?.trim() || '';
+  const specificSeedTableName = createSpecificSeedTableName(seedSuffix);
+  const submittedName = useSpecificSeed ? specificSeedTableName ?? '' : tableName;
+  const createNameIsValid = useSpecificSeed
+    ? specificSeedTableName !== null
+    : effectiveName.length >= 1 && effectiveName.length <= 45;
   const {
     yourRunningGames,
     pregameTables,
@@ -225,7 +233,20 @@ export function LobbyScreen({
           {showCreateTable && (
             <Panel>
               <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
-              <Field maxLength={45} onChangeText={setTableName} placeholder={randomTableName ?? 'Table name'} value={tableName} />
+              <ActionButton
+                title={useSpecificSeed ? 'Use specific seed: On' : 'Use specific seed'}
+                onPress={() => setUseSpecificSeed((enabled) => !enabled)}
+              />
+              {useSpecificSeed ? (
+                <>
+                  <Field maxLength={39} onChangeText={setSeedSuffix} placeholder="Seed suffix" value={seedSuffix} />
+                  <Text style={{ color: theme.colors.textMuted }}>
+                    hanab.live combines this suffix with the actual player count and variant when the game starts.
+                  </Text>
+                </>
+              ) : (
+                <Field maxLength={45} onChangeText={setTableName} placeholder={randomTableName ?? 'Table name'} value={tableName} />
+              )}
               <Field
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -268,11 +289,11 @@ export function LobbyScreen({
                 limit={maxPlayers - 1} users={users} protectedTable={tablePassword.length > 0} />}
               <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
               <ActionButton
-                disabled={attendancePending || effectiveName.length < 1 || effectiveName.length > 45}
+                disabled={attendancePending || !createNameIsValid}
                 title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}
                 tone="primary"
                 onPress={() => {
-                  if (lobbyRuntime.createTable(tableName, maxPlayers, createOptions, tablePassword, selectedBots)) {
+                  if (lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)) {
                     setTablePassword('');
                     setSelectedBots([]);
                   }
