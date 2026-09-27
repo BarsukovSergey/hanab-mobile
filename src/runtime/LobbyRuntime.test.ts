@@ -4263,6 +4263,45 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 9004, sharedReplay: false });
   });
 
+  test('arbitrary replay IDs do not require a loaded History item', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1,
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] } }));
+    expect(store.getState().history.items).toEqual([]);
+    expect(runtime.watchReplayByID(54321, 'shared')).toBe(true);
+    expect(socket.sent).toEqual(['replayCreate {"source":"id","databaseID":54321,"visibility":"shared"}']);
+    expect(store.getState().history.pendingReplayCreate).toMatchObject({
+      source: 'id', databaseID: 54321, visibility: 'shared', connectionEpoch: 1,
+    });
+    expect(runtime.watchReplayByID(0, 'solo')).toBe(false);
+  });
+
+  test('arbitrary ID authoritative option or visibility mismatch fails closed', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1,
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] } }));
+    expect(runtime.watchReplayByID(54322, 'solo')).toBe(true);
+    socket.emitMessage('tableStart {"tableID":9010,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      tableID: 9010, replay: true, databaseID: 54322, sharedReplay: true,
+      options: { ...makeInit({ tableID: 9010 }).options, speedrun: true },
+    }))}`);
+    expect(socket.sent.at(-1)).toBe('tableUnattend {"tableID":9010}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('server warning and error clear pending arbitrary ID requests', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1,
+      welcome: { userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [] } }));
+    expect(runtime.watchReplayByID(54323, 'solo')).toBe(true);
+    socket.emitMessage('warning {"warning":"Replay unavailable"}');
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+    expect(runtime.watchReplayByID(54324, 'shared')).toBe(true);
+    socket.emitMessage('error {"error":"Replay unavailable"}');
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+  });
+
   test('JSON shared replay requires matching visibility and reaches live shared replay', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     expect(runtime.watchJSONReplay({ actions: [] }, 'shared')).toBe(true);
