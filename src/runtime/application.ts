@@ -4,6 +4,7 @@ import { ChatRuntime } from './ChatRuntime';
 import { LobbyRuntime } from './LobbyRuntime';
 import { createRuntimeCommandGate } from './runtimeCommandGate';
 import { TerminationRuntime } from './terminationRuntime';
+import { replayExportActions } from '../platform/replayExportActions';
 
 export const networkSession = new HanabNetworkSession();
 const rawLobbyRuntime = new LobbyRuntime(networkSession, store);
@@ -34,4 +35,4 @@ const gameplayCommandGate = createRuntimeCommandGate(rawLobbyRuntime, [
 export const lobbyRuntime = gameplayCommandGate.runtime;
 export const suppressGameplayRuntimeCommands = () => gameplayCommandGate.suppress();
 export const terminationRuntime = new TerminationRuntime(rawLobbyRuntime, store);
-export const chatRuntime = new ChatRuntime(lobbyRuntime, terminationRuntime, store);
+export const chatRuntime = new ChatRuntime(lobbyRuntime, terminationRuntime, store, undefined, replayExportActions);

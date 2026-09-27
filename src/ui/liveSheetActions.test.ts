@@ -53,3 +53,16 @@ test('keeps live-game header actions outlined, matched, and tall enough to tap',
   }
   expect(app).toMatch(/liveHeaderAction:\s*\{[^}]*minHeight:\s*40[^}]*paddingHorizontal:\s*12/);
 });
+
+test('uses explicit export feedback tone instead of inferring it from message text', () => {
+  expect(app).toContain("message: string;\n    tone: 'success' | 'error';");
+  expect(liveSheet).toContain('<Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>');
+  expect(liveSheet).not.toMatch(/exportFeedback\.startsWith\(/);
+  expect(liveSheet).toContain("message: result.error, tone: 'error'");
+  expect(liveSheet).toContain("message: 'Replay link copied.', tone: 'success'");
+  expect(liveSheet).toContain("message: 'Share sheet opened.', tone: 'success'");
+  expect(liveSheet).toContain("message: 'Replay JSON copied.', tone: 'success'");
+  expect(liveSheet).toContain("message: 'Could not copy replay link.', tone: 'error'");
+  expect(liveSheet).toContain("message: 'Could not share replay link.', tone: 'error'");
+  expect(liveSheet).toContain("message: 'Could not copy replay JSON.', tone: 'error'");
+});

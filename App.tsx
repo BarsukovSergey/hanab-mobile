@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { HANAB_PASSWORD_RESET_URL } from './src/config/hanab';
+import { HANAB_HTTP_BASE_URL, HANAB_PASSWORD_RESET_URL } from './src/config/hanab';
+import { createReplayExport } from './src/game/client/replayExport';
+import { replayExportActions } from './src/platform/replayExportActions';
 import { forgetAccount, getPasswordCredential, listRecentAccounts, rememberAccount, savePasswordCredential } from './src/platform/credentialAccounts';
 import { chatRuntime, lobbyRuntime, networkSession } from './src/runtime/application';
 import { lobbyActions } from './src/store/lobbySlice';
@@ -46,7 +48,7 @@ import { UserContextActions } from './src/ui/UserContextActions';
 import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
-type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | null;
+type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | 'replay-export' | null;
 
 export default function App() {
   return (
@@ -76,6 +78,10 @@ function AppContent() {
   const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const [tagDraft, setTagDraft] = useState('');
+  const [exportFeedback, setExportFeedback] = useState<{
+    message: string;
+    tone: 'success' | 'error';
+  } | null>(null);
   const session = useAppSelector((state) => state.session);
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
@@ -384,6 +390,10 @@ function AppContent() {
                       setLiveSheet('tag');
                     }} />
                     <ActionButton title="Show tags" onPress={() => chatRuntime.submit('/tags')} />
+                    {liveClientState.finished && <ActionButton title="Export replay" onPress={() => {
+                      setExportFeedback(null);
+                      setLiveSheet('replay-export');
+                    }} />}
                     <SectionHeading title={`Players (${liveClientState.metadata.playerNames.length})`} />
                     {liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))}
                     <SectionHeading
@@ -437,6 +447,27 @@ function AppContent() {
                   </>
                   : liveSheet === 'settings'
                     ? <SettingsScreen onBack={() => setLiveSheet('menu')} onSignOut={() => void signOut()} />
+                    : liveSheet === 'replay-export'
+                      ? <>
+                        <SectionHeading title="Export replay" detail="Copy or share this finished replay." />
+                        {exportFeedback !== null && <Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>}
+                        <ActionButton title="Copy link" onPress={() => {
+                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
+                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
+                          void replayExportActions.copy(result.url).then(() => setExportFeedback({ message: 'Replay link copied.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not copy replay link.', tone: 'error' }));
+                        }} />
+                        <ActionButton title="Share link" onPress={() => {
+                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
+                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
+                          void replayExportActions.share(result.url).then(() => setExportFeedback({ message: 'Share sheet opened.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not share replay link.', tone: 'error' }));
+                        }} />
+                        <ActionButton title="Copy JSON" onPress={() => {
+                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
+                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
+                          void replayExportActions.copy(result.json).then(() => setExportFeedback({ message: 'Replay JSON copied.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not copy replay JSON.', tone: 'error' }));
+                        }} />
+                        <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
+                      </>
                     : liveSheet === 'tag'
                       ? <>
                         <SectionHeading title="Add tag" detail="Tags are attached to this game." />
