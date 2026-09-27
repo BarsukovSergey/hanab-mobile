@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Status: **planning snapshot reconciled with mobile `main` through PR #116; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #118; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `169f6ea348770166cf8dbdbb11fac1df18d07a04` (PR #116 merge)
+- current `main`: `12d0aa3fe47e6e37dd1cf6b74487cdf22b4b15de` (PR #118 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -91,7 +91,7 @@ already present:
 
 The biggest remaining parity gaps are now concentrated in five areas:
 
-1. **Replay/review power features**: replay arrows/annotations, JSON import, `/copy`, efficiency-mod origin controls, and other advanced review tools. Shared replay creation and turn-suggestion receive/UI are already implemented.
+1. **Replay/review power features**: replay arrows/annotations, richer replay-link opening/import, efficiency-mod origin controls, and other advanced review tools. JSON import and `/copy` export/share are already implemented.
 2. **Tags and richer history/profile workflows**: Add/display tag UI exists; richer tag search/delete management, arbitrary-player history, and richer profile/best-score surfaces remain.
 3. **Product/social surfaces**: optional linked-account UX and richer profile/settings workflows; account-management entry points and multi-bot invite UI are already implemented.
 4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, reverse-hand preference, and other non-core presentation settings remain.
@@ -127,13 +127,13 @@ Recently completed high-value parity work:
 - authoritative mute-state retention and source-faithful local chat/PM guard (#112).
 - controller-only Hypothetical card morph/unmorph UI with persistent Edit cards mode (#114).
 - authoritative arbitrary JSON replay import plus generalized replay-create source/visibility bootstrap validation (#116), including the shared-History replay bootstrap regression fix.
+- source-faithful finished-review `/copy` export/share with anonymized selected-segment GameJSON, Hypothetical continuation/morph support, upstream-compatible compression, clipboard/share actions, and local chat-command handling (#118).
 
 The highest-value remaining items are:
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
 | Richer tag management/search/delete | Partial | S–M | Medium | Add/display UI is implemented; structured search/delete/list management remains. |
-| `/copy` replay export | Missing | M | Medium | Browser-local upstream behavior needs a deliberate mobile export/share implementation. |
 | Rich player profile / arbitrary-player history | Partial | M–L | Medium | People/context actions exist; richer profile/history presentation does not. |
 | Chat typing/presentation polish | Partial | S–M | Low | Authoritative table unread/read state is implemented; typing, sounds and other presentation polish remain. |
 
@@ -969,7 +969,7 @@ jank (#4) as non-blocking defect backlog unless real usage reprioritizes it.
 
 ## C. Medium product slices
 
-1. `/copy` export/share.
+1. Richer replay-link opening/import, reusing the existing ID/JSON replay runtimes.
 2. Richer user/profile and arbitrary-player history surfaces.
 3. Account-management / linked-account UX.
 4. Chat typing/presentation polish beyond the implemented table unread/read state.
@@ -1008,7 +1008,7 @@ A useful way to describe current parity is:
 - empathy;
 - timed play;
 - live rewind;
-- finished/solo/shared replay core, including arbitrary JSON replay import;
+- finished/solo/shared replay core, including arbitrary JSON replay import and `/copy` export/share;
 - Hypothetical core including card morph/unmorph originating UI;
 - spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
@@ -1044,7 +1044,7 @@ A useful way to describe current parity is:
 - broader account/settings beyond the implemented login clarification, password change/reset entry points, card appearance settings, and H-group/Real-life presentation settings;
 - rich profiles and arbitrary-player history beyond existing People/context actions;
 - richer tag search/delete/management beyond the current Add/display flow;
-- JSON import/export;
+- richer replay-link opening/import beyond the existing raw JSON importer and `/copy` share URLs;
 - replay arrows/annotations/sounds and other advanced review tools;
 - sounds and reverse-hand preference;
 - server-backed typing and other chat-presentation polish.
