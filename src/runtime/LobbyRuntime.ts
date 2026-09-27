@@ -989,6 +989,14 @@ export class LobbyRuntime {
     return this.sendSharedHypotheticalOperation([parsed]);
   }
 
+  hypotheticalMorph(order: number, suitIndex: number, rank: number): boolean {
+    return this.sendHypotheticalAction({ type: 'morph', order, suitIndex, rank } as Extract<ActionIncludingHypothetical, { readonly type: 'morph' }>);
+  }
+
+  hypotheticalUnmorph(order: number): boolean {
+    return this.sendHypotheticalAction({ type: 'unmorph', order } as Extract<ActionIncludingHypothetical, { readonly type: 'unmorph' }>);
+  }
+
   hypotheticalPlay(order: number): boolean {
     return this.sendHypotheticalClientAction({ type: 'play', order });
   }
