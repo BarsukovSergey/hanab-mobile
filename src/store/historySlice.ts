@@ -213,7 +213,19 @@ export const historySlice = createSlice({
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
         || state.pendingReplayCreate !== null
+        || (action.payload.source === 'id' && ![...state.items, ...state.friendItems, ...state.taggedItems,
+          ...(state.tagSearchItems ?? []), ...(state.otherScores?.games ?? [])]
+          .some((item) => item.id === action.payload.databaseID))
       ) return;
+      state.pendingReplayCreate = action.payload;
+      state.error = null;
+    },
+    externalReplayCreateRequested(state, action: PayloadAction<PendingReplayCreate>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch
+        || state.pendingReplayCreate !== null
+        || action.payload.source !== 'id'
+        || !Number.isInteger(action.payload.databaseID)
+        || action.payload.databaseID <= 0) return;
       state.pendingReplayCreate = action.payload;
       state.error = null;
     },

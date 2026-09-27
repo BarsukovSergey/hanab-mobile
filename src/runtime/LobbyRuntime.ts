@@ -481,7 +481,7 @@ export class LobbyRuntime {
     const state = this.store.getState();
     if (!Number.isInteger(databaseID) || databaseID <= 0 || !this.canRequestReplay(state)) return false;
     if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
-    this.store.dispatch(historyActions.replayCreateRequested({
+    this.store.dispatch(historyActions.externalReplayCreateRequested({
       connectionEpoch: state.session.connectionEpoch, source: 'id', databaseID, visibility,
     }));
     return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
