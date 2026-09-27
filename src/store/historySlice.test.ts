@@ -42,9 +42,9 @@ describe('C15 history state', () => {
     expect(store.getState().history.taggedItems).toEqual(tagged);
     expect(store.getState().history.items).toEqual([]);
     expect(store.getState().history.taggedLoaded).toBe(true);
-    store.dispatch(historyActions.replayCreateRequested({ connectionEpoch: 1, databaseID: 3 }));
+    store.dispatch(historyActions.replayCreateRequested({ connectionEpoch: 1, source: 'id', visibility: 'solo', databaseID: 3 }));
     expect(store.getState().history.pendingReplayCreate?.databaseID).toBe(3);
-    store.dispatch(historyActions.replayCreateAccepted({ connectionEpoch: 1, databaseID: 3 }));
+    store.dispatch(historyActions.replayCreateAccepted({ connectionEpoch: 1, source: 'id', visibility: 'solo', databaseID: 3 }));
     store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));
     expect(store.getState().history.taggedPending).toBe(false);
     store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: 1, tag: 'x' }));
@@ -242,7 +242,7 @@ describe('C15 history state', () => {
       history: Array.from({ length: 10 }, (_, i) => item(20 - i)),
     }));
     store.dispatch(historyActions.pageRequested({ connectionEpoch: 1, offset: 10, amount: 10 }));
-    store.dispatch(historyActions.replayCreateRequested({ connectionEpoch: 1, databaseID: 20 }));
+    store.dispatch(historyActions.replayCreateRequested({ connectionEpoch: 1, source: 'id', visibility: 'solo', databaseID: 20 }));
     store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
     expect(store.getState().history).toMatchObject({
       connectionEpoch: 2, totalGames: 0, items: [], initialPageReceived: false,

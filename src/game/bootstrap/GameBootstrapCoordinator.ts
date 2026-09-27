@@ -51,6 +51,8 @@ type ActiveLoad = {
   role: Role;
   replay: boolean;
   expectedDatabaseID: number | null;
+  expectedReplaySource: 'id' | 'json' | null;
+  expectedReplayVisibility: 'solo' | 'shared' | null;
   phase: 'waiting_init' | 'waiting_history' | 'failed';
   info1Attempted: boolean;
   info2Attempted: boolean;
@@ -178,6 +180,8 @@ export class GameBootstrapCoordinator {
       role: room.role,
       replay: room.replay,
       expectedDatabaseID: room.expectedDatabaseID,
+      expectedReplaySource: room.expectedReplaySource,
+      expectedReplayVisibility: room.expectedReplayVisibility,
       phase: 'waiting_init',
       info1Attempted: false,
       info2Attempted: false,
@@ -221,7 +225,7 @@ export class GameBootstrapCoordinator {
         epoch: connectionEpoch,
         notice: { kind: 'warning', message: UNSUPPORTED_TABLE_WARNING },
       }));
-      if (load.expectedDatabaseID !== null) {
+      if (load.expectedReplaySource !== null) {
         this.store.dispatch(historyActions.operationFailed({
           connectionEpoch,
           message: UNSUPPORTED_TABLE_WARNING,
@@ -230,22 +234,23 @@ export class GameBootstrapCoordinator {
       return false;
     }
     const mismatch = (
-      (init.shadowing && (load.role !== 'spectator' || !init.spectating || load.replay || load.expectedDatabaseID !== null))
+      (init.shadowing && (load.role !== 'spectator' || !init.spectating || load.replay || load.expectedReplaySource !== null))
       || init.replay !== load.replay
       || (!load.replay && init.sharedReplay)
       || (load.expectedDatabaseID !== null && init.databaseID !== load.expectedDatabaseID)
-      || (load.expectedDatabaseID !== null && init.sharedReplay)
+      || (load.expectedReplaySource !== null && init.databaseID !== (load.expectedReplaySource === 'json' ? 0 : load.expectedDatabaseID))
+      || (load.expectedReplayVisibility !== null && init.sharedReplay !== (load.expectedReplayVisibility === 'shared'))
       || (!load.replay && load.role === 'player' && init.spectating)
       || (!load.replay && load.role === 'spectator' && !init.spectating)
     );
     if (mismatch) {
-      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
+      if (load.expectedReplaySource !== null) this.rejectHistoricalReplay(load);
       return false;
     }
 
     const username = this.store.getState().session.authenticatedUser?.username;
     if (username === undefined) {
-      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
+      if (load.expectedReplaySource !== null) this.rejectHistoricalReplay(load);
       return false;
     }
 
@@ -255,7 +260,7 @@ export class GameBootstrapCoordinator {
       metadata = makeMetadata(init, username);
       clientState = initializeHeadlessState(metadata, init);
     } catch {
-      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
+      if (load.expectedReplaySource !== null) this.rejectHistoricalReplay(load);
       return false;
     }
 
@@ -307,7 +312,7 @@ export class GameBootstrapCoordinator {
         });
       }
     } catch {
-      if (load.expectedDatabaseID !== null) this.rejectHistoricalReplay(load);
+      if (load.expectedReplaySource !== null) this.rejectHistoricalReplay(load);
       return false;
     }
     if (this.active !== load || load.phase !== 'waiting_history') return false;

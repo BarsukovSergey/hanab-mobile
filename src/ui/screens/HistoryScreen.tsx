@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
 import { lobbyRuntime } from '../../runtime/application';
@@ -25,9 +25,11 @@ const END_CONDITIONS = [
 export function HistoryScreen({
   onBack,
   onWatchReplay,
+  onWatchJSONReplay,
 }: {
   onBack: () => void;
   onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
+  onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
 }) {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
@@ -37,6 +39,9 @@ export function HistoryScreen({
     epoch: session.connectionEpoch, mode: 'mine',
   });
   const [tagInput, setTagInput] = useState('');
+  const [replayJSONText, setReplayJSONText] = useState('');
+  const [replayVisibility, setReplayVisibility] = useState<'solo' | 'shared'>('solo');
+  const [replayJSONError, setReplayJSONError] = useState<string | null>(null);
   useEffect(() => {
     if (
       session.friends.length === 0
@@ -105,6 +110,33 @@ export function HistoryScreen({
           onPress={() => lobbyRuntime.searchTag(tagInput)} />
         <ActionButton compact title="Clear search" tone="secondary" disabled={!history.tagSearchActive}
           onPress={() => lobbyRuntime.clearTagSearch()} />
+      </Panel>}
+
+      {!comparing && <Panel style={styles.importPanel}>
+        <SectionHeading title="Import JSON" />
+        <TextInput multiline value={replayJSONText} onChangeText={setReplayJSONText}
+          placeholder="Paste replay JSON" autoCapitalize="none" autoCorrect={false}
+          style={[styles.jsonInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />
+        <View style={styles.search}>
+          <ActionButton compact title="Solo" tone={replayVisibility === 'solo' ? 'primary' : 'secondary'}
+            onPress={() => setReplayVisibility('solo')} />
+          <ActionButton compact title="Shared" tone={replayVisibility === 'shared' ? 'primary' : 'secondary'}
+            onPress={() => setReplayVisibility('shared')} />
+          <ActionButton compact title="Watch replay" disabled={replayPending || replayJSONText.trim() === ''}
+            onPress={() => {
+              try {
+                const parsed: unknown = JSON.parse(replayJSONText);
+                if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                  setReplayJSONError('Replay JSON must be an object.'); return;
+                }
+                setReplayJSONError(null);
+                onWatchJSONReplay(parsed as Record<string, unknown>, replayVisibility);
+              } catch {
+                setReplayJSONError('Enter valid JSON.');
+              }
+            }} />
+        </View>
+        {replayJSONError !== null && <Notice tone="error">{replayJSONError}</Notice>}
       </Panel>}
 
       {!comparing && showingTagged && history.taggedPending && !history.tagSearchActive && <Notice>Loading tagged games…</Notice>}
@@ -196,6 +228,8 @@ const styles = StyleSheet.create({
   root: { gap: 16 },
   switcher: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   search: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  importPanel: { gap: 10 },
+  jsonInput: { minHeight: 110, borderWidth: 1, borderRadius: 10, padding: 10, textAlignVertical: 'top' },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   headerCopy: { flex: 1, gap: 3 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },

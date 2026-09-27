@@ -12,8 +12,10 @@ export type PendingHistoryRequest = {
 
 export type PendingReplayCreate = {
   connectionEpoch: number;
-  databaseID: number;
-};
+  source: 'id' | 'json';
+  visibility: 'solo' | 'shared';
+  databaseID?: number;
+} & ({ source: 'id'; databaseID: number } | { source: 'json'; databaseID?: never });
 
 export type PendingOtherScores = {
   connectionEpoch: number;
@@ -211,9 +213,9 @@ export const historySlice = createSlice({
       if (
         state.connectionEpoch !== action.payload.connectionEpoch
         || state.pendingReplayCreate !== null
-        || ![...state.items, ...state.friendItems, ...state.taggedItems,
+        || (action.payload.source === 'id' && ![...state.items, ...state.friendItems, ...state.taggedItems,
           ...(state.tagSearchItems ?? []), ...(state.otherScores?.games ?? [])]
-          .some((item) => item.id === action.payload.databaseID)
+          .some((item) => item.id === action.payload.databaseID))
       ) return;
       state.pendingReplayCreate = action.payload;
       state.error = null;
@@ -222,6 +224,8 @@ export const historySlice = createSlice({
       const pending = state.pendingReplayCreate;
       if (
         pending?.connectionEpoch === action.payload.connectionEpoch
+        && pending.source === action.payload.source
+        && pending.visibility === action.payload.visibility
         && pending.databaseID === action.payload.databaseID
       ) state.pendingReplayCreate = null;
     },

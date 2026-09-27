@@ -12,6 +12,7 @@ import {
   encodeHistoryGetSeedFrame,
   encodeGetNameFrame,
   encodeReplayCreateFrame,
+  encodeJSONReplayCreateFrame,
   encodeReplayActionFrame,
   encodeReplayHypoActionFrame,
   encodeReplayHypoBackFrame,
@@ -157,6 +158,9 @@ describe('lobby protocol decoder', () => {
     );
     expect(encodeReplayCreateFrame(77, 'shared')).toBe(
       'replayCreate {"source":"id","databaseID":77,"visibility":"shared"}',
+    );
+    expect(encodeJSONReplayCreateFrame({ seed: 'p2v0s1', actions: [] }, 'shared')).toBe(
+      'replayCreate {"source":"json","gameJSON":{"seed":"p2v0s1","actions":[]},"visibility":"shared"}',
     );
   });
   test('validates exact pinned chat and chatList payloads', () => {

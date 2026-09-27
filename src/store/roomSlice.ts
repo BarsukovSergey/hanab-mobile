@@ -38,6 +38,8 @@ export type RoomState =
       role: 'player' | 'spectator';
       replay: boolean;
       expectedDatabaseID: number | null;
+      expectedReplaySource: 'id' | 'json' | null;
+      expectedReplayVisibility: 'solo' | 'shared' | null;
       tableStartReceived: true;
       bootstrap:
         | 'pending_c5'
@@ -923,6 +925,8 @@ export const roomSlice = createSlice({
         role,
         replay: tableStart.replay,
         expectedDatabaseID: null,
+        expectedReplaySource: null,
+        expectedReplayVisibility: null,
         tableStartReceived: true,
         bootstrap: 'pending_c5',
       };
@@ -932,16 +936,18 @@ export const roomSlice = createSlice({
       action: PayloadAction<{
         epoch: number;
         tableStart: TableStart;
-        expectedDatabaseID: number;
+        source: 'id' | 'json';
+        visibility: 'solo' | 'shared';
+        databaseID?: number;
       }>,
     ) {
-      const { epoch, tableStart, expectedDatabaseID } = action.payload;
+      const { epoch, tableStart, source, visibility } = action.payload;
+      const expectedDatabaseID = source === 'id' ? action.payload.databaseID! : null;
       if (
         state.connectionEpoch !== epoch
         || state.room.kind !== 'none'
         || !tableStart.replay
-        || !Number.isInteger(expectedDatabaseID)
-        || expectedDatabaseID <= 0
+        || (source === 'id' && (!Number.isInteger(action.payload.databaseID) || action.payload.databaseID! <= 0))
         || state.pendingRecovery !== null
         || state.pendingSpectateTableID !== null
         || state.pendingJoin !== null
@@ -957,6 +963,8 @@ export const roomSlice = createSlice({
         role: 'spectator',
         replay: true,
         expectedDatabaseID,
+        expectedReplaySource: source,
+        expectedReplayVisibility: visibility,
         tableStartReceived: true,
         bootstrap: 'pending_c5',
       };

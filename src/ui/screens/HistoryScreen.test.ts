@@ -10,6 +10,12 @@ describe('History screen source contract', () => {
     expect(screen).toContain('>{item.tags}</Text>');
     expect(screen).not.toMatch(/item\.tags\.split/);
   });
+  test('offers local JSON parsing and requires an object without sending invalid input', () => {
+    expect(screen).toContain('title="Import JSON"');
+    expect(screen).toContain('JSON.parse(replayJSONText)');
+    expect(screen).toContain('parsed === null || typeof parsed !== \'object\' || Array.isArray(parsed)');
+    expect(screen).toContain('onWatchJSONReplay(parsed as Record<string, unknown>, replayVisibility)');
+  });
 
   test('same-seed comparison keeps source context and server order', () => {
     expect(screen).toContain('Math.max(0, item.numGamesOnThisSeed - 1)');

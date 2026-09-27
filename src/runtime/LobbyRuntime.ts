@@ -39,6 +39,7 @@ import {
   encodeHistoryGetFrame,
   encodeHistoryFriendsGetFrame,
   encodeHistoryGetSeedFrame,
+  encodeJSONReplayCreateFrame,
   historyGetSeedCommandSchema,
   type GameplayPresentationSettingName,
   encodeGetNameFrame,
@@ -484,9 +485,25 @@ export class LobbyRuntime {
     if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
     this.store.dispatch(historyActions.replayCreateRequested({
       connectionEpoch: state.session.connectionEpoch,
+      source: 'id', visibility,
       databaseID,
     }));
     return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
+  }
+
+  watchJSONReplay(gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared'): boolean {
+    const state = this.store.getState();
+    const room = state.room;
+    if (state.session.phase !== 'ready' || room.room.kind !== 'none' || state.history.pendingReplayCreate !== null
+      || room.pendingRecovery !== null || room.pendingSpectateTableID !== null || room.pendingJoin !== null
+      || room.pendingCreate !== null || room.pendingLeaveTableID !== null || room.pendingUnattendTableID !== null
+      || room.pendingStart !== null || room.pendingUpdate !== null || room.pendingLeaderName !== null
+      || room.pendingRestartTableID !== null || room.rematchTransition !== null || room.pendingGameplayAction !== null) return false;
+    if (!this.sendEncoded(encodeJSONReplayCreateFrame(gameJSON, visibility))) return false;
+    this.store.dispatch(historyActions.replayCreateRequested({
+      connectionEpoch: state.session.connectionEpoch, source: 'json', visibility,
+    }));
+    return this.store.getState().history.pendingReplayCreate?.source === 'json';
   }
 
   spectate(tableID: number): boolean {
@@ -1477,13 +1494,17 @@ export class LobbyRuntime {
             this.store.dispatch(roomActions.historicalReplayTableStartReceived({
               epoch,
               tableStart: event.data,
-              expectedDatabaseID: pendingReplay.databaseID,
+              source: pendingReplay.source,
+              visibility: pendingReplay.visibility,
+              ...(pendingReplay.source === 'id' ? { databaseID: pendingReplay.databaseID } : {}),
             }));
             const room = this.store.getState().room.room;
             if (
               room.kind === 'awaiting_game_bootstrap'
               && room.tableID === event.data.tableID
-              && room.expectedDatabaseID === pendingReplay.databaseID
+              && room.expectedReplaySource === pendingReplay.source
+              && room.expectedReplayVisibility === pendingReplay.visibility
+              && room.expectedDatabaseID === (pendingReplay.source === 'id' ? pendingReplay.databaseID : null)
             ) this.store.dispatch(historyActions.replayCreateAccepted(pendingReplay));
           } else {
             this.store.dispatch(roomActions.tableStartReceived({
