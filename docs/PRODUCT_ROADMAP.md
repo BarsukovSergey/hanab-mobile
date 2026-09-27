@@ -339,10 +339,10 @@ Candidates:
 - replay arrows / annotations;
 - replay sounds where useful;
 - user-facing shared replay efficiency-modifier origin controls;
-- pregame and shadow link opening/import where they can reuse authoritative join/spectate paths;
+- optional shadow-link opening/import if concrete demand justifies wiring URL seats into the existing spectator-perspective flow;
 - replay scrubber performance work if issue #4 remains material.
 
-Hypothetical card morph/unmorph controls landed in PR #114, arbitrary JSON replay import landed in PR #116, `/copy` export/share landed in PR #118, canonical replay-link opening/import landed in PR #120, and bounded running-game link opening landed in PR #122; none is a remaining Phase 4 candidate.
+Hypothetical card morph/unmorph controls landed in PR #114, arbitrary JSON replay import landed in PR #116, `/copy` export/share landed in PR #118, canonical replay-link opening/import landed in PR #120, bounded running-game link opening landed in PR #122, and player-join pregame link opening landed in PR #124; none is a remaining Phase 4 candidate.
 
 Treat import/export and annotations as a designed workflow, not a collection of raw command ports.
 
