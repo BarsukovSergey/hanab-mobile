@@ -623,6 +623,26 @@ export class LobbyRuntime {
     return false;
   }
 
+  openPregameByID(tableID: number, password?: string): boolean {
+    const state = this.store.getState();
+    const table = state.lobby.tables.entities[tableID];
+    const room = state.room;
+    if (state.session.phase !== 'ready' || table === undefined || table.running || table.sharedReplay
+      || !isJoinEligible(table)
+      || room.room.kind !== 'none'
+      || room.pendingRecovery !== null || room.pendingSpectateTableID !== null
+      || room.pendingJoin !== null || room.pendingCreate !== null
+      || room.pendingLeaveTableID !== null || room.pendingUnattendTableID !== null
+      || room.pendingStart !== null || room.pendingUpdate !== null
+      || room.pendingLeaderName !== null || room.pendingRestartTableID !== null
+      || room.pendingRestartHidePregame !== null || room.rematchTransition !== null
+      || room.pendingRoleSwitch !== null || room.pendingGameplayAction !== null
+      || room.pendingHypotheticalOperation !== null || room.pendingReplaySuggestion !== null
+      || state.history.pendingReplayCreate !== null
+      || (table.passwordProtected && (password === undefined || password.length === 0))) return false;
+    return this.join(tableID, password);
+  }
+
   createTable(
     name: string,
     maxPlayers: number,

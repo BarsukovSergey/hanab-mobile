@@ -441,6 +441,48 @@ describe('open running game link', () => {
   });
 });
 
+describe('open pregame link', () => {
+  test('joins a known supported table through the existing exact join command', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: joinableTable }));
+    expect(runtime.openPregameByID(123)).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableJoin {"tableID":123}');
+    expect(store.getState().room.pendingJoin?.tableID).toBe(123);
+  });
+
+  test('sends the supplied password only in the existing join command', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: { ...joinableTable, passwordProtected: true } }));
+    expect(runtime.openPregameByID(123, 'open sesame')).toBe(true);
+    expect(socket.sent.at(-1)).toBe('tableJoin {"tableID":123,"password":"open sesame"}');
+  });
+
+  test.each([
+    ['unknown', undefined],
+    ['full', { ...joinableTable, numPlayers: 5 }],
+    ['running', { ...joinableTable, running: true }],
+    ['unsupported', { ...joinableTable, options: { ...tableOptions, variantName: 'Unsupported' } }],
+    ['shared replay', { ...joinableTable, sharedReplay: true }],
+  ])('does not send for %s pregame', async (_label, table) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    if (table !== undefined) store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: table as LobbyTable }));
+    const before = socket.sent.length;
+    expect(runtime.openPregameByID(123)).toBe(false);
+    expect(socket.sent).toHaveLength(before);
+  });
+
+  test('protected table without password and pending attendance send nothing', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    store.dispatch(lobbyActions.tableReceived({ epoch: 1, table: { ...joinableTable, passwordProtected: true } }));
+    const before = socket.sent.length;
+    expect(runtime.openPregameByID(123)).toBe(false);
+    expect(socket.sent).toHaveLength(before);
+    store.dispatch(roomActions.spectateRequested({ epoch: 1, tableID: 456 }));
+    expect(runtime.openPregameByID(123, 'pw')).toBe(false);
+    expect(socket.sent).toHaveLength(before);
+  });
+});
+
 describe('authoritative progress and table chat reads', () => {
   test('applies live table progress and table chat unread to the current table history room', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();

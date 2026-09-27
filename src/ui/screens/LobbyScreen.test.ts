@@ -79,13 +79,18 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain("setTablePassword('');");
   });
 
-  test('offers bounded live game link paste and local availability feedback', () => {
+  test('offers game and pregame links, secure pregame password, and local feedback', () => {
     expect(screen).toContain('title="Open game link"');
     expect(screen).toContain('title="Paste from clipboard"');
     expect(screen).toContain('title="Open game"');
     expect(screen).toContain('title="Cancel"');
     expect(screen).toContain('parseLiveGameInput(liveGameLink)');
     expect(screen).toContain('lobbyRuntime.openLiveGameByID(parsed.tableID)');
+    expect(screen).toContain('lobbyRuntime.openPregameByID(parsed.tableID, liveGameLinkPassword || undefined)');
+    expect(screen).toContain('secureTextEntry');
+    expect(screen).toContain('Enter the table password.');
+    expect(screen).toContain('That pregame table is not currently available to join.');
+    expect(screen).toContain("setLiveGameLinkPassword('')");
     expect(screen).toContain('That running table is not currently available to open.');
     expect(screen).toContain('Clipboard is empty.');
     expect(screen).toContain('Could not read the clipboard.');
