@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
@@ -50,12 +50,20 @@ export function HistoryScreen({
   const [replayVisibility, setReplayVisibility] = useState<'solo' | 'shared'>('solo');
   const [replayJSONError, setReplayJSONError] = useState<string | null>(null);
   const [seedCopyFeedback, setSeedCopyFeedback] = useState<{ itemID: number; message: string } | null>(null);
+  const seedCopyGeneration = useRef(0);
+  const invalidateSeedCopy = useCallback(() => {
+    seedCopyGeneration.current += 1;
+    setSeedCopyFeedback(null);
+  }, []);
   useEffect(() => {
     if (
       session.friends.length === 0
       && (selection.epoch !== session.connectionEpoch || selection.mode === 'friends')
-    ) setSelection({ epoch: session.connectionEpoch, mode: 'mine' });
-  }, [selection, session.connectionEpoch, session.friends.length]);
+    ) {
+      invalidateSeedCopy();
+      setSelection({ epoch: session.connectionEpoch, mode: 'mine' });
+    }
+  }, [invalidateSeedCopy, selection, session.connectionEpoch, session.friends.length]);
   const mode = selection.epoch === session.connectionEpoch ? selection.mode : 'mine';
   const showingFriends = mode === 'friends' && session.friends.length > 0;
   const showingTagged = mode === 'tagged';
@@ -70,6 +78,7 @@ export function HistoryScreen({
   const replayPending = history.pendingReplayCreate !== null;
   const comparing = history.pendingOtherScores !== null || history.otherScores !== null;
   const returnFromComparison = () => {
+    invalidateSeedCopy();
     const friends = history.otherScores?.friends ?? history.pendingOtherScores?.friends ?? false;
     setSelection({ epoch: session.connectionEpoch, mode: friends && session.friends.length > 0 ? 'friends' : 'mine' });
     lobbyRuntime.dismissOtherScores();
@@ -84,6 +93,7 @@ export function HistoryScreen({
             : 'Open a finished game using the same authoritative replay path.'} />
         </View>
         <ActionButton compact title="Back to lobby" onPress={() => {
+          invalidateSeedCopy();
           if (comparing) lobbyRuntime.dismissOtherScores();
           onBack();
         }} />
@@ -101,24 +111,24 @@ export function HistoryScreen({
       {!comparing && (
         <View style={styles.switcher}>
           <ActionButton compact title="My history" tone={mode === 'mine' ? 'primary' : 'secondary'}
-            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'mine' }); setSeedCopyFeedback(null); }} />
+            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'mine' }); invalidateSeedCopy(); }} />
           {session.friends.length > 0 && <ActionButton compact title="Friends history" tone={showingFriends ? 'primary' : 'secondary'}
             onPress={() => {
               setSelection({ epoch: session.connectionEpoch, mode: 'friends' });
-              setSeedCopyFeedback(null);
+              invalidateSeedCopy();
               lobbyRuntime.ensureFriendsHistory();
             }} />}
           <ActionButton compact title="Tagged games" tone={showingTagged ? 'primary' : 'secondary'}
-            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'tagged' }); setSeedCopyFeedback(null); lobbyRuntime.ensureTaggedGames(); }} />
+            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'tagged' }); invalidateSeedCopy(); lobbyRuntime.ensureTaggedGames(); }} />
         </View>
       )}
 
       {!comparing && showingTagged && <Panel style={styles.search}>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setTagInput} placeholder="Exact tag" value={tagInput} />
         <ActionButton compact title="Search" disabled={history.tagSearchPending || tagInput.trim() === ''}
-          onPress={() => lobbyRuntime.searchTag(tagInput)} />
+          onPress={() => { invalidateSeedCopy(); lobbyRuntime.searchTag(tagInput); }} />
         <ActionButton compact title="Clear search" tone="secondary" disabled={!history.tagSearchActive}
-          onPress={() => lobbyRuntime.clearTagSearch()} />
+          onPress={() => { invalidateSeedCopy(); lobbyRuntime.clearTagSearch(); }} />
       </Panel>}
 
       {!comparing && <Panel style={styles.importPanel}>
@@ -198,8 +208,10 @@ export function HistoryScreen({
                   {item.seed !== '' ? `Seed ${item.seed}` : 'Seed unavailable'} · {item.numTurns} turns
                 </Text>
                 {item.seed !== '' && <ActionButton compact title="Copy seed" tone="secondary" onPress={() => {
+                  const requestID = ++seedCopyGeneration.current;
                   setSeedCopyFeedback(null);
                   void copyHistorySeed(item.seed, clipboardActions).then((copied) => {
+                    if (requestID !== seedCopyGeneration.current) return;
                     setSeedCopyFeedback({
                       itemID: item.id,
                       message: copied ? 'Seed copied.' : 'Could not copy seed.',
@@ -230,7 +242,7 @@ export function HistoryScreen({
                 disabled={otherCount === 0 || history.pendingOtherScores !== null}
                 title={`Other scores · ${otherCount}`}
                 tone="secondary"
-                onPress={() => { setSeedCopyFeedback(null); lobbyRuntime.loadOtherScores(item.id, showingFriends); }}
+                onPress={() => { invalidateSeedCopy(); lobbyRuntime.loadOtherScores(item.id, showingFriends); }}
               />}
             </Panel>
           );

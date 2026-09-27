@@ -52,6 +52,21 @@ describe('History screen source contract', () => {
     expect(screen).not.toContain('dispatch(');
   });
 
+  test('ignores stale copy completions when a newer copy or source transition supersedes them', () => {
+    expect(screen).toContain('const seedCopyGeneration = useRef(0)');
+    expect(screen).toContain('const requestID = ++seedCopyGeneration.current');
+    expect(screen).toContain('if (requestID !== seedCopyGeneration.current) return;');
+    expect(screen).toContain('seedCopyGeneration.current += 1');
+    expect(screen).toContain("mode: 'mine' }); invalidateSeedCopy();");
+    expect(screen).toContain('mode: \'friends\' });\n              invalidateSeedCopy();');
+    expect(screen).toContain("mode: 'tagged' }); invalidateSeedCopy(); lobbyRuntime.ensureTaggedGames();");
+    expect(screen).toContain('invalidateSeedCopy(); lobbyRuntime.searchTag(tagInput);');
+    expect(screen).toContain('invalidateSeedCopy(); lobbyRuntime.clearTagSearch();');
+    expect(screen).toContain('const returnFromComparison = () => {\n    invalidateSeedCopy();');
+    expect(screen).toContain('invalidateSeedCopy(); lobbyRuntime.loadOtherScores(item.id, showingFriends);');
+    expect(screen).toContain('title="Back to lobby" onPress={() => {\n          invalidateSeedCopy();');
+  });
+
   test('offers Friends history only for authoritative friends and uses its independent pages', () => {
     expect(screen).toContain('session.friends.length > 0');
     expect(screen).toContain('title="My history"');
@@ -100,7 +115,7 @@ describe('History screen source contract', () => {
   });
 
   test('resets selection to My history on an empty friends list without auto-selecting on re-add', () => {
-    expect(screen).toMatch(/useEffect\(\(\) => \{[\s\S]*?session\.friends\.length === 0[\s\S]*?selection\.mode === 'friends'[\s\S]*?setSelection\(\{ epoch: session\.connectionEpoch, mode: 'mine' \}\);[\s\S]*?\}, \[selection, session\.connectionEpoch, session\.friends\.length\]\);/);
+    expect(screen).toMatch(/useEffect\(\(\) => \{[\s\S]*?session\.friends\.length === 0[\s\S]*?selection\.mode === 'friends'[\s\S]*?invalidateSeedCopy\(\);[\s\S]*?setSelection\(\{ epoch: session\.connectionEpoch, mode: 'mine' \}\);[\s\S]*?\}, \[invalidateSeedCopy, selection, session\.connectionEpoch, session\.friends\.length\]\);/);
     expect(screen).toContain("const showingFriends = mode === 'friends' && session.friends.length > 0;");
     const resetEffect = screen.slice(screen.indexOf('useEffect('), screen.indexOf('const mode'));
     expect(resetEffect).not.toContain('ensureFriendsHistory');
