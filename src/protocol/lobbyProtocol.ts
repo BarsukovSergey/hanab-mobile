@@ -89,6 +89,66 @@ export type MobileTableOptions = Pick<TableOptions,
   'variantName' | 'timed' | 'timeBase' | 'timePerTurn'
   | 'cardCycle' | 'emptyClues' | 'oneExtraCard' | 'oneLessCard' | 'allOrNothing'>;
 
+export type CreateTablePreferences = {
+  variant: string;
+  timed: boolean;
+  timeBaseMinutes: number;
+  timePerTurnSeconds: number;
+  cardCycle: boolean;
+  emptyClues: boolean;
+  oneExtraCard: boolean;
+  oneLessCard: boolean;
+  allOrNothing: boolean;
+  maxPlayers: number;
+};
+
+export const DEFAULT_CREATE_TABLE_PREFERENCES: CreateTablePreferences = {
+  variant: 'No Variant', timed: false, timeBaseMinutes: 2, timePerTurnSeconds: 20,
+  cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false,
+  allOrNothing: false, maxPlayers: 5,
+};
+
+const createPreferenceValue = <T extends z.ZodTypeAny>(schema: T, fallback: z.infer<T>) =>
+  z.unknown().optional().transform((value) => {
+    const parsed = schema.safeParse(value);
+    return parsed.success ? parsed.data : fallback;
+  });
+
+const createTablePreferenceSettingsSchema = z.object({
+  createTableVariant: createPreferenceValue(z.string().min(1), DEFAULT_CREATE_TABLE_PREFERENCES.variant),
+  createTableTimed: createPreferenceValue(z.boolean(), DEFAULT_CREATE_TABLE_PREFERENCES.timed),
+  createTableTimeBaseMinutes: createPreferenceValue(z.number().finite().positive().max(10_080), DEFAULT_CREATE_TABLE_PREFERENCES.timeBaseMinutes),
+  createTableTimePerTurnSeconds: createPreferenceValue(z.number().int().positive().max(86_400), DEFAULT_CREATE_TABLE_PREFERENCES.timePerTurnSeconds),
+  createTableCardCycle: createPreferenceValue(z.boolean(), false),
+  createTableEmptyClues: createPreferenceValue(z.boolean(), false),
+  createTableOneExtraCard: createPreferenceValue(z.boolean(), false),
+  createTableOneLessCard: createPreferenceValue(z.boolean(), false),
+  createTableAllOrNothing: createPreferenceValue(z.boolean(), false),
+  createTableMaxPlayers: createPreferenceValue(z.number().int().min(2).max(6), 5),
+}).passthrough();
+
+export function normalizeCreateTablePreferences(settings?: Record<string, unknown>): CreateTablePreferences {
+  const source = settings ?? {};
+  const variant = typeof source.createTableVariant === 'string' && isVariantNameSupported(source.createTableVariant)
+    ? source.createTableVariant : DEFAULT_CREATE_TABLE_PREFERENCES.variant;
+  const bool = (key: string): boolean => typeof source[key] === 'boolean' ? source[key] as boolean : false;
+  return {
+    variant,
+    timed: bool('createTableTimed'),
+    timeBaseMinutes: typeof source.createTableTimeBaseMinutes === 'number' && Number.isFinite(source.createTableTimeBaseMinutes) && source.createTableTimeBaseMinutes > 0 && source.createTableTimeBaseMinutes <= 10_080
+      ? source.createTableTimeBaseMinutes : DEFAULT_CREATE_TABLE_PREFERENCES.timeBaseMinutes,
+    timePerTurnSeconds: typeof source.createTableTimePerTurnSeconds === 'number' && Number.isInteger(source.createTableTimePerTurnSeconds) && source.createTableTimePerTurnSeconds > 0 && source.createTableTimePerTurnSeconds <= 86_400
+      ? source.createTableTimePerTurnSeconds : DEFAULT_CREATE_TABLE_PREFERENCES.timePerTurnSeconds,
+    cardCycle: bool('createTableCardCycle'),
+    emptyClues: bool('createTableEmptyClues'),
+    oneExtraCard: bool('createTableOneExtraCard'),
+    oneLessCard: bool('createTableOneLessCard'),
+    allOrNothing: bool('createTableAllOrNothing'),
+    maxPlayers: typeof source.createTableMaxPlayers === 'number' && Number.isInteger(source.createTableMaxPlayers) && source.createTableMaxPlayers >= 2 && source.createTableMaxPlayers <= 6
+      ? source.createTableMaxPlayers : 5,
+  };
+}
+
 function timedValuesAreValid(options: Pick<TableOptions,
   'timed' | 'timeBase' | 'timePerTurn'>): boolean {
   return options.timed
@@ -384,13 +444,54 @@ const cardPresentationSettingsSchema = z.object({
   reverseHands: z.boolean().default(false),
   realLifeMode: z.boolean().default(false),
   hyphenatedConventions: z.boolean().default(false),
+  ...createTablePreferenceSettingsSchema.shape,
 }).passthrough().default({
   colorblindMode: false,
   styleNumbers: false,
   reverseHands: false,
   realLifeMode: false,
   hyphenatedConventions: false,
+  createTableVariant: 'No Variant', createTableTimed: false,
+  createTableTimeBaseMinutes: 2, createTableTimePerTurnSeconds: 20,
+  createTableCardCycle: false, createTableEmptyClues: false,
+  createTableOneExtraCard: false, createTableOneLessCard: false,
+  createTableAllOrNothing: false, createTableMaxPlayers: 5,
 });
+
+export type CreateTableSettingName =
+  | 'createTableVariant' | 'createTableTimed' | 'createTableTimeBaseMinutes'
+  | 'createTableTimePerTurnSeconds' | 'createTableCardCycle' | 'createTableEmptyClues'
+  | 'createTableOneExtraCard' | 'createTableOneLessCard' | 'createTableAllOrNothing'
+  | 'createTableMaxPlayers';
+type CreateTableSettingValue<N extends CreateTableSettingName> =
+  N extends 'createTableVariant' ? string
+    : N extends 'createTableTimed' | 'createTableCardCycle' | 'createTableEmptyClues'
+      | 'createTableOneExtraCard' | 'createTableOneLessCard' | 'createTableAllOrNothing' ? boolean
+      : N extends 'createTableTimeBaseMinutes' ? number
+        : number;
+export type CreateTableSetting = {
+  [N in CreateTableSettingName]: { name: N; value: CreateTableSettingValue<N> }
+}[CreateTableSettingName];
+const createTableSettingCommandSchema = z.object({
+  name: z.enum(['createTableVariant', 'createTableTimed', 'createTableTimeBaseMinutes',
+    'createTableTimePerTurnSeconds', 'createTableCardCycle', 'createTableEmptyClues',
+    'createTableOneExtraCard', 'createTableOneLessCard', 'createTableAllOrNothing', 'createTableMaxPlayers']),
+  setting: z.string(),
+}).strict();
+
+export function encodeCreateTableSettingFrame({ name, value }: CreateTableSetting): string {
+  if (name === 'createTableVariant') {
+    if (typeof value !== 'string' || value.length === 0) throw new Error('invalid create table variant');
+  } else if (name === 'createTableTimeBaseMinutes') {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) throw new Error('invalid create table time base');
+  } else if (name === 'createTableMaxPlayers') {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 2 || value > 6) throw new Error('invalid create table max players');
+  } else if (name === 'createTableTimePerTurnSeconds') {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) throw new Error('invalid create table time per turn');
+  } else if (typeof value !== 'boolean') throw new Error('invalid create table boolean setting');
+  const setting = typeof value === 'boolean' ? String(value) : String(value);
+  return encodeClientFrame('setting', createTableSettingCommandSchema.parse({ name, setting }));
+}
 
 const cardPresentationSettingCommandSchema = z.object({
   name: cardPresentationSettingNameSchema,

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
@@ -25,11 +25,17 @@ import { parseLiveGameInput } from '../../game/client/liveGameInput';
 import { clipboardActions, type ClipboardActions } from '../../platform/replayInputActions';
 import { createSpecificSeedTableName } from '../specificSeedName';
 
-const DEFAULT_OPTIONS: MobileTableOptions = {
-  variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
-  cardCycle: false, emptyClues: false,
-  oneExtraCard: false, oneLessCard: false, allOrNothing: false,
-};
+function createOptionsFromPreferences(preferences: import('../../protocol/lobbyProtocol').CreateTablePreferences): MobileTableOptions {
+  return {
+    variantName: preferences.variant,
+    timed: preferences.timed,
+    timeBase: preferences.timed ? Math.round(preferences.timeBaseMinutes * 60) : 0,
+    timePerTurn: preferences.timed ? preferences.timePerTurnSeconds : 0,
+    cardCycle: preferences.cardCycle, emptyClues: preferences.emptyClues,
+    oneExtraCard: preferences.oneExtraCard, oneLessCard: preferences.oneLessCard,
+    allOrNothing: preferences.allOrNothing,
+  };
+}
 
 const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 
@@ -63,8 +69,25 @@ export function LobbyScreen({
   const [liveGameLink, setLiveGameLink] = useState('');
   const [liveGameLinkError, setLiveGameLinkError] = useState<string | null>(null);
   const [liveGameLinkPassword, setLiveGameLinkPassword] = useState('');
-  const [maxPlayers, setMaxPlayers] = useState(5);
-  const [createOptions, setCreateOptions] = useState<MobileTableOptions>(DEFAULT_OPTIONS);
+  const createPreferences = useAppSelector((state) => state.session.createTablePreferences);
+  const sessionReady = useAppSelector((state) => state.session.phase === 'ready');
+  const [maxPlayers, setMaxPlayers] = useState(createPreferences.maxPlayers);
+  const [createOptions, setCreateOptions] = useState<MobileTableOptions>(() => createOptionsFromPreferences(createPreferences));
+  const latentTimers = useRef({
+    timeBase: Math.round(createPreferences.timeBaseMinutes * 60),
+    timePerTurn: createPreferences.timePerTurnSeconds,
+  });
+  const preferencesInitialized = useRef(false);
+  useEffect(() => {
+    if (!sessionReady || preferencesInitialized.current) return;
+    preferencesInitialized.current = true;
+    setMaxPlayers(createPreferences.maxPlayers);
+    setCreateOptions(createOptionsFromPreferences(createPreferences));
+    latentTimers.current = {
+      timeBase: Math.round(createPreferences.timeBaseMinutes * 60),
+      timePerTurn: createPreferences.timePerTurnSeconds,
+    };
+  }, [createPreferences, sessionReady]);
   const [reproductionPlayerCount, setReproductionPlayerCount] = useState<number | null>(null);
   const [joinPassword, setJoinPassword] = useState('');
   const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
@@ -79,6 +102,10 @@ export function LobbyScreen({
     setSeedSuffix(specificSeedCreatePrefill.seedSuffix);
     setMaxPlayers(specificSeedCreatePrefill.maxPlayers);
     setCreateOptions(specificSeedCreatePrefill.createOptions);
+    if (specificSeedCreatePrefill.createOptions.timed) latentTimers.current = {
+      timeBase: specificSeedCreatePrefill.createOptions.timeBase,
+      timePerTurn: specificSeedCreatePrefill.createOptions.timePerTurn,
+    };
     setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);
     onSpecificSeedCreatePrefillConsumed();
   }, [specificSeedCreatePrefill, onSpecificSeedCreatePrefillConsumed]);
@@ -327,7 +354,16 @@ export function LobbyScreen({
               {showBotPicker && <BotPicker selected={selectedBots} onChange={setSelectedBots}
                 limit={maxPlayers - 1} users={users} protectedTable={tablePassword.length > 0} />}
               <TableOptionsEditor options={createOptions} onChange={(options) => {
-                setCreateOptions(options);
+                if (createOptions.timed && !options.timed) latentTimers.current = {
+                  timeBase: createOptions.timeBase, timePerTurn: createOptions.timePerTurn,
+                };
+                const nextOptions = !createOptions.timed && options.timed
+                  ? { ...options, ...latentTimers.current }
+                  : options;
+                if (nextOptions.timed) latentTimers.current = {
+                  timeBase: nextOptions.timeBase, timePerTurn: nextOptions.timePerTurn,
+                };
+                setCreateOptions(nextOptions);
                 setReproductionPlayerCount(null);
               }} />
               <ActionButton

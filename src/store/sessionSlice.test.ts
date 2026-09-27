@@ -87,6 +87,27 @@ describe('session card presentation settings', () => {
   });
 });
 
+describe('session Create table preferences', () => {
+  test('uses safe defaults, preserves reconnect values, replaces from welcome, and resets on sign-out', () => {
+    const store = createAppStore();
+    expect(store.getState().session.createTablePreferences).toMatchObject({ variant: 'No Variant', timed: false, maxPlayers: 5 });
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: welcome({
+      createTableVariant: 'unsupported', createTableTimed: true, createTableTimeBaseMinutes: 1.5,
+      createTableTimePerTurnSeconds: 30, createTableMaxPlayers: 9,
+    }) }));
+    expect(store.getState().session.createTablePreferences).toMatchObject({
+      variant: 'No Variant', timed: true, timeBaseMinutes: 1.5, timePerTurnSeconds: 30, maxPlayers: 5,
+    });
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    expect(store.getState().session.createTablePreferences.timeBaseMinutes).toBe(1.5);
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 2, welcome: welcome({ createTableVariant: '6 Suits', createTableMaxPlayers: 4 }) }));
+    expect(store.getState().session.createTablePreferences).toMatchObject({ variant: '6 Suits', timed: false, maxPlayers: 4 });
+    store.dispatch(sessionActions.signedOut());
+    expect(store.getState().session.createTablePreferences).toMatchObject({ variant: 'No Variant', maxPlayers: 5 });
+  });
+});
+
 describe('session random table name', () => {
   test('uses welcome, replaces with name events, and clears across epochs and sign-out', () => {
     const store = createAppStore();

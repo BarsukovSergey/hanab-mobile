@@ -44,6 +44,17 @@ describe('lobby table details and create selector', () => {
     expect(screen).not.toContain('maxPlayers}v');
   });
 
+  test('initializes Create from server preferences and keeps latent timer values out of untimed commands', () => {
+    expect(screen).toContain('state.session.createTablePreferences');
+    expect(screen).toContain('useState(createPreferences.maxPlayers)');
+    expect(screen).toContain('variantName: preferences.variant');
+    expect(screen).toContain('timeBase: preferences.timed ? Math.round(preferences.timeBaseMinutes * 60) : 0');
+    expect(screen).toContain('timePerTurn: preferences.timed ? preferences.timePerTurnSeconds : 0');
+    expect(screen).toContain('timeBase: createOptions.timeBase, timePerTurn: createOptions.timePerTurn');
+    expect(screen).toContain('? { ...options, ...latentTimers.current }');
+    expect(screen).toContain('setCreateOptions(specificSeedCreatePrefill.createOptions);');
+  });
+
   test('adopts a one-shot History prefill locally and leaves creation to the user', () => {
     expect(app).toContain('useState<SpecificSeedCreatePrefill | null>(null)');
     expect(app).toContain('setSpecificSeedCreatePrefill(prefill);');
@@ -63,7 +74,7 @@ describe('lobby table details and create selector', () => {
   test('manual reproduction edits clear only the History hint and a later prefill restores it', () => {
     expect(screen).toContain('setSeedSuffix(value);\n                      setReproductionPlayerCount(null);');
     expect(screen).toContain('setMaxPlayers(value);\n                          setReproductionPlayerCount(null);');
-    expect(screen).toContain('setCreateOptions(options);\n                setReproductionPlayerCount(null);');
+    expect(screen).toContain('setCreateOptions(nextOptions);\n                setReproductionPlayerCount(null);');
     expect(screen).toContain('if (enabled) setReproductionPlayerCount(null);');
     expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
     expect(screen).toContain('value={seedSuffix}');
