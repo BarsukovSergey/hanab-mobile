@@ -1,8 +1,8 @@
 # Upstream parity audit
 
-Date: 2026-09-26
+Date: 2026-09-27
 
-Status: **planning snapshot reconciled with mobile `main` through PR #112; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #114; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `a89f209fc0335f9e46505da6cf47ec50726609ba` (PR #112 merge)
+- current `main`: `3a4639e62ea30f55152afa40543bb96edbf4c004` (PR #114 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -83,7 +83,7 @@ already present:
 - live rewind;
 - finished/solo replay;
 - shared-replay follow/detach/leader behavior;
-- Hypothetical play/discard/clue/back/reveal behavior;
+- Hypothetical play/discard/clue/back/reveal plus controller-only card morph/unmorph behavior;
 - spectator read-only gameplay;
 - history pagination and solo replay opening;
 - most browser-local slash-command transport;
@@ -97,7 +97,7 @@ The biggest remaining parity gaps are now concentrated in five areas:
 4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, reverse-hand preference, and other non-core presentation settings remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), variant-aware clue/discard resource-state cues (#108), server-backed gameplay presentation settings (#110), stronger friend visibility in People/Lobby (#111), and authoritative mute-state chat guarding (#112). Spectator perspective switching is also first-class in the live Game menu.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), variant-aware clue/discard resource-state cues (#108), server-backed gameplay presentation settings (#110), stronger friend visibility in People/Lobby (#111), authoritative mute-state chat guarding (#112), and first-class Hypothetical card morph/unmorph controls (#114). Spectator perspective switching is also first-class in the live Game menu.
 
 The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
@@ -125,6 +125,7 @@ Recently completed high-value parity work:
 - server-backed H-group features and Real-life mode presentation settings (#110).
 - friends-first People ordering plus visible friend emphasis in People and Lobby tables (#111).
 - authoritative mute-state retention and source-faithful local chat/PM guard (#112).
+- controller-only Hypothetical card morph/unmorph UI with persistent Edit cards mode (#114).
 
 The highest-value remaining items are:
 
@@ -132,7 +133,6 @@ The highest-value remaining items are:
 | --- | --- | --- | --- | --- |
 | Richer tag management/search/delete | Partial | S–M | Medium | Add/display UI is implemented; structured search/delete/list management remains. |
 | Arbitrary JSON replay import | Missing | M | Medium | Useful for research/bots; current upstream expanded JSON seed/deck/player-name semantics. |
-| Hypothetical morph UI | Wire/state-only | M | Medium | Reducers/rendering understand morph/unmorph, but mobile cannot originate one. |
 | `/copy` replay export | Missing | M | Medium | Browser-local upstream behavior needs a deliberate mobile export/share implementation. |
 | Rich player profile / arbitrary-player history | Partial | M–L | Medium | People/context actions exist; richer profile/history presentation does not. |
 | Chat typing/presentation polish | Partial | S–M | Low | Authoritative table unread/read state is implemented; typing, sounds and other presentation polish remain. |
@@ -505,11 +505,13 @@ Spectator shadowing is now exposed as a first-class live Game-menu action while 
 | Back/undo branch action | **Full** | — | High |
 | Reveal/hide drawn cards | **Full** | — | Medium |
 | Follow leader while branch active | **Full** | — | High |
-| Morph card to arbitrary identity | **Wire/state/rendering only** | M | Medium |
-| Unmorph | **Wire/state only** | M | Medium |
+| Morph card to arbitrary identity | **Full mobile workflow** | — | Medium |
+| Unmorph | **Full mobile workflow** | — | Medium |
 
-Mobile already parses/reduces/renders `morph` and `unmorph` actions received from upstream. The
-missing piece is an originating identity-picker/action for the shared-replay leader.
+PR #114 exposes the existing authoritative `morph` / `unmorph` semantics through an explicit
+controller-only `Edit cards` mode. Solo Hypothetical applies changes locally; shared replay leaders
+use the existing pending-operation / authoritative-echo path, followers cannot edit, turning Edit
+cards off preserves morphs, and `Original` unmorphs an individual card.
 
 ---
 
@@ -669,7 +671,7 @@ Current upstream server command map versus mobile:
 | `action` | Full supported gameplay | Play/Discard/Clue. |
 | `note` | Full | — |
 | `pause` | Full | Timed game pause/queue. |
-| `replayAction` | Full core | Segment/leader/hypo actions; morph UI not exposed. |
+| `replayAction` | Full core | Segment/leader/hypo actions including mobile morph/unmorph controls. |
 
 This table is the clearest evidence that many missing product features are **UI/state-selection
 work**, not new networking work.
@@ -812,7 +814,7 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Game History and Profiles | **Partial** | Own history exists; profiles, arbitrary-player/group history and richer stats are missing. |
 | Replays | **Partial** | Database-ID solo replay works. Shared creation, arbitrary JSON replay and copy/export are missing. |
 | Shared Replays | **Partial but strong core** | Leader/follow/detach/segment/Hypothetical core works; dynamic efficiency-mod synchronization is implemented, while annotations, suggestion receive-side and sound remain incomplete. |
-| Hypotheticals | **Full core / morph missing** | Start/end/play/discard/clue/back/reveal work; arbitrary card morph/unmorph cannot be originated from mobile. |
+| Hypotheticals | **Full mobile workflow** | Start/end/play/discard/clue/back/reveal plus controller-only arbitrary card morph/unmorph are exposed with authoritative shared-replay semantics. |
 | In-Game Statistics | **Full core stats / HUD polish pending** | Score/max/clues/strikes/deck and Pace/Eff context semantics are present; broader HUD hierarchy remains polish. |
 | 6-Player Games | **Partial presentation** | Upstream hand-size/rules state works; current dense mobile layout is not accepted 4P–6P UX. |
 | Custom Game Options | **Full for exposed supported subset** | Pregame create/edit and authoritative option preservation exist; unsupported rule families are rejected deliberately. |
@@ -969,11 +971,10 @@ jank (#4) as non-blocking defect backlog unless real usage reprioritizes it.
 
 1. Arbitrary JSON replay import.
 2. `/copy` export/share.
-3. Hypothetical morph picker.
-4. Richer user/profile and arbitrary-player history surfaces.
-5. Account-management / linked-account UX.
-6. Chat typing/presentation polish beyond the implemented table unread/read state.
-7. Remaining shared-replay arrows/annotations/sounds/leader controls.
+3. Richer user/profile and arbitrary-player history surfaces.
+4. Account-management / linked-account UX.
+5. Chat typing/presentation polish beyond the implemented table unread/read state.
+6. Remaining shared-replay arrows/annotations/sounds/leader controls.
 
 ## D. Defer until demanded
 
@@ -1009,7 +1010,7 @@ A useful way to describe current parity is:
 - timed play;
 - live rewind;
 - finished/solo/shared replay core;
-- Hypothetical core;
+- Hypothetical core including card morph/unmorph originating UI;
 - spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
 - generated upstream card presentation with colorblind/styled-number server settings plus server-backed H-group/Real-life presentation toggles;
