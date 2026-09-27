@@ -15,5 +15,12 @@ describe('createSpecificSeedTableName', () => {
 
   test('preserves suffix characters without validation or normalization', () => {
     expect(createSpecificSeedTableName('  bad suffix/!  ')).toBe('!seed bad suffix/!');
+    expect(createSpecificSeedTableName('AbC-123')).toBe('!seed AbC-123');
+  });
+
+  test('rejects an overlong suffix without truncating it into a different valid seed', () => {
+    const suffix = 'x'.repeat(40);
+    expect(createSpecificSeedTableName(suffix)).toBeNull();
+    expect(suffix).toBe('x'.repeat(40));
   });
 });

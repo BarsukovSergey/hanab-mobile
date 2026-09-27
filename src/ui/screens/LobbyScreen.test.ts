@@ -47,7 +47,15 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain("const [useSpecificSeed, setUseSpecificSeed] = useState(false);");
     expect(screen).toContain("const [seedSuffix, setSeedSuffix] = useState('');");
     expect(screen).toContain('title={useSpecificSeed ? \'Use specific seed: On\' : \'Use specific seed\'}');
-    expect(screen).toContain('placeholder="Seed suffix"');
+    const seedFieldStart = screen.lastIndexOf('<Field', screen.indexOf('placeholder="Seed suffix"'));
+    const seedFieldEnd = screen.indexOf('/>', screen.indexOf('placeholder="Seed suffix"')) + 2;
+    const seedField = screen.slice(seedFieldStart, seedFieldEnd);
+    expect(seedField).toContain('autoCapitalize="none"');
+    expect(seedField).toContain('autoCorrect={false}');
+    expect(seedField).toContain('spellCheck={false}');
+    expect(seedField).not.toContain('maxLength');
+    expect(screen).toContain('specificSeedTableName !== null');
+    expect(screen).toContain('disabled={attendancePending || !createNameIsValid}');
     expect(screen).toContain('placeholder={randomTableName ?? \'Table name\'} value={tableName}');
     expect(screen).toContain('actual player count and variant when the game starts.');
     expect(screen).toContain('disabled={attendancePending || !createNameIsValid}');

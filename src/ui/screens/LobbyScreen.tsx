@@ -239,7 +239,14 @@ export function LobbyScreen({
               />
               {useSpecificSeed ? (
                 <>
-                  <Field maxLength={39} onChangeText={setSeedSuffix} placeholder="Seed suffix" value={seedSuffix} />
+                  <Field
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    onChangeText={setSeedSuffix}
+                    placeholder="Seed suffix"
+                    spellCheck={false}
+                    value={seedSuffix}
+                  />
                   <Text style={{ color: theme.colors.textMuted }}>
                     hanab.live combines this suffix with the actual player count and variant when the game starts.
                   </Text>
