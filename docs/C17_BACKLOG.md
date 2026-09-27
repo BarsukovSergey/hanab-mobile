@@ -1,8 +1,8 @@
 # C17 Post-beta Backlog
 
-Date: 2026-09-26
+Date: 2026-09-27
 
-Last reconciled with `main` at `a89f209fc0335f9e46505da6cf47ec50726609ba` (PR #112 merge).
+Last reconciled with `main` at `3a4639e62ea30f55152afa40543bb96edbf4c004` (PR #114 merge).
 
 This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
@@ -74,7 +74,7 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Finished game and ordinary replay in the C17 workspace.
 - Shared review including follow/detach/leader semantics.
 - Shared replay creation from History and turn suggestions.
-- Hypothetical using upstream/server semantics.
+- Hypothetical using upstream/server semantics, including controller-only card morph/unmorph through the explicit Edit cards mode.
 - Live spectator C17 workspace.
 - Pregame player/spectator role switching where authoritative capability permits.
 - Spectator perspective switching between all hands and an authoritative player shadow seat.

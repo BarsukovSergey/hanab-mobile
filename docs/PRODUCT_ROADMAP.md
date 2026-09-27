@@ -1,6 +1,6 @@
 # Hanab Mobile product roadmap
 
-Date: 2026-09-26
+Date: 2026-09-27
 
 Status: **current sequencing authority for post-beta product work**
 
@@ -28,7 +28,7 @@ Hanab Mobile already has the difficult gameplay foundation:
 - pinned-upstream H-group and clue/discard resource-state presentation cues without changing action legality;
 - server-backed H-group features and Real-life mode gameplay-presentation settings;
 - notes, knowledge/empathy, Last Action / Recent and live Rewind;
-- finished replay, shared review, turn suggestions and Hypothetical;
+- finished replay, shared review, turn suggestions and Hypothetical including card morph/unmorph;
 - spectator mode with perspective switching;
 - History, Friends history, Other Scores and game tags;
 - People/Friend actions with friends-first visual emphasis, table chat, session PM Dialogs, direct `/r`, and authoritative mute-state guarding;
@@ -342,8 +342,9 @@ Candidates:
 - arbitrary JSON replay import;
 - deliberate mobile `/copy` / replay export/share flow;
 - richer replay-link sharing;
-- Hypothetical morph UI where authoritative semantics are already supported;
 - replay scrubber performance work if issue #4 remains material.
+
+Hypothetical card morph/unmorph controls landed in PR #114 and are no longer a remaining Phase 4 candidate.
 
 Treat import/export and annotations as a designed workflow, not a collection of raw command ports.
 
