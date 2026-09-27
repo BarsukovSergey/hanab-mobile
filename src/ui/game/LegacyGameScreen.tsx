@@ -64,6 +64,7 @@ export function GameScreen() {
   const { wide, width, height } = useResponsiveLayout();
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
+  const showTimerInUntimed = useAppSelector((state) => state.session.showTimerInUntimed);
   const reverseHands = useAppSelector((state) => state.session.cardPresentationSettings.reverseHands);
   const roomState = useAppSelector((state) => state.room);
   const lobbyUsers = useAppSelector((state) => state.lobby.users.entities);
@@ -135,7 +136,8 @@ export function GameScreen() {
 
   if (liveRoom === null || clientState === null || game === null) return null;
   const { metadata, replay, ongoingGame } = clientState;
-  const timed = metadata.options.timed === true && !clientState.finished
+  const timed = metadata.options.timed === true;
+  const showClock = (timed || showTimerInUntimed) && !clientState.finished
     && !replay.active && ongoingGame.turn.currentPlayerIndex !== null && !liveRoom.sharedReplay;
   const latest = ongoingGame.turn.segment ?? 0;
   const segment = replay.active ? replay.segment : latest;
@@ -457,7 +459,7 @@ export function GameScreen() {
           <View style={styles.handHeader}>
             <Text style={[styles.handTitle, { color: theme.colors.text }]}>Your hand</Text>
             <View style={styles.buttons}>
-              {timed && liveRoom.clock !== null && <LiveClockText clock={liveRoom.clock} paused={clientState.pause.active} playerIndex={metadata.ourPlayerIndex} />}
+              {showClock && liveRoom.clock !== null && <LiveClockText clock={liveRoom.clock} paused={clientState.pause.active} playerIndex={metadata.ourPlayerIndex} timed={timed} />}
               <Pill>{presence(liveRoom.connected?.[metadata.ourPlayerIndex], Object.values(lobbyUsers).find((user) => user?.name === metadata.playerNames[metadata.ourPlayerIndex])?.inactive ?? false)}</Pill>
             </View>
           </View>
@@ -517,7 +519,7 @@ export function GameScreen() {
                   <Text style={[styles.presence, { color: theme.colors.textMuted }]}>{presence(liveRoom.connected?.[i], Object.values(lobbyUsers).find((user) => user?.name === metadata.playerNames[i])?.inactive ?? false)}</Text>
                 </View>
                 <View style={styles.buttons}>
-                  {timed && liveRoom.clock !== null && <LiveClockText clock={liveRoom.clock} paused={clientState.pause.active} playerIndex={i} />}
+                  {showClock && liveRoom.clock !== null && <LiveClockText clock={liveRoom.clock} paused={clientState.pause.active} playerIndex={i} timed={timed} />}
                   {empathizing && <Pill active>Empathy</Pill>}
                   {target && !empathizing && <Pill active>Clue</Pill>}
                 </View>
@@ -994,7 +996,7 @@ function formatEfficiency(value: number | null): string {
   return value === null ? '-' : value.toFixed(2);
 }
 
-function LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; playerIndex: number; paused: boolean }) {
+function LiveClockText({ clock, playerIndex, paused, timed }: { clock: LiveClock; playerIndex: number; paused: boolean; timed: boolean }) {
   const { theme } = useHanabTheme();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -1003,7 +1005,7 @@ function LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; playe
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [clock.receivedAtMs, paused, playerIndex]);
-  const display = getDisplayedClockString(clock, playerIndex, paused, now);
+  const display = getDisplayedClockString(clock, playerIndex, paused, now, timed);
   if (display === null) return null;
   return <Text style={[styles.clock, { color: theme.colors.text }]}>{display}</Text>;
 }

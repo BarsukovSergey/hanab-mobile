@@ -2797,15 +2797,20 @@ describe('deterministic lobby runtime', () => {
 
     expect(runtime.setGameplayPresentationSetting('realLifeMode', true)).toBe(true);
     expect(runtime.setGameplayPresentationSetting('hyphenatedConventions', true)).toBe(true);
+    expect(runtime.setGameplayPresentationSetting('showTimerInUntimed', true)).toBe(true);
     expect(socket.sent).toEqual([
       'setting {"name":"realLifeMode","setting":"true"}',
       'setting {"name":"hyphenatedConventions","setting":"true"}',
+      'setting {"name":"showTimerInUntimed","setting":"true"}',
     ]);
     expect(store.getState().session.realLifeMode).toBe(true);
     expect(store.getState().session.hyphenatedConventions).toBe(true);
+    expect(store.getState().session.showTimerInUntimed).toBe(true);
 
     expect(runtime.setGameplayPresentationSetting('realLifeMode', true)).toBe(true);
-    expect(socket.sent).toHaveLength(2);
+    expect(socket.sent).toHaveLength(3);
+    expect(runtime.setGameplayPresentationSetting('showTimerInUntimed', true)).toBe(true);
+    expect(socket.sent).toHaveLength(3);
   });
 
   test('gameplay presentation setting send failure leaves local state unchanged', async () => {
@@ -2815,6 +2820,8 @@ describe('deterministic lobby runtime', () => {
     expect(runtime.setGameplayPresentationSetting('hyphenatedConventions', true)).toBe(false);
     expect(socket.sent).toEqual([]);
     expect(store.getState().session.hyphenatedConventions).toBe(false);
+    expect(runtime.setGameplayPresentationSetting('showTimerInUntimed', true)).toBe(false);
+    expect(store.getState().session.showTimerInUntimed).toBe(false);
   });
 
   test('gameplay presentation settings require a ready connection', async () => {

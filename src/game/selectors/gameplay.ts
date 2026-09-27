@@ -26,11 +26,14 @@ export function getDisplayedClockTime(
   playerIndex: number,
   paused: boolean,
   nowMs: number,
+  timed: boolean,
 ): number | null {
   const serverTime = clock.times[playerIndex];
   if (serverTime === undefined) return null;
-  if (paused || playerIndex !== clock.activePlayerIndex) return serverTime;
-  return Math.max(0, serverTime - Math.max(0, nowMs - clock.receivedAtMs));
+  const rawTime = paused || playerIndex !== clock.activePlayerIndex
+    ? serverTime
+    : serverTime - Math.max(0, nowMs - clock.receivedAtMs);
+  return timed ? Math.max(0, rawTime) : Math.max(0, -rawTime);
 }
 
 export function getDisplayedClockString(
@@ -38,8 +41,9 @@ export function getDisplayedClockString(
   playerIndex: number,
   paused: boolean,
   nowMs: number,
+  timed: boolean,
 ): string | null {
-  const time = getDisplayedClockTime(clock, playerIndex, paused, nowMs);
+  const time = getDisplayedClockTime(clock, playerIndex, paused, nowMs, timed);
   return time === null ? null : millisecondsToClockString(time);
 }
 

@@ -32,6 +32,14 @@ test('card appearance toggles use Redux values and the typed lobby runtime sette
   expect(settings).not.toContain('disabled={presentation.colorblindMode}');
 });
 
+test('untimed timer switch uses the Redux setting and typed gameplay setter', () => {
+  const settings = read('src/ui/screens/SettingsScreen.tsx');
+  expect(settings).toContain('state.session.showTimerInUntimed');
+  expect(settings).toContain('Show turn timers in untimed games');
+  expect(settings).toContain("lobbyRuntime.setGameplayPresentationSetting('showTimerInUntimed', enabled)");
+  expect(settings).toContain('value={showTimerInUntimed}');
+});
+
 test('sign out is confirmed from Settings and both App entry paths use App signOut', () => {
   const app = read('App.tsx');
   const settings = read('src/ui/screens/SettingsScreen.tsx');

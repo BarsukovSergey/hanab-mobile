@@ -59,6 +59,7 @@ export type SessionState = {
   cardPresentationSettings: CardPresentationSettings;
   realLifeMode: boolean;
   hyphenatedConventions: boolean;
+  showTimerInUntimed: boolean;
   createTablePreferences: CreateTablePreferences;
   serverStatus: { shuttingDown: boolean; datetimeShutdownInit: string | null; maintenanceMode: boolean };
   friends: string[];
@@ -89,6 +90,7 @@ const initialState: SessionState = {
   },
   realLifeMode: false,
   hyphenatedConventions: false,
+  showTimerInUntimed: false,
   createTablePreferences: { ...DEFAULT_CREATE_TABLE_PREFERENCES },
   serverStatus: { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false },
   friends: [],
@@ -116,6 +118,7 @@ export const sessionSlice = createSlice({
       state.muted = false;
       state.realLifeMode = false;
       state.hyphenatedConventions = false;
+      state.showTimerInUntimed = false;
       state.serverStatus = { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false };
       state.friends = [];
       state.randomTableName = null;
@@ -153,6 +156,7 @@ export const sessionSlice = createSlice({
       state.muted = welcome.muted ?? false;
       state.realLifeMode = welcome.settings?.realLifeMode ?? false;
       state.hyphenatedConventions = welcome.settings?.hyphenatedConventions ?? false;
+      state.showTimerInUntimed = welcome.settings?.showTimerInUntimed ?? false;
       state.createTablePreferences = normalizeCreateTablePreferences(welcome.settings);
       state.friends = [...(welcome.friends ?? [])];
       state.randomTableName = welcome.randomTableName ?? null;

@@ -19,6 +19,7 @@ describe('session card presentation settings', () => {
     const store = createAppStore();
     expect(store.getState().session.realLifeMode).toBe(false);
     expect(store.getState().session.hyphenatedConventions).toBe(false);
+    expect(store.getState().session.showTimerInUntimed).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,
@@ -41,15 +42,17 @@ describe('session card presentation settings', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 1,
-      welcome: welcome({ colorblindMode: true, styleNumbers: false, reverseHands: true, realLifeMode: true, hyphenatedConventions: true }),
+      welcome: welcome({ colorblindMode: true, styleNumbers: false, reverseHands: true, realLifeMode: true, hyphenatedConventions: true, showTimerInUntimed: true }),
     }));
 
     expect(store.getState().session.realLifeMode).toBe(true);
     expect(store.getState().session.hyphenatedConventions).toBe(true);
+    expect(store.getState().session.showTimerInUntimed).toBe(true);
 
     store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
     expect(store.getState().session.realLifeMode).toBe(false);
     expect(store.getState().session.hyphenatedConventions).toBe(false);
+    expect(store.getState().session.showTimerInUntimed).toBe(false);
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: true,
       styleNumbers: false,

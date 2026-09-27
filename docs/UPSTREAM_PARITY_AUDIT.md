@@ -404,9 +404,9 @@ settings remain intentionally unelevated until they have a useful mobile workflo
 | `keldonMode` | Missing | L | Low | Mobile layout should not chase desktop table geometry unless requested. |
 | `colorblindMode` | **Full** | — | **High** | Server-backed switch with generated pinned-upstream card presentation. |
 | `realLifeMode` | **Full** | — | Low | PR #110 exposes the server-backed switch; #107/#108 presentation cues honor it. |
+| `showTimerInUntimed` | **Full** | — | Low | Server-backed setting; ordinary untimed clocks retain authoritative negative player times and display cumulative time taken, counting up locally for the active player. |
 | `reverseHands` | **Full** | — | Medium | Server-backed switch flips every displayed hand direction while preserving authoritative card order. |
 | `styleNumbers` | **Full** | — | **High** | Server-backed switch with generated pinned-upstream styled-number assets. |
-| `showTimerInUntimed` | Missing | S | Low | Optional. |
 | `speedrunPreplay` | Missing + speedrun unsupported | L | Low | Defer. |
 | `speedrunMode` | Missing + speedrun unsupported | L | Low | Defer. |
 | `hyphenatedConventions` | **Full for mobile presentation** | — | Medium | PR #110 exposes the server-backed H-group features switch and C17 consumes the authoritative welcome/session setting for presentation. |

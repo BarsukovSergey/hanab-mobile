@@ -512,6 +512,26 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(room.clock).toBeNull();
   });
 
+  test('stores authoritative untimed clock values unchanged through the runtime path', async () => {
+    jest.setSystemTime(1_000);
+    const { socket, store } = await makeLive();
+
+    socket.emitMessage(
+      'clock {"tableID":123,"times":[-12000,-9000],"activePlayerIndex":0,"timeTaken":12000}',
+    );
+
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(room.clientState.metadata.options.timed).toBe(false);
+    expect(room.clock).toEqual({
+      times: [-12_000, -9_000],
+      activePlayerIndex: 0,
+      timeTaken: 12_000,
+      receivedAtMs: 1_000,
+    });
+    expect(store.getState().session.showTimerInUntimed).toBe(false);
+  });
+
   test('accepted turn clears the old clock', async () => {
     const { socket, store } = await makeLive('player', { timed: true });
     socket.emitMessage(

@@ -404,7 +404,6 @@ export class GameBootstrapCoordinator {
       || room.sharedReplay
       || room.clientState.finished
       || room.clientState.ongoingGame.turn.currentPlayerIndex === null
-      || !room.clientState.metadata.options.timed
       || room.clientState.pause.active
       || event.times.length !== room.clientState.metadata.options.numPlayers
       || event.activePlayerIndex < 0
