@@ -31,6 +31,27 @@ describe('History screen source contract', () => {
     expect(screen).toContain("mode: friends && session.friends.length > 0 ? 'friends' : 'mine'");
     expect(screen).toContain('lobbyRuntime.dismissOtherScores()');
   });
+  test('renders authoritative seed and turn count on every card source through one card path', () => {
+    expect(screen).toContain('(comparing ? history.otherScores?.games ?? [] : items).map((item) => {');
+    expect(screen).toContain('history.friendItems');
+    expect(screen).toContain('history.tagSearchItems ?? [] : history.taggedItems');
+    expect(screen).toContain('`Seed ${item.seed}` : \'Seed unavailable\'');
+    expect(screen).toContain('{item.numTurns} turns');
+    expect(screen).toContain('copyHistorySeed(item.seed, clipboardActions)');
+    expect(screen).toContain('title="Copy seed"');
+    expect(screen).toContain("item.seed !== '' && <ActionButton");
+    expect(screen).not.toMatch(/item\.seed\.trim\(|normalizeSeed/);
+  });
+
+  test('keeps seed copy feedback local and reports both clipboard outcomes', () => {
+    expect(screen).toContain('useState<{ itemID: number; message: string } | null>(null)');
+    expect(screen).toContain("copied ? 'Seed copied.' : 'Could not copy seed.'");
+    expect(screen).toContain('seedCopyFeedback?.itemID === item.id');
+    expect(screen).toContain('setSeedCopyFeedback(null)');
+    expect(screen).not.toContain('historyActions');
+    expect(screen).not.toContain('dispatch(');
+  });
+
   test('offers Friends history only for authoritative friends and uses its independent pages', () => {
     expect(screen).toContain('session.friends.length > 0');
     expect(screen).toContain('title="My history"');

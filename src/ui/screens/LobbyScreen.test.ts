@@ -94,5 +94,6 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('That running table is not currently available to open.');
     expect(screen).toContain('Clipboard is empty.');
     expect(screen).toContain('Could not read the clipboard.');
+    expect(screen).toContain('clipboard.readClipboard()');
   });
 });

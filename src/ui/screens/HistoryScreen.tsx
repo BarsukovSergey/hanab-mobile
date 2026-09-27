@@ -4,6 +4,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
 import { parseReplayInput, type ReplayInputResult } from '../../game/client/replayInput';
 import { replayInputActions, type ReplayInputActions } from '../../platform/replayInputActions';
+import { copyHistorySeed } from '../historySeedCopy';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import {
@@ -48,6 +49,7 @@ export function HistoryScreen({
   const [replayJSONText, setReplayJSONText] = useState('');
   const [replayVisibility, setReplayVisibility] = useState<'solo' | 'shared'>('solo');
   const [replayJSONError, setReplayJSONError] = useState<string | null>(null);
+  const [seedCopyFeedback, setSeedCopyFeedback] = useState<{ itemID: number; message: string } | null>(null);
   useEffect(() => {
     if (
       session.friends.length === 0
@@ -99,14 +101,15 @@ export function HistoryScreen({
       {!comparing && (
         <View style={styles.switcher}>
           <ActionButton compact title="My history" tone={mode === 'mine' ? 'primary' : 'secondary'}
-            onPress={() => setSelection({ epoch: session.connectionEpoch, mode: 'mine' })} />
+            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'mine' }); setSeedCopyFeedback(null); }} />
           {session.friends.length > 0 && <ActionButton compact title="Friends history" tone={showingFriends ? 'primary' : 'secondary'}
             onPress={() => {
               setSelection({ epoch: session.connectionEpoch, mode: 'friends' });
+              setSeedCopyFeedback(null);
               lobbyRuntime.ensureFriendsHistory();
             }} />}
           <ActionButton compact title="Tagged games" tone={showingTagged ? 'primary' : 'secondary'}
-            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'tagged' }); lobbyRuntime.ensureTaggedGames(); }} />
+            onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'tagged' }); setSeedCopyFeedback(null); lobbyRuntime.ensureTaggedGames(); }} />
         </View>
       )}
 
@@ -190,6 +193,22 @@ export function HistoryScreen({
                 && <Pill active>Your game</Pill>}
               <Text style={[styles.players, { color: theme.colors.text }]}>{item.playerNames.join(', ')}</Text>
               <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{finishedLabel}</Text>
+              <View style={styles.seedMetadata}>
+                <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
+                  {item.seed !== '' ? `Seed ${item.seed}` : 'Seed unavailable'} · {item.numTurns} turns
+                </Text>
+                {item.seed !== '' && <ActionButton compact title="Copy seed" tone="secondary" onPress={() => {
+                  setSeedCopyFeedback(null);
+                  void copyHistorySeed(item.seed, clipboardActions).then((copied) => {
+                    setSeedCopyFeedback({
+                      itemID: item.id,
+                      message: copied ? 'Seed copied.' : 'Could not copy seed.',
+                    });
+                  });
+                }} />}
+              </View>
+              {seedCopyFeedback?.itemID === item.id
+                && <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{seedCopyFeedback.message}</Text>}
               <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{END_CONDITIONS[item.endCondition]}</Text>
               {item.tags !== '' && <Text style={[styles.tags, { color: theme.colors.textMuted }]}>{item.tags}</Text>}
               {!supported && <Notice tone="error">This game uses unsupported options.</Notice>}
@@ -211,7 +230,7 @@ export function HistoryScreen({
                 disabled={otherCount === 0 || history.pendingOtherScores !== null}
                 title={`Other scores · ${otherCount}`}
                 tone="secondary"
-                onPress={() => lobbyRuntime.loadOtherScores(item.id, showingFriends)}
+                onPress={() => { setSeedCopyFeedback(null); lobbyRuntime.loadOtherScores(item.id, showingFriends); }}
               />}
             </Panel>
           );
@@ -250,5 +269,6 @@ const styles = StyleSheet.create({
   variant: { fontSize: 13 },
   players: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   meta: { fontSize: 12, lineHeight: 17 },
+  seedMetadata: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tags: { fontSize: 12, lineHeight: 16 },
 });
