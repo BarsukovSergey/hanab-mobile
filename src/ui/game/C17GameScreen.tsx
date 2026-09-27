@@ -566,7 +566,6 @@ export function C17GameScreen() {
       onUnmorph={() => {
         if (morphOrder !== null && lobbyRuntime.hypotheticalUnmorph(morphOrder)) setMorphOrder(null);
       }}
-      position={morphOrder === null ? 1 : (actionHand.findIndex((order) => order === morphOrder) + 1 || 1)}
       variantName={metadata.options.variantName}
       visible={morphOrder !== null && editHypotheticalCards && canHypotheticalControl && !hypotheticalOperationPending}
     />

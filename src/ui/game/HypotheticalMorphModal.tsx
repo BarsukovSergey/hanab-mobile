@@ -5,10 +5,9 @@ import { VisibleHanabiCard } from './GameCard';
 import { useHanabTheme } from '../designSystem';
 
 export function HypotheticalMorphModal({
-  visible, position, variantName, choices, current, onChoose, onUnmorph, onClose,
+  visible, variantName, choices, current, onChoose, onUnmorph, onClose,
 }: {
   visible: boolean;
-  position: number;
   variantName: string;
   choices: readonly HypotheticalMorphChoice[];
   current: CardIdentity | undefined;
@@ -19,18 +18,24 @@ export function HypotheticalMorphModal({
   const { theme } = useHanabTheme();
   return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
     <View style={styles.backdrop}>
-      <View accessibilityLabel={`Edit hypothetical card ${position}`} accessibilityRole="none" style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderStrong }]}>
+      <View accessibilityLabel="Hypothetical card morph picker" accessibilityRole="none" style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderStrong }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Card {position}</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Morph</Text>
           <Pressable accessibilityLabel="Close card identity picker" accessibilityRole="button" onPress={onClose} hitSlop={10}>
             <Text style={[styles.close, { color: theme.colors.text }]}>×</Text>
           </Pressable>
         </View>
         <View style={styles.actions}>
-          <Pressable accessibilityLabel="Restore original card identity" accessibilityRole="button" onPress={onUnmorph} style={[styles.original, { borderColor: theme.colors.borderStrong }]}>
+          <Pressable
+            accessibilityLabel="Original card identity"
+            accessibilityRole="button"
+            accessibilityState={{ selected: current === undefined }}
+            onPress={onUnmorph}
+            style={[styles.original, { borderColor: current === undefined ? theme.colors.accent : theme.colors.border, borderWidth: 2 }]}
+          >
             <Text style={{ color: theme.colors.text }}>Original</Text>
           </Pressable>
-          <Text style={[styles.hint, { color: theme.colors.textMuted }]}>{current ? 'Current explicit morph selected' : 'Choose a card identity'}</Text>
+          <Text style={[styles.hint, { color: theme.colors.textMuted }]}>Select the card you want to morph it into.</Text>
         </View>
         <ScrollView contentContainerStyle={styles.grid}>
           {choices.map((identity) => {
@@ -43,7 +48,7 @@ export function HypotheticalMorphModal({
               onPress={() => onChoose(identity)}
               style={[styles.choice, { borderColor: selected ? theme.colors.accent : theme.colors.border }]}
             >
-              <VisibleHanabiCard height={64} position={position} rank={identity.rank} selected={selected} size="mini" suitIndex={identity.suitIndex} variantName={variantName} />
+              <VisibleHanabiCard height={64} rank={identity.rank} selected={selected} size="mini" suitIndex={identity.suitIndex} variantName={variantName} />
             </Pressable>;
           })}
         </ScrollView>
