@@ -2074,6 +2074,7 @@ describe('deterministic lobby runtime', () => {
       role: 'player',
       replay: false,
       expectedDatabaseID: null,
+      expectedReplaySource: null, expectedReplayVisibility: null,
       bootstrap: { phase: 'waiting_init' },
     });
     expect(socket.sent.at(-1)).toBe('getGameInfo1 {"tableID":456}');
@@ -2734,6 +2735,7 @@ describe('deterministic lobby runtime', () => {
         role: 'spectator',
         replay: false,
         expectedDatabaseID: null,
+      expectedReplaySource: null, expectedReplayVisibility: null,
         tableStartReceived: true,
         bootstrap: {
           gameLoadEpoch: 1,
@@ -3676,6 +3678,7 @@ describe('deterministic lobby runtime', () => {
       role: 'player',
       replay: false,
       expectedDatabaseID: null,
+      expectedReplaySource: null, expectedReplayVisibility: null,
       tableStartReceived: true,
       bootstrap: {
         gameLoadEpoch: 1,
@@ -3713,6 +3716,7 @@ describe('deterministic lobby runtime', () => {
       role: 'player',
       replay: false,
       expectedDatabaseID: null,
+      expectedReplaySource: null, expectedReplayVisibility: null,
       bootstrap: {
         gameLoadEpoch: 1,
         phase: 'waiting_init',
@@ -3752,6 +3756,7 @@ describe('deterministic lobby runtime', () => {
       role: 'player',
       replay: false,
       expectedDatabaseID: null,
+      expectedReplaySource: null, expectedReplayVisibility: null,
       tableStartReceived: true,
       bootstrap: {
         gameLoadEpoch: 1,
@@ -4227,6 +4232,68 @@ describe('deterministic lobby runtime', () => {
     });
     expect(runtime.unattendLiveGame(9001)).toBe(true);
     expect(socket.sent.at(-1)).toBe('tableUnattend {"tableID":9001}');
+  });
+
+  test('shared History replay accepts authoritative shared bootstrap', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.emitMessage(`gameHistory ${JSON.stringify([historicalGame(78)])}`);
+    expect(runtime.watchHistoricalGame(78, 'shared')).toBe(true);
+    socket.emitMessage('tableStart {"tableID":9003,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      tableID: 9003, replay: true, sharedReplay: true, spectating: false,
+      databaseID: 78, datetimeFinished: '2026-09-01T00:10:00Z',
+    }))}`);
+    socket.emitMessage('gameActionList {"tableID":9003,"list":[]}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', tableID: 9003, sharedReplay: true,
+      clientState: { replay: { active: true, shared: expect.anything() } },
+    });
+    expect(socket.sent).not.toContain('tableUnattend {"tableID":9003}');
+  });
+
+  test('JSON replay keeps payload out of Redux and bootstraps database zero', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const imported = { seed: 'p2v0s1', players: ['Ada', 'Bob'], actions: [] };
+    expect(runtime.watchJSONReplay(imported, 'solo')).toBe(true);
+    expect(socket.sent[0]).toBe(`replayCreate ${JSON.stringify({ source: 'json', gameJSON: imported, visibility: 'solo' })}`);
+    expect(JSON.stringify(store.getState())).not.toContain('p2v0s1');
+    socket.emitMessage('tableStart {"tableID":9004,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({ tableID: 9004, replay: true, databaseID: 0 }))}`);
+    socket.emitMessage('gameActionList {"tableID":9004,"list":[]}');
+    expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 9004, sharedReplay: false });
+  });
+
+  test('JSON shared replay requires matching visibility and reaches live shared replay', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.watchJSONReplay({ actions: [] }, 'shared')).toBe(true);
+    socket.emitMessage('tableStart {"tableID":9005,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      tableID: 9005, replay: true, sharedReplay: true, databaseID: 0,
+    }))}`);
+    socket.emitMessage('gameActionList {"tableID":9005,"list":[]}');
+    expect(store.getState().room.room).toMatchObject({ kind: 'live_game', tableID: 9005, sharedReplay: true });
+  });
+
+  test('JSON replay visibility mismatch fails closed', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.watchJSONReplay({ actions: [] }, 'solo')).toBe(true);
+    socket.emitMessage('tableStart {"tableID":9006,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      tableID: 9006, replay: true, sharedReplay: true, databaseID: 0,
+    }))}`);
+    expect(socket.sent.at(-1)).toBe('tableUnattend {"tableID":9006}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('server warning clears pending JSON replay request', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.watchJSONReplay({ actions: [] }, 'shared')).toBe(true);
+    expect(store.getState().history.pendingReplayCreate?.source).toBe('json');
+    socket.emitMessage('warning {"warning":"Invalid replay JSON"}');
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+    expect(runtime.watchJSONReplay({ actions: [] }, 'solo')).toBe(true);
+    socket.emitMessage('error {"error":"Invalid replay JSON"}');
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
   });
 
   test('Watch rejects unsupported or conflicting history and mismatched init fails closed', async () => {

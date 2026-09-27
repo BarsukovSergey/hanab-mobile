@@ -443,11 +443,10 @@ export const hypoShowDrawnCardsSchema = z.object({
   tableID: idSchema, showDrawnCards: z.boolean(),
 }).strict();
 
-export const replayCreateCommandSchema = z.object({
-  source: z.literal('id'),
-  databaseID: z.number().int().positive(),
-  visibility: z.enum(['solo', 'shared']),
-}).strict();
+export const replayCreateCommandSchema = z.discriminatedUnion('source', [
+  z.object({ source: z.literal('id'), databaseID: z.number().int().positive(), visibility: z.enum(['solo', 'shared']) }).strict(),
+  z.object({ source: z.literal('json'), gameJSON: z.record(z.string(), z.unknown()), visibility: z.enum(['solo', 'shared']) }).strict(),
+]);
 
 const gameplayPresentationSettingCommandSchema = z.object({
   name: gameplayPresentationSettingNameSchema,
@@ -765,4 +764,8 @@ export function encodeReplayCreateFrame(databaseID: number, visibility: 'solo' |
   return encodeClientFrame('replayCreate', replayCreateCommandSchema.parse({
     source: 'id', databaseID, visibility,
   }));
+}
+
+export function encodeJSONReplayCreateFrame(gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared'): string {
+  return encodeClientFrame('replayCreate', replayCreateCommandSchema.parse({ source: 'json', gameJSON, visibility }));
 }
