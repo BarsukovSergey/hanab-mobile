@@ -10,7 +10,10 @@ export function extractCanonicalHistorySeedSuffix(
   if (!seed.startsWith(prefix)) return null;
 
   const suffix = seed.slice(prefix.length);
-  return suffix.length > 0 && createSpecificSeedTableName(suffix) !== null ? suffix : null;
+  return suffix.length > 0
+    && /^[A-Za-z0-9-]+$/.test(suffix)
+    && createSpecificSeedTableName(suffix) !== null
+    ? suffix : null;
 }
 
 export function createSpecificSeedTableName(seedSuffix: string): string | null {

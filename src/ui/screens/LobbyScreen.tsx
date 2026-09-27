@@ -254,14 +254,20 @@ export function LobbyScreen({
               <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
               <ActionButton
                 title={useSpecificSeed ? 'Use specific seed: On' : 'Use specific seed'}
-                onPress={() => setUseSpecificSeed((enabled) => !enabled)}
+                onPress={() => setUseSpecificSeed((enabled) => {
+                  if (enabled) setReproductionPlayerCount(null);
+                  return !enabled;
+                })}
               />
               {useSpecificSeed ? (
                 <>
                   <Field
                     autoCapitalize="none"
                     autoCorrect={false}
-                    onChangeText={setSeedSuffix}
+                    onChangeText={(value) => {
+                      setSeedSuffix(value);
+                      setReproductionPlayerCount(null);
+                    }}
                     placeholder="Seed suffix"
                     spellCheck={false}
                     value={seedSuffix}
@@ -295,7 +301,11 @@ export function LobbyScreen({
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                         hitSlop={6}
-                        onPress={() => { setMaxPlayers(value); setSelectedBots((names) => names.slice(0, value - 1)); }}
+                        onPress={() => {
+                          setMaxPlayers(value);
+                          setReproductionPlayerCount(null);
+                          setSelectedBots((names) => names.slice(0, value - 1));
+                        }}
                         style={[
                           styles.playerOption,
                           {
@@ -316,7 +326,10 @@ export function LobbyScreen({
                 onPress={() => setShowBotPicker(!showBotPicker)} />
               {showBotPicker && <BotPicker selected={selectedBots} onChange={setSelectedBots}
                 limit={maxPlayers - 1} users={users} protectedTable={tablePassword.length > 0} />}
-              <TableOptionsEditor options={createOptions} onChange={setCreateOptions} />
+              <TableOptionsEditor options={createOptions} onChange={(options) => {
+                setCreateOptions(options);
+                setReproductionPlayerCount(null);
+              }} />
               <ActionButton
                 disabled={attendancePending || !createNameIsValid}
                 title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}

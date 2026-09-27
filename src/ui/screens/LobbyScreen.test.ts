@@ -53,10 +53,22 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('setMaxPlayers(specificSeedCreatePrefill.maxPlayers);');
     expect(screen).toContain('setCreateOptions(specificSeedCreatePrefill.createOptions);');
     expect(screen).toContain('onSpecificSeedCreatePrefillConsumed();');
+    expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
     expect(screen).toContain('To reproduce this deal, start with exactly {reproductionPlayerCount} players and keep this variant.');
     expect(screen).toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)');
     expect(screen).not.toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots);');
     expect(app).not.toContain('dispatch(specificSeedCreatePrefill');
+  });
+
+  test('manual reproduction edits clear only the History hint and a later prefill restores it', () => {
+    expect(screen).toContain('setSeedSuffix(value);\n                      setReproductionPlayerCount(null);');
+    expect(screen).toContain('setMaxPlayers(value);\n                          setReproductionPlayerCount(null);');
+    expect(screen).toContain('setCreateOptions(options);\n                setReproductionPlayerCount(null);');
+    expect(screen).toContain('if (enabled) setReproductionPlayerCount(null);');
+    expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
+    expect(screen).toContain('value={seedSuffix}');
+    expect(screen).toContain('options={createOptions} onChange={(options) => {');
+    expect(screen).toContain('maxPlayers === value');
   });
 
   test('keeps ordinary and seed drafts local and exposes only the active name field', () => {
