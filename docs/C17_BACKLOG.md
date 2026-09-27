@@ -53,7 +53,7 @@ These items were explicitly removed from the C17 release gate during product rev
 
 - **Advanced shared-replay parity:** shared replay creation from History and send/receive turn suggestions are implemented. Remaining power-user candidates include replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. Initial `sharedReplayEffMod` state and authoritative follower-side `replayEfficiencyMod` updates are supported; controls for originating modifier changes remain future work. Do not rebuild the semantic state separately in UI.
 - **Game/replay tag management beyond current Add/display UI:** History/Friends History/Other Scores can display authoritative tags and the Game menu exposes Add tag through the existing server command path. Research whether tag search/delete or richer management deserves first-class mobile UI. This is distinct from note quick tags.
-- **`/copy` replay export:** implement the deliberately deferred replay-copy flow, including the required replay JSON/clipboard mechanics, without changing existing server-handled slash-command fallback behavior.
+- **Replay-link opening/import:** extend the existing raw JSON importer to understand ordinary `replay/<databaseID>` / `shared-replay/<databaseID>` URLs and compressed `replay-json` / `shared-replay-json` URLs through the existing authoritative replay-create paths. Verified OS-level App Links remain a separate future integration requiring stable signing/upstream cooperation.
 - **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
 
 ## Release / packaging / maintenance
@@ -73,6 +73,7 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Finished game and ordinary replay in the C17 workspace.
 - Shared review including follow/detach/leader semantics.
 - Shared replay creation from History and turn suggestions.
+- Finished-review `/copy` export/share, including Copy link, Share link, Copy JSON, selected-segment export, and Hypothetical continuation/morph semantics.
 - Hypothetical using upstream/server semantics, including controller-only card morph/unmorph through the explicit Edit cards mode.
 - Live spectator C17 workspace.
 - Pregame player/spectator role switching where authoritative capability permits.
