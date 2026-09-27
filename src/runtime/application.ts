@@ -25,6 +25,8 @@ const gameplayCommandGate = createRuntimeCommandGate(rawLobbyRuntime, [
   'toggleHypotheticalDrawnCards',
   'hypotheticalPlay',
   'hypotheticalDiscard',
+  'hypotheticalMorph',
+  'hypotheticalUnmorph',
   'hypotheticalColorClue',
   'hypotheticalRankClue',
 ]);

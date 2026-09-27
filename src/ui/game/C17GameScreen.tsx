@@ -66,8 +66,10 @@ import {
 } from './gameplayInteraction';
 import { getDisplayedHandOrders } from './gamePresentation';
 import { getHGroupStatusPresentation } from '../../game/selectors/hGroupStatusPresentation';
+import { getHypotheticalMorphChoices } from '../../game/selectors/hypotheticalMorph';
 import { getLiveNoteOrders } from './liveNoteOrders';
 import { getCommittedClueMarkerForMetadata, getPreviewClueMarker } from './clueIndication';
+import { HypotheticalMorphModal } from './HypotheticalMorphModal';
 
 type C17ReviewSelection = {
   actionSegment: number;
@@ -127,6 +129,8 @@ export function C17GameScreen() {
   const [discardViewerOpen, setDiscardViewerOpen] = useState(false);
   const [note, setNote] = useState('');
   const [noteWarning, setNoteWarning] = useState<string | null>(null);
+  const [editHypotheticalCards, setEditHypotheticalCards] = useState(false);
+  const [morphOrder, setMorphOrder] = useState<number | null>(null);
   const [c17Review, setC17Review] = useState<C17ReviewSelection | null>(null);
   const longPressedOpponent = useRef<number | null>(null);
 
@@ -163,6 +167,15 @@ export function C17GameScreen() {
   }, [hypotheticalActive, hypothetical?.ongoing.turn.currentPlayerIndex, hypothetical?.ongoing.turn.segment]);
 
   useEffect(() => {
+    if (!canHypotheticalControl) {
+      setEditHypotheticalCards(false);
+      setMorphOrder(null);
+    } else if (hypotheticalOperationPending) {
+      setMorphOrder(null);
+    }
+  }, [canHypotheticalControl, hypotheticalOperationPending]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
       longPressedOpponent.current = null;
@@ -194,8 +207,9 @@ export function C17GameScreen() {
     ? liveRoom.clock
     : null;
   const latest = ongoingGame.turn.segment ?? 0;
-  const selectedCard = isPlayingPlayer || canHypotheticalControl ? interaction.selectedCard : null;
+  const selectedCard = !editHypotheticalCards && (isPlayingPlayer || canHypotheticalControl) ? interaction.selectedCard : null;
   const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;
+  const activeSelectedTarget = editHypotheticalCards ? null : selectedTarget;
   const isOurTurn = isPlayingPlayer && game.turn.currentPlayerIndex === seatingAnchorIndex;
   const enabled = isPlayingPlayer
     && sessionPhase === 'ready'
@@ -203,7 +217,7 @@ export function C17GameScreen() {
     && !replay.active
     && !clientState.pause.active
     && roomState.pendingGameplayAction === null;
-  const hypotheticalEnabled = canHypotheticalControl && hypotheticalActor !== null
+  const hypotheticalEnabled = canHypotheticalControl && !editHypotheticalCards && hypotheticalActor !== null
     && !hypotheticalOperationPending;
   const cardEnabled = (enabled || hypotheticalEnabled) && selectedCard !== null && actionHand.some((order) => order === selectedCard);
   const discardEnabled = cardEnabled
@@ -245,12 +259,12 @@ export function C17GameScreen() {
       }));
     }
   };
-  const cluePreview = interaction.cluePreview === null || selectedTarget === null
+  const cluePreview = interaction.cluePreview === null || activeSelectedTarget === null
     ? null
     : getCluePreview(
       game,
       metadata.options.variantName,
-      selectedTarget,
+      activeSelectedTarget,
       interaction.cluePreview.type,
       interaction.cluePreview.value,
       hypotheticalActive ? {
@@ -260,9 +274,9 @@ export function C17GameScreen() {
         playing: clientState.playing,
       } : undefined,
     );
-  const targetName = selectedTarget === null
+  const targetName = activeSelectedTarget === null
     ? null
-    : metadata.playerNames[selectedTarget] ?? `Player ${selectedTarget + 1}`;
+    : metadata.playerNames[activeSelectedTarget] ?? `Player ${activeSelectedTarget + 1}`;
   const confirmClue = () => {
     if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;
     const sent = hypotheticalActive
@@ -425,6 +439,7 @@ export function C17GameScreen() {
       hypotheticalActor={hypotheticalActor}
       actionHandIndex={actionHandIndex}
       hypotheticalController={canHypotheticalControl}
+      editHypotheticalCards={editHypotheticalCards}
       hypotheticalOperationPending={hypotheticalOperationPending}
       globalEmpathy={interaction.globalEmpathy}
       historyAvailable={recentActions.length > 0}
@@ -482,6 +497,10 @@ export function C17GameScreen() {
       onDismissReplaySuggestion={() => dispatch(roomActions.replaySuggestionCleared())}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
+        if (editHypotheticalCards) {
+          if (canHypotheticalControl && !hypotheticalOperationPending) setMorphOrder(order);
+          return;
+        }
         if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {
           interactionDispatch({ type: 'select-card', order });
         }
@@ -494,6 +513,10 @@ export function C17GameScreen() {
       onEndHypothetical={() => { if (lobbyRuntime.endHypothetical()) interactionDispatch({ type: 'disarm-gameplay' }); }}
       onBackHypothetical={() => { if (lobbyRuntime.backHypothetical()) interactionDispatch({ type: 'disarm-gameplay' }); }}
       onToggleHypotheticalDrawn={() => lobbyRuntime.toggleHypotheticalDrawnCards()}
+      onToggleEditHypotheticalCards={() => {
+        if (!editHypotheticalCards) interactionDispatch({ type: 'disarm-gameplay' });
+        setEditHypotheticalCards((active) => !active);
+      }}
       seatingAnchorIndex={seatingAnchorIndex}
       pendingText={pendingText ?? null}
       pendingReplaySuggestion={pendingReplaySuggestion}
@@ -504,7 +527,7 @@ export function C17GameScreen() {
       finishedReplay={isFinishedReplay}
       selectedActionSegment={reviewTemporal.selectedSegment}
       selectedCard={selectedCard}
-      selectedTarget={selectedTarget}
+      selectedTarget={activeSelectedTarget}
       selectedTurn={reviewTemporal.selectedTurn}
       sharedReplay={replay.shared}
       sharedReplayOwnName={sharedReplayOwnName}
@@ -532,6 +555,19 @@ export function C17GameScreen() {
       title={noteCard === null ? 'Card note' : getCardLabel(game, metadata.playerNames, noteCard)}
       value={note}
       visible={noteEditorOpen}
+    />
+    <HypotheticalMorphModal
+      choices={getHypotheticalMorphChoices(metadata.options.variantName)}
+      current={morphOrder === null ? undefined : hypothetical?.morphedIdentities[morphOrder]}
+      onChoose={(identity) => {
+        if (morphOrder !== null && lobbyRuntime.hypotheticalMorph(morphOrder, identity.suitIndex, identity.rank)) setMorphOrder(null);
+      }}
+      onClose={() => setMorphOrder(null)}
+      onUnmorph={() => {
+        if (morphOrder !== null && lobbyRuntime.hypotheticalUnmorph(morphOrder)) setMorphOrder(null);
+      }}
+      variantName={metadata.options.variantName}
+      visible={morphOrder !== null && editHypotheticalCards && canHypotheticalControl && !hypotheticalOperationPending}
     />
   </>;
 }
@@ -561,6 +597,7 @@ function C17DenseWorkspace({
   hypothetical,
   hypotheticalActor,
   hypotheticalController,
+  editHypotheticalCards,
   hypotheticalOperationPending,
   globalEmpathy,
   historyAvailable,
@@ -607,6 +644,7 @@ function C17DenseWorkspace({
   onEndHypothetical,
   onBackHypothetical,
   onToggleHypotheticalDrawn,
+  onToggleEditHypotheticalCards,
   seatingAnchorIndex,
   pendingText,
   pendingReplaySuggestion,
@@ -651,6 +689,7 @@ function C17DenseWorkspace({
   hypothetical: HypotheticalState | null;
   hypotheticalActor: number | null;
   hypotheticalController: boolean;
+  editHypotheticalCards: boolean;
   hypotheticalOperationPending: boolean;
   globalEmpathy: boolean;
   historyAvailable: boolean;
@@ -699,6 +738,7 @@ function C17DenseWorkspace({
   onEndHypothetical: () => void;
   onBackHypothetical: () => void;
   onToggleHypotheticalDrawn: () => void;
+  onToggleEditHypotheticalCards: () => void;
   seatingAnchorIndex: number;
   pendingText: string | null;
   pendingReplaySuggestion: { userName: string; segment: number } | null;
@@ -1039,7 +1079,7 @@ function C17DenseWorkspace({
                     ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null,
                   onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => onEditNote(order),
                   onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index),
-                  onPress: () => onInspectNote(order),
+                  onPress: () => editHypotheticalCards ? onSelectCard(order) : onInspectNote(order),
                   onPressOut: globalEmpathy ? undefined : () => onHoldEmpathy(null),
                   position,
                   rank: hypothetical === null ? card.rank : normalKnowledge.displayRank,
@@ -1126,7 +1166,7 @@ function C17DenseWorkspace({
                 hasNote={hasAvailableNote(order)}
                 height={layout.ownCardHeight}
                 onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
-                onPress={() => onInspectNote(order)}
+                onPress={() => editHypotheticalCards ? onSelectCard(order) : onInspectNote(order)}
                 onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
                 position={position}
                 previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
@@ -1181,6 +1221,7 @@ function C17DenseWorkspace({
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HYPOTHETICAL · ACTOR {hypotheticalActor === null ? '—' : metadata.playerNames[hypotheticalActor] ?? `P${hypotheticalActor + 1}`}</Text>
           {hypotheticalController ? <View style={styles.actionButtons}>
             <ActionButton compact disabled={hypotheticalOperationPending || hypothetical.states.length <= 1} title="Back" onPress={onBackHypothetical} />
+            <ActionButton compact disabled={hypotheticalOperationPending} title={editHypotheticalCards ? 'Done editing' : 'Edit cards'} onPress={onToggleEditHypotheticalCards} />
             <ActionButton compact title="End Hypothetical" tone="primary" onPress={onEndHypothetical} />
             <ActionButton
               compact
@@ -1215,7 +1256,7 @@ function C17DenseWorkspace({
               <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
               <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
             </View>
-          </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Select a card from the hypothetical actor hand or a player to plan a clue.</Text> : null}
+          </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>{editHypotheticalCards ? 'Choose any visible hand card to edit its identity.' : 'Select a card from the hypothetical actor hand or a player to plan a clue.'}</Text> : null}
         </> : reviewActive && !finishedReplay && sharedReplay === null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <View style={styles.rowBetween}>

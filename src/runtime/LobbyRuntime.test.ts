@@ -1783,6 +1783,42 @@ describe('deterministic lobby runtime', () => {
     expect(runtime.hypotheticalPlay(0)).toBe(true);
   });
 
+  test('shared leader morph and unmorph send exact replay action frames and wait for echoes', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime();
+    expect(runtime.startHypothetical()).toBe(true);
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    const order = room.clientState.replay.hypothetical?.ongoing.hands[0]?.[0];
+    if (order === undefined) throw new Error('Expected a hypothetical card');
+
+    expect(runtime.hypotheticalMorph(order, 1, 2)).toBe(true);
+    expect(socket.sent.at(-1)).toBe(`replayAction ${JSON.stringify({ tableID: 123, type: 5, actionJSON: JSON.stringify({ type: 'morph', order, suitIndex: 1, rank: 2 }) })}`);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    expect(runtime.hypotheticalUnmorph(order)).toBe(false);
+    emitHypotheticalAction(socket, { type: 'morph', order, suitIndex: 1, rank: 2 } as ActionIncludingHypothetical);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+
+    expect(runtime.hypotheticalUnmorph(order)).toBe(true);
+    expect(socket.sent.at(-1)).toBe(`replayAction ${JSON.stringify({ tableID: 123, type: 5, actionJSON: JSON.stringify({ type: 'unmorph', order }) })}`);
+    expect(store.getState().room.pendingHypotheticalOperation).not.toBeNull();
+    emitHypotheticalAction(socket, { type: 'unmorph', order } as ActionIncludingHypothetical);
+    expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
+  });
+
+  test('shared replay follower cannot morph', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+    socket.emitMessage('hypoStart {"TableID":123}');
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    const order = room.clientState.replay.hypothetical?.ongoing.hands[0]?.[0];
+    if (order === undefined) throw new Error('Expected a hypothetical card');
+    const sentBefore = socket.sent.length;
+    expect(runtime.hypotheticalMorph(order, 1, 2)).toBe(false);
+    expect(runtime.hypotheticalUnmorph(order)).toBe(false);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
   test('shared hypothetical first-frame failure clears pending and sends nothing', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime();
     expect(runtime.startHypothetical()).toBe(true);
@@ -1846,6 +1882,64 @@ describe('deterministic lobby runtime', () => {
     expect(runtime.hypotheticalRankClue(actor === 0 ? 1 : 0, 1)).toBe(true);
     expect(store.getState().room.pendingHypotheticalOperation).toBeNull();
     expect(runtime.backHypothetical()).toBe(true);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('solo morph applies locally and unmorph restores the original identity', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Ada', ['Ada', 'Bob'], false);
+    const sentBefore = socket.sent.length;
+    expect(runtime.startHypothetical()).toBe(true);
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    const order = room.clientState.replay.hypothetical?.ongoing.hands[0]?.[0];
+    if (order === undefined) throw new Error('Expected a hypothetical card');
+    const original = room.clientState.cardIdentities[order];
+    expect(original).toBeDefined();
+    expect(runtime.hypotheticalMorph(order, 1, 2)).toBe(true);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    expect(room.clientState.replay.hypothetical?.morphedIdentities[order]).toEqual({ suitIndex: 1, rank: 2 });
+    expect(runtime.hypotheticalUnmorph(order)).toBe(true);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    expect(room.clientState.replay.hypothetical?.morphedIdentities[order]).toBeUndefined();
+    expect(room.clientState.cardIdentities[order]).toEqual(original);
+    expect(socket.sent).toHaveLength(sentBefore);
+  });
+
+  test('solo morph survives edit-mode exit and hypothetical play, then a newly drawn card can morph', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Ada', ['Ada', 'Bob'], false);
+    const sentBefore = socket.sent.length;
+    expect(runtime.startHypothetical()).toBe(true);
+    expect(runtime.toggleHypotheticalDrawnCards()).toBe(true);
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    let hypo = room.clientState.replay.hypothetical;
+    if (hypo === null) throw new Error('Expected hypothetical state');
+    const actor = hypo.ongoing.turn.currentPlayerIndex;
+    if (actor === null) throw new Error('Expected hypothetical actor');
+    const order = hypo.ongoing.hands[actor]?.[0];
+    if (order === undefined) throw new Error('Expected actor card');
+
+    expect(runtime.hypotheticalMorph(order, 1, 2)).toBe(true);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    expect(room.clientState.replay.hypothetical?.morphedIdentities[order]).toEqual({ suitIndex: 1, rank: 2 });
+
+    // Leaving edit mode is presentation state only, so no runtime call can undo the identity.
+    expect(runtime.hypotheticalPlay(order)).toBe(true);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    hypo = room.clientState.replay.hypothetical;
+    if (hypo === null) throw new Error('Expected hypothetical state');
+    expect(hypo.morphedIdentities[order]).toEqual({ suitIndex: 1, rank: 2 });
+    const newlyDrawnOrder = hypo.drawnCardsInHypothetical.at(-1);
+    if (newlyDrawnOrder === undefined) throw new Error('Expected newly drawn hypothetical card');
+
+    expect(runtime.hypotheticalMorph(newlyDrawnOrder, 2, 3)).toBe(true);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected solo replay');
+    expect(room.clientState.replay.hypothetical?.morphedIdentities[newlyDrawnOrder]).toEqual({ suitIndex: 2, rank: 3 });
     expect(socket.sent).toHaveLength(sentBefore);
   });
 

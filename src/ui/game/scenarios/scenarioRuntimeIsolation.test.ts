@@ -24,3 +24,34 @@ test('every production gameplay-screen runtime call is covered by the scenario-g
   expect([...new Set(runtimeCalls)].sort()).toEqual([...new Set(blockedMethods)].sort());
   expect(application).toContain('suppressGameplayRuntimeCommands');
 });
+
+test('Hypothetical Edit cards is a persistent controller-only interaction mode', () => {
+  const screen = read('src/ui/game/C17GameScreen.tsx');
+  const selection = screen.slice(
+    screen.indexOf('onSelectCard={(order) => {'),
+    screen.indexOf('onSelectClueTarget=', screen.indexOf('onSelectCard={(order) => {')),
+  );
+  const lifecycle = screen.slice(
+    screen.indexOf('if (!canHypotheticalControl) {'),
+    screen.indexOf('\n  }, [canHypotheticalControl, hypotheticalOperationPending]);', screen.indexOf('if (!canHypotheticalControl) {')),
+  );
+
+  expect(screen).toContain('title={editHypotheticalCards ? \'Done editing\' : \'Edit cards\'}');
+  expect(screen).toContain('if (!editHypotheticalCards) interactionDispatch({ type: \'disarm-gameplay\' });');
+  expect(screen).toContain('setEditHypotheticalCards((active) => !active);');
+  expect(selection).toContain('if (editHypotheticalCards) {\n          if (canHypotheticalControl && !hypotheticalOperationPending) setMorphOrder(order);\n          return;');
+  expect(selection).toContain("interactionDispatch({ type: 'select-card', order });");
+  expect(selection).toContain('inspectNote(order);');
+  expect(screen).toContain('const selectedCard = !editHypotheticalCards && (isPlayingPlayer || canHypotheticalControl) ? interaction.selectedCard : null;');
+  expect(screen).toContain('const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;');
+  expect(screen).toContain('const activeSelectedTarget = editHypotheticalCards ? null : selectedTarget;');
+  expect(screen).toContain('canHypotheticalControl && !editHypotheticalCards && hypotheticalActor !== null');
+  expect(screen).toContain('<ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />');
+  expect(screen).toContain('<ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />');
+  expect(screen).toContain('onPress: () => editHypotheticalCards ? onSelectCard(order) : onInspectNote(order)');
+  expect(screen).toContain('onPress={() => editHypotheticalCards ? onSelectCard(order) : onInspectNote(order)}');
+  expect(screen).toContain('hypotheticalController ? <View style={styles.actionButtons}>');
+  expect(lifecycle).toContain('if (!canHypotheticalControl) {\n      setEditHypotheticalCards(false);');
+  expect(lifecycle).toContain('} else if (hypotheticalOperationPending) {\n      setMorphOrder(null);');
+  expect(lifecycle.slice(lifecycle.indexOf('else if'))).not.toContain('setEditHypotheticalCards(false)');
+});
