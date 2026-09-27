@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Status: **planning snapshot reconciled with mobile `main` through PR #126; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #129; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `fd4f8b7c9aa62ef6279f344af0bb3b48b55764cb` (PR #126 merge)
+- current `main`: `cdc9bafd6f40b2b7ec49261bda3ad20381be6af5` (PR #129 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -132,6 +132,7 @@ Recently completed high-value parity work:
 - bounded Lobby opening for canonical running-game `/game/<tableID>` links, reusing authoritative Lobby eligibility plus existing reattend/spectate paths and a shared clipboard boundary (#122).
 - bounded `/pre-game/<tableID>` opening with authoritative Lobby membership/eligibility, player-only join semantics, and transient password handling through the existing `join` path (#124).
 - authoritative History seed/turn metadata plus exact Copy seed through the shared clipboard boundary, with stale async copy feedback guarded locally (#126).
+- native specific-seed Create over upstream `!seed [suffix]` semantics (#128), plus canonical History `Play this seed` prefill with player/variant matching and one-shot local handoff (#129).
 
 The highest-value remaining items are:
 
@@ -537,10 +538,10 @@ cards off preserves morphs, and `Original` unmorphs an individual card.
 | Game tags add/delete | **Command support** | S for UI | Medium | No first-class workflow. |
 | Tag search | **Command support** | M for results UI | Medium | Current server response is chat text with game IDs. |
 | Tagged-games page | Missing native UI | M–L | Low–Medium | Web has dedicated pages. |
-| Force seed via `!seed` table name | **Server path available** | S for discoverability | Medium | Mobile table-name field can pass server special syntax; no native helper. |
+| Force seed via `!seed` table name | **Full native helper** | — | Medium | PR #128 exposes specific-seed Create without new protocol semantics; PR #129 adds safe History `Play this seed` prefill for canonical reproducible seeds. |
 | Partial replay via `!replay` table name | **Server path available but undiscoverable** | S–M | Low–Medium | Better represented as replay tooling rather than teaching magic names. |
 
-History now displays the already-received **seed, tags, turns, and same-seed count**. Remaining seed work is discoverability: a native specific-seed Create workflow can reuse upstream `!seed` semantics without introducing a new server command.
+History now displays the already-received **seed, tags, turns, and same-seed count**. Native specific-seed Create and canonical History `Play this seed` prefill are implemented; broader seed browsing remains optional/web-oriented.
 
 ---
 
@@ -851,7 +852,7 @@ manual" omissions. It follows the current `docs/features.md` structure.
 | Pace | **Full presentation semantics** | Final-round/AON suppression, signed value display and risk treatment match upstream. |
 | Efficiency | **Full presentation semantics** | FRE/MRE and review/shared modifier policy match upstream; editing the manual modifier is not exposed in this presentation slice. |
 | Keyboard Shortcuts | **N/A literally** | Native controls/gestures should cover valuable actions rather than reproducing desktop key chords. |
-| Similar Deals and Competitive Play | **Partial+** | Server seed selection works automatically; magic `!seed`/`!replay` table names pass through; native Other Scores plus authoritative History seed/turn display and Copy seed are implemented. Native specific-seed creation remains undiscoverable. |
+| Similar Deals and Competitive Play | **Strong partial** | Server seed selection remains authoritative; native specific-seed Create, History seed/turn display + Copy seed, same-seed Other Scores, and History `Play this seed` prefill are implemented. Broader seed browsing remains web-oriented. |
 | Chat | **Full basic / partial rich features** | Text/PM/history/commands work; read/unread/typing/emotes/link richness/zen are incomplete. |
 | Friends | **Strong partial** | Commands/state, People contextual actions, friend-aware Lobby ordering, and Friends history are implemented; richer profiles/social flows remain. |
 | Linked Accounts | **Command-complete / UI missing** | Link/unlink/linked commands work; native explanation/workflow absent. |
