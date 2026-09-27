@@ -763,10 +763,11 @@ describe('deterministic lobby runtime', () => {
     const chat = new ChatRuntime(runtime, new TerminationRuntime(runtime, store), store);
 
     for (const message of [
-      'hello', '/help', '/random 1 5', '/replay 123', '/findvariant', '/whatever', '/copy', '/',
+      'hello', '/help', '/random 1 5', '/replay 123', '/findvariant', '/whatever', '/',
     ]) {
       expect(chat.submit(message)).toBe(true);
     }
+    expect(chat.submit('/copy')).toBe(false);
 
     expect(socket.sent).toEqual([
       'chat {"msg":"hello","room":"lobby"}',
@@ -775,7 +776,6 @@ describe('deterministic lobby runtime', () => {
       'chat {"msg":"/replay 123","room":"lobby"}',
       'chat {"msg":"/findvariant","room":"lobby"}',
       'chat {"msg":"/whatever","room":"lobby"}',
-      'chat {"msg":"/copy","room":"lobby"}',
       'chat {"msg":"/","room":"lobby"}',
     ]);
   });

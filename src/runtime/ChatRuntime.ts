@@ -6,6 +6,9 @@ import { chatActions } from '../store/chatSlice';
 import type { AppStore } from '../store/store';
 import type { LobbyRuntime } from './LobbyRuntime';
 import type { TerminationRuntime } from './terminationRuntime';
+import { createReplayExport } from '../game/client/replayExport';
+import { HANAB_HTTP_BASE_URL } from '../config/hanab';
+import type { ReplayExportActions } from '../platform/replayExportActions';
 
 export type LocalChatCommandResult =
   | { kind: 'handled-success' }
@@ -33,6 +36,7 @@ export class ChatRuntime {
     >,
     private readonly store: Pick<AppStore, 'dispatch' | 'getState'>,
     private readonly now: () => Date = () => new Date(),
+    private readonly replayExportActions?: ReplayExportActions,
   ) {
     this.register(PM_COMMANDS, (room, args) => this.privateMessage(room, args));
     this.register(['r'], (room, args) => this.reply(room, args));
@@ -55,6 +59,7 @@ export class ChatRuntime {
     this.register(['tagsdeleteall'], (room) => this.tableIDCommand(room, 'tagsDeleteAll'));
     this.register(['terminate'], () => this.terminationRuntime.terminateGame());
     this.register(['vote'], () => this.terminationRuntime.voteForTermination());
+    this.register(['copy'], (room) => this.copyReplay(room));
     this.register(PLAYER_INFO_COMMANDS, (_room, args) => this.playerInfo(args));
     this.register(['version'], (room) => {
       this.localMessage(
@@ -266,6 +271,24 @@ export class ChatRuntime {
       if (!this.lobbyRuntime.send('chatPlayerInfo', { name })) sent = false;
     }
     return sent;
+  }
+
+  private copyReplay(room: string): boolean {
+    const state = this.store.getState();
+    if (state.room.room.kind !== 'live_game' || !state.room.room.clientState.finished) {
+      this.localMessage(room, 'Replay export is available only during finished game review.', 'error');
+      return false;
+    }
+    const result = createReplayExport(state.room.room.clientState, HANAB_HTTP_BASE_URL);
+    if (!result.ok) { this.localMessage(room, result.error, 'error'); return false; }
+    if (this.replayExportActions === undefined) {
+      this.localMessage(room, 'Replay export is unavailable on this platform.', 'error');
+      return false;
+    }
+    void this.replayExportActions.copy(result.url).then(() => {
+      this.localMessage(room, 'Replay link copied to clipboard.', 'info');
+    }).catch(() => this.localMessage(room, 'Could not copy replay link.', 'error'));
+    return true;
   }
 
   private defaultPlayerInfoNames(): readonly string[] {
