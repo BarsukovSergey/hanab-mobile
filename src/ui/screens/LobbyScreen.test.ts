@@ -5,6 +5,7 @@ import { describe, expect, test } from '@jest/globals';
 import { formatLobbyRoster, getLobbyFriendContext } from '../lobbyTablePresentation';
 
 const screen = readFileSync(resolve(__dirname, 'LobbyScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
+const app = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('lobby table details and create selector', () => {
   test('exposes compact People and Game history actions together in the hero', () => {
@@ -41,6 +42,33 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain("const submittedName = useSpecificSeed ? specificSeedTableName ?? '' : tableName;");
     expect(screen).toContain('const effectiveName = tableName.trim() || randomTableName?.trim() || \'\';');
     expect(screen).not.toContain('maxPlayers}v');
+  });
+
+  test('adopts a one-shot History prefill locally and leaves creation to the user', () => {
+    expect(app).toContain('useState<SpecificSeedCreatePrefill | null>(null)');
+    expect(app).toContain('setSpecificSeedCreatePrefill(prefill);');
+    expect(app).toContain('setLocalScreen(\'lobby\');');
+    expect(screen).toContain('setUseSpecificSeed(true);');
+    expect(screen).toContain('setSeedSuffix(specificSeedCreatePrefill.seedSuffix);');
+    expect(screen).toContain('setMaxPlayers(specificSeedCreatePrefill.maxPlayers);');
+    expect(screen).toContain('setCreateOptions(specificSeedCreatePrefill.createOptions);');
+    expect(screen).toContain('onSpecificSeedCreatePrefillConsumed();');
+    expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
+    expect(screen).toContain('To reproduce this deal, start with exactly {reproductionPlayerCount} players and keep this variant.');
+    expect(screen).toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)');
+    expect(screen).not.toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots);');
+    expect(app).not.toContain('dispatch(specificSeedCreatePrefill');
+  });
+
+  test('manual reproduction edits clear only the History hint and a later prefill restores it', () => {
+    expect(screen).toContain('setSeedSuffix(value);\n                      setReproductionPlayerCount(null);');
+    expect(screen).toContain('setMaxPlayers(value);\n                          setReproductionPlayerCount(null);');
+    expect(screen).toContain('setCreateOptions(options);\n                setReproductionPlayerCount(null);');
+    expect(screen).toContain('if (enabled) setReproductionPlayerCount(null);');
+    expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
+    expect(screen).toContain('value={seedSuffix}');
+    expect(screen).toContain('options={createOptions} onChange={(options) => {');
+    expect(screen).toContain('maxPlayers === value');
   });
 
   test('keeps ordinary and seed drafts local and exposes only the active name field', () => {

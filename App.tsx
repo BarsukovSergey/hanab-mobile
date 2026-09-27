@@ -46,6 +46,14 @@ import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 import { UserContextActions } from './src/ui/UserContextActions';
 import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
+import type { MobileTableOptions } from './src/protocol/lobbyProtocol';
+
+type SpecificSeedCreatePrefill = {
+  seedSuffix: string;
+  maxPlayers: number;
+  numPlayers: number;
+  createOptions: MobileTableOptions;
+};
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | 'replay-export' | null;
@@ -75,6 +83,8 @@ function AppContent() {
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [showManualLogin, setShowManualLogin] = useState(false);
   const [localScreen, setLocalScreen] = useState<LocalScreen>('lobby');
+  const [specificSeedCreatePrefill, setSpecificSeedCreatePrefill] = useState<SpecificSeedCreatePrefill | null>(null);
+  const consumeSpecificSeedCreatePrefill = useCallback(() => setSpecificSeedCreatePrefill(null), []);
   const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const [tagDraft, setTagDraft] = useState('');
@@ -559,6 +569,10 @@ function AppContent() {
     content = <PregameScreen />;
   } else if (localScreen === 'history') {
     content = <HistoryScreen onBack={() => { setReturnAfterUnattend(null); setLocalScreen('lobby'); }}
+      onPlaySeed={(prefill) => {
+        setSpecificSeedCreatePrefill(prefill);
+        setLocalScreen('lobby');
+      }}
       onWatchReplay={(databaseID, visibility) => { if (lobbyRuntime.watchHistoricalGame(databaseID, visibility)) setReturnAfterUnattend('history'); }}
       onWatchJSONReplay={(gameJSON, visibility) => { if (lobbyRuntime.watchJSONReplay(gameJSON, visibility)) setReturnAfterUnattend('history'); }}
       onWatchReplayInput={(request) => {
@@ -573,6 +587,8 @@ function AppContent() {
     content = <PeopleScreen onBack={() => setLocalScreen('lobby')} />;
   } else {
     content = <LobbyScreen
+      specificSeedCreatePrefill={specificSeedCreatePrefill}
+      onSpecificSeedCreatePrefillConsumed={consumeSpecificSeedCreatePrefill}
       onOpenHistory={() => setLocalScreen('history')}
       onOpenPeople={() => setLocalScreen('people')}
     />;

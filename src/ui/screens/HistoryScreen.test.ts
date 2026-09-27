@@ -41,6 +41,22 @@ describe('History screen source contract', () => {
     expect(screen).toContain('title="Copy seed"');
     expect(screen).toContain("item.seed !== '' && <ActionButton");
     expect(screen).not.toMatch(/item\.seed\.trim\(|normalizeSeed/);
+    expect(screen).toContain('const seedSuffix = supported');
+    expect(screen).toContain('extractCanonicalHistorySeedSuffix(item.seed, item.options.numPlayers, item.options.variantID)');
+    expect(screen).toContain('supported && seedSuffix !== null && <ActionButton compact title="Play this seed"');
+    expect(screen).toContain('onPlaySeed({');
+    expect(screen).toContain('seedSuffix,');
+    expect(screen).toContain('maxPlayers: item.options.numPlayers');
+    expect(screen).toContain('variantName: item.options.variantName');
+    expect(screen).toContain('timed: item.options.timed');
+    expect(screen).toContain('timeBase: item.options.timeBase');
+    expect(screen).toContain('timePerTurn: item.options.timePerTurn');
+    expect(screen).toContain('cardCycle: item.options.cardCycle');
+    expect(screen).toContain('emptyClues: item.options.emptyClues');
+    expect(screen).toContain('oneExtraCard: item.options.oneExtraCard');
+    expect(screen).toContain('oneLessCard: item.options.oneLessCard');
+    expect(screen).toContain('allOrNothing: item.options.allOrNothing');
+    expect(screen).toContain('(comparing ? history.otherScores?.games ?? [] : items).map((item) => {');
   });
 
   test('keeps seed copy feedback local and reports both clipboard outcomes', () => {

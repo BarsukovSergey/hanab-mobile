@@ -1,6 +1,21 @@
 const MAX_TABLE_NAME_LENGTH = 45;
 const SEED_COMMAND_PREFIX = '!seed ';
 
+export function extractCanonicalHistorySeedSuffix(
+  seed: string,
+  numPlayers: number,
+  variantID: number,
+): string | null {
+  const prefix = `p${numPlayers}v${variantID}s`;
+  if (!seed.startsWith(prefix)) return null;
+
+  const suffix = seed.slice(prefix.length);
+  return suffix.length > 0
+    && /^[A-Za-z0-9-]+$/.test(suffix)
+    && createSpecificSeedTableName(suffix) !== null
+    ? suffix : null;
+}
+
 export function createSpecificSeedTableName(seedSuffix: string): string | null {
   const suffix = seedSuffix.trim();
   if (suffix.length === 0) return null;
