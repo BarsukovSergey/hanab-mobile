@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Last reconciled with `main` at `169f6ea348770166cf8dbdbb11fac1df18d07a04` (PR #116 merge).
+Last reconciled with `main` at `fd4f8b7c9aa62ef6279f344af0bb3b48b55764cb` (PR #126 merge).
 
 This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
@@ -53,6 +53,7 @@ These items were explicitly removed from the C17 release gate during product rev
 
 - **Advanced shared-replay parity:** shared replay creation from History and send/receive turn suggestions are implemented. Remaining power-user candidates include replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. Initial `sharedReplayEffMod` state and authoritative follower-side `replayEfficiencyMod` updates are supported; controls for originating modifier changes remain future work. Do not rebuild the semantic state separately in UI.
 - **Game/replay tag management beyond current Add/display UI:** History/Friends History/Other Scores can display authoritative tags and the Game menu exposes Add tag through the existing server command path. Research whether tag search/delete or richer management deserves first-class mobile UI. This is distinct from note quick tags.
+- **Specific-seed creation discoverability:** expose a native Create-table `Use specific seed` helper over existing upstream `!seed [suffix]` semantics. A History `Play this seed` shortcut should reuse that Create flow and only derive a suffix from canonical seeds whose `p{players}v{variant}s` prefix matches the authoritative History item options; never send the full stored seed as the suffix blindly.
 - **Optional shadow-link opening/import:** only add `game/<tableID>/shadow/<seat>` if concrete demand justifies it; spectator perspective switching is already first-class. Keep verified OS-level App Links separate; they still require stable signing and upstream cooperation.
 - **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
 
@@ -88,7 +89,7 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Compact authoritative Pregame player stats and spectator list.
 - Native Pregame Kick, Find variant, and Missing scores actions with slash-command fallback.
 - Multi-bot Create/Pregame picker for open and password-protected tables with transient password handling.
-- Own History, Friends history, and same-seed Other Scores comparison.
+- Own History, Friends history, same-seed Other Scores comparison, and authoritative seed/turn display with exact Copy seed.
 - Authoritative game tag display and first-class Add tag action.
 - Live table-chat unread indicator, server-backed read acknowledgement, direct `/r` reply handling, and authoritative mute-state guarding.
 - Minimal functional state-change animation.
