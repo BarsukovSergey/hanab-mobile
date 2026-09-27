@@ -339,12 +339,11 @@ Candidates:
 - replay arrows / annotations;
 - replay sounds where useful;
 - user-facing shared replay efficiency-modifier origin controls;
-- arbitrary JSON replay import;
 - deliberate mobile `/copy` / replay export/share flow;
 - richer replay-link sharing;
 - replay scrubber performance work if issue #4 remains material.
 
-Hypothetical card morph/unmorph controls landed in PR #114 and are no longer a remaining Phase 4 candidate.
+Hypothetical card morph/unmorph controls landed in PR #114 and arbitrary JSON replay import landed in PR #116; neither is a remaining Phase 4 candidate.
 
 Treat import/export and annotations as a designed workflow, not a collection of raw command ports.
 

@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Status: **planning snapshot reconciled with mobile `main` through PR #114; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #116; beta.2 remains the current tester line**
 
 ## Scope and source of truth
 
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `3a4639e62ea30f55152afa40543bb96edbf4c004` (PR #114 merge)
+- current `main`: `169f6ea348770166cf8dbdbb11fac1df18d07a04` (PR #116 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -126,13 +126,13 @@ Recently completed high-value parity work:
 - friends-first People ordering plus visible friend emphasis in People and Lobby tables (#111).
 - authoritative mute-state retention and source-faithful local chat/PM guard (#112).
 - controller-only Hypothetical card morph/unmorph UI with persistent Edit cards mode (#114).
+- authoritative arbitrary JSON replay import plus generalized replay-create source/visibility bootstrap validation (#116), including the shared-History replay bootstrap regression fix.
 
 The highest-value remaining items are:
 
 | Item | Status | Effort | Importance | Why |
 | --- | --- | --- | --- | --- |
 | Richer tag management/search/delete | Partial | S–M | Medium | Add/display UI is implemented; structured search/delete/list management remains. |
-| Arbitrary JSON replay import | Missing | M | Medium | Useful for research/bots; current upstream expanded JSON seed/deck/player-name semantics. |
 | `/copy` replay export | Missing | M | Medium | Browser-local upstream behavior needs a deliberate mobile export/share implementation. |
 | Rich player profile / arbitrary-player history | Partial | M–L | Medium | People/context actions exist; richer profile/history presentation does not. |
 | Chat typing/presentation polish | Partial | S–M | Low | Authoritative table unread/read state is implemented; typing, sounds and other presentation polish remain. |
@@ -472,8 +472,8 @@ Spectator shadowing is now exposed as a first-class live Game-menu action while 
 | Jump from stack/discard to action | Missing | M | Low–Medium | Could be a contextual inspector action. |
 | Finished game replay | **Full core** | — | High | Same C17 workspace. |
 | Solo replay by database ID from own history | **Full** | — | High | `replayCreate source=id visibility=solo`. |
-| Create shared replay from history | **Missing** | S–M | Medium | Protocol helper is hard-coded to solo. |
-| Watch arbitrary JSON replay | **Missing** | M | Medium | Upstream supports `source=json`. |
+| Create shared replay from history | **Full** | — | Medium | PR #116 verifies requested shared visibility against authoritative `init.sharedReplay` and reaches the shared replay workspace. |
+| Watch arbitrary JSON replay | **Full** | — | Medium | PR #116 adds History import for `source=json` with solo/shared visibility; mobile only parses a top-level JSON object and leaves GameJSON semantics to the server. |
 | Export/copy current replay (`/copy`) | **Missing** | M | Medium | Explicit backlog. |
 | Replay seed display | **Partial** | S | Medium | Legacy screen shows it; C17 primary portrait workflow does not clearly expose it. |
 | Player times/result metadata | Partial | S–M | Low–Medium | Legacy has richer result detail than current C17 summary. |
@@ -492,7 +492,7 @@ Spectator shadowing is now exposed as a first-class live Game-menu action while 
 | Local arrows | **Missing** | M | Low–Medium |
 | Shared replay sounds | Missing | M | Low |
 | Efficiency-modifier synchronization | **Adopted (#29 receive-side)** | S | Medium | Initial `sharedReplayEffMod` and authoritative follower-side `replayEfficiencyMod` updates use the existing `setEffMod` semantic. User-facing modifier controls remain future work. |
-| Explicit shared replay creation | Missing | S–M | Medium |
+| Explicit shared replay creation | **Full from History** | — | Medium |
 
 ## Hypothetical
 
@@ -660,7 +660,7 @@ Current upstream server command map versus mobile:
 | `historyGet` | Full | Own history. |
 | `historyGetSeed` | **Full** | Same-seed Other Scores comparison. |
 | `historyFriendsGet` | **Full** | Independent Friends history pagination. |
-| `replayCreate` | **Partial** | Database-ID solo/shared creation is supported; arbitrary JSON source remains missing. |
+| `replayCreate` | **Full supported workflow** | Database-ID and arbitrary JSON replay creation both support solo/shared visibility; PR #116 validates the authoritative source/visibility result during bootstrap. |
 | `tagSearch` | Full raw command path | Results only as server chat. |
 | `getGameInfo1` | Full | Bootstrap. |
 | `getGameInfo2` | Full | Bootstrap. |
@@ -969,12 +969,11 @@ jank (#4) as non-blocking defect backlog unless real usage reprioritizes it.
 
 ## C. Medium product slices
 
-1. Arbitrary JSON replay import.
-2. `/copy` export/share.
-3. Richer user/profile and arbitrary-player history surfaces.
-4. Account-management / linked-account UX.
-5. Chat typing/presentation polish beyond the implemented table unread/read state.
-6. Remaining shared-replay arrows/annotations/sounds/leader controls.
+1. `/copy` export/share.
+2. Richer user/profile and arbitrary-player history surfaces.
+3. Account-management / linked-account UX.
+4. Chat typing/presentation polish beyond the implemented table unread/read state.
+5. Remaining shared-replay arrows/annotations/sounds/leader controls.
 
 ## D. Defer until demanded
 
@@ -1009,7 +1008,7 @@ A useful way to describe current parity is:
 - empathy;
 - timed play;
 - live rewind;
-- finished/solo/shared replay core;
+- finished/solo/shared replay core, including arbitrary JSON replay import;
 - Hypothetical core including card morph/unmorph originating UI;
 - spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
