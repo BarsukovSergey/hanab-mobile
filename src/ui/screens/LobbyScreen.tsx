@@ -36,10 +36,19 @@ const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 export function LobbyScreen({
   onOpenHistory,
   onOpenPeople,
+  specificSeedCreatePrefill = null,
+  onSpecificSeedCreatePrefillConsumed = () => {},
   clipboard = clipboardActions,
 }: {
   onOpenHistory: () => void;
   onOpenPeople: () => void;
+  specificSeedCreatePrefill?: {
+    seedSuffix: string;
+    maxPlayers: number;
+    numPlayers: number;
+    createOptions: MobileTableOptions;
+  } | null;
+  onSpecificSeedCreatePrefillConsumed?: () => void;
   clipboard?: ClipboardActions;
 }) {
   const { theme } = useHanabTheme();
@@ -56,6 +65,7 @@ export function LobbyScreen({
   const [liveGameLinkPassword, setLiveGameLinkPassword] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [createOptions, setCreateOptions] = useState<MobileTableOptions>(DEFAULT_OPTIONS);
+  const [reproductionPlayerCount, setReproductionPlayerCount] = useState<number | null>(null);
   const [joinPassword, setJoinPassword] = useState('');
   const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
   const tables = useAppSelector(tableSelectors.selectAll);
@@ -63,6 +73,15 @@ export function LobbyScreen({
   const roomState = useAppSelector((state) => state.room);
   const randomTableName = useAppSelector((state) => state.session.randomTableName);
   const friends = useAppSelector((state) => state.session.friends);
+  useEffect(() => {
+    if (specificSeedCreatePrefill === null) return;
+    setUseSpecificSeed(true);
+    setSeedSuffix(specificSeedCreatePrefill.seedSuffix);
+    setMaxPlayers(specificSeedCreatePrefill.maxPlayers);
+    setCreateOptions(specificSeedCreatePrefill.createOptions);
+    setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);
+    onSpecificSeedCreatePrefillConsumed();
+  }, [specificSeedCreatePrefill, onSpecificSeedCreatePrefillConsumed]);
   useEffect(() => {
     setSelectedBots((current) => {
       const next = pruneBotSelection(current, users, [], tablePassword.length > 0, maxPlayers - 1);
@@ -250,6 +269,9 @@ export function LobbyScreen({
                   <Text style={{ color: theme.colors.textMuted }}>
                     hanab.live combines this suffix with the actual player count and variant when the game starts.
                   </Text>
+                  {reproductionPlayerCount !== null && <Text style={{ color: theme.colors.textMuted }}>
+                    To reproduce this deal, start with exactly {reproductionPlayerCount} players and keep this variant.
+                  </Text>}
                 </>
               ) : (
                 <Field maxLength={45} onChangeText={setTableName} placeholder={randomTableName ?? 'Table name'} value={tableName} />

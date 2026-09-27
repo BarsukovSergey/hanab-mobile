@@ -5,6 +5,8 @@ import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../gam
 import { parseReplayInput, type ReplayInputResult } from '../../game/client/replayInput';
 import { replayInputActions, type ReplayInputActions } from '../../platform/replayInputActions';
 import { copyHistorySeed } from '../historySeedCopy';
+import { extractCanonicalHistorySeedSuffix } from '../specificSeedName';
+import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import {
@@ -30,12 +32,14 @@ export function HistoryScreen({
   onWatchReplay,
   onWatchJSONReplay,
   onWatchReplayInput,
+  onPlaySeed,
   clipboardActions = replayInputActions,
 }: {
   onBack: () => void;
   onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
   onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
   onWatchReplayInput: (request: Exclude<ReplayInputResult, { kind: 'invalid' }>) => void;
+  onPlaySeed: (prefill: { seedSuffix: string; maxPlayers: number; createOptions: MobileTableOptions; numPlayers: number }) => void;
   clipboardActions?: ReplayInputActions;
 }) {
   const { theme } = useHanabTheme();
@@ -184,6 +188,9 @@ export function HistoryScreen({
       <View style={[styles.grid, wide && styles.gridWide]}>
         {(comparing ? history.otherScores?.games ?? [] : items).map((item) => {
           const supported = areTableOptionsSupported(item.options);
+          const seedSuffix = supported
+            ? extractCanonicalHistorySeedSuffix(item.seed, item.options.numPlayers, item.options.variantID)
+            : null;
           const maxScore = comparing && supported ? getSupportedVariantMaxScore(item.options.variantName) : null;
           const otherCount = Math.max(0, item.numGamesOnThisSeed - 1);
           const finished = new Date(item.datetimeFinished);
@@ -216,6 +223,24 @@ export function HistoryScreen({
                       itemID: item.id,
                       message: copied ? 'Seed copied.' : 'Could not copy seed.',
                     });
+                  });
+                }} />}
+                {supported && seedSuffix !== null && <ActionButton compact title="Play this seed" tone="secondary" onPress={() => {
+                  onPlaySeed({
+                    seedSuffix,
+                    maxPlayers: item.options.numPlayers,
+                    numPlayers: item.options.numPlayers,
+                    createOptions: {
+                      variantName: item.options.variantName,
+                      timed: item.options.timed,
+                      timeBase: item.options.timeBase,
+                      timePerTurn: item.options.timePerTurn,
+                      cardCycle: item.options.cardCycle,
+                      emptyClues: item.options.emptyClues,
+                      oneExtraCard: item.options.oneExtraCard,
+                      oneLessCard: item.options.oneLessCard,
+                      allOrNothing: item.options.allOrNothing,
+                    },
                   });
                 }} />}
               </View>
