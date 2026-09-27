@@ -410,19 +410,19 @@ settings remain intentionally unelevated until they have a useful mobile workflo
 | `speedrunPreplay` | Missing + speedrun unsupported | L | Low | Defer. |
 | `speedrunMode` | Missing + speedrun unsupported | L | Low | Defer. |
 | `hyphenatedConventions` | **Full for mobile presentation** | — | Medium | PR #110 exposes the server-backed H-group features switch and C17 consumes the authoritative welcome/session setting for presentation. |
-| `createTableVariant` | Missing persistence | S | Low–Medium | Mobile hardcodes defaults. |
-| `createTableTimed` | Missing persistence | S | Low | Same. |
-| `createTableTimeBaseMinutes` | Missing persistence | S | Low | Same. |
-| `createTableTimePerTurnSeconds` | Missing persistence | S | Low | Same. |
+| `createTableVariant` | Supported server-backed persistence | S | Low–Medium | Welcome initializes Create; successful Create saves changed values. Unsupported variants safely draft as No Variant. |
+| `createTableTimed` | Supported server-backed persistence | S | Low | Welcome initializes Create; successful Create saves changed values. |
+| `createTableTimeBaseMinutes` | Supported server-backed persistence | S | Low | Mobile seconds convert to upstream fractional minutes; untimed Create preserves the saved timer. |
+| `createTableTimePerTurnSeconds` | Supported server-backed persistence | S | Low | Saved timer is retained while untimed and restored when Timed is enabled. |
 | `createTableSpeedrun` | N/A while unsupported | — | Low | — |
-| `createTableCardCycle` | Missing persistence | S | Low | Capability itself is supported. |
+| `createTableCardCycle` | Supported server-backed persistence | S | Low | Capability itself is supported. |
 | `createTableDeckPlays` | N/A while unsupported | — | Low | — |
-| `createTableEmptyClues` | Missing persistence | S | Low | Capability itself is supported. |
-| `createTableOneExtraCard` | Missing persistence | S | Low | — |
-| `createTableOneLessCard` | Missing persistence | S | Low | — |
-| `createTableAllOrNothing` | Missing persistence | S | Low | — |
+| `createTableEmptyClues` | Supported server-backed persistence | S | Low | Capability itself is supported. |
+| `createTableOneExtraCard` | Supported server-backed persistence | S | Low | — |
+| `createTableOneLessCard` | Supported server-backed persistence | S | Low | — |
+| `createTableAllOrNothing` | Supported server-backed persistence | S | Low | — |
 | `createTableDetrimentalCharacters` | N/A while unsupported | — | Low | — |
-| `createTableMaxPlayers` | Missing persistence | S | Low | Mobile defaults to 5. |
+| `createTableMaxPlayers` | Supported server-backed persistence | S | Low | Invalid upstream values normalize to 5 for mobile Create. |
 
 Any additional server-backed setting should continue to use the authoritative `setting` command and
 must not create mobile-only server preference storage.

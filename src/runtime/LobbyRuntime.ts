@@ -66,6 +66,8 @@ import {
   type ChatMessage,
   type CardPresentationSettingName,
   type MobileTableOptions,
+  type CreateTableSetting,
+  encodeCreateTableSettingFrame,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
 import type { ActionIncludingHypothetical } from '../game/client/types/actions';
@@ -694,6 +696,8 @@ export class LobbyRuntime {
     }
     if (!this.sendEncoded(frame)) return false;
 
+    this.saveCreateTablePreferences(maxPlayers, exposed);
+
     this.store.dispatch(roomActions.createRequested({
       epoch: state.session.connectionEpoch,
       name: effectiveName,
@@ -704,6 +708,47 @@ export class LobbyRuntime {
       bots: [...bots], password,
     };
     this.sendEncoded(encodeGetNameFrame());
+    return true;
+  }
+
+  saveCreateTablePreferences(maxPlayers: number, options: MobileTableOptions): boolean {
+    const initial = this.store.getState();
+    if (initial.session.phase !== 'ready') return false;
+    const desired: CreateTableSetting[] = [
+      { name: 'createTableVariant', value: options.variantName },
+      { name: 'createTableTimed', value: options.timed },
+      ...(options.timed ? [
+        { name: 'createTableTimeBaseMinutes' as const, value: options.timeBase / 60 },
+        { name: 'createTableTimePerTurnSeconds' as const, value: options.timePerTurn },
+      ] : []),
+      { name: 'createTableCardCycle', value: options.cardCycle },
+      { name: 'createTableEmptyClues', value: options.emptyClues },
+      { name: 'createTableOneExtraCard', value: options.oneExtraCard },
+      { name: 'createTableOneLessCard', value: options.oneLessCard },
+      { name: 'createTableAllOrNothing', value: options.allOrNothing },
+      { name: 'createTableMaxPlayers', value: maxPlayers },
+    ];
+    for (const setting of desired) {
+      const state = this.store.getState();
+      if (state.session.phase !== 'ready') return false;
+      const keyMap = {
+        createTableVariant: 'variant', createTableTimed: 'timed',
+        createTableTimeBaseMinutes: 'timeBaseMinutes', createTableTimePerTurnSeconds: 'timePerTurnSeconds',
+        createTableCardCycle: 'cardCycle', createTableEmptyClues: 'emptyClues',
+        createTableOneExtraCard: 'oneExtraCard', createTableOneLessCard: 'oneLessCard',
+        createTableAllOrNothing: 'allOrNothing', createTableMaxPlayers: 'maxPlayers',
+      } as const;
+      const current = state.session.createTablePreferences[keyMap[setting.name]];
+      if (current === setting.value) continue;
+      let frame: string;
+      try {
+        frame = encodeCreateTableSettingFrame(setting);
+      } catch {
+        return false;
+      }
+      if (!this.sendEncoded(frame)) return false;
+      this.store.dispatch(sessionActions.createTablePreferenceUpdated(setting));
+    }
     return true;
   }
 

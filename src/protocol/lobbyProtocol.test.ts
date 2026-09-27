@@ -29,6 +29,7 @@ import {
   encodeTableSpectateFrame,
   encodeTableStartFrame,
   encodeTableUnattendFrame,
+  encodeCreateTableSettingFrame,
 } from './lobbyProtocol';
 
 const user = {
@@ -95,6 +96,23 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: { command: 'welcome', data: { settings: { reverseHands: false } } },
     });
+  });
+  test('decodes supported Create preferences tolerantly and encodes exact string settings', () => {
+    const decoded = decodeServerFrame('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"settings":{"createTableVariant":"6 Suits","createTableTimed":true,"createTableTimeBaseMinutes":1.5,"createTableTimePerTurnSeconds":25,"createTableCardCycle":true,"createTableEmptyClues":true,"createTableOneExtraCard":true,"createTableOneLessCard":false,"createTableAllOrNothing":true,"createTableMaxPlayers":6,"unrelated":42}}');
+    expect(decoded).toMatchObject({ kind: 'event', event: { data: { settings: {
+      createTableVariant: '6 Suits', createTableTimed: true, createTableTimeBaseMinutes: 1.5,
+      createTableTimePerTurnSeconds: 25, createTableMaxPlayers: 6, unrelated: 42,
+    } } } });
+    expect(decodeServerFrame('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"settings":{"createTableTimed":"bad","createTableMaxPlayers":99,"createTableVariant":"unsupported"}}'))
+      .toMatchObject({ kind: 'event', event: { data: { settings: {
+        createTableTimed: false, createTableMaxPlayers: 5,
+        createTableTimeBaseMinutes: 2, createTableTimePerTurnSeconds: 20,
+      } } } });
+    expect(encodeCreateTableSettingFrame({ name: 'createTableVariant', value: 'No Variant' })).toBe('setting {"name":"createTableVariant","setting":"No Variant"}');
+    expect(encodeCreateTableSettingFrame({ name: 'createTableTimed', value: true })).toBe('setting {"name":"createTableTimed","setting":"true"}');
+    expect(encodeCreateTableSettingFrame({ name: 'createTableTimed', value: false })).toBe('setting {"name":"createTableTimed","setting":"false"}');
+    expect(encodeCreateTableSettingFrame({ name: 'createTableMaxPlayers', value: 5 })).toBe('setting {"name":"createTableMaxPlayers","setting":"5"}');
+    expect(encodeCreateTableSettingFrame({ name: 'createTableTimeBaseMinutes', value: 1.5 })).toBe('setting {"name":"createTableTimeBaseMinutes","setting":"1.5"}');
   });
   test('retains authoritative welcome mute state and defaults it when absent', () => {
     expect(decodeServerFrame(

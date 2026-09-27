@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { CardPresentationSettingName, GameplayPresentationSettingName, Welcome } from '../protocol/lobbyProtocol';
+import { DEFAULT_CREATE_TABLE_PREFERENCES, normalizeCreateTablePreferences, type CardPresentationSettingName, type CreateTablePreferences, type CreateTableSetting, type GameplayPresentationSettingName, type Welcome } from '../protocol/lobbyProtocol';
 
 export type ConnectionPhase =
   | 'idle'
@@ -59,6 +59,7 @@ export type SessionState = {
   cardPresentationSettings: CardPresentationSettings;
   realLifeMode: boolean;
   hyphenatedConventions: boolean;
+  createTablePreferences: CreateTablePreferences;
   serverStatus: { shuttingDown: boolean; datetimeShutdownInit: string | null; maintenanceMode: boolean };
   friends: string[];
   randomTableName: string | null;
@@ -88,6 +89,7 @@ const initialState: SessionState = {
   },
   realLifeMode: false,
   hyphenatedConventions: false,
+  createTablePreferences: { ...DEFAULT_CREATE_TABLE_PREFERENCES },
   serverStatus: { shuttingDown: false, datetimeShutdownInit: null, maintenanceMode: false },
   friends: [],
   randomTableName: null,
@@ -151,6 +153,7 @@ export const sessionSlice = createSlice({
       state.muted = welcome.muted ?? false;
       state.realLifeMode = welcome.settings?.realLifeMode ?? false;
       state.hyphenatedConventions = welcome.settings?.hyphenatedConventions ?? false;
+      state.createTablePreferences = normalizeCreateTablePreferences(welcome.settings);
       state.friends = [...(welcome.friends ?? [])];
       state.randomTableName = welcome.randomTableName ?? null;
       state.resumeHints = {
@@ -171,6 +174,20 @@ export const sessionSlice = createSlice({
       action: PayloadAction<{ name: GameplayPresentationSettingName; enabled: boolean }>,
     ) {
       state[action.payload.name] = action.payload.enabled;
+    },
+    createTablePreferenceUpdated(
+      state,
+      action: PayloadAction<CreateTableSetting>,
+    ) {
+      const keyMap = {
+        createTableVariant: 'variant', createTableTimed: 'timed',
+        createTableTimeBaseMinutes: 'timeBaseMinutes', createTableTimePerTurnSeconds: 'timePerTurnSeconds',
+        createTableCardCycle: 'cardCycle', createTableEmptyClues: 'emptyClues',
+        createTableOneExtraCard: 'oneExtraCard', createTableOneLessCard: 'oneLessCard',
+        createTableAllOrNothing: 'allOrNothing', createTableMaxPlayers: 'maxPlayers',
+      } as const;
+      const key = keyMap[action.payload.name];
+      (state.createTablePreferences as unknown as Record<string, string | boolean | number>)[key] = action.payload.value;
     },
     shutdownReceived(state, action: PayloadAction<{ epoch: number; shuttingDown: boolean; datetimeShutdownInit: string }>) {
       if (state.connectionEpoch !== action.payload.epoch) return;

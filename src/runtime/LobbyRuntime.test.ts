@@ -391,6 +391,68 @@ describe('bot invites', () => {
   });
 });
 
+describe('Create preference persistence', () => {
+  test('sends only changed supported settings and updates state after each successful send', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    expect(runtime.saveCreateTablePreferences(4, {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: true, emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    })).toBe(true);
+    expect(socket.sent).toEqual([
+      'setting {"name":"createTableCardCycle","setting":"true"}',
+      'setting {"name":"createTableMaxPlayers","setting":"4"}',
+    ]);
+    expect(store.getState().session.createTablePreferences).toMatchObject({ cardCycle: true, maxPlayers: 4 });
+    expect(runtime.saveCreateTablePreferences(4, {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: true, emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    })).toBe(true);
+    expect(socket.sent).toHaveLength(2);
+  });
+
+  test('converts timed seconds to fractional minutes and leaves latent timers untouched when untimed', async () => {
+    const { socket, runtime, store } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome: {
+      userID: 1, username: 'Ada', totalGames: 0, playingAtTables: [],
+      settings: { createTableTimePerTurnSeconds: 15 },
+    } }));
+    expect(runtime.saveCreateTablePreferences(5, {
+      variantName: 'No Variant', timed: true, timeBase: 90, timePerTurn: 20,
+      cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    })).toBe(true);
+    expect(socket.sent).toContain('setting {"name":"createTableTimeBaseMinutes","setting":"1.5"}');
+    expect(socket.sent).toContain('setting {"name":"createTableTimePerTurnSeconds","setting":"20"}');
+    socket.sent.length = 0;
+    expect(runtime.saveCreateTablePreferences(5, {
+      variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    })).toBe(true);
+    expect(socket.sent).toEqual(['setting {"name":"createTableTimed","setting":"false"}']);
+  });
+
+  test('does not update a preference whose setting frame fails to send', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.failOnSendNumber = 1;
+    expect(runtime.saveCreateTablePreferences(4, {
+      variantName: '6 Suits', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    })).toBe(false);
+    expect(socket.sent).toEqual([]);
+    expect(store.getState().session.createTablePreferences).toMatchObject({ variant: 'No Variant', maxPlayers: 5 });
+  });
+
+  test('keeps a successfully sent tableCreate successful when preference persistence fails', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    socket.failOnSendNumber = 2;
+    expect(runtime.createTable('Mobile table', 4, {
+      variantName: '6 Suits', timed: false, timeBase: 0, timePerTurn: 0,
+      cardCycle: false, emptyClues: false, oneExtraCard: false, oneLessCard: false, allOrNothing: false,
+    })).toBe(true);
+    expect(socket.sent[0]).toMatch(/^tableCreate /);
+    expect(store.getState().session.createTablePreferences).toMatchObject({ variant: 'No Variant', maxPlayers: 5 });
+  });
+});
+
 describe('open running game link', () => {
   test('spectates a known supported running table through existing path', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
