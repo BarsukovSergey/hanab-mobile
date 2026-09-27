@@ -139,7 +139,7 @@ Native auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) are not planned in t
 
 ## Specific-seed creation discoverability
 
-Add a native Create-table `Use specific seed` workflow as a thin UI over the existing upstream `!seed [suffix]` table-name semantics. The server still owns seed interpretation and game creation. A later History `Play this seed` shortcut may prefill that same Create flow only when the authoritative History seed has the canonical `p{players}v{variant}s{suffix}` prefix matching the game's options; do not blindly pass a full History seed as the `!seed` suffix.
+Implemented in PRs #128–#129. Create table now exposes `Use specific seed` as a thin UI over upstream `!seed [suffix]`, and canonical History entries can prefill the same Create flow through `Play this seed` without new server/protocol semantics. The server still owns the final seed construction from actual players and variant.
 
 ## Read-only tag discovery
 
