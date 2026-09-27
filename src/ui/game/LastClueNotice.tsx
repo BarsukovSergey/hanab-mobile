@@ -11,6 +11,7 @@ export function LastClueNotice() {
   const { width, height } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
   const room = useAppSelector((state) => state.room.room);
+  const reverseHands = useAppSelector((state) => state.session.cardPresentationSettings.reverseHands);
   if (room.kind !== 'live_game' || room.clientState.finished || room.clientState.replay.active) return null;
 
   const slotStyle = landscapePhone ? styles.slotLandscape : styles.slot;
@@ -23,7 +24,7 @@ export function LastClueNotice() {
   const names = room.clientState.metadata.playerNames;
   const metadata = room.clientState.metadata;
   const choices = getGameplayClueChoicesForPlayerIndex(metadata, clue.giverPlayerIndex);
-  const targetHand = getDisplayedHandOrders(visibleState.hands[clue.targetPlayerIndex] ?? []);
+  const targetHand = getDisplayedHandOrders(visibleState.hands[clue.targetPlayerIndex] ?? [], reverseHands);
   const touchedPositions = clue.touchedOrders
     .map((order) => targetHand.findIndex((candidate) => candidate === order) + 1)
     .filter((position) => position > 0);

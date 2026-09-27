@@ -94,7 +94,7 @@ The biggest remaining parity gaps are now concentrated in five areas:
 1. **Replay/review power features**: replay arrows/annotations, efficiency-mod origin controls, optional shadow-link handling, and other advanced review/navigation tools. JSON import, `/copy` export/share, replay-link opening/import, and bounded running-game/pregame link opening are already implemented.
 2. **Tags and richer history/profile workflows**: Add/display tag UI exists; richer tag search/delete management, arbitrary-player history, and richer profile/best-score surfaces remain.
 3. **Product/social surfaces**: optional linked-account UX and richer profile/settings workflows; account-management entry points and multi-bot invite UI are already implemented.
-4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, reverse-hand preference, and other non-core presentation settings remain.
+4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, and other non-core presentation settings remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
 Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), variant-aware clue/discard resource-state cues (#108), server-backed gameplay presentation settings (#110), stronger friend visibility in People/Lobby (#111), authoritative mute-state chat guarding (#112), and first-class Hypothetical card morph/unmorph controls (#114). Spectator perspective switching is also first-class in the live Game menu.
@@ -404,7 +404,7 @@ settings remain intentionally unelevated until they have a useful mobile workflo
 | `keldonMode` | Missing | L | Low | Mobile layout should not chase desktop table geometry unless requested. |
 | `colorblindMode` | **Full** | — | **High** | Server-backed switch with generated pinned-upstream card presentation. |
 | `realLifeMode` | **Full** | — | Low | PR #110 exposes the server-backed switch; #107/#108 presentation cues honor it. |
-| `reverseHands` | Missing | S–M | Medium | Useful player preference; current display direction is fixed. |
+| `reverseHands` | **Full** | — | Medium | Server-backed switch flips every displayed hand direction while preserving authoritative card order. |
 | `styleNumbers` | **Full** | — | **High** | Server-backed switch with generated pinned-upstream styled-number assets. |
 | `showTimerInUntimed` | Missing | S | Low | Optional. |
 | `speedrunPreplay` | Missing + speedrun unsupported | L | Low | Defer. |
@@ -792,7 +792,7 @@ production bot-discovery service. Its README documents PM `/join` as the invitat
 | Keyboard shortcuts | **N/A** | — | Low | Replace with native actions/gestures where useful. |
 | Keldon desktop table layout | Missing, not required | L | Low | Mobile needs its own responsive layout. |
 | Real-life mode | Missing | M | Low | Niche presentation option. |
-| Reverse hand direction | Missing | S–M | Medium | Genuine player preference. |
+| Reverse hand direction | **Full** | — | Medium | Server-backed preference flips every displayed hand direction. |
 | Pre-playing / premoves | Missing | L | Low–Medium | High safety complexity; explicit mobile actions are safer baseline. |
 | Website statistics pages | External only | S for links; L for native | Low | Native parity is not required for gameplay. |
 | Project history/docs | N/A | — | Low | Documentation, not app capability. |
@@ -1050,7 +1050,7 @@ A useful way to describe current parity is:
 - richer tag search/delete/management beyond the current Add/display flow;
 - optional shadow-link handling beyond the implemented running-game and pregame URL openers;
 - replay arrows/annotations/sounds and other advanced review tools;
-- sounds and reverse-hand preference;
+- sounds;
 - server-backed typing and other chat-presentation polish.
 
 That distinction matters: most remaining high-value work does **not** require a second Hanabi engine

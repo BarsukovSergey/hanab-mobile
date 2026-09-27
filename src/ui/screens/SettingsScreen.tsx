@@ -156,6 +156,17 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
           value={presentation.styleNumbers}
         />
       </View>
+      <View style={styles.settingRow}>
+        <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Reverse hand direction</Text>
+        <Switch
+          accessibilityLabel="Reverse hand direction"
+          accessibilityRole="switch"
+          onValueChange={(enabled) => {
+            lobbyRuntime.setCardPresentationSetting('reverseHands', enabled);
+          }}
+          value={presentation.reverseHands}
+        />
+      </View>
     </Panel>
     <Panel>
       <SectionHeading title="Gameplay presentation" />

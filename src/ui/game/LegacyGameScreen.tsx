@@ -64,6 +64,7 @@ export function GameScreen() {
   const { wide, width, height } = useResponsiveLayout();
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
+  const reverseHands = useAppSelector((state) => state.session.cardPresentationSettings.reverseHands);
   const roomState = useAppSelector((state) => state.room);
   const lobbyUsers = useAppSelector((state) => state.lobby.users.entities);
   const hyphenatedConventions = useAppSelector((state) => {
@@ -76,7 +77,7 @@ export function GameScreen() {
   const playerRoom = liveRoom?.role === 'player' && clientState?.playing ? liveRoom : null;
   const ourIndex = playerRoom?.clientState.metadata.ourPlayerIndex ?? null;
   const ourHand = useMemo(() => ourIndex === null ? [] : game?.hands[ourIndex] ?? [], [game, ourIndex]);
-  const displayedOurHand = useMemo(() => getDisplayedHandOrders(ourHand), [ourHand]);
+  const displayedOurHand = useMemo(() => getDisplayedHandOrders(ourHand, reverseHands), [ourHand, reverseHands]);
   const clueTargets = useMemo(() => playerRoom?.clientState.metadata.playerNames
     .map((_, i) => i).filter((i) => i !== ourIndex) ?? [], [ourIndex, playerRoom]);
   const [interaction, interactionDispatch] = useReducer(gameplayInteractionReducer, initialGameplayInteractionState);
@@ -191,7 +192,7 @@ export function GameScreen() {
     };
     const selectedReplayLabel = noteCard === null
       ? 'Card notes'
-      : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
+      : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard, reverseHands);
     return <>
       <View style={[styles.finishedScreen, wide && styles.wide]}>
         <View style={styles.column}>
@@ -222,7 +223,7 @@ export function GameScreen() {
         </View>
         <View style={styles.column}>{review}
           <ReplayTable game={game} variantName={metadata.options.variantName} />
-          <ReplayHands game={game} notes={clientState.notes.allNotes} onOpenNote={openReplayNote} playerNames={metadata.playerNames} variantName={metadata.options.variantName} />
+          <ReplayHands game={game} notes={clientState.notes.allNotes} onOpenNote={openReplayNote} playerNames={metadata.playerNames} reverseHands={reverseHands} variantName={metadata.options.variantName} />
           <GameLog entries={ongoingGame.log} title="Full game log" />
         </View>
       </View>
@@ -251,7 +252,7 @@ export function GameScreen() {
   const clueEnabled = enabled && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName) && selectedTarget !== null;
   const notesEditable = sessionPhase === 'ready' && !replay.active && !liveRoom.sharedReplay
     && noteCard !== null && liveNoteOrders.includes(noteCard);
-  const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard);
+  const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard, reverseHands);
   const pauseLabel = clientState.pause.active ? 'Unpause' : isOurTurn ? 'Pause' : clientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
   const openNote = (order: number) => {
     setNote(clientState.notes.ourNotes[order]?.text ?? '');
@@ -309,12 +310,14 @@ export function GameScreen() {
       states: replay.states,
       selectedSegment: latest,
       variantName: metadata.options.variantName,
+      reverseHands,
     });
     const reviewTemporal = replay.active && c17Review !== null
       ? getC17TemporalContext({
         states: replay.states,
         selectedSegment: c17Review.actionSegment,
         variantName: metadata.options.variantName,
+        reverseHands,
       })
       : liveTemporal;
     const newerActionCount = replay.active && c17Review !== null
@@ -339,6 +342,7 @@ export function GameScreen() {
         states: replay.states,
         selectedSegment: actionSegment,
         variantName: metadata.options.variantName,
+        reverseHands,
       });
       disarmGameplay();
       setC17Review({
@@ -375,6 +379,7 @@ export function GameScreen() {
     return <>
       <C17DenseWorkspace
         actionSegments={actionSegments}
+        reverseHands={reverseHands}
         canReviewForward={reviewTemporal.nextActionSegment !== null}
         canReviewBack={reviewTemporal.previousActionSegment !== null}
         cardIdentities={clientState.cardIdentities}
@@ -492,7 +497,7 @@ export function GameScreen() {
           {visiblePlayers.map((i) => {
             const target = selectedTarget === i;
             const empathizing = interaction.empathyPlayer === i;
-            const displayedHand = getDisplayedHandOrders(game.hands[i]);
+            const displayedHand = getDisplayedHandOrders(game.hands[i], reverseHands);
             return <View key={i} style={[
               styles.player,
               gameplayLayout.opponentColumns === 2 && styles.playerLandscape,
@@ -575,6 +580,7 @@ export function GameScreen() {
 
 function C17DenseWorkspace({
   actionSegments,
+  reverseHands,
   canReviewForward,
   canReviewBack,
   cardIdentities,
@@ -617,6 +623,7 @@ function C17DenseWorkspace({
   variantName,
 }: {
   actionSegments: readonly number[];
+  reverseHands: boolean;
   canReviewForward: boolean;
   canReviewBack: boolean;
   cardIdentities: readonly CardIdentity[];
@@ -690,7 +697,7 @@ function C17DenseWorkspace({
   };
   const current = game.turn.currentPlayerIndex;
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
-  const ownHand = getDisplayedHandOrders(game.hands[ourIndex]);
+  const ownHand = getDisplayedHandOrders(game.hands[ourIndex], reverseHands);
   const selectedOwnCard = selectedCard !== null && ownHand.some((order) => order === selectedCard) ? selectedCard : null;
   const selectedNote = selectedOwnCard === null ? '' : notes[selectedOwnCard]?.text ?? '';
 
@@ -753,7 +760,7 @@ function C17DenseWorkspace({
                   <Text style={[styles.c17KnowledgeLink, { color: empathizing ? theme.colors.accent : theme.colors.textMuted }]}>{empathizing ? 'KNOW ✓' : 'KNOW'}</Text>
                 </Pressable>
               </View>
-              <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index]).map((order, position) => {
+              <View onLayout={index === opponents[0] ? onOpponentCardLaneLayout : undefined} style={styles.c17OpponentCards}>{getDisplayedHandOrders(game.hands[index], reverseHands).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
                 const cardNote = notes[order];
@@ -914,17 +921,18 @@ function ReplayTable({ game, variantName }: { game: GameState; variantName: stri
   return <CompactTable game={game} variantName={variantName} />;
 }
 
-function ReplayHands({ game, playerNames, variantName, notes, onOpenNote }: {
+function ReplayHands({ game, playerNames, variantName, notes, onOpenNote, reverseHands }: {
   game: GameState;
   playerNames: readonly string[];
   variantName: string;
   notes: ReadonlyArray<readonly NoteEntry[]>;
   onOpenNote: (order: number) => void;
+  reverseHands: boolean;
 }) {
   const { theme } = useHanabTheme();
-  return <Panel><SectionHeading title="Replay hands" detail="Desktop left-to-right order; tap a noted card to read it." /><View style={styles.players}>{playerNames.map((name, i) => <View key={name}
+  return <Panel><SectionHeading title="Replay hands" detail="Hand direction follows your card appearance setting; tap a noted card to read it." /><View style={styles.players}>{playerNames.map((name, i) => <View key={name}
     style={[styles.player, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><Text style={[styles.playerName, { color: theme.colors.text }]}>{name}</Text>
-    <View style={styles.replayHand}>{getDisplayedHandOrders(game.hands[i]).map((order, position) => {
+    <View style={styles.replayHand}>{getDisplayedHandOrders(game.hands[i], reverseHands).map((order, position) => {
       const card = game.deck[order];
       const knowledge = card === undefined ? null : getCardKnowledgeViewModel(variantName, card, undefined, true);
       const hasNote = notes[order]?.some((entry) => entry.text.trim().length > 0) ?? false;
@@ -937,9 +945,9 @@ function ReplayHands({ game, playerNames, variantName, notes, onOpenNote }: {
   </View>)}</View></Panel>;
 }
 
-function getCardLocationLabel(game: GameState, playerNames: readonly string[], variantName: string, order: number) {
+function getCardLocationLabel(game: GameState, playerNames: readonly string[], variantName: string, order: number, reverseHands: boolean) {
   for (const [playerIndex, hand] of game.hands.entries()) {
-    const displayed = getDisplayedHandOrders(hand);
+    const displayed = getDisplayedHandOrders(hand, reverseHands);
     const position = displayed.findIndex((cardOrder) => cardOrder === order);
     if (position >= 0) return `${playerNames[playerIndex] ?? `Player ${playerIndex + 1}`} · card ${position + 1}`;
   }

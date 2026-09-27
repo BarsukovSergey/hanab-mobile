@@ -24,8 +24,10 @@ test('card appearance toggles use Redux values and the typed lobby runtime sette
   expect(settings).toContain('state.session.cardPresentationSettings');
   expect(settings).toContain("lobbyRuntime.setCardPresentationSetting('colorblindMode', enabled)");
   expect(settings).toContain("lobbyRuntime.setCardPresentationSetting('styleNumbers', enabled)");
+  expect(settings).toContain("lobbyRuntime.setCardPresentationSetting('reverseHands', enabled)");
   expect(settings).toContain('value={presentation.colorblindMode}');
   expect(settings).toContain('value={presentation.styleNumbers}');
+  expect(settings).toContain('value={presentation.reverseHands}');
   expect(settings).toContain('accessibilityRole="switch"');
   expect(settings).not.toContain('disabled={presentation.colorblindMode}');
 });

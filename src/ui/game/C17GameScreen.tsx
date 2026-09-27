@@ -95,6 +95,7 @@ export function C17GameScreen() {
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
   const colorblindMode = useAppSelector((state) => state.session.cardPresentationSettings.colorblindMode);
+  const reverseHands = useAppSelector((state) => state.session.cardPresentationSettings.reverseHands);
   const realLifeMode = useAppSelector((state) => state.session.realLifeMode);
   const username = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
   const hyphenatedConventions = useAppSelector((state) => state.session.hyphenatedConventions);
@@ -304,18 +305,21 @@ export function C17GameScreen() {
     states: replay.states,
     selectedSegment: latest,
     variantName: metadata.options.variantName,
+    reverseHands,
   });
   const reviewTemporal = isFinishedReplay || isSharedReplay
     ? getC17TemporalContext({
       states: replay.states,
       selectedSegment: replay.segment,
       variantName: metadata.options.variantName,
+      reverseHands,
     })
     : replay.active && c17Review !== null
     ? getC17TemporalContext({
       states: replay.states,
       selectedSegment: c17Review.actionSegment,
       variantName: metadata.options.variantName,
+      reverseHands,
     })
     : liveTemporal;
   const newerActionCount = !isFinishedReplay && !isSharedReplay && replay.active && c17Review !== null
@@ -343,6 +347,7 @@ export function C17GameScreen() {
       states: replay.states,
       selectedSegment: actionSegment,
       variantName: metadata.options.variantName,
+      reverseHands,
     });
     disarmGameplay();
     if (!isFinishedReplay && !isSharedReplay) {
@@ -418,6 +423,7 @@ export function C17GameScreen() {
   return <>
     <C17DenseWorkspace
       actionSegments={actionSegments}
+      reverseHands={reverseHands}
       canPlayCard={cardEnabled}
       canDiscardCard={discardEnabled}
       canPlayGameplay={isPlayingPlayer || canHypotheticalControl}
@@ -552,7 +558,7 @@ export function C17GameScreen() {
       onClose={() => setNoteEditorOpen(false)}
       onSave={saveNote}
       startEditing
-      title={noteCard === null ? 'Card note' : getCardLabel(game, metadata.playerNames, noteCard)}
+      title={noteCard === null ? 'Card note' : getCardLabel(game, metadata.playerNames, noteCard, reverseHands)}
       value={note}
       visible={noteEditorOpen}
     />
@@ -574,6 +580,7 @@ export function C17GameScreen() {
 
 function C17DenseWorkspace({
   actionSegments,
+  reverseHands,
   actionHandIndex,
   canPlayCard,
   canDiscardCard,
@@ -666,6 +673,7 @@ function C17DenseWorkspace({
   realLifeMode,
 }: {
   actionSegments: readonly number[];
+  reverseHands: boolean;
   actionHandIndex: number | null;
   canPlayCard: boolean;
   canDiscardCard: boolean;
@@ -852,8 +860,8 @@ function C17DenseWorkspace({
       && liveTransition.touchedSlots.includes(position + 1) ? livePulseSegment : null
   );
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
-  const anchoredHand = getDisplayedHandOrders(game.hands[seatingAnchorIndex]);
-  const displayedActionHand = actionHandIndex === null ? [] : getDisplayedHandOrders(game.hands[actionHandIndex]);
+  const anchoredHand = getDisplayedHandOrders(game.hands[seatingAnchorIndex], reverseHands);
+  const displayedActionHand = actionHandIndex === null ? [] : getDisplayedHandOrders(game.hands[actionHandIndex], reverseHands);
   const anchoredIsActionHand = actionHandIndex === seatingAnchorIndex;
   const displayIdentity = (order: number) => hypothetical?.morphedIdentities[order] ?? cardIdentities[order];
   const hasExplicitBlankMorph = (order: number) => {
@@ -1016,7 +1024,7 @@ function C17DenseWorkspace({
               </View>
             </View>
             <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: 2 + layout.cardTopHeadroom }]}>
-              {getDisplayedHandOrders(game.hands[index]).map((order, position) => {
+              {getDisplayedHandOrders(game.hands[index], reverseHands).map((order, position) => {
                 const card = game.deck[order];
                 if (card === undefined) return null;
                 const cardNote = notes[order];
@@ -1444,9 +1452,9 @@ function formatEfficiency(value: number | null): string {
   return value === null ? '-' : value.toFixed(2);
 }
 
-function getCardLabel(game: GameState, playerNames: readonly string[], order: number): string {
+function getCardLabel(game: GameState, playerNames: readonly string[], order: number, reverseHands: boolean): string {
   for (const [playerIndex, hand] of game.hands.entries()) {
-    const displayed = getDisplayedHandOrders(hand);
+    const displayed = getDisplayedHandOrders(hand, reverseHands);
     const position = displayed.findIndex((candidate) => candidate === order);
     if (position >= 0) return `${playerNames[playerIndex] ?? `Player ${playerIndex + 1}`} · card ${position + 1}`;
   }

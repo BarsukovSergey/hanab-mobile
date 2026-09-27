@@ -2648,13 +2648,13 @@ describe('deterministic lobby runtime', () => {
   test('card presentation settings send once and update locally after success', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
 
-    expect(runtime.setCardPresentationSetting('colorblindMode', true)).toBe(true);
+    expect(runtime.setCardPresentationSetting('reverseHands', true)).toBe(true);
     expect(socket.sent).toEqual([
-      'setting {"name":"colorblindMode","setting":"true"}',
+      'setting {"name":"reverseHands","setting":"true"}',
     ]);
-    expect(store.getState().session.cardPresentationSettings.colorblindMode).toBe(true);
+    expect(store.getState().session.cardPresentationSettings.reverseHands).toBe(true);
 
-    expect(runtime.setCardPresentationSetting('colorblindMode', true)).toBe(true);
+    expect(runtime.setCardPresentationSetting('reverseHands', true)).toBe(true);
     expect(socket.sent).toHaveLength(1);
   });
 
@@ -2662,9 +2662,9 @@ describe('deterministic lobby runtime', () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     socket.failSend = true;
 
-    expect(runtime.setCardPresentationSetting('styleNumbers', true)).toBe(false);
+    expect(runtime.setCardPresentationSetting('reverseHands', true)).toBe(false);
     expect(socket.sent).toEqual([]);
-    expect(store.getState().session.cardPresentationSettings.styleNumbers).toBe(false);
+    expect(store.getState().session.cardPresentationSettings.reverseHands).toBe(false);
   });
 
   test('card presentation settings require a ready connection', async () => {
@@ -2676,7 +2676,7 @@ describe('deterministic lobby runtime', () => {
     await runtime.connect();
     socket.emitOpen();
 
-    expect(runtime.setCardPresentationSetting('styleNumbers', false)).toBe(false);
+    expect(runtime.setCardPresentationSetting('reverseHands', true)).toBe(false);
     expect(socket.sent).toEqual([]);
   });
 

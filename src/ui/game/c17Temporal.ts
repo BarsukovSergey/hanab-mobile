@@ -36,6 +36,7 @@ type Input = {
   states: readonly (GameState | undefined)[];
   selectedSegment: number;
   variantName: string;
+  reverseHands: boolean;
 };
 
 type TransitionFacts = Pick<
@@ -57,7 +58,7 @@ export function countC17TemporalStatesAfter(
   ), 0);
 }
 
-export function getC17TemporalContext({ states, selectedSegment, variantName }: Input): C17TemporalContext {
+export function getC17TemporalContext({ states, selectedSegment, variantName, reverseHands }: Input): C17TemporalContext {
   const available = states.flatMap((state, segment) => state === undefined ? [] : [segment]);
   const resolvedSegment = states[selectedSegment] === undefined
     ? available.at(-1) ?? 0
@@ -71,7 +72,7 @@ export function getC17TemporalContext({ states, selectedSegment, variantName }: 
     if (after === undefined) return null;
     const beforeSegment = index > 0 ? available[index - 1] : undefined;
     const before = beforeSegment === undefined ? undefined : states[beforeSegment];
-    return makeEntry(segment, before, after, variantName);
+    return makeEntry(segment, before, after, variantName, reverseHands);
   }).filter((entry): entry is C17TemporalEntry => entry !== null);
   const firstStateSegment = available[0] ?? null;
   const actionEntries = entries.filter((entry) => entry.segment !== firstStateSegment);
@@ -116,6 +117,7 @@ function makeEntry(
   before: GameState | undefined,
   after: GameState,
   variantName: string,
+  reverseHands: boolean,
 ): C17TemporalEntry {
   if (before === undefined) {
     return {
@@ -131,7 +133,7 @@ function makeEntry(
   const authoritativeText = actionLog?.text
     ?? after.log.at(-1)?.text
     ?? 'Game state updated';
-  const facts = getTransitionFacts(before, after, variantName);
+  const facts = getTransitionFacts(before, after, variantName, reverseHands);
   const details = getTransitionDetails(before, after, variantName, facts);
 
   return {
@@ -142,9 +144,9 @@ function makeEntry(
   };
 }
 
-function getTransitionFacts(before: GameState, after: GameState, variantName: string): TransitionFacts {
+function getTransitionFacts(before: GameState, after: GameState, variantName: string, reverseHands: boolean): TransitionFacts {
   for (const [playerIndex, hand] of before.hands.entries()) {
-    const displayedHand = getDisplayedHandOrders(hand);
+    const displayedHand = getDisplayedHandOrders(hand, reverseHands);
     const afterHand = new Set(after.hands[playerIndex] ?? []);
     for (const [displayedIndex, order] of displayedHand.entries()) {
       if (afterHand.has(order)) continue;
@@ -171,7 +173,7 @@ function getTransitionFacts(before: GameState, after: GameState, variantName: st
 
   const newClue = after.clues.length > before.clues.length ? after.clues.at(-1) : undefined;
   if (newClue !== undefined) {
-    const displayedHand = getDisplayedHandOrders(before.hands[newClue.target]);
+    const displayedHand = getDisplayedHandOrders(before.hands[newClue.target], reverseHands);
     const touchedSlots = newClue.list
       .map((order) => displayedHand.indexOf(order) + 1)
       .filter((slot) => slot > 0)
