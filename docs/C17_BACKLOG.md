@@ -53,7 +53,7 @@ These items were explicitly removed from the C17 release gate during product rev
 
 - **Advanced shared-replay parity:** shared replay creation from History and send/receive turn suggestions are implemented. Remaining power-user candidates include replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. Initial `sharedReplayEffMod` state and authoritative follower-side `replayEfficiencyMod` updates are supported; controls for originating modifier changes remain future work. Do not rebuild the semantic state separately in UI.
 - **Game/replay tag management beyond current Add/display UI:** History/Friends History/Other Scores can display authoritative tags and the Game menu exposes Add tag through the existing server command path. Research whether tag search/delete or richer management deserves first-class mobile UI. This is distinct from note quick tags.
-- **Pregame/shadow link opening/import:** add bounded `pre-game/<tableID>` and optional shadow-link handling only through the existing authoritative join/password and spectator-perspective flows. Keep verified OS-level App Links separate; they still require stable signing and upstream cooperation.
+- **Optional shadow-link opening/import:** only add `game/<tableID>/shadow/<seat>` if concrete demand justifies it; spectator perspective switching is already first-class. Keep verified OS-level App Links separate; they still require stable signing and upstream cooperation.
 - **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
 
 ## Release / packaging / maintenance
@@ -76,6 +76,7 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Finished-review `/copy` export/share, including Copy link, Share link, Copy JSON, selected-segment export, and Hypothetical continuation/morph semantics.
 - Unified replay opening from History for raw JSON plus canonical ID/compressed hanab.live replay links, including clipboard paste and server-authoritative arbitrary-ID loading.
 - Bounded running-game link opening from Lobby for canonical `game/<tableID>` URLs, with own-game reattend and other-game spectate through existing authoritative eligibility paths.
+- Bounded pregame link opening for canonical `pre-game/<tableID>` URLs, preserving player-only join semantics and transient password handling through the existing Join path.
 - Hypothetical using upstream/server semantics, including controller-only card morph/unmorph through the explicit Edit cards mode.
 - Live spectator C17 workspace.
 - Pregame player/spectator role switching where authoritative capability permits.
