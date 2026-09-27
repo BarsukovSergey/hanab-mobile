@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Last reconciled with `main` at `cdc9bafd6f40b2b7ec49261bda3ad20381be6af5` (PR #129 merge).
+Last reconciled with `main` at `3528763a3e4765ad39583b8dbbdae4a0138a8e03` (PR #133 merge).
 
 This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
@@ -45,6 +45,7 @@ These items were explicitly removed from the C17 release gate during product rev
 - **Bot invite follow-up:** the multi-select Create/Pregame picker and exact 19-name registry are implemented for open and password-protected tables. The current 19 entries have verified password-join capability; future registry entries remain capability-gated. Only authoritative online Lobby-status bots are selectable, Busy bots are shown but disabled, and table passwords remain transient rather than entering Redux/persistence. Do not create a bot-only protocol.
 - Rich/compact profiles beyond the existing People/context-action surfaces.
 - Broader friends/social UX beyond current People/Friend actions, friends-first People ordering, friend-highlighted Lobby discovery, Friends history, Other Scores, and session PM Dialogs.
+- **Chat / Messaging redesign:** design this together with the major Mobile App Design pass rather than persisting the current contextual Dialog UI in place. Decide the Chats/Messages location in app IA, conversation list, full conversation screen, People/Profile/Game entry points, private-message unread/read semantics, reconnect/offline behavior, local cache retention, logout/shared-device privacy, and whether a future upstream PM-history read capability should become the durable source. Upstream currently persists PMs server-side but does not send PM history on reconnect, so any device cache must be described as local history rather than complete account history.
 - **Chat presence/presentation polish:** authoritative table-chat unread counts, best-effort `chatRead` acknowledgements, direct `/r`, and authoritative mute-state guarding are implemented. Future work may research typing indicators or other presentation polish only if authoritative server/client capability is worth exposing on mobile.
 - **Push notifications:** research mobile notifications for genuinely useful events (for example turn/table/social events) only after verifying server/background-delivery capability and notification permission UX.
 - **Linked hanab.live accounts:** optional native UI for the already-supported `/link` / `/linked` / `/unlink` semantics. Upstream linking is **not Discord account linking**; it is asymmetric hanab.live account linkage used when choosing seeds so linked accounts do not receive deals the linked user has already played. Discord is a separate lobby-chat/community integration.
@@ -52,7 +53,7 @@ These items were explicitly removed from the C17 release gate during product rev
 ## Replay / command parity
 
 - **Advanced shared-replay parity:** shared replay creation from History and send/receive turn suggestions are implemented. Remaining power-user candidates include replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. Initial `sharedReplayEffMod` state and authoritative follower-side `replayEfficiencyMod` updates are supported; controls for originating modifier changes remain future work. Do not rebuild the semantic state separately in UI.
-- **Game/replay tag management beyond current Add/display UI:** History/Friends History/Other Scores can display authoritative tags and the Game menu exposes Add tag through the existing server command path. Research whether tag search/delete or richer management deserves first-class mobile UI. This is distinct from note quick tags.
+- **Game/replay tag management beyond current read-only discovery + Add/display UI:** History exposes the authenticated user's Tagged games and exact tag search (PR #92 / upstream #3136), History/Friends History/Other Scores can display authoritative tags, and the Game menu exposes Add tag through the existing server command path. Tag deletion/delete-all and richer management remain deferred. This is distinct from note quick tags.
 - **Optional shadow-link opening/import:** only add `game/<tableID>/shadow/<seat>` if concrete demand justifies it; spectator perspective switching is already first-class. Keep verified OS-level App Links separate; they still require stable signing and upstream cooperation.
 - **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
 
@@ -60,7 +61,7 @@ These items were explicitly removed from the C17 release gate during product rev
 
 - **Account credentials:** the Android recent-account chooser is current direction: Hanab Mobile may remember usernames only, while Android Credential Manager owns saved account passwords. Hanab Mobile does not persist account passwords.
 - **Web / Android credential sharing:** deferred Digital Asset Links integration, including upstream `https://hanab.live/.well-known/assetlinks.json` and package/signing-certificate association. Revisit only when the public/release signing identity is stable and upstream cooperation is appropriate. This association is not implemented.
-- **Beta.2 physical validation:** the frozen beta.2 APK has been built successfully and its exact identity is recorded in `docs/BETA_2_RELEASE_NOTES.md`. Before broad distribution, validate upgrade over beta.1 without uninstalling, perform at least one clean install, and complete the short physical smoke without changing the candidate SHA/hash.
+- **Beta.3 physical validation:** beta.2 remains the frozen previous tester binary. For beta.3, freeze one candidate SHA, validate upgrade over beta.2 without uninstalling, perform at least one clean install, and complete the focused physical smoke without changing the candidate SHA/hash.
 - **Play Store / AAB pipeline:** define store signing, AAB packaging, versioning, and release policy separately from the current standalone internal APK flow. Keep the heavy APK/AAB workflow manual unless deliberately changed.
 - **Dependency maintenance:** current findings and remediation order are recorded in `docs/DEPENDENCY_AUDIT.md`. The present lockfile reports 10 moderate / 0 high / 0 critical findings, all expanding from the Expo config -> `xcode@3.0.1` -> `uuid@7.0.3` advisory chain. Do not use `npm audit fix --force`; wait for a compatible upstream fix or handle it in an isolated, validated maintenance slice.
 - **Release housekeeping:** before a public/store release, explicitly verify final icon/splash/branding assets, About/licenses obligations, and the release checklist rather than inheriting historical C16/C17 assumptions.
@@ -89,7 +90,8 @@ For avoidance of doubt, the following are **not** backlog and remain C17 MUST:
 - Native Pregame Kick, Find variant, and Missing scores actions with slash-command fallback.
 - Multi-bot Create/Pregame picker for open and password-protected tables with transient password handling.
 - Own History, Friends history, same-seed Other Scores comparison, authoritative seed/turn display with exact Copy seed, native specific-seed Create, and canonical History `Play this seed` prefill.
-- Authoritative game tag display and first-class Add tag action.
+- Authoritative game tag display and first-class Add tag action, plus read-only Tagged games and exact tag search in History.
+- Server-backed supported Create-table preference persistence, reverse-hand direction, and show-turn-timers-in-untimed-games presentation settings.
 - Live table-chat unread indicator, server-backed read acknowledgement, direct `/r` reply handling, and authoritative mute-state guarding.
 - Minimal functional state-change animation.
 - Adaptive 4P–6P real-card portrait allocation with the 46 dp opponent floor and emergency-only Compact Overview fallback; current physical evidence covers 5P, true 6P, and 6P + One Extra Card on the tested Android class.

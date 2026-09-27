@@ -26,7 +26,7 @@ Hanab Mobile already has the difficult gameplay foundation:
 - serious 2P/3P live gameplay and adaptive 4P–6P real-card presentation;
 - explicit safe Play/Discard/Clue actions;
 - pinned-upstream H-group and clue/discard resource-state presentation cues without changing action legality;
-- server-backed H-group features and Real-life mode gameplay-presentation settings;
+- server-backed H-group features, Real-life mode, reverse-hand direction, and untimed-timer gameplay-presentation settings;
 - notes, knowledge/empathy, Last Action / Recent and live Rewind;
 - finished replay, shared review, turn suggestions and Hypothetical including card morph/unmorph;
 - spectator mode with perspective switching;
@@ -143,10 +143,10 @@ Implemented in PRs #128–#129. Create table now exposes `Use specific seed` as 
 
 ## Read-only tag discovery
 
-This slice is gated on upstream Hanabi-Live PR #3136, which remains open as of 2026-09-26. Do not implement mobile tag-list/search UI
-before that upstream read-only API merges and production availability is verified. When available,
-reuse the existing History cards and replay flow. Tag removal and delete-all remain deferred; this
-slice has no tag mutation UI.
+Implemented in mobile PR #92. Upstream Hanabi-Live PR #3136 is merged, so the read-only
+`/api/v1/tags/:username` and `/api/v1/tag/:tag` capability is available on the production line.
+History exposes Tagged games and exact tag search while reusing the existing replay/share flow.
+Tag removal and delete-all remain deferred; this slice has no tag mutation UI.
 
 ---
 
@@ -171,6 +171,7 @@ Candidate destinations to evaluate include:
 - Lobby / Home;
 - History / Review;
 - People / Social;
+- Messages / Chats;
 - You / Profile;
 - Settings;
 - an active Game / Return to game destination or persistent affordance.
@@ -244,12 +245,20 @@ Bring non-game surfaces into one coherent product system:
 
 - History / Friends history / Other Scores;
 - People, friends and PM entry points;
+- a coherent Messages/Chats surface instead of session-only contextual PM dialogs;
 - richer player/profile surface;
 - account/security, card appearance and gameplay-presentation settings;
 - tag workflows;
 - replay entry/sharing actions.
 
 The goal is to remove the feeling that each feature added its own mini-navigation system.
+
+Chat/messaging design belongs in this phase rather than as a pre-beta cache patch. Decide whether
+Messages is top-level or owned by People/Profile; define a conversation list and full conversation
+screen; define PM unread/read, reconnect/offline, local persistence and logout/privacy behavior; and
+decide whether durable history should remain device-local or eventually consume an upstream PM
+history capability. Lobby/table chat and private conversations should share presentation primitives
+without pretending they have the same authoritative history semantics.
 
 ## 2.6 Visual design system pass
 
@@ -447,22 +456,29 @@ These can be revisited only with a concrete user need or deliberate product deci
 
 # Near-term execution order
 
-While beta.2 feedback is active:
+Beta.3 feature scope is frozen after the completed small slices: read-only tag discovery (#92),
+specific-seed Create (#128–#129), reverse hands (#131), server-backed Create preferences (#132), and
+show-timer-in-untimed (#133). Upstream #3136 and #3139 are merged; the #3139 JSON replay URL
+visibility semantics were sanity-checked against mobile and require no mobile code change.
 
-1. respond to tester-confirmed correctness/safety defects;
-2. keep unrelated feature work isolated;
-3. keep read-only tag discovery blocked until upstream #3136 merges and production availability is verified;
-4. keep native auto-start helpers out of scope; existing slash-command fallback is sufficient;
-5. keep the major Mobile App Design pass deferred until it is explicitly reprioritized.
+Before distributing beta.3:
 
-When the beta.2 defect picture is reasonably stable:
+1. keep only correctness/safety regressions eligible for runtime changes;
+2. reconcile release/version metadata and freeze one candidate SHA;
+3. build the beta.3 artifact;
+4. validate upgrade over beta.2 plus a clean install on a physical device;
+5. run the focused gameplay/replay/spectator/chat/background smoke;
+6. distribute the immutable candidate to testers.
 
-6. execute the Mobile App Design implementation as a coherent milestone;
-7. run a new physical-device/product UX validation pass;
-8. deepen profiles/social/history;
-9. add advanced replay/review tools;
-10. add serious-player notes/clue-planning productivity features;
-11. complete store/AAB/release readiness when the product itself is ready.
+After beta.3:
+
+7. execute the Mobile App Design implementation as a coherent milestone, including the Chat /
+   Messaging redesign;
+8. run a new physical-device/product UX validation pass;
+9. deepen profiles/social/history;
+10. add advanced replay/review tools;
+11. add serious-player notes/clue-planning productivity features;
+12. complete store/AAB/release readiness when the product itself is ready.
 
 This ordering is intentionally product-first. The remaining work should make Hanab feel increasingly
 like a deliberate mobile application, not merely maximize the number of Hanabi-Live features copied
