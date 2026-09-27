@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Last reconciled with `main` at `3a4639e62ea30f55152afa40543bb96edbf4c004` (PR #114 merge).
+Last reconciled with `main` at `169f6ea348770166cf8dbdbb11fac1df18d07a04` (PR #116 merge).
 
 This file is an inventory, not the sequencing authority. See `PRODUCT_ROADMAP.md` for the current order of work and major product stages.
 
@@ -52,7 +52,6 @@ These items were explicitly removed from the C17 release gate during product rev
 ## Replay / command parity
 
 - **Advanced shared-replay parity:** shared replay creation from History and send/receive turn suggestions are implemented. Remaining power-user candidates include replay arrows/annotations, replay sounds, and user-facing efficiency-mod controls. Initial `sharedReplayEffMod` state and authoritative follower-side `replayEfficiencyMod` updates are supported; controls for originating modifier changes remain future work. Do not rebuild the semantic state separately in UI.
-- **Arbitrary JSON replay import:** add the upstream `replayCreate` `source=json` workflow for research/bot review only after deliberately adopting the current upstream JSON seed/deck/player-name semantics recorded in `docs/UPSTREAM_PARITY_AUDIT.md`.
 - **Game/replay tag management beyond current Add/display UI:** History/Friends History/Other Scores can display authoritative tags and the Game menu exposes Add tag through the existing server command path. Research whether tag search/delete or richer management deserves first-class mobile UI. This is distinct from note quick tags.
 - **`/copy` replay export:** implement the deliberately deferred replay-copy flow, including the required replay JSON/clipboard mechanics, without changing existing server-handled slash-command fallback behavior.
 - **Replay scrubber performance:** investigate rapid-scrub rendering/update cost while preserving authoritative replay semantics and the existing final-position flush behavior. Concrete defect tracking remains GitHub issue #4.
