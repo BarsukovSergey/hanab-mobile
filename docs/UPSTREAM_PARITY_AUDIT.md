@@ -2,7 +2,7 @@
 
 Date: 2026-09-27
 
-Status: **planning snapshot reconciled with mobile `main` through PR #129; beta.2 remains the current tester line**
+Status: **planning snapshot reconciled with mobile `main` through PR #133; beta.2 remains the current tester line while beta.3 is prepared**
 
 ## Scope and source of truth
 
@@ -12,7 +12,7 @@ mobile repository state.
 Upstream repositories reviewed:
 
 - `Hanabi-Live/hanabi-live`
-  - current `main`: `aed0d81d02b32136d6136c8ddd386d529ab04415`
+  - current `main`: `2ddc7ca52cf429460d5638e01657e96cdb6c727e`
   - mobile baseline game/protocol pin: `e78e82bce2ff5d54b9d2ec359530955fd354e9b7`
   - mobile card-presentation pin: `7a9c601b66f5966f7e33564855e25f82e68a94ed`
   - mobile Hypothetical replay-core pin: `8be709c48145ad56a1891307663ed3bec2cd4175`
@@ -22,7 +22,7 @@ Upstream repositories reviewed:
 Mobile repository reviewed at:
 
 - `BarsukovSergey/hanab-mobile`
-- current `main`: `cdc9bafd6f40b2b7ec49261bda3ad20381be6af5` (PR #129 merge)
+- current `main`: `3528763a3e4765ad39583b8dbbdae4a0138a8e03` (PR #133 merge)
 - distributed beta.2 runtime remains frozen at `45d99d15960d04934ea0ce07fcb90db73eb206df` (PR #84 runtime candidate)
 - distributed beta.1 runtime remains frozen at `d297ad71153095f18fba3101f760e306ed69e214`
 
@@ -92,12 +92,12 @@ already present:
 The biggest remaining parity gaps are now concentrated in five areas:
 
 1. **Replay/review power features**: replay arrows/annotations, efficiency-mod origin controls, optional shadow-link handling, and other advanced review/navigation tools. JSON import, `/copy` export/share, replay-link opening/import, and bounded running-game/pregame link opening are already implemented.
-2. **Tags and richer history/profile workflows**: Add/display tag UI exists; richer tag search/delete management, arbitrary-player history, and richer profile/best-score surfaces remain.
+2. **Tags and richer history/profile workflows**: read-only Tagged games and exact tag search are implemented, as are Add/display flows; tag deletion/management, arbitrary-player history, and richer profile/best-score surfaces remain.
 3. **Product/social surfaces**: optional linked-account UX and richer profile/settings workflows; account-management entry points and multi-bot invite UI are already implemented.
-4. **Chat/presentation long tail**: authoritative table-chat unread/read state and session PM dialogs now exist; typing, sounds, and other non-core presentation settings remain.
+4. **Chat/messaging and presentation long tail**: authoritative table-chat unread/read state and session PM dialogs exist; a coherent Chats/Messages information architecture, durable conversation-history policy, typing, sounds, and other non-core presentation work remain.
 5. **Explicitly unsupported rule families/options**: 184 variants plus speedrun, deck-play and detrimental-character tables.
 
-Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), variant-aware clue/discard resource-state cues (#108), server-backed gameplay presentation settings (#110), stronger friend visibility in People/Lobby (#111), authoritative mute-state chat guarding (#112), and first-class Hypothetical card morph/unmorph controls (#114). Spectator perspective switching is also first-class in the live Game menu.
+Since the original audit snapshot, major parity slices have landed: adaptive real-card 4P–6P layout (#37–#41), bundled card presentation modes and settings (#50–#51), People/context actions (#52/#59), random table-name parity (#63), Pregame stats (#65), Pregame spectators (#67), friend-aware Lobby discovery (#69), Friends history (#71), same-seed Other Scores (#73), first-class game tags (#76), shared replay creation from History (#77), shared-replay suggestion receive/UI (#78), live table-chat unread state (#79), direct `/r` submission handling (#80), session PM Dialogs (#82/#83), account-management UX (#88), native Pregame Kick/Find/Missing tools (#90), the multi-bot Create/Pregame picker including transient protected-table joins (#91), read-only tag discovery (#92), server maintenance/shutdown status notices (#104), live lobby table-progress plus server-backed table-chat read-state synchronization (#105), H-group gameplay status cues (#107), variant-aware clue/discard resource-state cues (#108), server-backed gameplay presentation settings (#110), stronger friend visibility in People/Lobby (#111), authoritative mute-state chat guarding (#112), first-class Hypothetical card morph/unmorph controls (#114), arbitrary JSON replay import (#116), `/copy` export/share (#118), canonical replay-link opening (#120), bounded game/pregame URL opening (#122/#124), specific-seed Create (#128–#129), reverse hands (#131), server-backed Create preference persistence (#132), and show-timer-in-untimed (#133). Spectator perspective switching is also first-class in the live Game menu.
 
 The protocol surface is already broad. The command/event matrices below remain useful capability inventories, but the original aggregate counts are no longer treated as live totals after these later parity slices.
 
@@ -391,9 +391,11 @@ closed. The current 2242 variants already represent the overwhelming majority of
 The server sends the complete upstream settings object in `welcome`. Mobile deliberately retains a
 bounded subset needed by supported product flows instead of mirroring every web preference.
 
-The mobile Settings screen now exposes server-backed card appearance plus H-group/Real-life gameplay
-presentation controls alongside its local theme/accent/developer and account controls. Other upstream
-settings remain intentionally unelevated until they have a useful mobile workflow.
+The mobile Settings screen now exposes server-backed card appearance plus H-group/Real-life,
+reverse-hand, and show-timer-in-untimed gameplay presentation controls alongside its local
+theme/accent/developer and account controls. Supported Create-table preferences are also initialized
+from and persisted through server settings. Other upstream settings remain intentionally unelevated
+until they have a useful mobile workflow.
 
 | Upstream setting | Mobile status | Effort | Importance | Recommendation |
 | --- | --- | ---: | ---: | --- |
@@ -590,7 +592,7 @@ commands already works without explicit mobile protocol code.
 
 | Command family | Mobile status |
 | --- | --- |
-| `/copy` | **Missing** |
+| `/copy` | **Full mobile-local finished-review export/share** |
 | friend/unfriend/friends | Full |
 | link/unlink/linked | Full |
 | PM aliases | Full |
@@ -601,7 +603,7 @@ commands already works without explicit mobile protocol code.
 | terminate/vote | Full + native controls |
 | playerinfo/stats | Full command path |
 | version | Full |
-| reply `/r` | Partial edge case as described above |
+| reply `/r` | Full direct reply path |
 
 ### Server chat commands that already work through fallback
 
@@ -944,11 +946,15 @@ the live server, or browser-only fixes irrelevant to React Native.
 
 Do not move the broad baseline pin merely because `main` is ahead.
 
-Recommended scoped actions:
+Recent scoped drift checks are complete:
 
-1. add mobile lifecycle coverage for the **server-side #3129 pregame-spectator behavior**;
-2. when implementing JSON replay/import/`copy`, deliberately source the complete current JSON
-   semantics from the 2026-09-15..18 upstream changes rather than the older baseline.
+1. upstream #3136 merged and the mobile read-only tag discovery already implemented in #92 matches
+   the production API semantics;
+2. upstream #3139 merged with `/replay-json/...` → solo and
+   `/shared-replay-json/...` → shared; mobile already maps both routes that way, so no code or pin
+   change was required.
+
+Keep the broad baseline pin stable unless a future feature needs additional vendored game semantics.
 
 ---
 
@@ -967,8 +973,8 @@ jank (#4) as non-blocking defect backlog unless real usage reprioritizes it.
 
 ## B. High-value, relatively low-risk next work
 
-1. Continue small authoritative-state/parity fixes only when independently useful.
-2. Revisit read-only tag discovery only after upstream #3136 merges and production availability is verified.
+1. Keep beta.3 runtime scope frozen except for confirmed correctness/safety regressions.
+2. Treat read-only tag discovery as complete; defer tag deletion/richer management until it has clear product value.
 3. Keep native Pregame auto-start helpers (`/s`, `/s2`…`/s6`, `/startin`) out of scope; slash-command fallback remains the supported path.
 
 ## C. Medium product slices
@@ -976,7 +982,7 @@ jank (#4) as non-blocking defect backlog unless real usage reprioritizes it.
 1. Richer user/profile and arbitrary-player history surfaces.
 2. Optional shadow-link handling if there is concrete demand; spectator perspective switching is already first-class in the Game menu.
 3. Account-management / linked-account UX.
-4. Chat typing/presentation polish beyond the implemented table unread/read state.
+4. Chat/Messaging redesign during the Mobile App Design pass, including conversation IA/history policy, plus later typing/presentation polish where authoritative capability exists.
 5. Remaining shared-replay arrows/annotations/sounds/leader controls.
 
 ## D. Defer until demanded
@@ -1016,9 +1022,9 @@ A useful way to describe current parity is:
 - Hypothetical core including card morph/unmorph originating UI;
 - spectator read-only gameplay with player-perspective shadow switching;
 - supported option/variant rules;
-- generated upstream card presentation with colorblind/styled-number server settings plus server-backed H-group/Real-life presentation toggles;
+- generated upstream card presentation with colorblind/styled-number server settings plus server-backed H-group/Real-life, reverse-hands, and show-timer-in-untimed presentation toggles;
 - pinned-upstream H-group and clue/discard resource-state presentation cues for supported gameplay;
-- own History, Friends history, and same-seed Other Scores;
+- own History, Friends history, same-seed Other Scores, read-only Tagged games, and exact tag search;
 - People/Pregame/live-game contextual friend/session-PM actions, friends-first visual emphasis, and compact Pregame stats;
 - shared replay creation and turn-suggestion receive/UI;
 - game tag display/Add flow;
@@ -1047,7 +1053,7 @@ A useful way to describe current parity is:
 
 - broader account/settings beyond the implemented login clarification, password change/reset entry points, card appearance settings, and H-group/Real-life presentation settings;
 - rich profiles and arbitrary-player history beyond existing People/context actions;
-- richer tag search/delete/management beyond the current Add/display flow;
+- tag delete/delete-all and richer management beyond the implemented Add/display plus read-only discovery flow;
 - optional shadow-link handling beyond the implemented running-game and pregame URL openers;
 - replay arrows/annotations/sounds and other advanced review tools;
 - sounds;
@@ -1060,13 +1066,13 @@ or a protocol rewrite.
 
 During the beta.2 tester window, keep runtime work in isolated slices so tester-confirmed defects can still be hotfixed without unrelated churn.
 
-For the current feature cycle, the most defensible order is:
+For the current feature cycle, the order is:
 
-1. fix any tester-confirmed beta.2 runtime defects;
-2. keep read-only tag discovery gated on upstream #3136 and keep native auto-start helpers out of scope;
-3. tackle JSON/`copy` and advanced replay power features deliberately;
-4. expand profiles/social/settings only where mobile context adds value;
-5. only then consider expensive exotic rules/options.
+1. keep beta.3 feature scope frozen and fix only confirmed correctness/safety regressions;
+2. complete beta.3 release/version housekeeping, build, and physical-device validation;
+3. run the major Mobile App Design pass, including Chat / Messaging information architecture;
+4. deepen profiles/social/history and advanced replay/review workflows after the shell is coherent;
+5. only then consider serious-player productivity expansions and expensive exotic rules/options.
 
 This preserves the project's strongest architectural property: the server/upstream rules stay
 authoritative while mobile work remains mostly presentation, interaction and carefully scoped
@@ -1130,7 +1136,7 @@ slash commands are sent as ordinary authoritative chat text and the server handl
 | `/unpause` | **Full through fallback + native timed-game UI** | server command / typed pause runtime | Already covered. | — | Medium |
 | `/terminate` | **Full + native UI** | termination runtime | Already covered. | — | Medium |
 | `/tag [tag]` | **Full command path + native Add action** | direct `tag` | Game menu exposes first-class Add tag; richer search/delete management remains. | S | Medium |
-| `/copy` | **Missing** | browser-local upstream command | Mobile fallback sends text to server, which cannot perform the browser-local copy/export behavior. Needs replay JSON/share implementation. | M | Medium |
+| `/copy` | **Full mobile-local** | finished-review export/share | Copy link, Share link, Copy JSON, selected-segment export, and Hypothetical continuation/morph semantics are implemented. | — | Medium |
 | `/suggest [turn]` | **Full shared-review flow** | direct `tableSuggest` send + authoritative `suggestion` receive/UI | Mobile can send and receive turn suggestions; leader-side Accept/Dismiss uses existing replay navigation. | — | Medium |
 | `/tagdelete [tag]` | **Full command path** | direct `tagDelete` | Structured tags UI missing. | S–M | Medium |
 | `/tags` | **Full through fallback** | server replay command | Returns text; first-class tag display exists in History surfaces, while richer structured management remains. | S | Medium |
@@ -1171,11 +1177,11 @@ mobile feature requirement. The table separates the underlying user need from li
 | `/history/[username1]/.../[username6]` | Shared history for selected players | **Missing** | L | Low–Medium |
 | `/missing-scores/[username]` | Non-max scores for one player | Command-level `/missing` exists for current group; no native arbitrary-user page. | M–L | Low–Medium |
 | `/shared-missing-scores/2/[username...]` | Shared missing scores for 2–6 users | Current-table `/missing` fallback covers the common live need; page parity missing. | L | Low |
-| `/tags/[username]` | Player's tagged games | **Missing native tags/history surface** | M–L | Low–Medium |
+| `/tags/[username]` | Player's tagged games | **Native read-only discovery implemented** in History via upstream #3136 API | — | Low–Medium |
 | `/seed/[seed]` | Games on the same deal | **Native contextual equivalent implemented** via authenticated Other Scores; full public seed page remains web-only. | — | Medium |
 | `/stats` | Site-wide statistics | External/web-only today | L | Low |
 | `/variant/[id]` | Variant statistics | External/web-only today | L | Low |
-| `/tag/[tag]` | Games matching a tag | Raw `/tagsearch` exists; structured native results missing. | M | Medium |
+| `/tag/[tag]` | Games matching a tag | **Native exact tag search implemented** in History via upstream #3136 API; mutation management remains separate. | — | Medium |
 
 For mobile, the best use of these capabilities is usually a native contextual subset (profile,
 history, seed comparison, tags), with an external-browser link for the long-tail statistics pages.
@@ -1184,7 +1190,7 @@ history, seed comparison, tags), with an external-browser link for the long-tail
 
 | Upstream endpoint | Purpose | Mobile status / relevance | Effort | Importance |
 | --- | --- | --- | ---: | ---: |
-| `/export/[game ID]` | Full game JSON export | **Not used**; relevant to future `/copy`/research export. | M | Medium |
+| `/export/[game ID]` | Full game JSON export | Not used; mobile `/copy` export/share is already implemented from authoritative loaded replay state. | — | Medium |
 | `/api/v1/variants` | Variant IDs/list | Not used; mobile vendors pinned variant data deliberately. | — | Low |
 | `/api/v1/variants-full` | Full variant metadata | Not used; pinned vendored closure is architecturally preferred for gameplay. | — | Low |
 | `/api/v1/variants/[variant ID]` | Paginated games for variant | Not used; analytics/research only. | M–L | Low |
@@ -1192,6 +1198,8 @@ history, seed comparison, tags), with an external-browser link for the long-tail
 | `/api/v1/history-full/[username...]` | Complete player/shared history | Not used; potentially expensive and not needed for core mobile UX. | M–L | Low |
 | `/api/v1/seed/[seed]` | Paginated games on seed | Not used; `historyGetSeed` is the better authenticated in-app path. | — | Low |
 | `/api/v1/seed-full/[seed]` | All games on seed | Not used; research/export use only. | M | Low |
+| `/api/v1/tags/:username` | Games tagged by one user | **Used** for mobile Tagged games discovery; read-only and newest-first. | — | Medium |
+| `/api/v1/tag/:tag` | Games matching normalized tag | **Used** for exact mobile tag search with upstream dedupe semantics. | — | Medium |
 
 ### Endpoint architecture rule
 
