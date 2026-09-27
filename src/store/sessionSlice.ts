@@ -18,6 +18,7 @@ export type AuthenticatedUser = {
 export type CardPresentationSettings = {
   colorblindMode: boolean;
   styleNumbers: boolean;
+  reverseHands: boolean;
 };
 
 export type ResumeHints = Pick<
@@ -83,6 +84,7 @@ const initialState: SessionState = {
   cardPresentationSettings: {
     colorblindMode: false,
     styleNumbers: false,
+    reverseHands: false,
   },
   realLifeMode: false,
   hyphenatedConventions: false,
@@ -144,6 +146,7 @@ export const sessionSlice = createSlice({
       state.cardPresentationSettings = {
         colorblindMode: welcome.settings?.colorblindMode ?? false,
         styleNumbers: welcome.settings?.styleNumbers ?? false,
+        reverseHands: welcome.settings?.reverseHands ?? false,
       };
       state.muted = welcome.muted ?? false;
       state.realLifeMode = welcome.settings?.realLifeMode ?? false;

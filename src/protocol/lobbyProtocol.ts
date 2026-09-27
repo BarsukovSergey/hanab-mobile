@@ -366,6 +366,7 @@ export type LobbyTable = z.infer<typeof lobbyTableSchema>;
 export const cardPresentationSettingNameSchema = z.enum([
   'colorblindMode',
   'styleNumbers',
+  'reverseHands',
 ]);
 
 export type CardPresentationSettingName = z.infer<typeof cardPresentationSettingNameSchema>;
@@ -380,11 +381,13 @@ export type GameplayPresentationSettingName = z.infer<typeof gameplayPresentatio
 const cardPresentationSettingsSchema = z.object({
   colorblindMode: z.boolean().default(false),
   styleNumbers: z.boolean().default(false),
+  reverseHands: z.boolean().default(false),
   realLifeMode: z.boolean().default(false),
   hyphenatedConventions: z.boolean().default(false),
 }).passthrough().default({
   colorblindMode: false,
   styleNumbers: false,
+  reverseHands: false,
   realLifeMode: false,
   hyphenatedConventions: false,
 });

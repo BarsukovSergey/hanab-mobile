@@ -72,12 +72,12 @@ describe('lobby protocol decoder', () => {
   });
   test('parses presentation settings, tolerates other settings, and defaults absent settings', () => {
     expect(decodeServerFrame(
-      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"realLifeMode":true,"hyphenatedConventions":true,"sounds":true}}',
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"reverseHands":true,"realLifeMode":true,"hyphenatedConventions":true,"sounds":true}}',
     )).toMatchObject({
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: true, styleNumbers: false, realLifeMode: true, hyphenatedConventions: true, sounds: true } },
+        data: { settings: { colorblindMode: true, styleNumbers: false, reverseHands: true, realLifeMode: true, hyphenatedConventions: true, sounds: true } },
       },
     });
     expect(decodeServerFrame(
@@ -86,8 +86,14 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: false, styleNumbers: false, realLifeMode: false, hyphenatedConventions: false } },
+        data: { settings: { colorblindMode: false, styleNumbers: false, reverseHands: false, realLifeMode: false, hyphenatedConventions: false } },
       },
+    });
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"reverseHands":false}}',
+    )).toMatchObject({
+      kind: 'event',
+      event: { command: 'welcome', data: { settings: { reverseHands: false } } },
     });
   });
   test('retains authoritative welcome mute state and defaults it when absent', () => {
@@ -128,6 +134,12 @@ describe('lobby protocol decoder', () => {
     );
     expect(encodeCardPresentationSettingFrame('styleNumbers', false)).toBe(
       'setting {"name":"styleNumbers","setting":"false"}',
+    );
+    expect(encodeCardPresentationSettingFrame('reverseHands', true)).toBe(
+      'setting {"name":"reverseHands","setting":"true"}',
+    );
+    expect(encodeCardPresentationSettingFrame('reverseHands', false)).toBe(
+      'setting {"name":"reverseHands","setting":"false"}',
     );
   });
 

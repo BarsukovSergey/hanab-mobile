@@ -22,6 +22,7 @@ describe('session card presentation settings', () => {
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,
+      reverseHands: false,
     });
 
     store.dispatch(sessionActions.cardPresentationSettingUpdated({
@@ -31,6 +32,7 @@ describe('session card presentation settings', () => {
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: true,
+      reverseHands: false,
     });
   });
 
@@ -39,7 +41,7 @@ describe('session card presentation settings', () => {
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 1,
-      welcome: welcome({ colorblindMode: true, styleNumbers: false, realLifeMode: true, hyphenatedConventions: true }),
+      welcome: welcome({ colorblindMode: true, styleNumbers: false, reverseHands: true, realLifeMode: true, hyphenatedConventions: true }),
     }));
 
     expect(store.getState().session.realLifeMode).toBe(true);
@@ -51,15 +53,17 @@ describe('session card presentation settings', () => {
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: true,
       styleNumbers: false,
+      reverseHands: true,
     });
 
     store.dispatch(sessionActions.welcomeReceived({
       epoch: 2,
-      welcome: welcome({ colorblindMode: false, styleNumbers: true }),
+      welcome: welcome({ colorblindMode: false, styleNumbers: true, reverseHands: false }),
     }));
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: true,
+      reverseHands: false,
     });
     expect(store.getState().session.realLifeMode).toBe(false);
     expect(store.getState().session.hyphenatedConventions).toBe(false);
@@ -78,6 +82,7 @@ describe('session card presentation settings', () => {
     expect(store.getState().session.cardPresentationSettings).toEqual({
       colorblindMode: false,
       styleNumbers: false,
+      reverseHands: false,
     });
   });
 });
