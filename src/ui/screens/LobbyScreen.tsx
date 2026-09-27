@@ -50,6 +50,7 @@ export function LobbyScreen({
   const [showLiveGameLink, setShowLiveGameLink] = useState(false);
   const [liveGameLink, setLiveGameLink] = useState('');
   const [liveGameLinkError, setLiveGameLinkError] = useState<string | null>(null);
+  const [liveGameLinkPassword, setLiveGameLinkPassword] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [createOptions, setCreateOptions] = useState<MobileTableOptions>(DEFAULT_OPTIONS);
   const [joinPassword, setJoinPassword] = useState('');
@@ -96,31 +97,52 @@ export function LobbyScreen({
       </Panel>
 
       {showLiveGameLink && <Panel style={styles.linkPanel}>
-        <SectionHeading title="Open running game" detail="Open a running game that is available in the Lobby." />
-        <TextInput value={liveGameLink} onChangeText={(value) => { setLiveGameLink(value); setLiveGameLinkError(null); }}
+        <SectionHeading title="Open game link" detail="Open a game or join a pregame table available in the Lobby." />
+        <TextInput value={liveGameLink} onChangeText={(value) => { setLiveGameLink(value); setLiveGameLinkError(null); setLiveGameLinkPassword(''); }}
           placeholder="https://hanab.live/game/123" autoCapitalize="none" autoCorrect={false}
           style={[styles.linkInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />
+        {(() => {
+          const parsed = parseLiveGameInput(liveGameLink);
+          const target = parsed.kind === 'pregame' ? tables.find((table) => table.id === parsed.tableID) : undefined;
+          return parsed.kind === 'pregame' && target?.passwordProtected === true ? (
+            <TextInput value={liveGameLinkPassword} onChangeText={setLiveGameLinkPassword}
+              placeholder="Table password" secureTextEntry autoCapitalize="none" autoCorrect={false}
+              style={[styles.linkInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />
+          ) : null;
+        })()}
         {liveGameLinkError !== null && <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{liveGameLinkError}</Text>}
         <View style={styles.heroActions}>
           <ActionButton compact title="Paste from clipboard" tone="secondary" onPress={() => {
             void clipboard.readClipboard().then((text) => {
               if (text.trim() === '') setLiveGameLinkError('Clipboard is empty.');
-              else { setLiveGameLink(text); setLiveGameLinkError(null); }
+              else { setLiveGameLink(text); setLiveGameLinkError(null); setLiveGameLinkPassword(''); }
             }).catch(() => setLiveGameLinkError('Could not read the clipboard.'));
           }} />
           <ActionButton compact title="Open game" tone="primary" onPress={() => {
             const parsed = parseLiveGameInput(liveGameLink);
             if (parsed.kind === 'invalid') { setLiveGameLinkError(parsed.reason); return; }
-            if (!lobbyRuntime.openLiveGameByID(parsed.tableID)) {
+            if (parsed.kind === 'liveGame' && !lobbyRuntime.openLiveGameByID(parsed.tableID)) {
               setLiveGameLinkError('That running table is not currently available to open.');
               return;
             }
+            if (parsed.kind === 'pregame') {
+              const table = tables.find((candidate) => candidate.id === parsed.tableID);
+              if (table?.passwordProtected && liveGameLinkPassword.length === 0) {
+                setLiveGameLinkError('Enter the table password.');
+                return;
+              }
+              if (!lobbyRuntime.openPregameByID(parsed.tableID, liveGameLinkPassword || undefined)) {
+                setLiveGameLinkError('That pregame table is not currently available to join.');
+                return;
+              }
+            }
             setLiveGameLinkError(null);
+            setLiveGameLinkPassword('');
             setShowLiveGameLink(false);
             setLiveGameLink('');
           }} />
           <ActionButton compact title="Cancel" tone="secondary" onPress={() => {
-            setShowLiveGameLink(false); setLiveGameLinkError(null);
+            setShowLiveGameLink(false); setLiveGameLink(''); setLiveGameLinkError(null); setLiveGameLinkPassword('');
           }} />
         </View>
       </Panel>}
