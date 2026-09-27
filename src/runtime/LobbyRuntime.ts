@@ -459,7 +459,6 @@ export class LobbyRuntime {
     const item = [...state.history.items, ...state.history.friendItems, ...state.history.taggedItems,
       ...(state.history.tagSearchItems ?? []), ...(state.history.otherScores?.games ?? [])]
       .find((candidate) => candidate.id === databaseID);
-    const room = state.room;
     if (
       state.session.phase !== 'ready'
       || state.history.connectionEpoch !== state.session.connectionEpoch
@@ -467,20 +466,7 @@ export class LobbyRuntime {
       || databaseID <= 0
       || item === undefined
       || !areTableOptionsSupported(item.options)
-      || room.room.kind !== 'none'
-      || room.pendingRecovery !== null
-      || room.pendingSpectateTableID !== null
-      || room.pendingJoin !== null
-      || room.pendingCreate !== null
-      || room.pendingLeaveTableID !== null
-      || room.pendingUnattendTableID !== null
-      || room.pendingStart !== null
-      || room.pendingUpdate !== null
-      || room.pendingLeaderName !== null
-      || room.pendingRestartTableID !== null
-      || room.rematchTransition !== null
-      || room.pendingGameplayAction !== null
-      || state.history.pendingReplayCreate !== null
+      || !this.canRequestReplay(state)
     ) return false;
     if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
     this.store.dispatch(historyActions.replayCreateRequested({
@@ -491,19 +477,38 @@ export class LobbyRuntime {
     return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
   }
 
+  watchReplayByID(databaseID: number, visibility: 'solo' | 'shared'): boolean {
+    const state = this.store.getState();
+    if (!Number.isInteger(databaseID) || databaseID <= 0 || !this.canRequestReplay(state)) return false;
+    if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
+    this.store.dispatch(historyActions.externalReplayCreateRequested({
+      connectionEpoch: state.session.connectionEpoch, source: 'id', databaseID, visibility,
+    }));
+    return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
+  }
+
   watchJSONReplay(gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared'): boolean {
     const state = this.store.getState();
-    const room = state.room;
-    if (state.session.phase !== 'ready' || room.room.kind !== 'none' || state.history.pendingReplayCreate !== null
-      || room.pendingRecovery !== null || room.pendingSpectateTableID !== null || room.pendingJoin !== null
-      || room.pendingCreate !== null || room.pendingLeaveTableID !== null || room.pendingUnattendTableID !== null
-      || room.pendingStart !== null || room.pendingUpdate !== null || room.pendingLeaderName !== null
-      || room.pendingRestartTableID !== null || room.rematchTransition !== null || room.pendingGameplayAction !== null) return false;
+    if (!this.canRequestReplay(state)) return false;
     if (!this.sendEncoded(encodeJSONReplayCreateFrame(gameJSON, visibility))) return false;
     this.store.dispatch(historyActions.replayCreateRequested({
       connectionEpoch: state.session.connectionEpoch, source: 'json', visibility,
     }));
     return this.store.getState().history.pendingReplayCreate?.source === 'json';
+  }
+
+  private canRequestReplay(state: ReturnType<LobbyRuntime['store']['getState']>): boolean {
+    const room = state.room;
+    return state.session.phase === 'ready'
+      && state.history.connectionEpoch === state.session.connectionEpoch
+      && room.room.kind === 'none'
+      && room.pendingRecovery === null && room.pendingSpectateTableID === null
+      && room.pendingJoin === null && room.pendingCreate === null
+      && room.pendingLeaveTableID === null && room.pendingUnattendTableID === null
+      && room.pendingStart === null && room.pendingUpdate === null
+      && room.pendingLeaderName === null && room.pendingRestartTableID === null
+      && room.rematchTransition === null && room.pendingGameplayAction === null
+      && state.history.pendingReplayCreate === null;
   }
 
   spectate(tableID: number): boolean {

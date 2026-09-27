@@ -560,7 +560,13 @@ function AppContent() {
   } else if (localScreen === 'history') {
     content = <HistoryScreen onBack={() => { setReturnAfterUnattend(null); setLocalScreen('lobby'); }}
       onWatchReplay={(databaseID, visibility) => { if (lobbyRuntime.watchHistoricalGame(databaseID, visibility)) setReturnAfterUnattend('history'); }}
-      onWatchJSONReplay={(gameJSON, visibility) => { if (lobbyRuntime.watchJSONReplay(gameJSON, visibility)) setReturnAfterUnattend('history'); }} />;
+      onWatchJSONReplay={(gameJSON, visibility) => { if (lobbyRuntime.watchJSONReplay(gameJSON, visibility)) setReturnAfterUnattend('history'); }}
+      onWatchReplayInput={(request) => {
+        const opened = request.kind === 'id'
+          ? lobbyRuntime.watchReplayByID(request.databaseID, request.visibility)
+          : lobbyRuntime.watchJSONReplay(request.gameJSON, request.visibility);
+        if (opened) setReturnAfterUnattend('history');
+      }} />;
   } else if (localScreen === 'settings') {
     content = <SettingsScreen onBack={() => setLocalScreen('lobby')} onSignOut={() => void signOut()} />;
   } else if (localScreen === 'people') {

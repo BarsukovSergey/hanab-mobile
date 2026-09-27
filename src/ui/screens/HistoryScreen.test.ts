@@ -10,11 +10,15 @@ describe('History screen source contract', () => {
     expect(screen).toContain('>{item.tags}</Text>');
     expect(screen).not.toMatch(/item\.tags\.split/);
   });
-  test('offers local JSON parsing and requires an object without sending invalid input', () => {
-    expect(screen).toContain('title="Import JSON"');
-    expect(screen).toContain('JSON.parse(replayJSONText)');
-    expect(screen).toContain('parsed === null || typeof parsed !== \'object\' || Array.isArray(parsed)');
-    expect(screen).toContain('onWatchJSONReplay(parsed as Record<string, unknown>, replayVisibility)');
+  test('offers unified replay input and rejects invalid input locally', () => {
+    expect(screen).toContain('title="Open replay"');
+    expect(screen).toContain('parseReplayInput(replayJSONText, replayVisibility)');
+    expect(screen).toContain('title="Paste from clipboard"');
+    expect(screen).toContain('title="Open replay"');
+    expect(screen).toContain('onWatchJSONReplay(parsed.gameJSON, parsed.visibility)');
+    expect(screen).toContain("else { setReplayJSONText(text); setReplayJSONError(null); }");
+    expect(screen).toContain("setReplayJSONError('Clipboard is empty.')");
+    expect(screen).toContain("setReplayJSONError('Could not read the clipboard.')");
   });
 
   test('same-seed comparison keeps source context and server order', () => {

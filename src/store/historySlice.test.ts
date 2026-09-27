@@ -32,6 +32,17 @@ function readyStore(totalGames = 30) {
 }
 
 describe('C15 history state', () => {
+  test('ordinary replay requests require a loaded ID while external requests accept an unknown positive ID', () => {
+    const store = readyStore();
+    const unknownRequest = { connectionEpoch: 1, source: 'id' as const, visibility: 'shared' as const, databaseID: 987654 };
+
+    store.dispatch(historyActions.replayCreateRequested(unknownRequest));
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+
+    store.dispatch(historyActions.externalReplayCreateRequested(unknownRequest));
+    expect(store.getState().history.pendingReplayCreate).toEqual(unknownRequest);
+  });
+
   test('tag loads/searches remain isolated, preserve order and ignore stale epochs', () => {
     const store = readyStore();
     store.dispatch(historyActions.taggedRequested({ connectionEpoch: 1 }));

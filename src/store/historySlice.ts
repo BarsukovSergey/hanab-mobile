@@ -220,6 +220,15 @@ export const historySlice = createSlice({
       state.pendingReplayCreate = action.payload;
       state.error = null;
     },
+    externalReplayCreateRequested(state, action: PayloadAction<PendingReplayCreate>) {
+      if (state.connectionEpoch !== action.payload.connectionEpoch
+        || state.pendingReplayCreate !== null
+        || action.payload.source !== 'id'
+        || !Number.isInteger(action.payload.databaseID)
+        || action.payload.databaseID <= 0) return;
+      state.pendingReplayCreate = action.payload;
+      state.error = null;
+    },
     replayCreateAccepted(state, action: PayloadAction<PendingReplayCreate>) {
       const pending = state.pendingReplayCreate;
       if (

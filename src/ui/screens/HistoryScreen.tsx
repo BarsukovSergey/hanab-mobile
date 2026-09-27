@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
+import { parseReplayInput, type ReplayInputResult } from '../../game/client/replayInput';
+import { replayInputActions, type ReplayInputActions } from '../../platform/replayInputActions';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import {
@@ -26,10 +28,14 @@ export function HistoryScreen({
   onBack,
   onWatchReplay,
   onWatchJSONReplay,
+  onWatchReplayInput,
+  clipboardActions = replayInputActions,
 }: {
   onBack: () => void;
   onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
   onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
+  onWatchReplayInput: (request: Exclude<ReplayInputResult, { kind: 'invalid' }>) => void;
+  clipboardActions?: ReplayInputActions;
 }) {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
@@ -113,27 +119,28 @@ export function HistoryScreen({
       </Panel>}
 
       {!comparing && <Panel style={styles.importPanel}>
-        <SectionHeading title="Import JSON" />
+        <SectionHeading title="Open replay" detail="Paste replay JSON or a hanab.live replay link." />
         <TextInput multiline value={replayJSONText} onChangeText={setReplayJSONText}
-          placeholder="Paste replay JSON" autoCapitalize="none" autoCorrect={false}
+          placeholder="Replay JSON or https://hanab.live/replay/…" autoCapitalize="none" autoCorrect={false}
           style={[styles.jsonInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />
         <View style={styles.search}>
+          <ActionButton compact title="Paste from clipboard" tone="secondary" onPress={() => {
+            void clipboardActions.readClipboard().then((text) => {
+              if (text.trim() === '') setReplayJSONError('Clipboard is empty.');
+              else { setReplayJSONText(text); setReplayJSONError(null); }
+            }).catch(() => setReplayJSONError('Could not read the clipboard.'));
+          }} />
           <ActionButton compact title="Solo" tone={replayVisibility === 'solo' ? 'primary' : 'secondary'}
             onPress={() => setReplayVisibility('solo')} />
           <ActionButton compact title="Shared" tone={replayVisibility === 'shared' ? 'primary' : 'secondary'}
             onPress={() => setReplayVisibility('shared')} />
-          <ActionButton compact title="Watch replay" disabled={replayPending || replayJSONText.trim() === ''}
+          <ActionButton compact title="Open replay" disabled={replayPending || replayJSONText.trim() === ''}
             onPress={() => {
-              try {
-                const parsed: unknown = JSON.parse(replayJSONText);
-                if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                  setReplayJSONError('Replay JSON must be an object.'); return;
-                }
-                setReplayJSONError(null);
-                onWatchJSONReplay(parsed as Record<string, unknown>, replayVisibility);
-              } catch {
-                setReplayJSONError('Enter valid JSON.');
-              }
+              const parsed = parseReplayInput(replayJSONText, replayVisibility);
+              if (parsed.kind === 'invalid') { setReplayJSONError(parsed.reason); return; }
+              setReplayJSONError(null);
+              if (parsed.kind === 'id') onWatchReplayInput(parsed);
+              else onWatchJSONReplay(parsed.gameJSON, parsed.visibility);
             }} />
         </View>
         {replayJSONError !== null && <Notice tone="error">{replayJSONError}</Notice>}
