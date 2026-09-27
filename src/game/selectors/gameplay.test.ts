@@ -14,14 +14,26 @@ import {
 import { PaceRisk } from '../upstream/enums/PaceRisk';
 
 describe('getGameTableSuits', () => {
-  it('counts down only the active clock and ignores timeTaken', () => {
+  it('counts down timed clocks only for the active player and ignores timeTaken', () => {
     const clock = {
       times: [12_000, 9_000], activePlayerIndex: 0, timeTaken: 8_000, receivedAtMs: 1_000,
     };
-    expect(getDisplayedClockTime(clock, 0, false, 4_500)).toBe(8_500);
-    expect(getDisplayedClockTime(clock, 1, false, 4_500)).toBe(9_000);
-    expect(getDisplayedClockTime(clock, 0, true, 99_000)).toBe(12_000);
-    expect(getDisplayedClockTime(clock, 0, false, 0)).toBe(12_000);
+    expect(getDisplayedClockTime(clock, 0, false, 4_500, true)).toBe(8_500);
+    expect(getDisplayedClockTime(clock, 1, false, 4_500, true)).toBe(9_000);
+    expect(getDisplayedClockTime(clock, 0, true, 99_000, true)).toBe(12_000);
+    expect(getDisplayedClockTime(clock, 0, false, 0, true)).toBe(12_000);
+    expect(getDisplayedClockTime(clock, 0, false, 99_000, true)).toBe(0);
+  });
+
+  it('inverts untimed server clocks into elapsed time without mutating the frame', () => {
+    const clock = {
+      times: [-12_000, -9_000], activePlayerIndex: 0, timeTaken: 0, receivedAtMs: 1_000,
+    };
+    expect(getDisplayedClockTime(clock, 0, false, 4_500, false)).toBe(15_500);
+    expect(getDisplayedClockTime(clock, 1, false, 4_500, false)).toBe(9_000);
+    expect(getDisplayedClockTime(clock, 0, true, 4_500, false)).toBe(12_000);
+    expect(getDisplayedClockTime(clock, 0, false, 0, false)).toBe(12_000);
+    expect(clock.times).toEqual([-12_000, -9_000]);
   });
   it('uses upstream clue names for variant and character semantics', () => {
     expect(getGameplayClueChoices('Odds and Evens (5 Suits)').ranks).toEqual([

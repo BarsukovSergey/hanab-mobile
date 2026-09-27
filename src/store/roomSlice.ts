@@ -1344,7 +1344,6 @@ export const roomSlice = createSlice({
         || state.room.tableID !== payload.tableID
         || state.room.gameLoadEpoch !== payload.gameLoadEpoch
         || state.room.clientState.pause.active
-        || !state.room.clientState.metadata.options.timed
         || payload.clock.times.length !== state.room.clientState.metadata.options.numPlayers
         || payload.clock.activePlayerIndex < 0
         || payload.clock.activePlayerIndex

@@ -248,14 +248,14 @@ test('dense clue Workbench reserves content height without moving Ledger hands',
   expect(screen).toContain('dense={usesDenseSideLabels}');
 });
 
-test('C17 renders authoritative live clocks only for an eligible timed live game', () => {
+test('C17 renders authoritative clocks for an eligible timed or opted-in untimed live game', () => {
   const screen = readC17Screen();
   const eligibility = screen.slice(screen.indexOf('const liveClock ='), screen.indexOf('const latest ='));
   const clockComponent = screen.slice(screen.indexOf('function C17LiveClockText'), screen.indexOf('\n\nfunction HudStat'));
 
   expect(screen).toContain('getDisplayedClockString,');
   expect(screen).toContain('type LiveClock,');
-  expect(eligibility).toContain('metadata.options.timed === true');
+  expect(eligibility).toContain('(timed || showTimerInUntimed)');
   expect(eligibility).toContain('!clientState.finished');
   expect(eligibility).toContain('!replay.active');
   expect(eligibility).toContain('!hypotheticalActive');
@@ -263,9 +263,9 @@ test('C17 renders authoritative live clocks only for an eligible timed live game
   expect(eligibility).toContain('ongoingGame.turn.currentPlayerIndex !== null');
   expect(eligibility).toContain('liveRoom.clock !== null');
   expect(screen).toContain('clockPaused={clientState.pause.active}');
-  expect(screen).toContain('<C17LiveClockText\n                  clock={liveClock}\n                  paused={clockPaused}\n                  playerIndex={index}');
-  expect(screen).toContain('<C17LiveClockText\n            clock={liveClock}\n            paused={clockPaused}\n            playerIndex={seatingAnchorIndex}');
-  expect(clockComponent).toContain('getDisplayedClockString(clock, playerIndex, paused, now)');
+  expect(screen).toContain('<C17LiveClockText\n                  clock={liveClock}\n                  paused={clockPaused}\n                  timed={metadata.options.timed === true}\n                  playerIndex={index}');
+  expect(screen).toContain('<C17LiveClockText\n            clock={liveClock}\n            paused={clockPaused}\n            timed={metadata.options.timed === true}\n            playerIndex={seatingAnchorIndex}');
+  expect(clockComponent).toContain('getDisplayedClockString(clock, playerIndex, paused, now, timed)');
   expect(clockComponent).toContain('if (paused) return undefined;');
   expect(clockComponent).toContain('setInterval(() => setNow(Date.now()), 1000)');
   expect(screen).not.toContain("from './LegacyGameScreen'");

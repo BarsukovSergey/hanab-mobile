@@ -21,6 +21,7 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
   const presentation = useAppSelector((state) => state.session.cardPresentationSettings);
   const hyphenatedConventions = useAppSelector((state) => state.session.hyphenatedConventions);
   const realLifeMode = useAppSelector((state) => state.session.realLifeMode);
+  const showTimerInUntimed = useAppSelector((state) => state.session.showTimerInUntimed);
   const authenticatedUsername = useAppSelector((state) => state.session.authenticatedUser?.username ?? null);
   const { theme } = useHanabTheme();
 
@@ -170,6 +171,17 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
     </Panel>
     <Panel>
       <SectionHeading title="Gameplay presentation" />
+      <View style={styles.settingRow}>
+        <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Show turn timers in untimed games</Text>
+        <Switch
+          accessibilityLabel="Show turn timers in untimed games"
+          accessibilityRole="switch"
+          onValueChange={(enabled) => {
+            lobbyRuntime.setGameplayPresentationSetting('showTimerInUntimed', enabled);
+          }}
+          value={showTimerInUntimed}
+        />
+      </View>
       <View style={styles.settingRow}>
         <Text style={[styles.settingLabel, { color: theme.colors.text }]}>H-group features</Text>
         <Switch

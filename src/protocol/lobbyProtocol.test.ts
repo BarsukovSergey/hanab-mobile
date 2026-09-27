@@ -73,12 +73,12 @@ describe('lobby protocol decoder', () => {
   });
   test('parses presentation settings, tolerates other settings, and defaults absent settings', () => {
     expect(decodeServerFrame(
-      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"reverseHands":true,"realLifeMode":true,"hyphenatedConventions":true,"sounds":true}}',
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"colorblindMode":true,"styleNumbers":false,"reverseHands":true,"realLifeMode":true,"hyphenatedConventions":true,"showTimerInUntimed":true,"sounds":true}}',
     )).toMatchObject({
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: true, styleNumbers: false, reverseHands: true, realLifeMode: true, hyphenatedConventions: true, sounds: true } },
+        data: { settings: { colorblindMode: true, styleNumbers: false, reverseHands: true, realLifeMode: true, hyphenatedConventions: true, showTimerInUntimed: true, sounds: true } },
       },
     });
     expect(decodeServerFrame(
@@ -87,8 +87,13 @@ describe('lobby protocol decoder', () => {
       kind: 'event',
       event: {
         command: 'welcome',
-        data: { settings: { colorblindMode: false, styleNumbers: false, reverseHands: false, realLifeMode: false, hyphenatedConventions: false } },
+        data: { settings: { colorblindMode: false, styleNumbers: false, reverseHands: false, realLifeMode: false, hyphenatedConventions: false, showTimerInUntimed: false } },
       },
+    });
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"showTimerInUntimed":false}}',
+    )).toMatchObject({
+      kind: 'event', event: { command: 'welcome', data: { settings: { showTimerInUntimed: false } } },
     });
     expect(decodeServerFrame(
       'welcome {"userID":1,"username":"Ada","totalGames":12,"playingAtTables":[],"settings":{"reverseHands":false}}',
@@ -167,6 +172,12 @@ describe('lobby protocol decoder', () => {
     );
     expect(encodeGameplayPresentationSettingFrame('hyphenatedConventions', false)).toBe(
       'setting {"name":"hyphenatedConventions","setting":"false"}',
+    );
+    expect(encodeGameplayPresentationSettingFrame('showTimerInUntimed', true)).toBe(
+      'setting {"name":"showTimerInUntimed","setting":"true"}',
+    );
+    expect(encodeGameplayPresentationSettingFrame('showTimerInUntimed', false)).toBe(
+      'setting {"name":"showTimerInUntimed","setting":"false"}',
     );
   });
 

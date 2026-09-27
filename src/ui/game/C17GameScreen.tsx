@@ -94,6 +94,7 @@ export function C17GameScreen() {
   const orientationRef = useRef(orientation);
   const dispatch = useAppDispatch();
   const sessionPhase = useAppSelector((state) => state.session.phase);
+  const showTimerInUntimed = useAppSelector((state) => state.session.showTimerInUntimed);
   const colorblindMode = useAppSelector((state) => state.session.cardPresentationSettings.colorblindMode);
   const reverseHands = useAppSelector((state) => state.session.cardPresentationSettings.reverseHands);
   const realLifeMode = useAppSelector((state) => state.session.realLifeMode);
@@ -198,7 +199,8 @@ export function C17GameScreen() {
   if (liveRoom === null || clientState === null || game === null || seatingAnchorIndex === null) return null;
 
   const { metadata, replay, ongoingGame } = clientState;
-  const liveClock = metadata.options.timed === true
+  const timed = metadata.options.timed === true;
+  const liveClock = (timed || showTimerInUntimed)
     && !clientState.finished
     && !replay.active
     && !hypotheticalActive
@@ -1019,6 +1021,7 @@ function C17DenseWorkspace({
                 {liveClock !== null && <C17LiveClockText
                   clock={liveClock}
                   paused={clockPaused}
+                  timed={metadata.options.timed === true}
                   playerIndex={index}
                 />}
               </View>
@@ -1122,6 +1125,7 @@ function C17DenseWorkspace({
           {liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
+            timed={metadata.options.timed === true}
             playerIndex={seatingAnchorIndex}
           />}
         </View>
@@ -1404,7 +1408,7 @@ function C17DenseWorkspace({
   </View>;
 }
 
-function C17LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; playerIndex: number; paused: boolean }) {
+function C17LiveClockText({ clock, playerIndex, paused, timed }: { clock: LiveClock; playerIndex: number; paused: boolean; timed: boolean }) {
   const { theme } = useHanabTheme();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -1413,7 +1417,7 @@ function C17LiveClockText({ clock, playerIndex, paused }: { clock: LiveClock; pl
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [clock.receivedAtMs, paused, playerIndex]);
-  const display = getDisplayedClockString(clock, playerIndex, paused, now);
+  const display = getDisplayedClockString(clock, playerIndex, paused, now, timed);
   if (display === null) return null;
   return <Text style={[styles.clock, { color: theme.colors.text }]}>{display}</Text>;
 }

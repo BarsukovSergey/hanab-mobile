@@ -434,6 +434,7 @@ export type CardPresentationSettingName = z.infer<typeof cardPresentationSetting
 export const gameplayPresentationSettingNameSchema = z.enum([
   'realLifeMode',
   'hyphenatedConventions',
+  'showTimerInUntimed',
 ]);
 
 export type GameplayPresentationSettingName = z.infer<typeof gameplayPresentationSettingNameSchema>;
@@ -444,6 +445,7 @@ const cardPresentationSettingsSchema = z.object({
   reverseHands: z.boolean().default(false),
   realLifeMode: z.boolean().default(false),
   hyphenatedConventions: z.boolean().default(false),
+  showTimerInUntimed: z.boolean().default(false),
   ...createTablePreferenceSettingsSchema.shape,
 }).passthrough().default({
   colorblindMode: false,
@@ -451,6 +453,7 @@ const cardPresentationSettingsSchema = z.object({
   reverseHands: false,
   realLifeMode: false,
   hyphenatedConventions: false,
+  showTimerInUntimed: false,
   createTableVariant: 'No Variant', createTableTimed: false,
   createTableTimeBaseMinutes: 2, createTableTimePerTurnSeconds: 20,
   createTableCardCycle: false, createTableEmptyClues: false,
