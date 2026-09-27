@@ -78,4 +78,16 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('effectiveName.length < 1 || effectiveName.length > 45');
     expect(screen).toContain("setTablePassword('');");
   });
+
+  test('offers bounded live game link paste and local availability feedback', () => {
+    expect(screen).toContain('title="Open game link"');
+    expect(screen).toContain('title="Paste from clipboard"');
+    expect(screen).toContain('title="Open game"');
+    expect(screen).toContain('title="Cancel"');
+    expect(screen).toContain('parseLiveGameInput(liveGameLink)');
+    expect(screen).toContain('lobbyRuntime.openLiveGameByID(parsed.tableID)');
+    expect(screen).toContain('That running table is not currently available to open.');
+    expect(screen).toContain('Clipboard is empty.');
+    expect(screen).toContain('Could not read the clipboard.');
+  });
 });

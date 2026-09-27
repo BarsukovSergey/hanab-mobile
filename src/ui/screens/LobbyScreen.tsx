@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { pruneBotSelection } from '../../config/knownBots';
@@ -21,6 +21,8 @@ import {
 import { getLobbySections } from '../lobbySections';
 import { getLobbyFriendContext } from '../lobbyTablePresentation';
 import { TableOptionsEditor } from '../TableOptionsEditor';
+import { parseLiveGameInput } from '../../game/client/liveGameInput';
+import { clipboardActions, type ClipboardActions } from '../../platform/replayInputActions';
 
 const DEFAULT_OPTIONS: MobileTableOptions = {
   variantName: 'No Variant', timed: false, timeBase: 0, timePerTurn: 0,
@@ -33,9 +35,11 @@ const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 export function LobbyScreen({
   onOpenHistory,
   onOpenPeople,
+  clipboard = clipboardActions,
 }: {
   onOpenHistory: () => void;
   onOpenPeople: () => void;
+  clipboard?: ClipboardActions;
 }) {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
@@ -43,6 +47,9 @@ export function LobbyScreen({
   const [tablePassword, setTablePassword] = useState('');
   const [selectedBots, setSelectedBots] = useState<string[]>([]);
   const [showBotPicker, setShowBotPicker] = useState(false);
+  const [showLiveGameLink, setShowLiveGameLink] = useState(false);
+  const [liveGameLink, setLiveGameLink] = useState('');
+  const [liveGameLinkError, setLiveGameLinkError] = useState<string | null>(null);
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [createOptions, setCreateOptions] = useState<MobileTableOptions>(DEFAULT_OPTIONS);
   const [joinPassword, setJoinPassword] = useState('');
@@ -84,8 +91,39 @@ export function LobbyScreen({
         <View style={styles.heroActions}>
           <ActionButton compact title="People" onPress={onOpenPeople} />
           <ActionButton compact title="Game history" onPress={onOpenHistory} />
+          <ActionButton compact title="Open game link" onPress={() => { setShowLiveGameLink(true); setLiveGameLinkError(null); }} />
         </View>
       </Panel>
+
+      {showLiveGameLink && <Panel style={styles.linkPanel}>
+        <SectionHeading title="Open running game" detail="Open a running game that is available in the Lobby." />
+        <TextInput value={liveGameLink} onChangeText={(value) => { setLiveGameLink(value); setLiveGameLinkError(null); }}
+          placeholder="https://hanab.live/game/123" autoCapitalize="none" autoCorrect={false}
+          style={[styles.linkInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />
+        {liveGameLinkError !== null && <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{liveGameLinkError}</Text>}
+        <View style={styles.heroActions}>
+          <ActionButton compact title="Paste from clipboard" tone="secondary" onPress={() => {
+            void clipboard.readClipboard().then((text) => {
+              if (text.trim() === '') setLiveGameLinkError('Clipboard is empty.');
+              else { setLiveGameLink(text); setLiveGameLinkError(null); }
+            }).catch(() => setLiveGameLinkError('Could not read the clipboard.'));
+          }} />
+          <ActionButton compact title="Open game" tone="primary" onPress={() => {
+            const parsed = parseLiveGameInput(liveGameLink);
+            if (parsed.kind === 'invalid') { setLiveGameLinkError(parsed.reason); return; }
+            if (!lobbyRuntime.openLiveGameByID(parsed.tableID)) {
+              setLiveGameLinkError('That running table is not currently available to open.');
+              return;
+            }
+            setLiveGameLinkError(null);
+            setShowLiveGameLink(false);
+            setLiveGameLink('');
+          }} />
+          <ActionButton compact title="Cancel" tone="secondary" onPress={() => {
+            setShowLiveGameLink(false); setLiveGameLinkError(null);
+          }} />
+        </View>
+      </Panel>}
 
       {yourRunningGames.length > 0 && (
         <TableSection
@@ -330,6 +368,8 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   heroCopy: { flex: 1, gap: 2 },
   heroActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
+  linkPanel: { gap: 10 },
+  linkInput: { minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   heroTitle: { fontSize: 28, fontWeight: '900' },
   heroDetail: { fontSize: 14 },

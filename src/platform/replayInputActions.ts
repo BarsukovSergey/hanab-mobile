@@ -1,7 +1,9 @@
 import * as Clipboard from 'expo-clipboard';
 
-export interface ReplayInputActions { readClipboard(): Promise<string>; }
+export interface ClipboardActions { readClipboard(): Promise<string>; }
+export type ReplayInputActions = ClipboardActions;
 
-export const replayInputActions: ReplayInputActions = {
+export const clipboardActions: ClipboardActions = {
   readClipboard: async () => await Clipboard.getStringAsync(),
 };
+export const replayInputActions = clipboardActions;
