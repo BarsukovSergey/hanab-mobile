@@ -38,7 +38,15 @@ import { GameScreen } from './src/ui/game/GameScreen';
 import { LastClueNotice } from './src/ui/game/LastClueNotice';
 import { TerminationControls } from './src/ui/game/TerminationControls';
 import { isC17WorkspaceEligible } from './src/ui/game/c17Workspace';
-import { getBackAction, type LocalScreen } from './src/ui/navigationPolicy';
+import {
+  backBrowsing,
+  createBrowsingPresentation,
+  isBrowsingSettings,
+  navigateBrowsing,
+  openBrowsingSettings,
+  type BrowsingDestination,
+} from './src/ui/browsingNavigationState';
+import { getBrowsingBackAction, getRoomAttendanceBackAction } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { PeopleScreen } from './src/ui/screens/PeopleScreen';
@@ -82,10 +90,10 @@ function AppContent() {
   const [recentAccounts, setRecentAccounts] = useState<string[]>([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [showManualLogin, setShowManualLogin] = useState(false);
-  const [localScreen, setLocalScreen] = useState<LocalScreen>('lobby');
+  const [browsing, setBrowsing] = useState(() => createBrowsingPresentation());
+  const navigate = (destination: BrowsingDestination) => setBrowsing((state) => navigateBrowsing(state, destination));
   const [specificSeedCreatePrefill, setSpecificSeedCreatePrefill] = useState<SpecificSeedCreatePrefill | null>(null);
   const consumeSpecificSeedCreatePrefill = useCallback(() => setSpecificSeedCreatePrefill(null), []);
-  const [returnAfterUnattend, setReturnAfterUnattend] = useState<LocalScreen | null>(null);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [exportFeedback, setExportFeedback] = useState<{
@@ -99,7 +107,6 @@ function AppContent() {
   const liveChatUnreadCount = useAppSelector((state) => state.room.room.kind === 'live_game'
     ? state.chat.unreadByRoom[`table${state.room.room.tableID}`] ?? 0
     : 0);
-  const pendingReplayCreate = useAppSelector((state) => state.history.pendingReplayCreate);
   const serverStatusMessage = session.authenticatedUser === null
     ? null : getServerStatusNoticeMessage(session.serverStatus);
 
@@ -143,17 +150,6 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {
-      setLocalScreen('lobby');
-      return;
-    }
-    if (returnAfterUnattend !== null && pendingReplayCreate === null) {
-      setLocalScreen(returnAfterUnattend);
-      setReturnAfterUnattend(null);
-    }
-  }, [pendingReplayCreate, returnAfterUnattend, roomState.rematchTransition, roomState.room.kind]);
-
-  useEffect(() => {
     if (roomState.room.kind !== 'live_game') setLiveSheet(null);
   }, [roomState.room.kind]);
 
@@ -163,40 +159,33 @@ function AppContent() {
         setLiveSheet(null);
         return true;
       }
-      const roomRole = roomState.room.kind === 'pregame'
-        || roomState.room.kind === 'awaiting_game_bootstrap'
-        || roomState.room.kind === 'live_game'
-        ? roomState.room.role
-        : null;
-      const action = getBackAction({
-        localScreen,
-        authenticated: probe === 'valid' && session.phase === 'ready' && hydrated,
-        roomKind: roomState.room.kind,
-        roomRole,
-        rematchPending: roomState.rematchTransition !== null,
-      });
-      if (action === 'go_to_lobby') {
-        setLocalScreen('lobby');
-        return true;
-      }
-      if (action === 'leave_pregame') {
-        if (roomState.room.kind === 'pregame' && roomState.pendingLeaveTableID === null) {
-          lobbyRuntime.leave(roomState.room.tableID);
+      const authenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
+      if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {
+        const room = roomState.room.kind === 'pregame'
+          || roomState.room.kind === 'awaiting_game_bootstrap'
+          || roomState.room.kind === 'live_game'
+          ? roomState.room : null;
+        if (room !== null) {
+          const action = getRoomAttendanceBackAction(room);
+          if (action === 'leave_pregame' && roomState.room.kind === 'pregame' && roomState.pendingLeaveTableID === null) {
+            lobbyRuntime.leave(roomState.room.tableID);
+          }
+          if (action === 'unattend' && roomState.room.kind === 'live_game' && roomState.pendingUnattendTableID === null) {
+            lobbyRuntime.unattendLiveGame(roomState.room.tableID);
+          }
         }
         return true;
       }
-      if (action === 'unattend') {
-        if (roomState.room.kind === 'live_game' && roomState.pendingUnattendTableID === null) {
-          lobbyRuntime.unattendLiveGame(roomState.room.tableID);
-        }
+      if (getBrowsingBackAction(browsing, authenticated) === 'back') {
+        setBrowsing((state) => backBrowsing(state));
         return true;
       }
-      return action === 'consume';
+      return false;
     });
     return () => subscription.remove();
   }, [
-    hydrated, liveSheet, localScreen, probe, roomState.pendingLeaveTableID,
-    roomState.pendingUnattendTableID, roomState.rematchTransition,
+    browsing, hydrated, liveSheet, probe, roomState.rematchTransition,
+    roomState.pendingLeaveTableID, roomState.pendingUnattendTableID,
     roomState.room, session.phase,
   ]);
 
@@ -222,8 +211,7 @@ function AppContent() {
           await savePasswordCredential(loginUsername, loginPassword);
         }
         setProbe('valid');
-        setLocalScreen('lobby');
-        setReturnAfterUnattend(null);
+        setBrowsing(createBrowsingPresentation('home'));
         void lobbyRuntime.connect();
       } else {
         setProbe(result.kind === 'missing' ? 'missing' : 'indeterminate');
@@ -263,8 +251,7 @@ function AppContent() {
     const result = await lobbyRuntime.signOut();
     if (result.kind === 'signedOut') {
       setProbe('missing');
-      setLocalScreen('lobby');
-      setReturnAfterUnattend(null);
+      setBrowsing(createBrowsingPresentation('home'));
       setLiveSheet(null);
       setUsername('');
       setPassword('');
@@ -439,8 +426,6 @@ function AppContent() {
                       title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
                       onPress={() => {
                         setLiveSheet(null);
-                        setReturnAfterUnattend(null);
-                        setLocalScreen('lobby');
                         lobbyRuntime.unattendLiveGame(liveTableID);
                       }}
                     />
@@ -567,30 +552,31 @@ function AppContent() {
     content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
   } else if (roomState.room.kind === 'pregame') {
     content = <PregameScreen />;
-  } else if (localScreen === 'history') {
-    content = <HistoryScreen onBack={() => { setReturnAfterUnattend(null); setLocalScreen('lobby'); }}
+  } else if (browsing.destination === 'history' && !isBrowsingSettings(browsing)) {
+    content = <HistoryScreen onBack={() => navigate('home')}
       onPlaySeed={(prefill) => {
         setSpecificSeedCreatePrefill(prefill);
-        setLocalScreen('lobby');
+        navigate('home');
       }}
-      onWatchReplay={(databaseID, visibility) => { if (lobbyRuntime.watchHistoricalGame(databaseID, visibility)) setReturnAfterUnattend('history'); }}
-      onWatchJSONReplay={(gameJSON, visibility) => { if (lobbyRuntime.watchJSONReplay(gameJSON, visibility)) setReturnAfterUnattend('history'); }}
+      onWatchReplay={(databaseID, visibility) => { lobbyRuntime.watchHistoricalGame(databaseID, visibility); }}
+      onWatchJSONReplay={(gameJSON, visibility) => { lobbyRuntime.watchJSONReplay(gameJSON, visibility); }}
       onWatchReplayInput={(request) => {
-        const opened = request.kind === 'id'
-          ? lobbyRuntime.watchReplayByID(request.databaseID, request.visibility)
-          : lobbyRuntime.watchJSONReplay(request.gameJSON, request.visibility);
-        if (opened) setReturnAfterUnattend('history');
+        if (request.kind === 'id') {
+          lobbyRuntime.watchReplayByID(request.databaseID, request.visibility);
+        } else {
+          lobbyRuntime.watchJSONReplay(request.gameJSON, request.visibility);
+        }
       }} />;
-  } else if (localScreen === 'settings') {
-    content = <SettingsScreen onBack={() => setLocalScreen('lobby')} onSignOut={() => void signOut()} />;
-  } else if (localScreen === 'people') {
-    content = <PeopleScreen onBack={() => setLocalScreen('lobby')} />;
+  } else if (isBrowsingSettings(browsing)) {
+    content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()} />;
+  } else if (browsing.destination === 'people') {
+    content = <PeopleScreen onBack={() => navigate('home')} />;
   } else {
     content = <LobbyScreen
       specificSeedCreatePrefill={specificSeedCreatePrefill}
       onSpecificSeedCreatePrefillConsumed={consumeSpecificSeedCreatePrefill}
-      onOpenHistory={() => setLocalScreen('history')}
-      onOpenPeople={() => setLocalScreen('people')}
+      onOpenHistory={() => navigate('history')}
+      onOpenPeople={() => navigate('people')}
     />;
   }
 
@@ -607,7 +593,7 @@ function AppContent() {
           </View>
           <View style={styles.headerActions}>
             {probe === 'valid' && session.authenticatedUser !== null && <>
-              <ActionButton compact title="Settings" tone="ghost" onPress={() => setLocalScreen('settings')} />
+              <ActionButton compact title="Settings" tone="ghost" onPress={() => setBrowsing((state) => openBrowsingSettings(state))} />
             </>}
           </View>
         </View>
