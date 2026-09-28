@@ -2,16 +2,42 @@
 
 Date: 2026-09-28
 
-Status: APK built successfully; ready for physical validation.
+Status: initial beta.3 physical smoke found Android UI blockers; hotfix 1 is published and awaits a focused re-smoke.
 
-Runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
+Initial runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
 
-Android workflow run: `#3` / run ID `36361833453`
+Initial Android workflow run: `#3` / run ID `36361833453`
 
-Workflow head: `3d75474b92b7626086b1d55905f91dbbf5922f58`
+Initial APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
 
-The workflow head differs from the frozen runtime candidate only by release-documentation commits, so
-the produced runtime is equivalent to the frozen candidate.
+## Beta.3 hotfix 1
+
+Runtime candidate: `36717a2284490c8179e35b882dca0bde15a14a75`
+
+Exact-candidate CI: run `#724` / run ID `36366120596` — success.
+
+Publisher run: `36366347391` — success.
+
+Release: `v1.0.0-beta.3-hotfix.1`
+
+App version remains `1.0.0-beta.3`; Android `versionCode` is `4`.
+
+APK: `Hanab-Mobile-1.0.0-beta.3.apk`
+
+APK byte size: `135756615`
+
+APK SHA-256: `80543d8c8fc2573e0bca3dfc972d00af771bcdd71ca2d5bdfe507e549884a9f9`
+
+The initial physical smoke confirmed the main gameplay path was otherwise usable but found three
+Android UI regressions:
+
+- live-game `More` opened with its action area collapsed, which also made in-game Settings/Lobby
+  unreachable through that menu;
+- the narrow-screen Lobby hero compressed its title/detail into unusable wrapping;
+- Pregame Max players had regressed from direct `2–6` choices to a plus/minus stepper.
+
+Hotfix 1 addresses those three regressions. Android Back was observed working and is not part of this
+hotfix. A focused install-over re-smoke of the hotfix APK is still required before marking beta.3 PASS.
 
 ## Before installing
 
