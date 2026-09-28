@@ -47,10 +47,12 @@ Record:
 - Android version:
 - currently installed Hanab version:
 - downloaded APK filename: `Hanab-Mobile-1.0.0-beta.3.apk`
-- downloaded APK byte size: `135761383`
-- downloaded APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
+- downloaded APK byte size: `135756615`
+- downloaded APK SHA-256: `80543d8c8fc2573e0bca3dfc972d00af771bcdd71ca2d5bdfe507e549884a9f9`
 
-Do not uninstall beta.2 before the upgrade-path check.
+For the hotfix re-smoke, install this APK directly over the already-installed initial beta.3 build;
+Android `versionCode` 4 is intentionally higher than the initial beta.3 `versionCode` 3. If separately
+repeating the beta.2 upgrade-path check, do not uninstall beta.2 first.
 
 ## 1. Upgrade over beta.2
 
