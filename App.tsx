@@ -30,6 +30,7 @@ import {
   HanabThemeProvider,
   Notice,
   Panel,
+  ResponsiveSurfaceProvider,
   SectionHeading,
   useHanabTheme,
   useResponsiveLayout,
@@ -69,9 +70,11 @@ type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | 'replay-export' | null;
 export default function App() {
   return (
     <SafeAreaProvider>
-      <HanabThemeProvider>
-        <AppContent />
-      </HanabThemeProvider>
+      <ResponsiveSurfaceProvider>
+        <HanabThemeProvider>
+          <AppContent />
+        </HanabThemeProvider>
+      </ResponsiveSurfaceProvider>
     </SafeAreaProvider>
   );
 }
@@ -583,6 +586,8 @@ function AppContent() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
+      {/* Browsing owns system insets here; descendants use the measured available window. */}
+      <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
       <ScrollView contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <View style={styles.appHeader}>
           <View style={styles.brandCopy}>
@@ -602,14 +607,13 @@ function AppContent() {
       </ScrollView>
       {lobbyNotice !== null && (
         <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
-          <SafeAreaView edges={['top']} style={styles.lobbyNoticeSafeArea}>
             <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
               <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>
               <ActionButton compact title="Dismiss" tone="ghost" onPress={() => dispatch(lobbyActions.noticeDismissed())} />
             </View>
-          </SafeAreaView>
         </View>
       )}
+      </SafeAreaView>
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
     </KeyboardAvoidingView>
   );
@@ -617,9 +621,8 @@ function AppContent() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 42 : 54, width: '100%' },
+  container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: 16, width: '100%' },
   lobbyNoticeOverlay: { elevation: 10, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
-  lobbyNoticeSafeArea: { width: '100%' },
   lobbyNoticeContainer: { alignSelf: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 6, width: '100%' },
   gameContainer: { alignSelf: 'center', flexGrow: 1, gap: 10, paddingBottom: 18, paddingHorizontal: 10, paddingTop: 9, width: '100%' },
   gameContainerC17: { flex: 1, paddingBottom: 0 },

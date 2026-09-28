@@ -1,5 +1,7 @@
 import {
   Pressable,
+  Keyboard,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -11,7 +13,9 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { legacyResponsiveHints, measureWindow, reconcileWindow, type MeasuredWindow } from './responsiveSurface';
 
 type ThemePreference = 'system' | 'light' | 'dark';
 type ThemeScheme = 'light' | 'dark';
@@ -99,11 +103,44 @@ export function useHanabTheme() {
   return value;
 }
 
-export function useResponsiveLayout() {
+const ResponsiveWindowContext = createContext<(MeasuredWindow & { width: number; height: number }) | null>(null);
+
+export function ResponsiveSurfaceProvider({ children }: { children: ReactNode }) {
   const { width, height } = useWindowDimensions();
-  const wide = width >= 760 || (width >= 620 && width > height);
-  const tablet = width >= 900;
-  return { width, height, wide, tablet, contentMaxWidth: tablet ? 1280 : wide ? 1080 : 720 };
+  const frame = useSafeAreaFrame();
+  const systemInsets = useSafeAreaInsets();
+  const [imeOcclusion, setImeOcclusion] = useState(0);
+  const [confirmHeightResize, setConfirmHeightResize] = useState(false);
+  const unoccluded = useRef<MeasuredWindow | null>(null);
+  const current = measureWindow({ width: frame.width, height: frame.height }, systemInsets);
+  const resolved = reconcileWindow(unoccluded.current, current, imeOcclusion, confirmHeightResize);
+  unoccluded.current = resolved.baseline;
+  const { geometry } = resolved;
+  useEffect(() => {
+    if (!resolved.pendingHeightResize) {
+      setConfirmHeightResize(false);
+      return;
+    }
+    // Android reports adjustResize before keyboardDidShow. A sustained height-only
+    // change without an IME event is a real window resize.
+    const timer = setTimeout(() => setConfirmHeightResize(true), 400);
+    return () => clearTimeout(timer);
+  }, [resolved.pendingHeightResize, current.availableHeight, current.availableWidth]);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => setImeOcclusion(event.endCoordinates.height));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setImeOcclusion(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  return <ResponsiveWindowContext.Provider value={{ ...geometry, width, height }}>{children}</ResponsiveWindowContext.Provider>;
+}
+
+export function useResponsiveLayout() {
+  const geometry = useContext(ResponsiveWindowContext);
+  if (geometry === null) throw new Error('useResponsiveLayout must be used inside ResponsiveSurfaceProvider');
+  const { width, height, windowClass } = geometry;
+  return { ...geometry, ...legacyResponsiveHints({ width, height }, windowClass) };
 }
 
 export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
