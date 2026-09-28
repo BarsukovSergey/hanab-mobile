@@ -69,7 +69,7 @@ Build the standalone internal beta APK:
 npm run android:beta-apk
 ```
 
-The APK is written to `dist/Hanab-Mobile-1.0.0-beta.2.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
+The APK is written to `dist/Hanab-Mobile-1.0.0-beta.3.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
 
 Validation used in CI:
 
