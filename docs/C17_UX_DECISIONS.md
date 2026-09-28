@@ -3,7 +3,9 @@
 Date: 2026-09-11
 Status: **ratified**
 
-This file records explicit product decisions made while reviewing C17 discrepancies. The authoritative current contract is `docs/C17_UX_CONTRACT.md` v1.2. Earlier entries in this file that conflict with the list below are superseded.
+This file records explicit product decisions made while reviewing C17 discrepancies. The authoritative gameplay contract is `docs/C17_UX_CONTRACT.md` v1.2. Earlier entries in this file that conflict with the list below are superseded.
+
+**2026-09-28 authority note:** `docs/MOBILE_APP_DESIGN_V2.md` is newer and authoritative for app shell, top-level navigation, Browse/Return/Back policy, room-context menus, and responsive/short-wide composition. C17 remains authoritative for gameplay interaction semantics. D03 and D19 below are revised accordingly.
 
 ## D01 — Table Ledger + Decision Workbench
 
@@ -19,7 +21,7 @@ Comparison pins remain backlog.
 
 ## D03 — Landscape / tablet
 
-**BACKLOG FOR BESPOKE LAYOUT.** C17 must remain safe and usable after rotation and on larger windows, but a dedicated two-column landscape/tablet composition and large-screen polish do not block phone-portrait C17.
+**REVISED BY MOBILE APP DESIGN V2.** The old statement that bespoke landscape could remain backlog is superseded for the Phase 2 redesign. Phone landscape is now a first-class short-wide layout class. Preserve C17 gameplay semantics, but choose the Live landscape composition by measured fit/capacity rules from `MOBILE_APP_DESIGN_V2.md` rather than stretching portrait or treating phone landscape as generic `wide`/tablet.
 
 ## D04 — Direct actions
 
@@ -114,9 +116,9 @@ Deep Knowledge, compare/pins, and an optional global Toggle/Hold preference are 
 
 **C17 MUST MINIMAL.** Short non-blocking feedback for play/discard, clue touches, actor/resource/last-action transitions. Richer/prettier/cinematic animation is backlog.
 
-## D19 — More / secondary actions
+## D19 — Room-context secondary actions
 
-**RATIFIED.** Reuse the existing `More` surface as the single overflow for secondary live/replay actions. Do not add another Table/ellipsis control. Put eligible chat, participants/spectators, attendance/Leave, Pause/Unpause, settings, VTK/admin, and sign-out actions there as supported by authoritative capabilities.
+**REVISED BY MOBILE APP DESIGN V2.** Keep one bounded room-context overflow for secondary Pregame/Live/Review actions, but do not conflate it with the top-level browsing `More` destination. The room surface may be presented/named as `Table menu`, `Game menu`, or `Review menu` according to context. Preserve authoritative eligibility and explicit attendance/destructive actions; browsing navigation must not implicitly Leave/Unattend.
 
 ## D20 — People/profile/friends
 
