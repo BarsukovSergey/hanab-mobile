@@ -14,7 +14,11 @@ test('global navigation belongs to authenticated browsing and uses responsive ge
   for (const destination of ['Home', 'History', 'People', 'More']) expect(nav).toContain("label: '" + destination + "'");
   expect(nav).toContain("measureNavigation('bottom'");
   expect(nav).toContain("measureNavigation('rail'");
-  expect(nav).toContain('onTitleLayout=');
+  expect(nav).toContain('accessibilityElementsHidden');
+  expect(nav).toContain('pointerEvents="none"');
+  expect(nav).toContain('styles.measurementLabel');
+  expect(nav).toContain('COMPACT_ACTION_BUTTON_LABEL_STYLE');
+  expect(nav).not.toContain('numberOfLines={1}');
   expect(nav).toContain('measureNavigation(\'bottom\', labelWidth, labelHeight, availableWidth)');
   expect(nav).toContain('measureNavigation(\'rail\', labelWidth, labelHeight)');
   expect(nav).not.toContain('64, 20');

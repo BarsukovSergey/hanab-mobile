@@ -1,7 +1,6 @@
 import {
   Pressable,
   Keyboard,
-  type LayoutChangeEvent,
   Platform,
   StyleSheet,
   Text,
@@ -176,11 +175,12 @@ export function SectionHeading({ title, detail }: { title: string; detail?: stri
 
 type ActionButtonProps = {
   title: string; onPress: () => void; onLongPress?: () => void; disabled?: boolean;
-  onTitleLayout?: (event: LayoutChangeEvent) => void;
   tone?: 'primary' | 'secondary' | 'danger' | 'ghost'; compact?: boolean; style?: StyleProp<ViewStyle>;
 };
 
-export function ActionButton({ title, onPress, onLongPress, onTitleLayout, disabled = false, tone = 'secondary', compact = false, style }: ActionButtonProps) {
+export const COMPACT_ACTION_BUTTON_LABEL_STYLE: TextStyle = { fontSize: 12, fontWeight: '700' };
+
+export function ActionButton({ title, onPress, onLongPress, disabled = false, tone = 'secondary', compact = false, style }: ActionButtonProps) {
   const { theme } = useHanabTheme();
   const palette = tone === 'primary'
     ? { bg: theme.colors.accent, pressed: theme.colors.accentPressed, text: theme.colors.accentText, border: theme.colors.accent }
@@ -193,7 +193,7 @@ export function ActionButton({ title, onPress, onLongPress, onTitleLayout, disab
     onLongPress={onLongPress} onPress={onPress} style={({ pressed }) => [
     styles.button, compact && styles.buttonCompact,
     { backgroundColor: pressed ? palette.pressed : palette.bg, borderColor: palette.border }, disabled && styles.disabled, style,
-  ]}><Text onLayout={onTitleLayout} numberOfLines={1} style={[styles.buttonText, compact && styles.buttonTextCompact, { color: palette.text }]}>{title}</Text></Pressable>;
+  ]}><Text numberOfLines={1} style={[styles.buttonText, compact && COMPACT_ACTION_BUTTON_LABEL_STYLE, { color: palette.text }]}>{title}</Text></Pressable>;
 }
 
 export function Field({ style, ...props }: TextInputProps & { style?: StyleProp<TextStyle> }) {
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   sectionDetail: { fontSize: 13, lineHeight: 18 },
   button: { alignItems: 'center', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14, paddingVertical: 10 },
   buttonCompact: { borderRadius: 8, minHeight: 32, paddingHorizontal: 8, paddingVertical: 5 }, buttonText: { fontSize: 15, fontWeight: '700' },
-  buttonTextCompact: { fontSize: 12 }, disabled: { opacity: 0.45 },
+  disabled: { opacity: 0.45 },
   input: { borderRadius: 10, borderWidth: 1, fontSize: 15, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
   empty: { fontSize: 14, fontStyle: 'italic', lineHeight: 20 }, pill: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
   pillText: { fontSize: 12, fontWeight: '700' }, notice: { borderLeftWidth: 3, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
