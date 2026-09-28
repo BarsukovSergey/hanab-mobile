@@ -8,7 +8,7 @@ const app = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8').replace
 describe('focused Pregame surface', () => {
   test('App hosts Pregame outside the browsing shell and leaves browsing navigation hidden', () => {
     const start = app.indexOf("if (roomState.room.kind === 'pregame') {\n    const pregameReady");
-    const end = app.indexOf('\n  return (', start);
+    const end = app.indexOf('\n  let content: ReactNode;', start);
     const host = app.slice(start, end);
     expect(host).toContain("<SafeAreaView edges={['top', 'right', 'bottom', 'left']}");
     expect(host).toContain('<PregameScreen backRef={pregameBackRef} />');
@@ -21,7 +21,18 @@ describe('focused Pregame surface', () => {
     expect(host).toContain('Connection lost');
     expect(host).toContain('Connecting to lobby');
     expect(host).toContain('title="Retry"');
+    expect(host).toContain('focusedRoomPresentation = <KeyboardAvoidingView');
+    expect(host).not.toContain('return <KeyboardAvoidingView');
     expect(app).not.toContain('content = <PregameScreen />');
+  });
+
+  test('visibility defaults to visible and only gates root Chat reads without resetting local state', () => {
+    expect(screen).toContain('presentationVisible?: boolean;');
+    expect(screen).toContain('presentationVisible = true');
+    const effects = screen.slice(screen.indexOf('  useEffect('), screen.indexOf('  const handleBack'));
+    expect(effects).not.toContain('presentationVisible');
+    expect(effects).toContain("setSurface('root');");
+    expect(effects).toContain('setEditName(room.data.name);');
   });
 
   test('root shows compact identity, roster and setup entries before a fixed role/start footer', () => {
@@ -29,7 +40,7 @@ describe('focused Pregame surface', () => {
     expect(root).toContain('{tableIdentity}');
     expect(root).toContain('{roster}');
     expect(root).toContain('{setupSummary}');
-    expect(root).toContain('<ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive />');
+    expect(root).toContain('<ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive={presentationVisible} />');
     const nestedSurfaces = screen.slice(
       screen.indexOf("{surface === 'table-settings'"),
       screen.indexOf('</ScrollView>', screen.indexOf("{surface === 'table-settings'")),

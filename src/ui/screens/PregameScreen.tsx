@@ -19,7 +19,10 @@ import { isPregameLandscape } from '../navigationPolicy';
 const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 type PregameSurface = 'root' | 'table-settings' | 'spectators' | 'team-tools' | 'table-menu';
 
-export function PregameScreen({ backRef }: { backRef?: { current: (() => void) | null } }) {
+export function PregameScreen({ backRef, presentationVisible = true }: {
+  backRef?: { current: (() => void) | null };
+  presentationVisible?: boolean;
+}) {
   const { theme } = useHanabTheme();
   const { availableWidth, availableHeight } = useResponsiveLayout();
   const landscape = isPregameLandscape(availableWidth, availableHeight);
@@ -163,7 +166,7 @@ export function PregameScreen({ backRef }: { backRef?: { current: (() => void) |
             <View style={styles.region}>{setupSummary}</View>
           </View>
           : <>{tableIdentity}{roster}{setupSummary}</>}
-        <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive />
+        <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive={presentationVisible} />
       </>}
 
       {surface === 'table-settings' && <Panel style={styles.panel}>
