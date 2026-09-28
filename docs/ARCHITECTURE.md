@@ -4,6 +4,8 @@
 
 Build an Android-first React Native client for hanab.live that connects to the existing production service and can play in the same tables as browser users. iOS should remain supportable from the same codebase.
 
+**Current authority note (2026-09-28):** `docs/MOBILE_APP_DESIGN_V2.md` owns app-level IA, navigation, Back/Browse/Return, room-context menus, and responsive/short-wide composition. The C17 documents below remain authoritative for gameplay interaction semantics. Where older C17 shell/menu/landscape text conflicts with Mobile App Design v2, v2 wins; the technical safety boundaries in this file remain unchanged.
+
 ## C17 product/UI authority
 
 For C17 gameplay and product presentation, the authoritative specification is `docs/C17_UX_CONTRACT.md`.
