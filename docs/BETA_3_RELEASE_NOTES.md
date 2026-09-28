@@ -9,7 +9,7 @@ Status: **runtime candidate frozen; CI/build/physical validation in progress**
 - version: `1.0.0-beta.3`
 - Android `versionCode`: `3`
 - runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
-- ordinary CI: **run #719 / run ID `36361502403` — in progress**
+- ordinary CI: **success — run #719 / run ID `36361502403`**
 - Android workflow: `Android Beta APK`
 - Android workflow run: **not started**
 - workflow artifact: `Hanab-Mobile-1.0.0-beta.3`
