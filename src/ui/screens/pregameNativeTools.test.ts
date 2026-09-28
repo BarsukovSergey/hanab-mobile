@@ -5,8 +5,19 @@ import { describe, expect, test } from '@jest/globals';
 const source = readFileSync(resolve(__dirname, 'PregameScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('pregame native tools', () => {
+  test('uses direct max-player buttons instead of a plus-minus stepper', () => {
+    expect(source).toContain('const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;');
+    expect(source).toContain('MAX_PLAYER_OPTIONS.map((value) => {');
+    expect(source).toContain('const selected = editMaxPlayers === value;');
+    expect(source).toContain('accessibilityState={{ selected }}');
+    expect(source).toContain('onPress={() => setEditMaxPlayers(value)}');
+    expect(source).not.toContain('styles.stepperRow');
+    expect(source).not.toContain('title="−"');
+    expect(source).not.toContain('title="+"');
+  });
+
   test('confirms owner kicks and sends through chat only after confirmation', () => {
-    expect(source).toContain('import { Alert, StyleSheet, Text, View } from \'react-native\'');
+    expect(source).toContain('import { Alert, Pressable, StyleSheet, Text, View } from \'react-native\'');
     expect(source).toContain('isOwner && (');
     expect(source).toContain('{!player.you && (');
     expect(source).toContain('Alert.alert(');
