@@ -1,6 +1,8 @@
 # Hanab Mobile — Testing Guide
 
-This page is for people testing the **Hanab Mobile 1.0.0-beta.2 Android build**.
+This page is for people testing the current **Hanab Mobile 1.0.0-beta.3 Android line**.
+
+For the current hotfix artifact, exact APK identity and the focused re-smoke checklist live in `docs/BETA_3_PHYSICAL_SMOKE.md`; that document wins for build-specific acceptance details.
 
 You do not need to understand the C17 design documents or the implementation. Test it like a normal player. **If you need instructions to discover an ordinary gameplay control, report that as a problem.**
 
@@ -17,7 +19,7 @@ Please note:
 
 If you were given an APK/build directly, install that build. You do not need the source repository.
 
-If beta.1 is already installed, beta.2 should preferably be installed **over it without uninstalling first** so upgrade continuity is exercised.
+For the focused beta.3 hotfix check, install hotfix 1 **over the already-installed initial beta.3 build** where possible. If separately repeating the beta.2 upgrade path, do not uninstall beta.2 first.
 
 ## What to test
 
@@ -91,9 +93,9 @@ During normal play and rewind, briefly check:
 
 The 2P/3P path remains the core smoke target. Beta.2 also includes substantial 4P–6P real-card layout work, so a larger table is useful regression coverage when convenient.
 
-### 6. Beta.2 additions
+### 6. Beta.3 additions
 
-If convenient, sample the newer beta.2 surfaces:
+If convenient, sample the current beta.3 surfaces:
 
 - spectator mode and perspective switching;
 - colorblind/styled-number card settings;
@@ -108,7 +110,7 @@ These are regression targets, not a requirement to exhaust every feature in one 
 
 ## Beta scope and known limitations
 
-Beta.2 is centered on reliable **2P/3P** gameplay and review while also carrying the newer adaptive 4P–6P real-card layout.
+Beta.3 remains centered on reliable live gameplay/review while carrying the current 4P–6P real-card layout and the post-beta.2 product additions.
 
 The current 4P–6P path uses real cards as the primary UI with Compact Overview reserved as an emergency fallback. Report clipping, unreadable cards, excessive density, or an unexpected fallback.
 
@@ -116,7 +118,7 @@ Known non-blockers:
 
 - rapid replay scrubber movement can still show visible jank (issue #4);
 - compact shell/Pregame information-density polish remains future work (issue #58);
-- `/copy` replay export is intentionally deferred.
+- the major Mobile App Design v2 implementation is post-beta.3; session PM Dialogs are still not durable account-wide history.
 
 Still report crashes, broken navigation, accidental sends, lost state, clipped UI, unreadable cards, or anything that makes ordinary play confusing.
 
