@@ -32,6 +32,7 @@ export function NoteEditor({
   value,
   editable,
   visible,
+  presentationVisible = true,
   startEditing = false,
   onChange,
   onSave,
@@ -41,6 +42,7 @@ export function NoteEditor({
   value: string;
   editable: boolean;
   visible: boolean;
+  presentationVisible?: boolean;
   startEditing?: boolean;
   onChange: (value: string) => void;
   onSave: (value: string) => void;
@@ -50,6 +52,7 @@ export function NoteEditor({
   const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState(false);
   const [presentationReady, setPresentationReady] = useState(false);
+  const [focusOnShow, setFocusOnShow] = useState(false);
   const [draft, setDraft] = useState(value);
   const lastSubmittedNote = useRef('');
   const sessionOpen = useRef(false);
@@ -67,6 +70,7 @@ export function NoteEditor({
     if (!visible) {
       sessionOpen.current = false;
       setPresentationReady(false);
+      setFocusOnShow(false);
       setEditing(false);
       return;
     }
@@ -79,13 +83,21 @@ export function NoteEditor({
     setDraft(initial);
     onChange(initial);
     setEditing(shouldEdit);
-  }, [editable, onChange, startEditing, value, visible]);
+    setFocusOnShow(shouldEdit && presentationVisible);
+  }, [editable, onChange, presentationVisible, startEditing, value, visible]);
+
+  useEffect(() => {
+    if (presentationVisible) return;
+    setPresentationReady(false);
+    setFocusOnShow(false);
+  }, [presentationVisible]);
 
   const setDraftValue = (next: string) => {
     setDraft(next);
     onChange(next);
   };
   const submitValue = (nextValue: string) => {
+    if (!visible || !presentationVisible) return;
     const normalized = normalizeSubmittedNote(nextValue);
     lastSubmittedNote.current = normalized;
     onSave(normalized);
@@ -108,14 +120,16 @@ export function NoteEditor({
     setDraft(next);
     onChange(next);
     setEditing(true);
+    setFocusOnShow(true);
   };
   const cancelAndClose = () => {
+    if (!presentationVisible) return;
     setDraft(sessionSavedValue.current);
     onChange(sessionSavedValue.current);
     setEditing(false);
     onClose();
   };
-  const autofocusReady = editable && editing && presentationReady;
+  const autofocusReady = editable && editing && presentationReady && focusOnShow;
 
   return <Modal
     animationType="slide"
@@ -123,7 +137,7 @@ export function NoteEditor({
     onShow={() => setPresentationReady(true)}
     statusBarTranslucent
     transparent
-    visible={visible}
+    visible={visible && presentationVisible}
   >
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

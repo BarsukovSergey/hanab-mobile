@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AppState, Modal, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import type { CardIdentity, CardNote, GameState } from '../../game/bootstrap/types';
@@ -59,7 +59,7 @@ type C17ReviewSelection = {
   liveSegmentAtEntry: number;
 };
 
-export function GameScreen() {
+export function GameScreen({ presentationVisible = true }: { presentationVisible?: boolean }) {
   const { theme } = useHanabTheme();
   const { wide, width, height } = useResponsiveLayout();
   const dispatch = useAppDispatch();
@@ -73,6 +73,8 @@ export function GameScreen() {
     return userID !== undefined && state.lobby.users.entities[userID]?.hyphenated === true;
   });
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
+  const gameLoadEpoch = liveRoom?.gameLoadEpoch ?? null;
+  const gameLoadEpochRef = useRef(gameLoadEpoch);
   const clientState = liveRoom?.clientState ?? null;
   const game = clientState?.visibleState ?? null;
   const playerRoom = liveRoom?.role === 'player' && clientState?.playing ? liveRoom : null;
@@ -86,8 +88,18 @@ export function GameScreen() {
   const [discardViewerOpen, setDiscardViewerOpen] = useState(false);
   const [note, setNote] = useState('');
   const [c17Review, setC17Review] = useState<C17ReviewSelection | null>(null);
-  const selectedCard = interaction.selectedCard;
-  const selectedTarget = interaction.clueTarget;
+  useEffect(() => {
+    if (gameLoadEpochRef.current === gameLoadEpoch) return;
+    gameLoadEpochRef.current = gameLoadEpoch;
+    interactionDispatch({ type: 'reset-for-game-load' });
+    setNoteEditorOpen(false);
+    setNote('');
+    setDiscardViewerOpen(false);
+    setC17Review(null);
+  }, [gameLoadEpoch]);
+  const currentGameLoad = gameLoadEpochRef.current === gameLoadEpoch;
+  const selectedCard = currentGameLoad && presentationVisible ? interaction.selectedCard : null;
+  const selectedTarget = currentGameLoad && presentationVisible ? interaction.clueTarget : null;
   const noteCard = interaction.noteCard;
   const replayActive = clientState?.replay.active ?? false;
 
@@ -116,14 +128,20 @@ export function GameScreen() {
   }), [game, height, ourIndex, width]);
 
   useEffect(() => {
-    interactionDispatch({ type: 'reset-lifecycle-transients' });
+    interactionDispatch({ type: 'interrupt-lifecycle' });
     setDiscardViewerOpen(false);
   }, [gameplayLayout.orientation]);
 
   useEffect(() => {
+    if (presentationVisible) return;
+    interactionDispatch({ type: 'disarm-gameplay' });
+    setDiscardViewerOpen(false);
+  }, [presentationVisible]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
-      interactionDispatch({ type: 'reset-lifecycle-transients' });
+      interactionDispatch({ type: 'interrupt-lifecycle' });
       setDiscardViewerOpen(false);
     });
     return () => subscription.remove();
@@ -189,6 +207,7 @@ export function GameScreen() {
     const canRemake = sessionPhase === 'ready' && isRestartToPregameEligible(clientState, roomState.pendingRestartTableID);
     const selectedReplayNotes = noteCard === null ? [] : clientState.notes.allNotes[noteCard]?.filter((entry) => entry.text.trim().length > 0) ?? [];
     const openReplayNote = (order: number) => {
+      if (!presentationVisible) return;
       interactionDispatch({ type: 'open-note', order });
       setNoteEditorOpen(true);
     };
@@ -236,13 +255,14 @@ export function GameScreen() {
         onSave={() => undefined}
         title={selectedReplayLabel}
         value={selectedReplayNotes.map((entry) => `${entry.name}: ${entry.text}`).join('\n')}
-        visible={noteEditorOpen}
+        visible={currentGameLoad && noteEditorOpen}
+        presentationVisible={presentationVisible}
       />
     </>;
   }
 
   const isOurTurn = playerRoom !== null && game.turn.currentPlayerIndex === ourIndex;
-  const enabled = sessionPhase === 'ready' && isOurTurn && !replay.active && !clientState.pause.active && roomState.pendingGameplayAction === null;
+  const enabled = currentGameLoad && presentationVisible && sessionPhase === 'ready' && isOurTurn && !replay.active && !clientState.pause.active && roomState.pendingGameplayAction === null;
   const clueChoices = playerRoom === null ? null : getGameplayClueChoicesForPlayer(playerRoom.clientState.metadata);
   const lastClue = getLastCluePresentation(replay.actions);
   const currentIndex = game.turn.currentPlayerIndex;
@@ -257,6 +277,7 @@ export function GameScreen() {
   const noteCardLabel = noteCard === null ? 'Select a card first.' : getCardLocationLabel(game, metadata.playerNames, metadata.options.variantName, noteCard, reverseHands);
   const pauseLabel = clientState.pause.active ? 'Unpause' : isOurTurn ? 'Pause' : clientState.pause.queued ? 'Cancel queued pause' : 'Queue pause';
   const openNote = (order: number) => {
+    if (!presentationVisible) return;
     setNote(clientState.notes.ourNotes[order]?.text ?? '');
     interactionDispatch({ type: 'open-note', order });
     setNoteEditorOpen(true);
@@ -280,7 +301,7 @@ export function GameScreen() {
   const previewTouched = new Set(cluePreview?.touchedOrders ?? []);
   const targetName = selectedTarget === null ? null : metadata.playerNames[selectedTarget] ?? `Player ${selectedTarget + 1}`;
   const confirmClue = () => {
-    if (selectedTarget === null || interaction.cluePreview === null) return;
+    if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;
     const sent = interaction.cluePreview.type === 'color'
       ? lobbyRuntime.colorClue(selectedTarget, interaction.cluePreview.value)
       : lobbyRuntime.rankClue(selectedTarget, interaction.cluePreview.value);
@@ -410,7 +431,7 @@ export function GameScreen() {
         onReturnLive={returnLive}
         onScrubAction={jumpToAction}
         onSelectCard={(order) => {
-          if (!replay.active) interactionDispatch({ type: 'select-card', order });
+          if (presentationVisible && !replay.active) interactionDispatch({ type: 'select-card', order });
         }}
         onSelectRecentAction={jumpToAction}
         onToggleEmpathyPlayer={(playerIndex) => interactionDispatch({ type: 'toggle-empathy-player', playerIndex })}
@@ -418,6 +439,7 @@ export function GameScreen() {
         ourIndex={ourIndex}
         pendingText={pendingText ?? null}
         recentActions={recentActions}
+        presentationVisible={presentationVisible}
         reviewActive={replay.active}
         selectedActionSegment={reviewTemporal.selectedSegment}
         selectedCard={selectedCard}
@@ -425,7 +447,7 @@ export function GameScreen() {
         speedrun={metadata.options.speedrun}
         variantName={metadata.options.variantName}
       />
-      <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
+      <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={presentationVisible && discardViewerOpen} />
       <NoteEditor
         editable={notesEditable}
         onChange={setNote}
@@ -433,7 +455,8 @@ export function GameScreen() {
         onSave={saveNote}
         title={noteCardLabel}
         value={note}
-        visible={noteEditorOpen}
+        visible={currentGameLoad && noteEditorOpen}
+        presentationVisible={presentationVisible}
       />
     </>;
   }
@@ -474,7 +497,9 @@ export function GameScreen() {
                 key={order}
                 knowledge={getCardKnowledgeViewModel(metadata.options.variantName, card, clientState.notes.ourNotes[order], false)}
                 onLongPress={() => openNote(order)}
-                onSelect={() => interactionDispatch({ type: 'select-card', order })}
+                onSelect={() => {
+                  if (presentationVisible) interactionDispatch({ type: 'select-card', order });
+                }}
                 position={position}
                 selected={selectedCard === order}
                 variantName={metadata.options.variantName}
@@ -511,7 +536,9 @@ export function GameScreen() {
                 accessibilityRole={playerRoom === null ? undefined : 'button'}
                 accessibilityState={playerRoom === null ? undefined : { selected: target }}
                 disabled={playerRoom === null}
-                onPress={() => interactionDispatch({ type: 'select-clue-target', playerIndex: i })}
+                onPress={() => {
+                  if (presentationVisible) interactionDispatch({ type: 'select-clue-target', playerIndex: i });
+                }}
                 style={styles.playerHeader}
               >
                 <View style={styles.grow}>
@@ -558,16 +585,18 @@ export function GameScreen() {
           enabled={clueEnabled}
           onClear={() => interactionDispatch({ type: 'clear-clue-preview' })}
           onConfirm={confirmClue}
-          onPreview={(clueType, value) => interactionDispatch({ type: 'preview-clue', clueType, value })}
+          onPreview={(clueType, value) => {
+            if (presentationVisible) interactionDispatch({ type: 'preview-clue', clueType, value });
+          }}
           preview={cluePreview}
-          previewState={interaction.cluePreview}
+          previewState={presentationVisible ? interaction.cluePreview : null}
           targetName={targetName}
         />}
         {replay.active && review}
         {gameplayLayout.needsSharedVerticalScroll && <Text style={[styles.denseHint, { color: theme.colors.textMuted }]}>Dense table: one shared vertical scroll may be needed; individual hands never scroll sideways.</Text>}
       </View>
     </View>
-    <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={discardViewerOpen} />
+    <DiscardViewer game={game} onClose={() => setDiscardViewerOpen(false)} variantName={metadata.options.variantName} visible={presentationVisible && discardViewerOpen} />
     <NoteEditor
       editable={notesEditable}
       onChange={setNote}
@@ -575,7 +604,8 @@ export function GameScreen() {
       onSave={saveNote}
       title={noteCardLabel}
       value={note}
-      visible={noteEditorOpen}
+      visible={currentGameLoad && noteEditorOpen}
+      presentationVisible={presentationVisible}
     />
   </>;
 }
@@ -618,6 +648,7 @@ function C17DenseWorkspace({
   onToggleGlobalEmpathy,
   pendingText,
   recentActions,
+  presentationVisible,
   reviewActive,
   selectedActionSegment,
   selectedTurn,
@@ -661,6 +692,7 @@ function C17DenseWorkspace({
   onToggleGlobalEmpathy: () => void;
   pendingText: string | null;
   recentActions: readonly C17TemporalEntry[];
+  presentationVisible: boolean;
   reviewActive: boolean;
   selectedActionSegment: number;
   selectedTurn: number;
@@ -671,6 +703,12 @@ function C17DenseWorkspace({
   const [recentOpen, setRecentOpen] = useState(false);
   const [efficiencyDetailsOpen, setEfficiencyDetailsOpen] = useState(false);
   const [paceDetailsOpen, setPaceDetailsOpen] = useState(false);
+  useEffect(() => {
+    if (presentationVisible) return;
+    setRecentOpen(false);
+    setEfficiencyDetailsOpen(false);
+    setPaceDetailsOpen(false);
+  }, [presentationVisible]);
   const [layoutMetrics, setLayoutMetrics] = useState({
     opponentCardLaneWidth: 0,
     handsRegionHeight: 0,
@@ -874,7 +912,7 @@ function C17DenseWorkspace({
           </>}
       </View>
     </View>
-    <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
+    <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={presentationVisible && recentOpen}>
       <View style={[styles.c17RecentBackdrop, { backgroundColor: theme.colors.overlay }]}>
         <View style={[styles.c17RecentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
           <View style={styles.between}>
@@ -908,13 +946,13 @@ function C17DenseWorkspace({
     <EfficiencyDetailsModal
       onClose={() => setEfficiencyDetailsOpen(false)}
       presentation={gameplayPresentation}
-      visible={efficiencyDetailsOpen}
+      visible={presentationVisible && efficiencyDetailsOpen}
     />
     <PaceDetailsModal
       onClose={() => setPaceDetailsOpen(false)}
       pace={gameplayPresentation.pace}
       paceRisk={gameplayPresentation.paceRisk}
-      visible={paceDetailsOpen}
+      visible={presentationVisible && paceDetailsOpen}
     />
   </>;
 }

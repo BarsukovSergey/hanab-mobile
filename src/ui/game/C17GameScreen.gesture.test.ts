@@ -83,7 +83,7 @@ test('C17 clears a stale opponent long-press latch across lifecycle interruption
   const screen = readC17Screen();
 
   expect((screen.match(/longPressedOpponent\.current = null;/g) ?? []).length).toBeGreaterThanOrEqual(4);
-  expect(screen).toContain("interactionDispatch({ type: 'reset-lifecycle-transients' });");
+  expect(screen).toContain("interactionDispatch({ type: 'interrupt-lifecycle' });");
 });
 
 test('C17 keeps spectator interaction observational while retaining the workspace tools', () => {
@@ -98,7 +98,7 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain("canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName");
   expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
   expect(screen).toContain('if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {');
-  expect(screen).toContain('const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;');
+  expect(screen).toContain('const selectedTarget = currentGameLoad && presentationVisible && (isPlayingPlayer || canHypotheticalControl) ? interaction.clueTarget : null;');
   expect(screen).toContain('{canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>');
 });
 

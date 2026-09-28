@@ -87,7 +87,7 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen() {
+export function C17GameScreen({ presentationVisible = true }: { presentationVisible?: boolean }) {
   const { theme } = useHanabTheme();
   const { width, height } = useWindowDimensions();
   const orientation = width > height ? 'landscape' : 'portrait';
@@ -102,6 +102,8 @@ export function C17GameScreen() {
   const hyphenatedConventions = useAppSelector((state) => state.session.hyphenatedConventions);
   const roomState = useAppSelector((state) => state.room);
   const liveRoom = roomState.room.kind === 'live_game' ? roomState.room : null;
+  const gameLoadEpoch = liveRoom?.gameLoadEpoch ?? null;
+  const gameLoadEpochRef = useRef(gameLoadEpoch);
   const clientState = liveRoom?.clientState ?? null;
   const hypothetical = clientState?.replay.hypothetical ?? null;
   const hypotheticalActive = hypothetical !== null;
@@ -137,10 +139,22 @@ export function C17GameScreen() {
   const longPressedOpponent = useRef<number | null>(null);
 
   useEffect(() => {
+    if (gameLoadEpochRef.current === gameLoadEpoch) return;
+    gameLoadEpochRef.current = gameLoadEpoch;
+    interactionDispatch({ type: 'reset-for-game-load' });
+    setNoteEditorOpen(false);
+    setNote('');
+    setDiscardViewerOpen(false);
+    setC17Review(null);
+    setMorphOrder(null);
+    setEditHypotheticalCards(false);
+  }, [gameLoadEpoch]);
+
+  useEffect(() => {
     if (orientationRef.current === orientation) return;
     orientationRef.current = orientation;
     longPressedOpponent.current = null;
-    interactionDispatch({ type: 'reset-lifecycle-transients' });
+    interactionDispatch({ type: 'interrupt-lifecycle' });
   }, [orientation]);
 
   const liveNoteOrders = useMemo(() => getLiveNoteOrders(game), [game]);
@@ -178,10 +192,19 @@ export function C17GameScreen() {
   }, [canHypotheticalControl, hypotheticalOperationPending]);
 
   useEffect(() => {
+    if (presentationVisible) return;
+    longPressedOpponent.current = null;
+    interactionDispatch({ type: 'disarm-gameplay' });
+    setDiscardViewerOpen(false);
+    setEditHypotheticalCards(false);
+    setMorphOrder(null);
+  }, [presentationVisible]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
       longPressedOpponent.current = null;
-      interactionDispatch({ type: 'reset-lifecycle-transients' });
+      interactionDispatch({ type: 'interrupt-lifecycle' });
       setDiscardViewerOpen(false);
     });
     return () => subscription.remove();
@@ -210,17 +233,18 @@ export function C17GameScreen() {
     ? liveRoom.clock
     : null;
   const latest = ongoingGame.turn.segment ?? 0;
-  const selectedCard = !editHypotheticalCards && (isPlayingPlayer || canHypotheticalControl) ? interaction.selectedCard : null;
-  const selectedTarget = isPlayingPlayer || canHypotheticalControl ? interaction.clueTarget : null;
+  const currentGameLoad = gameLoadEpochRef.current === gameLoadEpoch;
+  const selectedCard = currentGameLoad && presentationVisible && !editHypotheticalCards && (isPlayingPlayer || canHypotheticalControl) ? interaction.selectedCard : null;
+  const selectedTarget = currentGameLoad && presentationVisible && (isPlayingPlayer || canHypotheticalControl) ? interaction.clueTarget : null;
   const activeSelectedTarget = editHypotheticalCards ? null : selectedTarget;
   const isOurTurn = isPlayingPlayer && game.turn.currentPlayerIndex === seatingAnchorIndex;
-  const enabled = isPlayingPlayer
+  const enabled = currentGameLoad && presentationVisible && isPlayingPlayer
     && sessionPhase === 'ready'
     && isOurTurn
     && !replay.active
     && !clientState.pause.active
     && roomState.pendingGameplayAction === null;
-  const hypotheticalEnabled = canHypotheticalControl && !editHypotheticalCards && hypotheticalActor !== null
+  const hypotheticalEnabled = currentGameLoad && presentationVisible && canHypotheticalControl && !editHypotheticalCards && hypotheticalActor !== null
     && !hypotheticalOperationPending;
   const cardEnabled = (enabled || hypotheticalEnabled) && selectedCard !== null && actionHand.some((order) => order === selectedCard);
   const discardEnabled = cardEnabled
@@ -240,12 +264,14 @@ export function C17GameScreen() {
     : ['Playing card', 'Discarding card', 'Giving color clue', 'Giving rank clue'][pending.type];
 
   const inspectNote = (order: number) => {
+    if (!presentationVisible) return;
     setNote(clientState.notes.ourNotes[order]?.text ?? '');
     const outsideActionHand = !actionHand.some((actionOrder) => actionOrder === order);
     if (outsideActionHand) interactionDispatch({ type: 'disarm-gameplay' });
     interactionDispatch({ type: 'open-note', order });
   };
   const editNote = (order: number) => {
+    if (!presentationVisible) return;
     inspectNote(order);
     setNoteEditorOpen(true);
   };
@@ -439,8 +465,8 @@ export function C17GameScreen() {
       clueChoices={clueChoices}
       clueEnabled={clueEnabled}
       cluePreview={cluePreview}
-      cluePreviewState={interaction.cluePreview}
-      empathyPlayer={interaction.empathyPlayer}
+      cluePreviewState={presentationVisible ? interaction.cluePreview : null}
+      empathyPlayer={presentationVisible ? interaction.empathyPlayer : null}
       gameplayPresentation={gameplayPresentation}
       game={game}
       hypothetical={hypothetical}
@@ -479,7 +505,9 @@ export function C17GameScreen() {
       }}
       onEditNote={editNote}
       onEnterRewind={enterRewind}
-      onHoldEmpathy={(playerIndex) => interactionDispatch({ type: 'hold-empathy', playerIndex })}
+      onHoldEmpathy={(playerIndex) => {
+        if (presentationVisible) interactionDispatch({ type: 'hold-empathy', playerIndex });
+      }}
       onInspectNote={inspectNote}
       onOpenDiscards={() => setDiscardViewerOpen(true)}
       onPlay={() => {
@@ -488,7 +516,9 @@ export function C17GameScreen() {
           if (sent) interactionDispatch({ type: 'complete-card-action', order: selectedCard });
         }
       }}
-      onPreviewClue={(clueType, value) => interactionDispatch({ type: 'preview-clue', clueType, value })}
+      onPreviewClue={(clueType, value) => {
+        if (presentationVisible) interactionDispatch({ type: 'preview-clue', clueType, value });
+      }}
       onReviewBack={() => navigateReviewAction('back')}
       onReviewEnd={() => jumpReviewEdge('end')}
       onReviewForward={() => navigateReviewAction('forward')}
@@ -505,6 +535,7 @@ export function C17GameScreen() {
       onDismissReplaySuggestion={() => dispatch(roomActions.replaySuggestionCleared())}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
+        if (!presentationVisible) return;
         if (editHypotheticalCards) {
           if (canHypotheticalControl && !hypotheticalOperationPending) setMorphOrder(order);
           return;
@@ -514,7 +545,9 @@ export function C17GameScreen() {
         }
         inspectNote(order);
       }}
-      onSelectClueTarget={(playerIndex) => interactionDispatch({ type: 'select-clue-target', playerIndex })}
+      onSelectClueTarget={(playerIndex) => {
+        if (presentationVisible) interactionDispatch({ type: 'select-clue-target', playerIndex });
+      }}
       onSelectRecentAction={jumpToAction}
       onToggleGlobalEmpathy={() => interactionDispatch({ type: 'toggle-global-empathy' })}
       onStartHypothetical={() => { if (lobbyRuntime.startHypothetical()) interactionDispatch({ type: 'disarm-gameplay' }); }}
@@ -530,6 +563,7 @@ export function C17GameScreen() {
       pendingReplaySuggestion={pendingReplaySuggestion}
       canEnterClue={enabled || hypotheticalEnabled}
       recentActions={recentActions}
+      presentationVisible={presentationVisible}
       result={result}
       reviewActive={!hypotheticalActive && (isFinishedReplay || replay.active || isSharedReplay)}
       finishedReplay={isFinishedReplay}
@@ -552,17 +586,18 @@ export function C17GameScreen() {
       game={game}
       onClose={() => setDiscardViewerOpen(false)}
       variantName={metadata.options.variantName}
-      visible={discardViewerOpen}
+      visible={presentationVisible && discardViewerOpen}
     />
     <NoteEditor
       editable={notesEditable}
       onChange={setNote}
       onClose={() => setNoteEditorOpen(false)}
       onSave={saveNote}
+      presentationVisible={presentationVisible}
       startEditing
       title={noteCard === null ? 'Card note' : getCardLabel(game, metadata.playerNames, noteCard, reverseHands)}
       value={note}
-      visible={noteEditorOpen}
+      visible={currentGameLoad && noteEditorOpen}
     />
     <HypotheticalMorphModal
       choices={getHypotheticalMorphChoices(metadata.options.variantName)}
@@ -575,7 +610,7 @@ export function C17GameScreen() {
         if (morphOrder !== null && lobbyRuntime.hypotheticalUnmorph(morphOrder)) setMorphOrder(null);
       }}
       variantName={metadata.options.variantName}
-      visible={morphOrder !== null && editHypotheticalCards && canHypotheticalControl && !hypotheticalOperationPending}
+      visible={presentationVisible && morphOrder !== null && editHypotheticalCards && canHypotheticalControl && !hypotheticalOperationPending}
     />
   </>;
 }
@@ -658,6 +693,7 @@ function C17DenseWorkspace({
   pendingText,
   pendingReplaySuggestion,
   recentActions,
+  presentationVisible,
   result,
   reviewActive,
   finishedReplay,
@@ -753,6 +789,7 @@ function C17DenseWorkspace({
   pendingText: string | null;
   pendingReplaySuggestion: { userName: string; segment: number } | null;
   recentActions: readonly C17TemporalEntry[];
+  presentationVisible: boolean;
   result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
   finishedReplay: boolean;
@@ -795,6 +832,12 @@ function C17DenseWorkspace({
   useEffect(() => {
     if (reviewActive) setRecentOpen(false);
   }, [reviewActive]);
+  useEffect(() => {
+    if (presentationVisible) return;
+    setRecentOpen(false);
+    setEfficiencyDetailsOpen(false);
+    setPaceDetailsOpen(false);
+  }, [presentationVisible]);
 
   const shellMeasured = layoutMetrics.shellKey === shellKey
     && layoutMetrics.ambientBodyHeight > 0
@@ -1370,7 +1413,7 @@ function C17DenseWorkspace({
     </View>}
     </View>
 
-    <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={recentOpen}>
+    <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={presentationVisible && recentOpen}>
       <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
         <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
           <View style={styles.rowBetween}>
@@ -1397,13 +1440,13 @@ function C17DenseWorkspace({
     <EfficiencyDetailsModal
       onClose={() => setEfficiencyDetailsOpen(false)}
       presentation={gameplayPresentation}
-      visible={efficiencyDetailsOpen}
+      visible={presentationVisible && efficiencyDetailsOpen}
     />
     <PaceDetailsModal
       onClose={() => setPaceDetailsOpen(false)}
       pace={gameplayPresentation.pace}
       paceRisk={gameplayPresentation.paceRisk}
-      visible={paceDetailsOpen}
+      visible={presentationVisible && paceDetailsOpen}
     />
   </View>;
 }

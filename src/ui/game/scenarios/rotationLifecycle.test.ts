@@ -46,26 +46,27 @@ describe('gameplay rotation lifecycle', () => {
     expect(room.clientState.ongoingGame).toBe(game);
   });
 
-  test('preserves durable reasoning context while clearing hold empathy at lifecycle boundaries', () => {
+  test('preserves clue and Note identity while clearing card arming at lifecycle boundaries', () => {
     const active = {
       selectedCard: 3,
       clueTarget: 1,
       cluePreview: { type: 'rank' as const, value: 2 },
       empathyPlayer: 1,
       persistentEmpathyPlayer: 1,
-      globalEmpathy: false,
+      globalEmpathy: true,
       noteCard: 5,
     };
     const expected = {
       ...active,
+      selectedCard: null,
       empathyPlayer: null,
       persistentEmpathyPlayer: null,
     };
 
-    const afterRotation = gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' });
+    const afterRotation = gameplayInteractionReducer(active, { type: 'interrupt-lifecycle' });
     expect(afterRotation).toEqual(expected);
 
-    const afterBackground = gameplayInteractionReducer(active, { type: 'reset-lifecycle-transients' });
+    const afterBackground = gameplayInteractionReducer(active, { type: 'interrupt-lifecycle' });
     expect(afterBackground).toEqual(expected);
   });
 });

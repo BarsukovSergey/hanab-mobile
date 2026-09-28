@@ -29,7 +29,7 @@ describe('focused Pregame surface', () => {
     expect(root).toContain('{tableIdentity}');
     expect(root).toContain('{roster}');
     expect(root).toContain('{setupSummary}');
-    expect(screen).toContain('<ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />');
+    expect(screen).toContain('<ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive={surface === \'root\'} />');
     expect(screen).toContain('<ScrollView style={styles.scroll}');
     expect(screen).toContain("{surface === 'root' && <View style={styles.footer}>");
     expect(root).not.toContain('formatPregamePlayerStats');

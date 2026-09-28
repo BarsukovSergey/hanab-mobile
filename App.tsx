@@ -470,7 +470,7 @@ function AppContent() {
                 </>
                 : liveSheet === 'chat'
                   ? <>
-                    <ChatPanel room={`table${liveTableID}`} title="Table chat" />
+                    <ChatPanel room={`table${liveTableID}`} title="Table chat" readActive={liveSheet === 'chat'} />
                     <ActionButton title="Back" onPress={() => setLiveSheet(null)} />
                   </>
                   : liveSheet === 'settings'
