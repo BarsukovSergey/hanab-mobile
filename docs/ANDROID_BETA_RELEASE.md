@@ -2,7 +2,7 @@
 
 Planned Android tester candidate: **1.0.0-beta.3**
 
-Build status: **APK built successfully from a docs-only descendant of the frozen runtime candidate; physical-device smoke is pending.**
+Build status: **GitHub prerelease published with the checksum-verified Beta.3 APK; physical-device smoke is still pending.**
 
 ## Beta.3 version identity
 
@@ -18,6 +18,8 @@ Build status: **APK built successfully from a docs-only descendant of the frozen
 - artifact ID: `10945838465`
 - APK size: `135761383` bytes
 - APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
+- GitHub prerelease: `v1.0.0-beta.3` / release ID `397876619`
+- release asset ID: `594109178`
 
 The merge commit `fd9919bf7b764354c4f4cce75a96a90c1f2e5506` is the immutable beta.3 runtime candidate. Workflow #3 ran from `3d75474b92b7626086b1d55905f91dbbf5922f58`, which differs from the candidate only by release-documentation commits, so the produced runtime is equivalent to the frozen candidate. If a later runtime fix is required, select a new candidate and rebuild.
 
