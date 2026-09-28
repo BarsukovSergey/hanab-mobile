@@ -2,7 +2,7 @@
 
 Date: 2026-09-28
 
-Status: ready to run after the Android Beta APK workflow finishes.
+Status: APK built successfully; ready for physical validation.
 
 Runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
 
@@ -20,9 +20,9 @@ Record:
 - device model:
 - Android version:
 - currently installed Hanab version:
-- downloaded APK filename:
-- downloaded APK byte size:
-- downloaded APK SHA-256:
+- downloaded APK filename: `Hanab-Mobile-1.0.0-beta.3.apk`
+- downloaded APK byte size: `135761383`
+- downloaded APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
 
 Do not uninstall beta.2 before the upgrade-path check.
 
