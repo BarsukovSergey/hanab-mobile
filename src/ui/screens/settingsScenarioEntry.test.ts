@@ -55,9 +55,22 @@ test('sign out is confirmed from Settings and both App entry paths use App signO
 
 test('Settings uses a local Back then title navigation header', () => {
   const settings = read('src/ui/screens/SettingsScreen.tsx');
-  expect(settings.indexOf('<ActionButton compact title="Back"')).toBeLessThan(settings.indexOf('>Settings</Text>'));
+  expect(settings.indexOf('<ActionButton compact title="Back"')).toBeLessThan(settings.indexOf("category === null ? 'Settings'"));
+  expect(settings).toContain("if (changePasswordOpen) {");
+  expect(settings).toContain('clearPasswordFields();');
+  expect(settings).toContain('backRef.current = handleBack');
   expect(settings).not.toContain('App preferences.');
   expect(settings).not.toContain('<SectionHeading title="Settings"');
+});
+
+test('Settings groups existing controls under the four canonical categories', () => {
+  const settings = read('src/ui/screens/SettingsScreen.tsx');
+  for (const title of ['Account & security', 'Appearance', 'Cards', 'Gameplay presentation']) {
+    expect(settings).toContain('title="' + title + '"');
+  }
+  expect(settings).toContain("category === 'account'");
+  expect(settings).toContain("category === 'cards'");
+  expect(settings).toContain("category === 'gameplay'");
 });
 
 test('live-game identity contains only the authenticated username with single-line truncation', () => {

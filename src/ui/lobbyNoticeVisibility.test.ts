@@ -5,7 +5,8 @@ import { expect, test } from '@jest/globals';
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 test('lobby notice is rendered in a shell overlay outside the main ScrollView', () => {
-  const scrollStart = app.indexOf('<ScrollView contentContainerStyle={[styles.container');
+  const scrollTag = app.match(/<ScrollView\b(?=[^>]*ref=\{browsingScrollRef\})[^>]*>/);
+  const scrollStart = scrollTag?.index ?? -1;
   const scrollEnd = app.indexOf('</ScrollView>', scrollStart);
   const overlay = app.indexOf('style={styles.lobbyNoticeOverlay}', scrollEnd);
 
@@ -21,5 +22,8 @@ test('lobby notice is rendered in a shell overlay outside the main ScrollView', 
 
 test('lobby notice keeps error and warning tone mapping without automatic scrolling', () => {
   expect(app).toContain("tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}");
-  expect(app).not.toMatch(/scrollTo|scrollRef|scrollViewRef|autoScroll/i);
+  const noticeStart = app.indexOf('{lobbyNotice !== null && (');
+  const notice = app.slice(noticeStart, app.indexOf('\n      )}', noticeStart));
+  expect(noticeStart).toBeGreaterThanOrEqual(0);
+  expect(notice).not.toMatch(/scrollTo|scrollRef|scrollViewRef|autoScroll/i);
 });

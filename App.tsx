@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AppState,
   BackHandler,
@@ -42,14 +42,18 @@ import { isC17WorkspaceEligible } from './src/ui/game/c17Workspace';
 import {
   backBrowsing,
   createBrowsingPresentation,
+  currentBrowsingSurface,
   isBrowsingSettings,
   navigateBrowsing,
+  openMoreSurface,
   openBrowsingSettings,
   type BrowsingDestination,
 } from './src/ui/browsingNavigationState';
 import { getBrowsingBackAction, getRoomAttendanceBackAction } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
+import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
+import { MoreScreen } from './src/ui/screens/MoreScreen';
 import { PeopleScreen } from './src/ui/screens/PeopleScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
@@ -82,7 +86,7 @@ export default function App() {
 function AppContent() {
   const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
-  const { contentMaxWidth, width, height } = useResponsiveLayout();
+  const { contentMaxWidth, width, height, windowClass } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
@@ -94,10 +98,17 @@ function AppContent() {
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [showManualLogin, setShowManualLogin] = useState(false);
   const [browsing, setBrowsing] = useState(() => createBrowsingPresentation());
-  const navigate = (destination: BrowsingDestination) => setBrowsing((state) => navigateBrowsing(state, destination));
+  const [passwordTaskOpen, setPasswordTaskOpen] = useState(false);
+  const browsingScrollRef = useRef<ScrollView>(null);
+  const navigate = (destination: BrowsingDestination) => {
+    browsingScrollRef.current?.scrollTo({ y: 0, animated: browsing.destination === destination });
+    setBrowsing((state) => navigateBrowsing(state, destination));
+  };
   const [specificSeedCreatePrefill, setSpecificSeedCreatePrefill] = useState<SpecificSeedCreatePrefill | null>(null);
+  const [gameLinkRequest, setGameLinkRequest] = useState(0);
   const consumeSpecificSeedCreatePrefill = useCallback(() => setSpecificSeedCreatePrefill(null), []);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
+  const settingsBackRef = useRef<(() => void) | null>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [exportFeedback, setExportFeedback] = useState<{
     message: string;
@@ -158,6 +169,10 @@ function AppContent() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (liveSheet === 'settings' || (roomState.room.kind === 'none' && isBrowsingSettings(browsing))) {
+        settingsBackRef.current?.();
+        return true;
+      }
       if (liveSheet !== null) {
         setLiveSheet(null);
         return true;
@@ -378,8 +393,14 @@ function AppContent() {
           </View>
         </ScrollView>
         </SafeAreaView>
-        <Modal animationType="fade" onRequestClose={() => setLiveSheet(null)} statusBarTranslucent transparent visible={liveSheet !== null}>
-          <Pressable onPress={() => setLiveSheet(null)} style={styles.sheetBackdrop}>
+        <Modal animationType="fade" onRequestClose={() => {
+          if (liveSheet === 'settings') settingsBackRef.current?.();
+          else setLiveSheet(null);
+        }} statusBarTranslucent transparent visible={liveSheet !== null}>
+          <Pressable onPress={() => {
+            if (liveSheet === 'settings') settingsBackRef.current?.();
+            else setLiveSheet(null);
+          }} style={styles.sheetBackdrop}>
             <Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
               {liveSheet === 'menu'
                 ? <>
@@ -444,7 +465,8 @@ function AppContent() {
                     <ActionButton title="Back" onPress={() => setLiveSheet(null)} />
                   </>
                   : liveSheet === 'settings'
-                    ? <SettingsScreen onBack={() => setLiveSheet('menu')} onSignOut={() => void signOut()} />
+                    ? <SettingsScreen onBack={() => setLiveSheet('menu')} onSignOut={() => void signOut()}
+                        backRef={settingsBackRef} />
                     : liveSheet === 'replay-export'
                       ? <>
                         <SectionHeading title="Export replay" detail="Copy or share this finished replay." />
@@ -571,24 +593,46 @@ function AppContent() {
         }
       }} />;
   } else if (isBrowsingSettings(browsing)) {
-    content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()} />;
+    content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()}
+      onPasswordTaskChange={setPasswordTaskOpen} backRef={settingsBackRef} />;
   } else if (browsing.destination === 'people') {
     content = <PeopleScreen onBack={() => navigate('home')} />;
+  } else if (browsing.destination === 'more') {
+    const surface = currentBrowsingSurface(browsing);
+    content = <MoreScreen surface={surface.kind === 'tools' || surface.kind === 'about' ? surface.kind : 'root'}
+      username={session.authenticatedUser?.username ?? ''}
+      onBack={() => setBrowsing((state) => backBrowsing(state))}
+      onSettings={() => setBrowsing((state) => openBrowsingSettings(state))}
+      onTools={() => setBrowsing((state) => openMoreSurface(state, 'tools'))}
+      onAbout={() => setBrowsing((state) => openMoreSurface(state, 'about'))}
+      onHomeTools={() => {
+        navigate('home');
+        setGameLinkRequest((request) => request + 1);
+      }}
+      onHistoryTools={() => navigate('history')} />;
   } else {
     content = <LobbyScreen
       specificSeedCreatePrefill={specificSeedCreatePrefill}
+      openGameLinkRequest={gameLinkRequest}
       onSpecificSeedCreatePrefillConsumed={consumeSpecificSeedCreatePrefill}
       onOpenHistory={() => navigate('history')}
       onOpenPeople={() => navigate('people')}
     />;
   }
 
+  const showBrowsingNavigation = probe === 'valid' && session.phase === 'ready' && hydrated
+    && session.authenticatedUser !== null
+    && roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen;
+  const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       {/* Browsing owns system insets here; descendants use the measured available window. */}
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
-      <ScrollView contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+      <View style={styles.browsingBody}>
+      {railNavigation && <BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />}
+      <ScrollView ref={browsingScrollRef} style={styles.flex} contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <View style={styles.appHeader}>
           <View style={styles.brandCopy}>
             <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
@@ -596,15 +640,12 @@ function AppContent() {
               <Text style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser.username}</Text>
             )}
           </View>
-          <View style={styles.headerActions}>
-            {probe === 'valid' && session.authenticatedUser !== null && <>
-              <ActionButton compact title="Settings" tone="ghost" onPress={() => setBrowsing((state) => openBrowsingSettings(state))} />
-            </>}
-          </View>
         </View>
         {probe === 'valid' && serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
         {content}
       </ScrollView>
+      </View>
+      {showBrowsingNavigation && !railNavigation && <BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />}
       {lobbyNotice !== null && (
         <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
             <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
@@ -621,6 +662,7 @@ function AppContent() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  browsingBody: { flex: 1, flexDirection: 'row' },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: 16, width: '100%' },
   lobbyNoticeOverlay: { elevation: 10, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
   lobbyNoticeContainer: { alignSelf: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 6, width: '100%' },

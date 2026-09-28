@@ -3,8 +3,10 @@ import { describe, expect, test } from '@jest/globals';
 import {
   backBrowsing,
   createBrowsingPresentation,
+  currentBrowsingSurface,
   isBrowsingSettings,
   navigateBrowsing,
+  openMoreSurface,
   openBrowsingSettings,
 } from './browsingNavigationState';
 
@@ -40,6 +42,22 @@ describe('browsing presentation state', () => {
   test('changing browsing root is a presentation-only transition', () => {
     const people = navigateBrowsing(createBrowsingPresentation('home'), 'people');
     expect(people).toEqual(createBrowsingPresentation('people'));
+  });
+
+  test.each(['tools', 'about'] as const)('nested More %s backs to More then Home', (kind) => {
+    const more = createBrowsingPresentation('more');
+    const nested = openMoreSurface(more, kind);
+    expect(currentBrowsingSurface(nested)).toEqual({ kind, origin: 'more' });
+    expect(openMoreSurface(nested, kind)).toBe(nested);
+    expect(backBrowsing(nested)).toEqual(more);
+    expect(backBrowsing(backBrowsing(nested))).toEqual(createBrowsingPresentation('home'));
+  });
+
+  test('selecting any destination resets its nested presentation to root', () => {
+    const nested = openMoreSurface(createBrowsingPresentation('more'), 'tools');
+    expect(navigateBrowsing(nested, 'more')).toEqual(createBrowsingPresentation('more'));
+    expect(navigateBrowsing(nested, 'history')).toEqual(createBrowsingPresentation('history'));
+    expect(openMoreSurface(createBrowsingPresentation('home'), 'tools')).toEqual(createBrowsingPresentation('home'));
   });
 
 });
