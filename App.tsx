@@ -49,7 +49,7 @@ import {
   openBrowsingSettings,
   type BrowsingDestination,
 } from './src/ui/browsingNavigationState';
-import { getBrowsingBackAction, getRoomAttendanceBackAction } from './src/ui/navigationPolicy';
+import { getBrowsingBackAction } from './src/ui/navigationPolicy';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
@@ -192,15 +192,6 @@ function AppContent() {
           pregameBackRef.current?.();
           return true;
         }
-        const room = roomState.room.kind === 'awaiting_game_bootstrap'
-          || roomState.room.kind === 'live_game'
-          ? roomState.room : null;
-        if (room !== null) {
-          const action = getRoomAttendanceBackAction(room);
-          if (action === 'unattend' && roomState.room.kind === 'live_game' && roomState.pendingUnattendTableID === null) {
-            lobbyRuntime.unattendLiveGame(roomState.room.tableID);
-          }
-        }
         return true;
       }
       if (getBrowsingBackAction(browsing, authenticated) === 'back') {
@@ -212,7 +203,7 @@ function AppContent() {
     return () => subscription.remove();
   }, [
     browsing, createTaskOpen, hydrated, liveSheet, probe, roomState.rematchTransition,
-    roomState.pendingLeaveTableID, roomState.pendingUnattendTableID,
+    roomState.pendingLeaveTableID,
     roomState.room, session.phase,
   ]);
 
@@ -301,6 +292,7 @@ function AppContent() {
     );
   }
 
+  let focusedRoomPresentation: ReactNode = null;
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
     const authenticatedUsername = session.authenticatedUser?.username;
@@ -348,7 +340,7 @@ function AppContent() {
       sharedReplay: roomState.room.sharedReplay,
     });
     const gameRootScrollable = !c17Workspace || width > height || height < 700;
-    return (
+    focusedRoomPresentation = (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.flex, { backgroundColor: theme.colors.background }]}
@@ -398,7 +390,7 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
-            <GameScreen />
+            <GameScreen presentationVisible />
           </View>
         </ScrollView>
         </SafeAreaView>
@@ -547,7 +539,7 @@ function AppContent() {
           : probe === 'checking'
             ? <Panel><SectionHeading title="Checking session…" detail="Looking for an existing hanab.live session." /></Panel>
             : <Panel><SectionHeading title="Connecting to lobby…" detail="Synchronizing tables and chat." /></Panel>;
-    return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    focusedRoomPresentation = <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
         <View style={styles.focusedRoomShell}>
@@ -667,7 +659,7 @@ function AppContent() {
     && roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen && !createTaskOpen;
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
 
-  return (
+  return focusedRoomPresentation !== null ? focusedRoomPresentation : (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       {/* Browsing owns system insets here; descendants use the measured available window. */}

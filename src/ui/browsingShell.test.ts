@@ -24,6 +24,32 @@ test('global navigation belongs to authenticated browsing and uses responsive ge
   expect(nav).not.toContain('64, 20');
 });
 
+test('focused rooms populate one final presentation layer and exclude browsing while focused', () => {
+  const app = read('App.tsx').replace(/\r\n/g, '\n');
+  const liveStart = app.indexOf('const gameRootScrollable');
+  const live = app.slice(liveStart, app.indexOf("if (roomState.room.kind === 'pregame')", liveStart));
+  const pregame = app.slice(app.indexOf("if (roomState.room.kind === 'pregame') {\n    const pregameReady"), app.indexOf('  let content: ReactNode;'));
+  const finalRender = app.slice(app.indexOf('  return focusedRoomPresentation !== null'));
+  expect(app).toContain('let focusedRoomPresentation: ReactNode = null;');
+  expect(live).toContain('focusedRoomPresentation = (');
+  expect(live).toContain('<GameScreen presentationVisible />');
+  expect(live).not.toMatch(/\breturn\s*\(\s*<KeyboardAvoidingView/);
+  expect(pregame).toContain('focusedRoomPresentation = <KeyboardAvoidingView');
+  expect(pregame).not.toContain('return <KeyboardAvoidingView');
+  expect(finalRender).toContain('return focusedRoomPresentation !== null ? focusedRoomPresentation : (');
+  expect(finalRender).toContain('<BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />');
+  expect(finalRender).toContain('{content}');
+});
+
+test('hardware Back consumes bare Live attendance without sending Unattend', () => {
+  const app = read('App.tsx').replace(/\r\n/g, '\n');
+  const hardwareBack = app.slice(app.indexOf("BackHandler.addEventListener('hardwareBackPress'"), app.indexOf('return () => subscription.remove();', app.indexOf("BackHandler.addEventListener('hardwareBackPress'")));
+  const liveMenu = app.slice(app.indexOf("liveSheet === 'menu'"), app.indexOf(": liveSheet === 'chat'"));
+  expect(hardwareBack).toContain("if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {");
+  expect(hardwareBack).not.toContain('lobbyRuntime.unattendLiveGame');
+  expect(liveMenu).toContain('lobbyRuntime.unattendLiveGame(liveTableID);');
+});
+
 test('More routes to current task owners and reads the repository version', () => {
   const app = read('App.tsx');
   const more = read('src/ui/screens/MoreScreen.tsx');

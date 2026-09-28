@@ -13,9 +13,10 @@ describe('browsing and room attendance Back ownership', () => {
   test('room attendance Back policy remains outside browsing policy', () => {
     expect(getRoomAttendanceBackAction({ kind: 'pregame', role: 'spectator' })).toBe('consume');
     expect(getRoomAttendanceBackAction({ kind: 'pregame', role: 'player' })).toBe('consume');
-    expect(getRoomAttendanceBackAction({ kind: 'live_game', role: 'spectator' })).toBe('unattend');
+    expect(getRoomAttendanceBackAction({ kind: 'live_game', role: 'spectator' })).toBe('consume');
     expect(getRoomAttendanceBackAction({ kind: 'live_game', role: 'player' })).toBe('consume');
     expect(getRoomAttendanceBackAction({ kind: 'awaiting_game_bootstrap', role: 'spectator' })).toBe('consume');
+    expect(getRoomAttendanceBackAction({ kind: 'awaiting_game_bootstrap', role: 'player' })).toBe('consume');
   });
 
   test('Pregame composition follows actual landscape bounds, including short-wide windows', () => {
