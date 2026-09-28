@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
 import { freeBotSlots, pruneBotSelection } from '../../config/knownBots';
@@ -20,6 +20,8 @@ import {
 } from '../designSystem';
 import { TableOptionsEditor } from '../TableOptionsEditor';
 import { formatPregamePlayerStats } from './pregamePlayerStats';
+
+const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 
 export function PregameScreen() {
   const { theme } = useHanabTheme();
@@ -287,16 +289,32 @@ export function PregameScreen() {
                 : 'Changes are sent to the table owner as a proposal.'}
             />
             <Field maxLength={45} onChangeText={setEditName} placeholder="Table name" value={editName} />
-            <View style={styles.stepperRow}>
-              <View style={styles.stepperCopy}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
-                <Text style={[styles.stepperValue, { color: theme.colors.text }]}>{editMaxPlayers}</Text>
-              </View>
-              <View style={styles.actionsRow}>
-                <ActionButton compact disabled={editMaxPlayers <= 2} title="−"
-                  onPress={() => setEditMaxPlayers((count) => count - 1)} />
-                <ActionButton compact disabled={editMaxPlayers >= 6} title="+"
-                  onPress={() => setEditMaxPlayers((count) => count + 1)} />
+            <View style={styles.playerSelector}>
+              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
+              <View style={styles.playerOptions}>
+                {MAX_PLAYER_OPTIONS.map((value) => {
+                  const selected = editMaxPlayers === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      hitSlop={6}
+                      onPress={() => setEditMaxPlayers(value)}
+                      style={[
+                        styles.playerOption,
+                        {
+                          backgroundColor: selected ? theme.colors.accent : theme.colors.surfaceRaised,
+                          borderColor: selected ? theme.colors.accent : theme.colors.borderStrong,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.playerOptionText, { color: selected ? theme.colors.accentText : theme.colors.text }]}>
+                        {value}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
             <TableOptionsEditor options={editOptions} onChange={setEditOptions} />
@@ -334,9 +352,10 @@ const styles = StyleSheet.create({
   playerName: { fontSize: 15, fontWeight: '800' },
   playerState: { fontSize: 12, fontWeight: '700' },
   playerStats: { fontSize: 12, lineHeight: 17 },
-  stepperRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  stepperCopy: { gap: 2 },
   label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  stepperValue: { fontSize: 24, fontWeight: '800' },
+  playerSelector: { gap: 8 },
+  playerOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  playerOption: { alignItems: 'center', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 44, minWidth: 44, paddingHorizontal: 12 },
+  playerOptionText: { fontSize: 15, fontWeight: '800' },
   actionsRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
 });
