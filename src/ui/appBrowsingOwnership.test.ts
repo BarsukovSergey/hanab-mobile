@@ -15,11 +15,13 @@ describe('App browsing ownership', () => {
     expect(app.split(homeReset)).toHaveLength(3);
   });
 
-  test('room foreground remains authoritative without replay-specific browsing restoration', () => {
+  test('room foreground remains authoritative and Pregame is hosted outside browsing content', () => {
     expect(app).not.toContain('returnAfterUnattend');
     expect(app).toContain("if (probe === 'valid' && roomState.room.kind === 'live_game')");
     expect(app).toContain("} else if (roomState.room.kind === 'awaiting_game_bootstrap') {");
     expect(app).toContain('} else if (roomState.rematchTransition !== null) {');
-    expect(app).toContain("} else if (roomState.room.kind === 'pregame') {");
+    expect(app).toContain("if (probe === 'valid' && session.phase === 'ready' && hydrated && roomState.room.kind === 'pregame') {");
+    expect(app).toContain('<PregameScreen backRef={pregameBackRef} />');
+    expect(app).not.toContain('content = <PregameScreen />');
   });
 });

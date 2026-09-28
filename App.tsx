@@ -107,6 +107,7 @@ function AppContent() {
   }, []);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const settingsBackRef = useRef<(() => void) | null>(null);
+  const pregameBackRef = useRef<(() => void) | null>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [exportFeedback, setExportFeedback] = useState<{
     message: string;
@@ -187,15 +188,15 @@ function AppContent() {
       }
       const authenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
       if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {
-        const room = roomState.room.kind === 'pregame'
-          || roomState.room.kind === 'awaiting_game_bootstrap'
+        if (roomState.room.kind === 'pregame') {
+          pregameBackRef.current?.();
+          return true;
+        }
+        const room = roomState.room.kind === 'awaiting_game_bootstrap'
           || roomState.room.kind === 'live_game'
           ? roomState.room : null;
         if (room !== null) {
           const action = getRoomAttendanceBackAction(room);
-          if (action === 'leave_pregame' && roomState.room.kind === 'pregame' && roomState.pendingLeaveTableID === null) {
-            lobbyRuntime.leave(roomState.room.tableID);
-          }
           if (action === 'unattend' && roomState.room.kind === 'live_game' && roomState.pendingUnattendTableID === null) {
             lobbyRuntime.unattendLiveGame(roomState.room.tableID);
           }
@@ -530,6 +531,25 @@ function AppContent() {
     );
   }
 
+  if (probe === 'valid' && session.phase === 'ready' && hydrated && roomState.room.kind === 'pregame') {
+    return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.flex, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
+        <View style={styles.focusedRoomShell}>
+          {serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
+          <PregameScreen backRef={pregameBackRef} />
+        </View>
+        {lobbyNotice !== null && <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
+          <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
+            <Notice tone={lobbyNotice.kind === 'error' ? 'error' : 'neutral'}>{lobbyNotice.message}</Notice>
+            <ActionButton compact title="Dismiss" tone="ghost" onPress={() => dispatch(lobbyActions.noticeDismissed())} />
+          </View>
+        </View>}
+      </SafeAreaView>
+      <StatusBar style={theme.dark ? 'light' : 'dark'} />
+    </KeyboardAvoidingView>;
+  }
+
   let content: ReactNode;
   if (probe === 'checking') {
     content = <Panel><SectionHeading title="Checking session…" detail="Looking for an existing hanab.live session." /></Panel>;
@@ -583,8 +603,6 @@ function AppContent() {
     content = <Panel><SectionHeading title="Loading game…" detail="Receiving the authoritative game state." /></Panel>;
   } else if (roomState.rematchTransition !== null) {
     content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
-  } else if (roomState.room.kind === 'pregame') {
-    content = <PregameScreen />;
   } else if (browsing.destination === 'history' && !isBrowsingSettings(browsing)) {
     content = <HistoryScreen onBack={() => navigate('home')}
       onPlaySeed={(prefill) => {
@@ -672,6 +690,7 @@ function AppContent() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   browsingBody: { flex: 1, flexDirection: 'row' },
+  focusedRoomShell: { flex: 1, gap: 8, maxWidth: 1280, paddingHorizontal: 12, paddingTop: 8, alignSelf: 'center', width: '100%' },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: 16, width: '100%' },
   lobbyNoticeOverlay: { elevation: 10, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
   lobbyNoticeContainer: { alignSelf: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 6, width: '100%' },

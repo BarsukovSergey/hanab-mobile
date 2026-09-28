@@ -45,9 +45,9 @@ describe('pregame player stats', () => {
     expect(formatted).not.toMatch(/NaN|Infinity/);
   });
 
-  test('PregameScreen shows stats in each player row alongside existing actions', () => {
+  test('Pregame root keeps the roster compact while preserving room actions and presence', () => {
     const source = readFileSync(resolve(__dirname, 'PregameScreen.tsx'), 'utf8');
-    expect(source).toContain('formatPregamePlayerStats(player, room.data.players.length)');
+    expect(source).not.toContain('formatPregamePlayerStats(player, room.data.players.length)');
     expect(source).toContain('<UserContextActions');
     expect(source).toContain('lobbyRuntime.setTableLeader(player.name)');
     expect(source).toContain("player.present ? 'Present' : 'Away'");

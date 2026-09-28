@@ -17,9 +17,9 @@ describe('pregame native tools', () => {
   });
 
   test('confirms owner kicks and sends through chat only after confirmation', () => {
-    expect(source).toContain('import { Alert, Pressable, StyleSheet, Text, View } from \'react-native\'');
-    expect(source).toContain('isOwner && (');
-    expect(source).toContain('{!player.you && (');
+    expect(source).toContain('import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from \'react-native\'');
+    expect(source).toContain('{isOwner && <ActionButton compact disabled={roomTransitionPending} title="Kick"');
+    expect(source).toContain('{!player.you && <UserContextActions');
     expect(source).toContain('Alert.alert(');
     expect(source).toContain("{ text: 'Cancel', style: 'cancel' }");
     expect(source).toContain('style: \'destructive\'');

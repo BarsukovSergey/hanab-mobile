@@ -19,7 +19,7 @@ describe('player context actions', () => {
   });
 
   test('Pregame exposes actions only for other players using authoritative friends and table context', () => {
-    expect(pregame).toContain('{!player.you && (');
+    expect(pregame).toContain('{!player.you && <UserContextActions');
     expect(pregame).toContain('<UserContextActions');
     expect(pregame).toContain('session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())');
     expect(pregame).toContain('room={`table${room.tableID}`}');
