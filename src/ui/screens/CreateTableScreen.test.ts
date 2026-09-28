@@ -16,6 +16,23 @@ describe('Create Table task', () => {
     expect(app).toContain('createBackRef.current?.();');
   });
 
+  test('keeps an accepted create pending on the task until authoritative room entry', () => {
+    const submit = create.slice(create.indexOf('if (lobbyRuntime.createTable('), create.indexOf('</ActionButton>', create.indexOf('if (lobbyRuntime.createTable(')));
+    expect(submit).toContain('setTablePassword(\'\');');
+    expect(submit).toContain('setSelectedBots([]);');
+    expect(submit).not.toContain('onBack()');
+    expect(create).toContain("title={roomState.pendingCreate === null ? 'Create Table' : 'Creating…'}");
+    expect(app).toContain('} else if (createTaskOpen) {');
+    expect(app).toContain('if (previousKind === \'none\' && roomState.room.kind !== \'none\') closeCreateTask();');
+    expect(app).toContain('setCreateTaskOpen(false);\n    setSpecificSeedCreatePrefill(null);');
+  });
+
+  test('uses bounded task geometry for the Create form', () => {
+    expect(create).toContain("measureSurface(responsiveWindow, 'task')");
+    expect(create).toContain('maxWidth: taskGeometry.contentWidth');
+    expect(create).toContain("root: { alignSelf: 'center', gap: 16, width: '100%' }");
+  });
+
   test('Back discards nested edits and root Back clears the password without creating', () => {
     expect(create).toContain("if (surface === 'root') closeTask();");
     expect(create).toContain("else if (surface === 'variant') setSurface('root');");
@@ -48,7 +65,7 @@ describe('Create Table task', () => {
     expect(create).toContain('disabled={!createAllowed || attendancePending || !createNameIsValid}');
     expect(create).toContain('getLobbySections(tables).showCreateTable');
     expect(create).toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)');
-    expect(create).toContain("setTablePassword('');\n            setSelectedBots([]);\n            onBack();");
+    expect(create).toContain("setTablePassword('');\n            setSelectedBots([]);");
   });
 
   test('uses the canonical seed name and keeps History reproduction guidance until edited', () => {

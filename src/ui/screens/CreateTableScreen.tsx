@@ -7,11 +7,12 @@ import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { tableSelectors, userSelectors } from '../../store/store';
 import { BotPicker } from '../BotPicker';
-import { ActionButton, Field, Panel, SectionHeading, useHanabTheme } from '../designSystem';
+import { ActionButton, Field, Panel, SectionHeading, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { getLobbySections } from '../lobbySections';
 import { createSpecificSeedTableName } from '../specificSeedName';
 import { RulePicker, VariantPicker } from '../TableOptionsEditor';
 import { toggleMobileTableBooleanOption } from '../tableOptions';
+import { measureSurface } from '../responsiveSurface';
 
 export type SpecificSeedCreatePrefill = {
   seedSuffix: string;
@@ -41,6 +42,8 @@ export function CreateTableScreen({ onBack, backRef, specificSeedCreatePrefill =
   specificSeedCreatePrefill?: SpecificSeedCreatePrefill | null;
 }) {
   const { theme } = useHanabTheme();
+  const responsiveWindow = useResponsiveLayout();
+  const taskGeometry = measureSurface(responsiveWindow, 'task');
   const createPreferences = useAppSelector((state) => state.session.createTablePreferences);
   const sessionReady = useAppSelector((state) => state.session.phase === 'ready');
   const randomTableName = useAppSelector((state) => state.session.randomTableName);
@@ -153,7 +156,7 @@ export function CreateTableScreen({ onBack, backRef, specificSeedCreatePrefill =
     || roomState.pendingCreate !== null;
   const createAllowed = getLobbySections(tables).showCreateTable;
 
-  return <View style={styles.root}>
+  return <View style={[styles.root, { maxWidth: taskGeometry.contentWidth }]}>
     <View style={styles.header}>
       <ActionButton compact title="Back" onPress={handleBack} />
       <Text style={[styles.title, { color: theme.colors.text }]}>{surface === 'root' ? 'Create Table' : surface === 'specific-seed' ? 'Specific seed' : surface === 'additional-rules' ? 'Additional rules' : surface.charAt(0).toUpperCase() + surface.slice(1)}</Text>
@@ -195,7 +198,6 @@ export function CreateTableScreen({ onBack, backRef, specificSeedCreatePrefill =
           if (lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)) {
             setTablePassword('');
             setSelectedBots([]);
-            onBack();
           }
         }} />
     </Panel>}
@@ -245,7 +247,7 @@ export function CreateTableScreen({ onBack, backRef, specificSeedCreatePrefill =
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 16 },
+  root: { alignSelf: 'center', gap: 16, width: '100%' },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   title: { flex: 1, fontSize: 22, fontWeight: '800' },
   panel: { gap: 12 },

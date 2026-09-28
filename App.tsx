@@ -116,6 +116,12 @@ function AppContent() {
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
+  const previousRoomKind = useRef(roomState.room.kind);
+  useEffect(() => {
+    const previousKind = previousRoomKind.current;
+    previousRoomKind.current = roomState.room.kind;
+    if (previousKind === 'none' && roomState.room.kind !== 'none') closeCreateTask();
+  }, [closeCreateTask, roomState.room.kind]);
   const liveChatUnreadCount = useAppSelector((state) => state.room.room.kind === 'live_game'
     ? state.chat.unreadByRoom[`table${state.room.room.tableID}`] ?? 0
     : 0);
