@@ -2,7 +2,7 @@
 
 Date: **2026-09-28**
 
-Status: **APK built successfully; physical-device validation pending**
+Status: **GitHub prerelease published; physical-device validation pending**
 
 ## Candidate identity
 
@@ -17,6 +17,9 @@ Status: **APK built successfully; physical-device validation pending**
 - APK filename: `Hanab-Mobile-1.0.0-beta.3.apk`
 - APK byte size: `135761383`
 - APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
+- GitHub release: `v1.0.0-beta.3` / release ID `397876619`
+- release asset ID: `594109178`
+- published: `2026-09-28T00:46:57Z`
 
 The runtime candidate is `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`. Android workflow #3 ran from docs-only descendant `3d75474b92b7626086b1d55905f91dbbf5922f58`; the runtime content is equivalent to the candidate. A subsequent runtime fix requires a new candidate and rebuild.
 
@@ -81,4 +84,4 @@ confusing or incorrect.
 
 ## Distribution record
 
-Build identity is frozen above. Physical smoke and distribution date remain to be recorded before sending to testers.
+GitHub prerelease is published with the exact checksum-verified APK. Physical smoke remains pending before treating beta.3 as a validated tester release.
