@@ -1,5 +1,7 @@
 # Hanab Mobile 1.0.0-beta.3
 
+> **Superseded artifact note:** the initial beta.3 candidate documented below was superseded by `v1.0.0-beta.3-hotfix.1`. Use `BETA_3_PHYSICAL_SMOKE.md` for the current hotfix runtime, APK checksum, and physical-acceptance state.
+
 Date: **2026-09-28**
 
 Status: **GitHub prerelease published; physical-device validation pending**
