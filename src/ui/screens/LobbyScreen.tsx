@@ -42,12 +42,14 @@ const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 export function LobbyScreen({
   onOpenHistory,
   onOpenPeople,
+  openGameLinkRequest = 0,
   specificSeedCreatePrefill = null,
   onSpecificSeedCreatePrefillConsumed = () => {},
   clipboard = clipboardActions,
 }: {
   onOpenHistory: () => void;
   onOpenPeople: () => void;
+  openGameLinkRequest?: number;
   specificSeedCreatePrefill?: {
     seedSuffix: string;
     maxPlayers: number;
@@ -69,6 +71,7 @@ export function LobbyScreen({
   const [liveGameLink, setLiveGameLink] = useState('');
   const [liveGameLinkError, setLiveGameLinkError] = useState<string | null>(null);
   const [liveGameLinkPassword, setLiveGameLinkPassword] = useState('');
+  const handledGameLinkRequest = useRef(0);
   const createPreferences = useAppSelector((state) => state.session.createTablePreferences);
   const sessionReady = useAppSelector((state) => state.session.phase === 'ready');
   const [maxPlayers, setMaxPlayers] = useState(createPreferences.maxPlayers);
@@ -78,6 +81,12 @@ export function LobbyScreen({
     timePerTurn: createPreferences.timePerTurnSeconds,
   });
   const preferencesInitialized = useRef(false);
+  useEffect(() => {
+    if (openGameLinkRequest <= handledGameLinkRequest.current) return;
+    handledGameLinkRequest.current = openGameLinkRequest;
+    setLiveGameLinkError(null);
+    setShowLiveGameLink(true);
+  }, [openGameLinkRequest]);
   useEffect(() => {
     if (!sessionReady || preferencesInitialized.current) return;
     preferencesInitialized.current = true;

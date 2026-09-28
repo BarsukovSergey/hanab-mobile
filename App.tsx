@@ -105,6 +105,7 @@ function AppContent() {
     setBrowsing((state) => navigateBrowsing(state, destination));
   };
   const [specificSeedCreatePrefill, setSpecificSeedCreatePrefill] = useState<SpecificSeedCreatePrefill | null>(null);
+  const [gameLinkRequest, setGameLinkRequest] = useState(0);
   const consumeSpecificSeedCreatePrefill = useCallback(() => setSpecificSeedCreatePrefill(null), []);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const settingsBackRef = useRef<(() => void) | null>(null);
@@ -604,11 +605,15 @@ function AppContent() {
       onSettings={() => setBrowsing((state) => openBrowsingSettings(state))}
       onTools={() => setBrowsing((state) => openMoreSurface(state, 'tools'))}
       onAbout={() => setBrowsing((state) => openMoreSurface(state, 'about'))}
-      onHomeTools={() => navigate('home')}
+      onHomeTools={() => {
+        navigate('home');
+        setGameLinkRequest((request) => request + 1);
+      }}
       onHistoryTools={() => navigate('history')} />;
   } else {
     content = <LobbyScreen
       specificSeedCreatePrefill={specificSeedCreatePrefill}
+      openGameLinkRequest={gameLinkRequest}
       onSpecificSeedCreatePrefillConsumed={consumeSpecificSeedCreatePrefill}
       onOpenHistory={() => navigate('history')}
       onOpenPeople={() => navigate('people')}

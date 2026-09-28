@@ -1,6 +1,7 @@
 import {
   Pressable,
   Keyboard,
+  type LayoutChangeEvent,
   Platform,
   StyleSheet,
   Text,
@@ -175,10 +176,11 @@ export function SectionHeading({ title, detail }: { title: string; detail?: stri
 
 type ActionButtonProps = {
   title: string; onPress: () => void; onLongPress?: () => void; disabled?: boolean;
+  onTitleLayout?: (event: LayoutChangeEvent) => void;
   tone?: 'primary' | 'secondary' | 'danger' | 'ghost'; compact?: boolean; style?: StyleProp<ViewStyle>;
 };
 
-export function ActionButton({ title, onPress, onLongPress, disabled = false, tone = 'secondary', compact = false, style }: ActionButtonProps) {
+export function ActionButton({ title, onPress, onLongPress, onTitleLayout, disabled = false, tone = 'secondary', compact = false, style }: ActionButtonProps) {
   const { theme } = useHanabTheme();
   const palette = tone === 'primary'
     ? { bg: theme.colors.accent, pressed: theme.colors.accentPressed, text: theme.colors.accentText, border: theme.colors.accent }
@@ -191,7 +193,7 @@ export function ActionButton({ title, onPress, onLongPress, disabled = false, to
     onLongPress={onLongPress} onPress={onPress} style={({ pressed }) => [
     styles.button, compact && styles.buttonCompact,
     { backgroundColor: pressed ? palette.pressed : palette.bg, borderColor: palette.border }, disabled && styles.disabled, style,
-  ]}><Text numberOfLines={1} style={[styles.buttonText, compact && styles.buttonTextCompact, { color: palette.text }]}>{title}</Text></Pressable>;
+  ]}><Text onLayout={onTitleLayout} numberOfLines={1} style={[styles.buttonText, compact && styles.buttonTextCompact, { color: palette.text }]}>{title}</Text></Pressable>;
 }
 
 export function Field({ style, ...props }: TextInputProps & { style?: StyleProp<TextStyle> }) {

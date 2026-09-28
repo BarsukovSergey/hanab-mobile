@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ActionButton, useHanabTheme, useResponsiveLayout } from './designSystem';
@@ -15,11 +16,17 @@ export function BrowsingNavigation({ destination, onNavigate }: {
   destination: BrowsingDestination;
   onNavigate: (destination: BrowsingDestination) => void;
 }) {
+  const [labelLayouts, setLabelLayouts] = useState<Record<BrowsingDestination, { width: number; height: number }>>({
+    home: { width: 0, height: 0 }, history: { width: 0, height: 0 },
+    people: { width: 0, height: 0 }, more: { width: 0, height: 0 },
+  });
   const { theme } = useHanabTheme();
   const { windowClass, availableWidth } = useResponsiveLayout();
   const bottom = windowClass === 'compact';
-  const bottomHeight = bottom ? measureNavigation('bottom', 64, 20, availableWidth).height : 0;
-  const railWidth = bottom ? 0 : measureNavigation('rail', 64, 20).width;
+  const labelWidth = Math.max(...Object.values(labelLayouts).map(({ width }) => width));
+  const labelHeight = Math.max(...Object.values(labelLayouts).map(({ height }) => height));
+  const bottomHeight = bottom ? measureNavigation('bottom', labelWidth, labelHeight, availableWidth).height : 0;
+  const railWidth = bottom ? 0 : measureNavigation('rail', labelWidth, labelHeight).width;
   return <View accessibilityRole="tablist" style={[
     bottom ? styles.bottom : styles.rail,
     { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
@@ -27,7 +34,12 @@ export function BrowsingNavigation({ destination, onNavigate }: {
   ]}>
     {destinations.map(({ key, label }) => <View key={key} style={bottom ? styles.bottomItem : styles.railItem}>
       <ActionButton compact title={label} tone={destination === key ? 'primary' : 'ghost'}
-        onPress={() => onNavigate(key)} style={styles.button} />
+        onPress={() => onNavigate(key)} style={styles.button}
+        onTitleLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setLabelLayouts((current) => current[key].width === width && current[key].height === height
+            ? current : { ...current, [key]: { width, height } });
+        }} />
     </View>)}
   </View>;
 }

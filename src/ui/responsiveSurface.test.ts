@@ -96,6 +96,11 @@ describe('surface envelopes', () => {
       .toBeLessThan(measureSurface(window, 'browsing').contentWidth);
   });
 
+  test('font-scaled navigation labels select the measured fallback', () => {
+    expect(measureNavigation('bottom', 176, 32, 400).presentation).toBe('two-row');
+    expect(measureNavigation('rail', 176, 32)).toEqual({ width: 96, labelFits: false });
+  });
+
   test('caps content and never returns negative geometry under extreme occlusion', () => {
     const window = measureWindow({ width: 1600, height: 900 }, none, 2000);
     expect(measureSurface(window, 'task')).toMatchObject({ contentWidth: 560, contentHeight: 0 });
