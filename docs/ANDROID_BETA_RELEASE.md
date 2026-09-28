@@ -2,7 +2,7 @@
 
 Planned Android tester candidate: **1.0.0-beta.3**
 
-Build status: **runtime candidate frozen; ordinary CI passed on the exact candidate; APK build and physical-device smoke are still pending.**
+Build status: **APK built successfully from a docs-only descendant of the frozen runtime candidate; physical-device smoke is pending.**
 
 ## Beta.3 version identity
 
@@ -13,10 +13,13 @@ Build status: **runtime candidate frozen; ordinary CI passed on the exact candid
 - expected APK: `Hanab-Mobile-1.0.0-beta.3.apk`
 - runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
 - ordinary CI: **success — run #719 / run ID `36361502403`**
-- Android workflow run: **not started**
-- APK size / SHA-256: **not recorded yet**
+- Android workflow run: **success — #3 / run ID `36361833453`**
+- workflow head: `3d75474b92b7626086b1d55905f91dbbf5922f58`
+- artifact ID: `10945838465`
+- APK size: `135761383` bytes
+- APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
 
-The merge commit `fd9919bf7b764354c4f4cce75a96a90c1f2e5506` is the immutable beta.3 runtime candidate. If a later runtime fix is required, select a new candidate and rebuild. Documentation-only recording commits do not redefine the candidate binary.
+The merge commit `fd9919bf7b764354c4f4cce75a96a90c1f2e5506` is the immutable beta.3 runtime candidate. Workflow #3 ran from `3d75474b92b7626086b1d55905f91dbbf5922f58`, which differs from the candidate only by release-documentation commits, so the produced runtime is equivalent to the frozen candidate. If a later runtime fix is required, select a new candidate and rebuild.
 
 ## Frozen beta.2 reference
 
