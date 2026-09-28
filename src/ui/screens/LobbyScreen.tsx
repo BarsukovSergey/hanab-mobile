@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
-import { pruneBotSelection } from '../../config/knownBots';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
-import { tableSelectors, userSelectors } from '../../store/store';
-import { BotPicker } from '../BotPicker';
+import { tableSelectors } from '../../store/store';
 import { ChatPanel } from '../ChatPanel';
 import {
   ActionButton,
@@ -20,116 +17,36 @@ import {
 } from '../designSystem';
 import { getLobbySections } from '../lobbySections';
 import { getLobbyFriendContext } from '../lobbyTablePresentation';
-import { TableOptionsEditor } from '../TableOptionsEditor';
 import { parseLiveGameInput } from '../../game/client/liveGameInput';
 import { clipboardActions, type ClipboardActions } from '../../platform/replayInputActions';
-import { createSpecificSeedTableName } from '../specificSeedName';
-
-function createOptionsFromPreferences(preferences: import('../../protocol/lobbyProtocol').CreateTablePreferences): MobileTableOptions {
-  return {
-    variantName: preferences.variant,
-    timed: preferences.timed,
-    timeBase: preferences.timed ? Math.round(preferences.timeBaseMinutes * 60) : 0,
-    timePerTurn: preferences.timed ? preferences.timePerTurnSeconds : 0,
-    cardCycle: preferences.cardCycle, emptyClues: preferences.emptyClues,
-    oneExtraCard: preferences.oneExtraCard, oneLessCard: preferences.oneLessCard,
-    allOrNothing: preferences.allOrNothing,
-  };
-}
-
-const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 
 export function LobbyScreen({
-  onOpenHistory,
-  onOpenPeople,
+  onCreate,
   openGameLinkRequest = 0,
-  specificSeedCreatePrefill = null,
-  onSpecificSeedCreatePrefillConsumed = () => {},
   clipboard = clipboardActions,
 }: {
-  onOpenHistory: () => void;
-  onOpenPeople: () => void;
+  onCreate: () => void;
   openGameLinkRequest?: number;
-  specificSeedCreatePrefill?: {
-    seedSuffix: string;
-    maxPlayers: number;
-    numPlayers: number;
-    createOptions: MobileTableOptions;
-  } | null;
-  onSpecificSeedCreatePrefillConsumed?: () => void;
   clipboard?: ClipboardActions;
 }) {
   const { theme } = useHanabTheme();
   const { wide } = useResponsiveLayout();
-  const [tableName, setTableName] = useState('');
-  const [useSpecificSeed, setUseSpecificSeed] = useState(false);
-  const [seedSuffix, setSeedSuffix] = useState('');
-  const [tablePassword, setTablePassword] = useState('');
-  const [selectedBots, setSelectedBots] = useState<string[]>([]);
-  const [showBotPicker, setShowBotPicker] = useState(false);
   const [showLiveGameLink, setShowLiveGameLink] = useState(false);
   const [liveGameLink, setLiveGameLink] = useState('');
   const [liveGameLinkError, setLiveGameLinkError] = useState<string | null>(null);
   const [liveGameLinkPassword, setLiveGameLinkPassword] = useState('');
   const handledGameLinkRequest = useRef(0);
-  const createPreferences = useAppSelector((state) => state.session.createTablePreferences);
-  const sessionReady = useAppSelector((state) => state.session.phase === 'ready');
-  const [maxPlayers, setMaxPlayers] = useState(createPreferences.maxPlayers);
-  const [createOptions, setCreateOptions] = useState<MobileTableOptions>(() => createOptionsFromPreferences(createPreferences));
-  const latentTimers = useRef({
-    timeBase: Math.round(createPreferences.timeBaseMinutes * 60),
-    timePerTurn: createPreferences.timePerTurnSeconds,
-  });
-  const preferencesInitialized = useRef(false);
   useEffect(() => {
     if (openGameLinkRequest <= handledGameLinkRequest.current) return;
     handledGameLinkRequest.current = openGameLinkRequest;
     setLiveGameLinkError(null);
     setShowLiveGameLink(true);
   }, [openGameLinkRequest]);
-  useEffect(() => {
-    if (!sessionReady || preferencesInitialized.current) return;
-    preferencesInitialized.current = true;
-    setMaxPlayers(createPreferences.maxPlayers);
-    setCreateOptions(createOptionsFromPreferences(createPreferences));
-    latentTimers.current = {
-      timeBase: Math.round(createPreferences.timeBaseMinutes * 60),
-      timePerTurn: createPreferences.timePerTurnSeconds,
-    };
-  }, [createPreferences, sessionReady]);
-  const [reproductionPlayerCount, setReproductionPlayerCount] = useState<number | null>(null);
   const [joinPassword, setJoinPassword] = useState('');
   const [joinPasswordTableID, setJoinPasswordTableID] = useState<number | null>(null);
   const tables = useAppSelector(tableSelectors.selectAll);
-  const users = useAppSelector(userSelectors.selectAll);
   const roomState = useAppSelector((state) => state.room);
-  const randomTableName = useAppSelector((state) => state.session.randomTableName);
   const friends = useAppSelector((state) => state.session.friends);
-  useEffect(() => {
-    if (specificSeedCreatePrefill === null) return;
-    setUseSpecificSeed(true);
-    setSeedSuffix(specificSeedCreatePrefill.seedSuffix);
-    setMaxPlayers(specificSeedCreatePrefill.maxPlayers);
-    setCreateOptions(specificSeedCreatePrefill.createOptions);
-    if (specificSeedCreatePrefill.createOptions.timed) latentTimers.current = {
-      timeBase: specificSeedCreatePrefill.createOptions.timeBase,
-      timePerTurn: specificSeedCreatePrefill.createOptions.timePerTurn,
-    };
-    setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);
-    onSpecificSeedCreatePrefillConsumed();
-  }, [specificSeedCreatePrefill, onSpecificSeedCreatePrefillConsumed]);
-  useEffect(() => {
-    setSelectedBots((current) => {
-      const next = pruneBotSelection(current, users, [], tablePassword.length > 0, maxPlayers - 1);
-      return next.length === current.length && next.every((name, index) => name === current[index]) ? current : next;
-    });
-  }, [users, tablePassword, maxPlayers]);
-  const effectiveName = tableName.trim() || randomTableName?.trim() || '';
-  const specificSeedTableName = createSpecificSeedTableName(seedSuffix);
-  const submittedName = useSpecificSeed ? specificSeedTableName ?? '' : tableName;
-  const createNameIsValid = useSpecificSeed
-    ? specificSeedTableName !== null
-    : effectiveName.length >= 1 && effectiveName.length <= 45;
   const {
     yourRunningGames,
     pregameTables,
@@ -147,17 +64,17 @@ export function LobbyScreen({
       <Panel style={[styles.hero, !wide && styles.heroNarrow]}>
         <View style={[styles.heroCopy, !wide && styles.heroCopyNarrow]}>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HANAB</Text>
-          <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Lobby</Text>
+          <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Home</Text>
           <Text style={[styles.heroDetail, { color: theme.colors.textMuted }]}>
             {tables.length} {tables.length === 1 ? 'table' : 'tables'} available
           </Text>
         </View>
         <View style={[styles.heroActions, !wide && styles.heroActionsNarrow]}>
-          <ActionButton compact title="People" onPress={onOpenPeople} />
-          <ActionButton compact title="Game history" onPress={onOpenHistory} />
+          <ActionButton compact title="Create" disabled={!showCreateTable} onPress={onCreate} />
           <ActionButton compact title="Open game link" onPress={() => { setShowLiveGameLink(true); setLiveGameLinkError(null); }} />
         </View>
       </Panel>
+      {!showCreateTable && <Text style={{ color: theme.colors.textMuted }}>Create is unavailable while you have a running game to rejoin.</Text>}
 
       {showLiveGameLink && <Panel style={styles.linkPanel}>
         <SectionHeading title="Open game link" detail="Open a game or join a pregame table available in the Lobby." />
@@ -220,7 +137,7 @@ export function LobbyScreen({
             <ActionButton
               compact
               disabled={attendancePending}
-              title="Return to game"
+              title="Rejoin game"
               tone="primary"
               onPress={() => lobbyRuntime.reattend(table.id)}
             />
@@ -285,109 +202,6 @@ export function LobbyScreen({
             })}
           </Panel>
 
-          {showCreateTable && (
-            <Panel>
-              <SectionHeading title="Create table" detail="Start a new room with hanab.live-compatible options." />
-              <ActionButton
-                title={useSpecificSeed ? 'Use specific seed: On' : 'Use specific seed'}
-                onPress={() => setUseSpecificSeed((enabled) => {
-                  if (enabled) setReproductionPlayerCount(null);
-                  return !enabled;
-                })}
-              />
-              {useSpecificSeed ? (
-                <>
-                  <Field
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={(value) => {
-                      setSeedSuffix(value);
-                      setReproductionPlayerCount(null);
-                    }}
-                    placeholder="Seed suffix"
-                    spellCheck={false}
-                    value={seedSuffix}
-                  />
-                  <Text style={{ color: theme.colors.textMuted }}>
-                    hanab.live combines this suffix with the actual player count and variant when the game starts.
-                  </Text>
-                  {reproductionPlayerCount !== null && <Text style={{ color: theme.colors.textMuted }}>
-                    To reproduce this deal, start with exactly {reproductionPlayerCount} players and keep this variant.
-                  </Text>}
-                </>
-              ) : (
-                <Field maxLength={45} onChangeText={setTableName} placeholder={randomTableName ?? 'Table name'} value={tableName} />
-              )}
-              <Field
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={setTablePassword}
-                placeholder="Table password (optional)"
-                secureTextEntry
-                value={tablePassword}
-              />
-              <View style={styles.playerSelector}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Max players</Text>
-                <View style={styles.playerOptions}>
-                  {MAX_PLAYER_OPTIONS.map((value) => {
-                    const selected = maxPlayers === value;
-                    return (
-                      <Pressable
-                        key={value}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        hitSlop={6}
-                        onPress={() => {
-                          setMaxPlayers(value);
-                          setReproductionPlayerCount(null);
-                          setSelectedBots((names) => names.slice(0, value - 1));
-                        }}
-                        style={[
-                          styles.playerOption,
-                          {
-                            backgroundColor: selected ? theme.colors.accent : theme.colors.surfaceRaised,
-                            borderColor: selected ? theme.colors.accent : theme.colors.borderStrong,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.playerOptionText, { color: selected ? theme.colors.accentText : theme.colors.text }]}>
-                          {value}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-              <ActionButton title={showBotPicker ? 'Hide bots' : 'Choose bots'}
-                onPress={() => setShowBotPicker(!showBotPicker)} />
-              {showBotPicker && <BotPicker selected={selectedBots} onChange={setSelectedBots}
-                limit={maxPlayers - 1} users={users} protectedTable={tablePassword.length > 0} />}
-              <TableOptionsEditor options={createOptions} onChange={(options) => {
-                if (createOptions.timed && !options.timed) latentTimers.current = {
-                  timeBase: createOptions.timeBase, timePerTurn: createOptions.timePerTurn,
-                };
-                const nextOptions = !createOptions.timed && options.timed
-                  ? { ...options, ...latentTimers.current }
-                  : options;
-                if (nextOptions.timed) latentTimers.current = {
-                  timeBase: nextOptions.timeBase, timePerTurn: nextOptions.timePerTurn,
-                };
-                setCreateOptions(nextOptions);
-                setReproductionPlayerCount(null);
-              }} />
-              <ActionButton
-                disabled={attendancePending || !createNameIsValid}
-                title={roomState.pendingCreate === null ? 'Create table' : 'Creating…'}
-                tone="primary"
-                onPress={() => {
-                  if (lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)) {
-                    setTablePassword('');
-                    setSelectedBots([]);
-                  }
-                }}
-              />
-            </Panel>
-          )}
         </View>
 
         <View style={[styles.column, styles.listColumn]}>
@@ -511,11 +325,6 @@ const styles = StyleSheet.create({
   column: { flex: 1, gap: 16, minWidth: 0 },
   discoveryColumn: { flex: 0.92 },
   listColumn: { flex: 1.08 },
-  label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  playerSelector: { gap: 8 },
-  playerOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  playerOption: { alignItems: 'center', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 44, minWidth: 44, paddingHorizontal: 12 },
-  playerOptionText: { fontSize: 15, fontWeight: '800' },
   actionsRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tableCard: { borderTopWidth: 1, gap: 10, paddingTop: 12 },
   friendTableCard: { borderLeftWidth: 3, paddingLeft: 8 },

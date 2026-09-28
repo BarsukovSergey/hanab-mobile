@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(resolve(__dirname, '../..', path), '
 test('global navigation belongs to authenticated browsing and uses responsive geometry', () => {
   const app = read('App.tsx');
   const nav = read('src/ui/BrowsingNavigation.tsx');
-  expect(app).toContain("roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen");
+  expect(app).toContain("roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen && !createTaskOpen");
   expect(app).toContain("windowClass !== 'compact'");
   expect(app).toContain('<BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />');
   expect(app).not.toContain('<ActionButton compact title="Settings" tone="ghost"');

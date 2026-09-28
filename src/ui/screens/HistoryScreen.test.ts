@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from '@jest/globals';
 
-const screen = readFileSync(resolve(__dirname, 'HistoryScreen.tsx'), 'utf8');
+const screen = readFileSync(resolve(__dirname, 'HistoryScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('History screen source contract', () => {
   test('renders authoritative tags only when non-empty', () => {
