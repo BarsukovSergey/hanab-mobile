@@ -5,12 +5,15 @@ import { describe, expect, test } from '@jest/globals';
 import { formatLobbyRoster, getLobbyFriendContext } from '../lobbyTablePresentation';
 
 const screen = readFileSync(resolve(__dirname, 'LobbyScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
-const app = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
-describe('lobby table details and create selector', () => {
-  test('exposes compact People and Game history actions together in the hero', () => {
-    expect(screen).toContain('<ActionButton compact title="People" onPress={onOpenPeople} />');
-    expect(screen).toContain('<ActionButton compact title="Game history" onPress={onOpenHistory} />');
+describe('Home catalog', () => {
+  test('shows Create and Open game link with an explanation when creation is unavailable', () => {
+    expect(screen).toContain('title="Create" disabled={!showCreateTable} onPress={onCreate}');
+    expect(screen).toContain('title="Open game link"');
+    expect(screen).toContain('Create is unavailable while you have a running game to rejoin.');
+    expect(screen).not.toContain('title="People"');
+    expect(screen).not.toContain('title="Game history"');
+    expect(screen).not.toContain('lobbyRuntime.createTable(');
   });
 
   test('stacks the hero copy above actions on narrow screens', () => {
@@ -29,84 +32,12 @@ describe('lobby table details and create selector', () => {
   });
 
   test('renders roster in both manual Pregame and shared TableSection card paths', () => {
-    const pregamePath = screen.slice(screen.indexOf('{pregameTables.map'), screen.indexOf('{showCreateTable'));
+    const pregamePath = screen.slice(screen.indexOf('{pregameTables.map'), screen.indexOf('</Panel>', screen.indexOf('{pregameTables.map')));
     const sectionPath = screen.slice(screen.indexOf('function TableSection'), screen.indexOf('const styles'));
 
     expect(pregamePath).toContain('<LobbyRoster table={table} friends={friends} />');
     expect(sectionPath).toContain('<LobbyRoster table={table} friends={friends} />');
     expect(screen).toContain('friendNames.has(name.toLowerCase())');
-  });
-
-  test('exposes exactly max player options 2 through 6 with selected button state', () => {
-    expect(screen).toContain('const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;');
-    expect(screen).toContain('accessibilityRole="button"');
-    expect(screen).toContain('accessibilityState={{ selected }}');
-    expect(screen).toContain('setMaxPlayers(value)');
-    expect(screen).not.toContain('stepperRow');
-    expect(screen).not.toContain('stepperValue');
-  });
-
-  test('passes the selected name, maxPlayers, options, password, and bots unchanged to createTable', () => {
-    expect(screen).toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)');
-    expect(screen).toContain("const submittedName = useSpecificSeed ? specificSeedTableName ?? '' : tableName;");
-    expect(screen).toContain('const effectiveName = tableName.trim() || randomTableName?.trim() || \'\';');
-    expect(screen).not.toContain('maxPlayers}v');
-  });
-
-  test('initializes Create from server preferences and keeps latent timer values out of untimed commands', () => {
-    expect(screen).toContain('state.session.createTablePreferences');
-    expect(screen).toContain('useState(createPreferences.maxPlayers)');
-    expect(screen).toContain('variantName: preferences.variant');
-    expect(screen).toContain('timeBase: preferences.timed ? Math.round(preferences.timeBaseMinutes * 60) : 0');
-    expect(screen).toContain('timePerTurn: preferences.timed ? preferences.timePerTurnSeconds : 0');
-    expect(screen).toContain('timeBase: createOptions.timeBase, timePerTurn: createOptions.timePerTurn');
-    expect(screen).toContain('? { ...options, ...latentTimers.current }');
-    expect(screen).toContain('setCreateOptions(specificSeedCreatePrefill.createOptions);');
-  });
-
-  test('adopts a one-shot History prefill locally and leaves creation to the user', () => {
-    expect(app).toContain('useState<SpecificSeedCreatePrefill | null>(null)');
-    expect(app).toContain('setSpecificSeedCreatePrefill(prefill);');
-    expect(app).toContain("navigate('home');");
-    expect(screen).toContain('setUseSpecificSeed(true);');
-    expect(screen).toContain('setSeedSuffix(specificSeedCreatePrefill.seedSuffix);');
-    expect(screen).toContain('setMaxPlayers(specificSeedCreatePrefill.maxPlayers);');
-    expect(screen).toContain('setCreateOptions(specificSeedCreatePrefill.createOptions);');
-    expect(screen).toContain('onSpecificSeedCreatePrefillConsumed();');
-    expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
-    expect(screen).toContain('To reproduce this deal, start with exactly {reproductionPlayerCount} players and keep this variant.');
-    expect(screen).toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots)');
-    expect(screen).not.toContain('lobbyRuntime.createTable(submittedName, maxPlayers, createOptions, tablePassword, selectedBots);');
-    expect(app).not.toContain('dispatch(specificSeedCreatePrefill');
-  });
-
-  test('manual reproduction edits clear only the History hint and a later prefill restores it', () => {
-    expect(screen).toContain('setSeedSuffix(value);\n                      setReproductionPlayerCount(null);');
-    expect(screen).toContain('setMaxPlayers(value);\n                          setReproductionPlayerCount(null);');
-    expect(screen).toContain('setCreateOptions(nextOptions);\n                setReproductionPlayerCount(null);');
-    expect(screen).toContain('if (enabled) setReproductionPlayerCount(null);');
-    expect(screen).toContain('setReproductionPlayerCount(specificSeedCreatePrefill.numPlayers);');
-    expect(screen).toContain('value={seedSuffix}');
-    expect(screen).toContain('options={createOptions} onChange={(options) => {');
-    expect(screen).toContain('maxPlayers === value');
-  });
-
-  test('keeps ordinary and seed drafts local and exposes only the active name field', () => {
-    expect(screen).toContain("const [useSpecificSeed, setUseSpecificSeed] = useState(false);");
-    expect(screen).toContain("const [seedSuffix, setSeedSuffix] = useState('');");
-    expect(screen).toContain('title={useSpecificSeed ? \'Use specific seed: On\' : \'Use specific seed\'}');
-    const seedFieldStart = screen.lastIndexOf('<Field', screen.indexOf('placeholder="Seed suffix"'));
-    const seedFieldEnd = screen.indexOf('/>', screen.indexOf('placeholder="Seed suffix"')) + 2;
-    const seedField = screen.slice(seedFieldStart, seedFieldEnd);
-    expect(seedField).toContain('autoCapitalize="none"');
-    expect(seedField).toContain('autoCorrect={false}');
-    expect(seedField).toContain('spellCheck={false}');
-    expect(seedField).not.toContain('maxLength');
-    expect(screen).toContain('specificSeedTableName !== null');
-    expect(screen).toContain('disabled={attendancePending || !createNameIsValid}');
-    expect(screen).toContain('placeholder={randomTableName ?? \'Table name\'} value={tableName}');
-    expect(screen).toContain('actual player count and variant when the game starts.');
-    expect(screen).toContain('disabled={attendancePending || !createNameIsValid}');
   });
 
   test('uses authoritative friends for compact table context and running progress', () => {
@@ -132,20 +63,11 @@ describe('lobby table details and create selector', () => {
     }, ['friend']).hasFriends).toBe(true);
     expect(screen).toContain("if (!context.hasFriends) return null;");
     expect(screen).toContain('table.running ? ` · ${table.progress}%`');
-    expect(screen).toContain('title="Return to game"');
+    expect(screen).toContain('title="Rejoin game"');
     expect(screen).toContain('title="Join"');
     expect(screen).toContain('title="Spectate pregame"');
     expect(screen).toContain('title="Spectate"');
     expect(screen).toContain('title="Open review"');
-    expect(screen).toContain('title="Create table"');
-  });
-
-  test('uses the server name as the blank field placeholder and permits blank create', () => {
-    expect(screen).toContain('state.session.randomTableName');
-    expect(screen).toContain("placeholder={randomTableName ?? 'Table name'}");
-    expect(screen).toContain("const effectiveName = tableName.trim() || randomTableName?.trim() || '';");
-    expect(screen).toContain('effectiveName.length >= 1 && effectiveName.length <= 45');
-    expect(screen).toContain("setTablePassword('');");
   });
 
   test('offers game and pregame links, secure pregame password, and local feedback', () => {

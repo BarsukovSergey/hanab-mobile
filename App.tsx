@@ -53,20 +53,13 @@ import { getBrowsingBackAction, getRoomAttendanceBackAction } from './src/ui/nav
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
+import { CreateTableScreen, type SpecificSeedCreatePrefill } from './src/ui/screens/CreateTableScreen';
 import { MoreScreen } from './src/ui/screens/MoreScreen';
 import { PeopleScreen } from './src/ui/screens/PeopleScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
 import { UserContextActions } from './src/ui/UserContextActions';
 import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
-import type { MobileTableOptions } from './src/protocol/lobbyProtocol';
-
-type SpecificSeedCreatePrefill = {
-  seedSuffix: string;
-  maxPlayers: number;
-  numPlayers: number;
-  createOptions: MobileTableOptions;
-};
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
 type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | 'replay-export' | null;
@@ -105,8 +98,13 @@ function AppContent() {
     setBrowsing((state) => navigateBrowsing(state, destination));
   };
   const [specificSeedCreatePrefill, setSpecificSeedCreatePrefill] = useState<SpecificSeedCreatePrefill | null>(null);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const createBackRef = useRef<(() => void) | null>(null);
   const [gameLinkRequest, setGameLinkRequest] = useState(0);
-  const consumeSpecificSeedCreatePrefill = useCallback(() => setSpecificSeedCreatePrefill(null), []);
+  const closeCreateTask = useCallback(() => {
+    setCreateTaskOpen(false);
+    setSpecificSeedCreatePrefill(null);
+  }, []);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const settingsBackRef = useRef<(() => void) | null>(null);
   const [tagDraft, setTagDraft] = useState('');
@@ -177,6 +175,10 @@ function AppContent() {
         setLiveSheet(null);
         return true;
       }
+      if (createTaskOpen && roomState.room.kind === 'none') {
+        createBackRef.current?.();
+        return true;
+      }
       const authenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
       if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {
         const room = roomState.room.kind === 'pregame'
@@ -202,7 +204,7 @@ function AppContent() {
     });
     return () => subscription.remove();
   }, [
-    browsing, hydrated, liveSheet, probe, roomState.rematchTransition,
+    browsing, createTaskOpen, hydrated, liveSheet, probe, roomState.rematchTransition,
     roomState.pendingLeaveTableID, roomState.pendingUnattendTableID,
     roomState.room, session.phase,
   ]);
@@ -582,6 +584,7 @@ function AppContent() {
       onPlaySeed={(prefill) => {
         setSpecificSeedCreatePrefill(prefill);
         navigate('home');
+        setCreateTaskOpen(true);
       }}
       onWatchReplay={(databaseID, visibility) => { lobbyRuntime.watchHistoricalGame(databaseID, visibility); }}
       onWatchJSONReplay={(gameJSON, visibility) => { lobbyRuntime.watchJSONReplay(gameJSON, visibility); }}
@@ -592,6 +595,9 @@ function AppContent() {
           lobbyRuntime.watchJSONReplay(request.gameJSON, request.visibility);
         }
       }} />;
+  } else if (createTaskOpen) {
+    content = <CreateTableScreen onBack={closeCreateTask} backRef={createBackRef}
+      specificSeedCreatePrefill={specificSeedCreatePrefill} />;
   } else if (isBrowsingSettings(browsing)) {
     content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()}
       onPasswordTaskChange={setPasswordTaskOpen} backRef={settingsBackRef} />;
@@ -612,17 +618,14 @@ function AppContent() {
       onHistoryTools={() => navigate('history')} />;
   } else {
     content = <LobbyScreen
-      specificSeedCreatePrefill={specificSeedCreatePrefill}
       openGameLinkRequest={gameLinkRequest}
-      onSpecificSeedCreatePrefillConsumed={consumeSpecificSeedCreatePrefill}
-      onOpenHistory={() => navigate('history')}
-      onOpenPeople={() => navigate('people')}
+      onCreate={() => setCreateTaskOpen(true)}
     />;
   }
 
   const showBrowsingNavigation = probe === 'valid' && session.phase === 'ready' && hydrated
     && session.authenticatedUser !== null
-    && roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen;
+    && roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen && !createTaskOpen;
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
 
   return (

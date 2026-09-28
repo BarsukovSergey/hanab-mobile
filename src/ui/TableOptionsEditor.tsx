@@ -15,80 +15,13 @@ export function TableOptionsEditor({ options, onChange }: {
   onChange: (options: MobileTableOptions) => void;
 }) {
   const { theme } = useHanabTheme();
-  const [variantSearch, setVariantSearch] = useState('');
-  const matchingVariants = SUPPORTED_VARIANT_NAMES.filter((name) => (
-    name.toLocaleLowerCase().includes(variantSearch.trim().toLocaleLowerCase())
-  )).slice(0, 20);
-  const toggle = (key: BooleanMobileTableOption) => {
-    onChange(toggleMobileTableBooleanOption(options, key));
-  };
-  const toggles = [
-    ['timed', 'Timed'], ['cardCycle', 'Card Cycle'], ['emptyClues', 'Empty Clues'],
-    ['oneExtraCard', 'One Extra Card'], ['oneLessCard', 'One Less Card'],
-    ['allOrNothing', 'All or Nothing'],
-  ] as const;
 
   return (
     <View style={[styles.root, { borderColor: theme.colors.border }]}>
       <SectionHeading title="Variant & rules" detail={`Selected: ${options.variantName}`} />
-      <Field
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={setVariantSearch}
-        placeholder="Search variants"
-        value={variantSearch}
-      />
-      <View style={styles.chips}>
-        {matchingVariants.map((name) => {
-          const active = options.variantName === name;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              key={name}
-              onPress={() => onChange({ ...options, variantName: name })}
-              style={({ pressed }) => [
-                styles.chip,
-                {
-                  backgroundColor: active ? theme.colors.accent : theme.colors.surfaceRaised,
-                  borderColor: active ? theme.colors.accent : theme.colors.border,
-                },
-                pressed && { opacity: 0.72 },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: active ? theme.colors.accentText : theme.colors.text }]}>
-                {active ? '✓ ' : ''}{name}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <VariantPicker options={options} onChange={onChange} />
       <Text style={[styles.label, { color: theme.colors.textMuted }]}>Optional rules</Text>
-      <View style={styles.chips}>
-        {toggles.map(([key, label]) => {
-          const active = options[key];
-          return (
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: active }}
-              key={key}
-              onPress={() => toggle(key)}
-              style={({ pressed }) => [
-                styles.chip,
-                {
-                  backgroundColor: active ? theme.colors.accent : theme.colors.surfaceRaised,
-                  borderColor: active ? theme.colors.accent : theme.colors.border,
-                },
-                pressed && { opacity: 0.72 },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: active ? theme.colors.accentText : theme.colors.text }]}>
-                {active ? '✓ ' : ''}{label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <RulePicker options={options} onChange={onChange} includeTimed />
       {options.timed && (
         <View style={styles.timedRow}>
           <View style={styles.timedField}>
@@ -107,6 +40,56 @@ export function TableOptionsEditor({ options, onChange }: {
       )}
     </View>
   );
+}
+
+type PickerProps = { options: MobileTableOptions; onChange: (options: MobileTableOptions) => void };
+
+export function VariantPicker({ options, onChange }: PickerProps) {
+  const { theme } = useHanabTheme();
+  const [variantSearch, setVariantSearch] = useState('');
+  const matchingVariants = SUPPORTED_VARIANT_NAMES.filter((name) => (
+    name.toLocaleLowerCase().includes(variantSearch.trim().toLocaleLowerCase())
+  )).slice(0, 20);
+  return <>
+    <Field autoCapitalize="none" autoCorrect={false} onChangeText={setVariantSearch}
+      placeholder="Search variants" value={variantSearch} />
+    <View style={styles.chips}>{matchingVariants.map((name) => {
+      const active = options.variantName === name;
+      return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} key={name}
+        onPress={() => onChange({ ...options, variantName: name })}
+        style={({ pressed }) => [styles.chip, {
+          backgroundColor: active ? theme.colors.accent : theme.colors.surfaceRaised,
+          borderColor: active ? theme.colors.accent : theme.colors.border,
+        }, pressed && { opacity: 0.72 }]}>
+        <Text style={[styles.chipText, { color: active ? theme.colors.accentText : theme.colors.text }]}>
+          {active ? '✓ ' : ''}{name}
+        </Text>
+      </Pressable>;
+    })}</View>
+  </>;
+}
+
+export function RulePicker({ options, onChange, includeTimed = false }: PickerProps & { includeTimed?: boolean }) {
+  const { theme } = useHanabTheme();
+  const toggles: readonly (readonly [BooleanMobileTableOption, string])[] = [
+    ...(includeTimed ? [['timed', 'Timed'] as const] : []),
+    ['cardCycle', 'Card Cycle'], ['emptyClues', 'Empty Clues'],
+    ['oneExtraCard', 'One Extra Card'], ['oneLessCard', 'One Less Card'],
+    ['allOrNothing', 'All or Nothing'],
+  ];
+  return <View style={styles.chips}>{toggles.map(([key, label]) => {
+    const active = options[key];
+    return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: active }} key={key}
+      onPress={() => onChange(toggleMobileTableBooleanOption(options, key))}
+      style={({ pressed }) => [styles.chip, {
+        backgroundColor: active ? theme.colors.accent : theme.colors.surfaceRaised,
+        borderColor: active ? theme.colors.accent : theme.colors.border,
+      }, pressed && { opacity: 0.72 }]}>
+      <Text style={[styles.chipText, { color: active ? theme.colors.accentText : theme.colors.text }]}>
+        {active ? '✓ ' : ''}{label}
+      </Text>
+    </Pressable>;
+  })}</View>;
 }
 
 const styles = StyleSheet.create({
