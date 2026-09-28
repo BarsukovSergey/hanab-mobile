@@ -1,5 +1,7 @@
 # Android Beta Release
 
+> **Current artifact:** `v1.0.0-beta.3-hotfix.1` supersedes the original beta.3/versionCode 3 candidate documented below. Use `BETA_3_PHYSICAL_SMOKE.md` for the current hotfix runtime, versionCode 4 APK identity, checksum, and focused physical-acceptance state.
+
 Planned Android tester candidate: **1.0.0-beta.3**
 
 Build status: **GitHub prerelease published with the checksum-verified Beta.3 APK; physical-device smoke is still pending.**
