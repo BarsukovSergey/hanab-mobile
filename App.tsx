@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AppState,
   BackHandler,
@@ -50,6 +50,7 @@ import {
   type BrowsingDestination,
 } from './src/ui/browsingNavigationState';
 import { getBrowsingBackAction } from './src/ui/navigationPolicy';
+import { reconcilePresentationFocus, type PresentationFocusMemory } from './src/ui/presentationFocus';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
@@ -117,12 +118,33 @@ function AppContent() {
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
-  const previousRoomKind = useRef(roomState.room.kind);
-  useEffect(() => {
-    const previousKind = previousRoomKind.current;
-    previousRoomKind.current = roomState.room.kind;
-    if (previousKind === 'none' && roomState.room.kind !== 'none') closeCreateTask();
-  }, [closeCreateTask, roomState.room.kind]);
+  const [presentationFocus, setPresentationFocus] = useState<'room' | 'browsing'>('browsing');
+  const presentationFocusMemory = useRef<PresentationFocusMemory>({
+    previousConnectionEpoch: session.connectionEpoch,
+    previousRoomKind: 'none',
+    preserveNextRoomEntry: false,
+  });
+  const resumeRoomHint =
+    (session.resumeHints?.playingAtTables.length ?? 0) > 0
+    || (session.resumeHints?.disconSpectatingTable ?? 0) > 0;
+  const stableNoOwnedRoom =
+    session.phase === 'ready'
+    && hydrated
+    && roomState.room.kind === 'none'
+    && roomState.rematchTransition === null
+    && !resumeRoomHint;
+  useLayoutEffect(() => {
+    const result = reconcilePresentationFocus(presentationFocus, presentationFocusMemory.current, {
+      connectionEpoch: session.connectionEpoch,
+      roomKind: roomState.room.kind,
+      roomMigrationPending: roomState.rematchTransition !== null,
+      stableNoOwnedRoom,
+    });
+    presentationFocusMemory.current = result.memory;
+    if (result.focus !== presentationFocus) setPresentationFocus(result.focus);
+    if (result.enteredRoom) closeCreateTask();
+  }, [closeCreateTask, presentationFocus, roomState.room.kind, roomState.rematchTransition,
+    session.connectionEpoch, stableNoOwnedRoom]);
   const liveChatUnreadCount = useAppSelector((state) => state.room.room.kind === 'live_game'
     ? state.chat.unreadByRoom[`table${state.room.room.tableID}`] ?? 0
     : 0);
@@ -171,6 +193,10 @@ function AppContent() {
   useEffect(() => {
     if (roomState.room.kind !== 'live_game') setLiveSheet(null);
   }, [roomState.room.kind]);
+
+  useEffect(() => {
+    if (presentationFocus !== 'room') setLiveSheet(null);
+  }, [presentationFocus]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -270,6 +296,8 @@ function AppContent() {
     if (result.kind === 'signedOut') {
       setProbe('missing');
       setBrowsing(createBrowsingPresentation('home'));
+      setPresentationFocus('browsing');
+      presentationFocusMemory.current.preserveNextRoomEntry = false;
       setLiveSheet(null);
       setUsername('');
       setPassword('');
@@ -293,6 +321,9 @@ function AppContent() {
   }
 
   let focusedRoomPresentation: ReactNode = null;
+  const roomPresentationVisible =
+    ((probe === 'valid' && roomState.room.kind === 'live_game') || roomState.room.kind === 'pregame')
+    && presentationFocus === 'room';
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
     const authenticatedUsername = session.authenticatedUser?.username;
@@ -390,14 +421,14 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
-            <GameScreen presentationVisible />
+            <GameScreen presentationVisible={roomPresentationVisible} />
           </View>
         </ScrollView>
         </SafeAreaView>
         <Modal animationType="fade" onRequestClose={() => {
           if (liveSheet === 'settings') settingsBackRef.current?.();
           else setLiveSheet(null);
-        }} statusBarTranslucent transparent visible={liveSheet !== null}>
+        }} statusBarTranslucent transparent visible={roomPresentationVisible && liveSheet !== null}>
           <Pressable onPress={() => {
             if (liveSheet === 'settings') settingsBackRef.current?.();
             else setLiveSheet(null);
@@ -462,7 +493,7 @@ function AppContent() {
                 </>
                 : liveSheet === 'chat'
                   ? <>
-                    <ChatPanel room={`table${liveTableID}`} title="Table chat" readActive={liveSheet === 'chat'} />
+                    <ChatPanel room={`table${liveTableID}`} title="Table chat" readActive={roomPresentationVisible && liveSheet === 'chat'} />
                     <ActionButton title="Back" onPress={() => setLiveSheet(null)} />
                   </>
                   : liveSheet === 'settings'
@@ -544,7 +575,7 @@ function AppContent() {
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
         <View style={styles.focusedRoomShell}>
           {serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
-          {pregameReady ? <PregameScreen backRef={pregameBackRef} /> : pregameConnectionStatus}
+          {pregameReady ? <PregameScreen backRef={pregameBackRef} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}
         </View>
         {lobbyNotice !== null && <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
           <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
@@ -659,7 +690,7 @@ function AppContent() {
     && roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen && !createTaskOpen;
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
 
-  return focusedRoomPresentation !== null ? focusedRoomPresentation : (
+  const browsingPresentation = (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       {/* Browsing owns system insets here; descendants use the measured available window. */}
@@ -692,6 +723,17 @@ function AppContent() {
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
     </KeyboardAvoidingView>
   );
+
+  return <>
+    {focusedRoomPresentation !== null && <View
+      style={[styles.flex, !roomPresentationVisible && { display: 'none' }]}
+      pointerEvents={roomPresentationVisible ? 'auto' : 'none'}
+      accessibilityElementsHidden={!roomPresentationVisible}
+      importantForAccessibility={roomPresentationVisible ? 'auto' : 'no-hide-descendants'}>
+      {focusedRoomPresentation}
+    </View>}
+    {(focusedRoomPresentation === null || presentationFocus === 'browsing') && browsingPresentation}
+  </>;
 }
 
 const styles = StyleSheet.create({

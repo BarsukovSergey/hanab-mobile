@@ -24,21 +24,41 @@ test('global navigation belongs to authenticated browsing and uses responsive ge
   expect(nav).not.toContain('64, 20');
 });
 
-test('focused rooms populate one final presentation layer and exclude browsing while focused', () => {
+test('focused rooms stay mounted in an App-owned layer while browsing has focus', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const liveStart = app.indexOf('const gameRootScrollable');
   const live = app.slice(liveStart, app.indexOf("if (roomState.room.kind === 'pregame')", liveStart));
   const pregame = app.slice(app.indexOf("if (roomState.room.kind === 'pregame') {\n    const pregameReady"), app.indexOf('  let content: ReactNode;'));
-  const finalRender = app.slice(app.indexOf('  return focusedRoomPresentation !== null'));
+  const finalRender = app.slice(app.indexOf('  const browsingPresentation = ('));
   expect(app).toContain('let focusedRoomPresentation: ReactNode = null;');
   expect(live).toContain('focusedRoomPresentation = (');
-  expect(live).toContain('<GameScreen presentationVisible />');
+  expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible} />');
+  expect(live).toContain('visible={roomPresentationVisible && liveSheet !== null}');
+  expect(live).toContain("readActive={roomPresentationVisible && liveSheet === 'chat'}");
   expect(live).not.toMatch(/\breturn\s*\(\s*<KeyboardAvoidingView/);
   expect(pregame).toContain('focusedRoomPresentation = <KeyboardAvoidingView');
   expect(pregame).not.toContain('return <KeyboardAvoidingView');
-  expect(finalRender).toContain('return focusedRoomPresentation !== null ? focusedRoomPresentation : (');
+  expect(finalRender).toContain('const browsingPresentation = (');
+  expect(finalRender).toContain('{focusedRoomPresentation !== null && <View');
+  expect(finalRender).toContain("!roomPresentationVisible && { display: 'none' }");
+  expect(finalRender).toContain("pointerEvents={roomPresentationVisible ? 'auto' : 'none'}");
+  expect(finalRender).toContain('accessibilityElementsHidden={!roomPresentationVisible}');
+  expect(finalRender).toContain("importantForAccessibility={roomPresentationVisible ? 'auto' : 'no-hide-descendants'}");
+  expect(finalRender).toContain("(focusedRoomPresentation === null || presentationFocus === 'browsing') && browsingPresentation");
   expect(finalRender).toContain('<BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />');
   expect(finalRender).toContain('{content}');
+});
+
+test('App reconciles focus before paint and hidden focus only closes the live sheet', () => {
+  const app = read('App.tsx').replace(/\r\n/g, '\n');
+  expect(app).toContain('useLayoutEffect(() => {\n    const result = reconcilePresentationFocus(');
+  expect(app).toContain('roomMigrationPending: roomState.rematchTransition !== null');
+  expect(app).toContain('if (result.enteredRoom) closeCreateTask();');
+  const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setLiveSheet(null);"));
+  expect(hiddenEffect.slice(0, hiddenEffect.indexOf('}, [presentationFocus]);')))
+    .toBe("if (presentationFocus !== 'room') setLiveSheet(null);\n  ");
+  expect(app).not.toContain('title="Browse"');
+  expect(app).not.toContain('title="Return"');
 });
 
 test('hardware Back consumes bare Live attendance without sending Unattend', () => {
