@@ -13,7 +13,8 @@
     "bot:check": "node tools/add-bot.mjs --check",
     "cards:generate": "node tools/card-assets/generate.mjs",
     "cards:check": "node tools/card-assets/generate.mjs --check",
-    "android:beta-apk": "node tools/build-android-beta.mjs"
+    "android:beta-apk": "node tools/build-android-beta.mjs",
+    "validate": "npm run typecheck && npm test"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
