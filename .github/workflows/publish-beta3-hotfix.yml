@@ -1,4 +1,4 @@
-name: Publish Beta.3 Hotfix
+name: Finalize Beta.3 Hotfix Release
 
 on:
   push:
@@ -11,57 +11,16 @@ permissions:
   contents: write
 
 jobs:
-  build-and-publish:
+  finalize:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      CANDIDATE_SHA: 36717a2284490c8179e35b882dca0bde15a14a75
-      RELEASE_TAG: v1.0.0-beta.3-hotfix.1
-      APK_PATH: dist/Hanab-Mobile-1.0.0-beta.3.apk
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ env.CANDIDATE_SHA }}
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - run: npm ci
-
-      - run: npm run android:beta-apk
-
-      - name: Record APK identity
-        id: apk
-        shell: bash
-        run: |
-          test -f "$APK_PATH"
-          bytes="$(stat -c%s "$APK_PATH")"
-          sha="$(sha256sum "$APK_PATH" | cut -d' ' -f1)"
-          echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Hanab-Mobile-1.0.0-beta.3-hotfix.1
-          path: ${{ env.APK_PATH }}
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Publish prerelease
+      - name: Correct hotfix release metadata
         env:
           GH_TOKEN: ${{ github.token }}
-          APK_BYTES: ${{ steps.apk.outputs.bytes }}
-          APK_SHA: ${{ steps.apk.outputs.sha }}
         shell: bash
         run: |
-          cat > release-notes.md <<EOF
+          cat > release-notes.md <<'EOF'
           Beta.3 hotfix for Android physical-smoke regressions.
 
           Fixes:
@@ -72,17 +31,18 @@ jobs:
           App version remains `1.0.0-beta.3`.
           Android versionCode: `4`.
 
-          Runtime candidate: `$CANDIDATE_SHA`
-          APK bytes: `$APK_BYTES`
-          APK SHA-256: `$APK_SHA`
+          Runtime candidate: `36717a2284490c8179e35b882dca0bde15a14a75`
+          Exact-candidate CI: run #724 / `36366120596` — success
+          Publisher run: `36366347391` — success
+          APK: `Hanab-Mobile-1.0.0-beta.3.apk`
+          APK bytes: `135756615`
+          APK SHA-256: `80543d8c8fc2573e0bca3dfc972d00af771bcdd71ca2d5bdfe507e549884a9f9`
           EOF
 
-          gh release create "$RELEASE_TAG" "$APK_PATH" \
+          gh release edit v1.0.0-beta.3-hotfix.1 \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$CANDIDATE_SHA" \
             --title "Hanab Mobile 1.0.0-beta.3 hotfix 1" \
-            --notes-file release-notes.md \
-            --prerelease
+            --notes-file release-notes.md
 
           gh release edit v1.0.0-beta.3 \
             --repo "$GITHUB_REPOSITORY" \
