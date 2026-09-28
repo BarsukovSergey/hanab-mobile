@@ -8,7 +8,7 @@ This directory mixes current product/technical authority with historical impleme
 - `../TESTING.md` — tester-facing script and bug-report format; use the beta.3 physical-smoke document for the current hotfix acceptance pass.
 - `BETA_3_PHYSICAL_SMOKE.md` — current beta.3/hotfix physical acceptance record and exact hotfix APK identity.
 - `BETA_3_RELEASE_NOTES.md` — beta.3 release notes; `BETA_2_RELEASE_NOTES.md` remains the frozen previous-release reference.
-- `ANDROID_BETA_RELEASE.md` — current internal APK version, build identity, acceptance checklist, and frozen-build policy.
+- `ANDROID_BETA_RELEASE.md` — internal APK build/release process and historical candidate identities; use `BETA_3_PHYSICAL_SMOKE.md` for the current hotfix artifact/acceptance state.
 - `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the beta.1 tester window plus the version/upgrade checklist used to prepare beta.2.
 
 ## Authority precedence
