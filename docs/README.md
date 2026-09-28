@@ -8,8 +8,20 @@ This directory mixes current product/technical authority with historical impleme
 - `../TESTING.md` — tester-facing script and bug-report format; use the beta.3 physical-smoke document for the current hotfix acceptance pass.
 - `BETA_3_PHYSICAL_SMOKE.md` — current beta.3/hotfix physical acceptance record and exact hotfix APK identity.
 - `BETA_3_RELEASE_NOTES.md` — beta.3 release notes; `BETA_2_RELEASE_NOTES.md` remains the frozen previous-release reference.
-- `ANDROID_BETA_RELEASE.md` — current internal APK version, build identity, acceptance checklist, and frozen-build policy.
+- `ANDROID_BETA_RELEASE.md` — internal APK build/release process and historical candidate identities; use `BETA_3_PHYSICAL_SMOKE.md` for the current hotfix artifact/acceptance state.
 - `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the beta.1 tester window plus the version/upgrade checklist used to prepare beta.2.
+
+## Authority precedence
+
+For implementation tasks, use the narrowest applicable authority instead of reading every document:
+
+1. `MOBILE_APP_DESIGN_V2.md` — app shell, IA, navigation, Back/Browse/Return, room menus, responsive classes and Phase 2 slice order.
+2. `C17_UX_CONTRACT.md` / `C17_UX_DECISIONS.md` — gameplay interaction semantics.
+3. `ARCHITECTURE.md` — technical/runtime/network safety boundaries.
+4. `UPSTREAM.md` and local upstream notes — pinned upstream behavior.
+5. `PRODUCT_ROADMAP.md` — sequencing/priorities.
+
+When shell/menu/landscape text in older C17 material conflicts with Mobile App Design v2, v2 is the current authority. Historical/evidence documents never override a current authority document.
 
 ## Current authority
 
