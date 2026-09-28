@@ -23,7 +23,7 @@ describe('Create Table task', () => {
     expect(submit).not.toContain('onBack()');
     expect(create).toContain("title={roomState.pendingCreate === null ? 'Create Table' : 'Creating…'}");
     expect(app).toContain('} else if (createTaskOpen) {');
-    expect(app).toContain('if (previousKind === \'none\' && roomState.room.kind !== \'none\') closeCreateTask();');
+    expect(app).toContain('if (result.enteredRoom) closeCreateTask();');
     expect(app).toContain('setCreateTaskOpen(false);\n    setSpecificSeedCreatePrefill(null);');
   });
 
