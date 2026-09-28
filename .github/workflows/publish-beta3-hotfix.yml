@@ -83,3 +83,7 @@ jobs:
             --title "Hanab Mobile 1.0.0-beta.3 hotfix 1" \
             --notes-file release-notes.md \
             --prerelease
+
+          gh release edit v1.0.0-beta.3 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Hanab Mobile 1.0.0-beta.3 (superseded by hotfix 1)"
