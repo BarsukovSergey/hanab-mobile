@@ -2,14 +2,14 @@
 
 Date: **2026-09-28**
 
-Status: **release preparation; runtime candidate and APK identity not frozen yet**
+Status: **runtime candidate frozen; CI/build/physical validation in progress**
 
 ## Candidate identity
 
 - version: `1.0.0-beta.3`
 - Android `versionCode`: `3`
-- runtime candidate: **pending release-prep merge SHA**
-- ordinary CI: **pending candidate**
+- runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
+- ordinary CI: **run #719 / run ID `36361502403` — in progress**
 - Android workflow: `Android Beta APK`
 - Android workflow run: **not started**
 - workflow artifact: `Hanab-Mobile-1.0.0-beta.3`
@@ -18,8 +18,7 @@ Status: **release preparation; runtime candidate and APK identity not frozen yet
 - APK byte size: **not recorded yet**
 - APK SHA-256: **not recorded yet**
 
-The runtime candidate will be the release-prep merge SHA unless a subsequent runtime fix requires a
-new candidate. Later documentation-only commits do not redefine the binary.
+The runtime candidate is `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`. A subsequent runtime fix requires a new candidate and rebuild. Later documentation-only commits do not redefine the binary.
 
 ## What changed since beta.2
 
