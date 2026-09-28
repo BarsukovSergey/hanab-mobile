@@ -2,7 +2,9 @@
 
 Date: 2026-09-28
 
-Status: research baseline only. No runtime behavior is changed by this document.
+Status: historical research baseline. No runtime behavior is changed by this document.
+
+**Decision authority has moved to `MOBILE_APP_DESIGN_V2.md`.** This file remains the pre-design snapshot of the product and should be used as evidence of the starting point, not as the implementation contract.
 
 This snapshot is intended to make the post-beta.3 Mobile App Design pass start from the actual current
 product instead of redesigning from memory. It records current navigation ownership, major surfaces,
@@ -144,3 +146,25 @@ The design pass must not weaken existing correctness boundaries:
 
 Issue #4 (rapid replay scrubber jank) remains a performance backlog item and should only be folded into
 the design milestone if physical validation shows that the new review UX makes it material.
+
+
+## Ratified design outcome — 2026-09-28
+
+The post-beta.3 design pass is complete. The canonical implementation contract is
+`MOBILE_APP_DESIGN_V2.md`.
+
+Key ratified decisions:
+
+- browsing destinations are `Home · History · People · More`;
+- presentation focus is separate from authoritative room ownership;
+- Pregame/Live/Review/Hypothetical use a focused Room Workspace with no global bottom navigation;
+- room browsing is explicit via `Browse`; ordinary bare Back in player/spectator Pregame and Live is consumed;
+- Leave / Unattend / Stop watching remain explicit actions and are never implied by browsing navigation;
+- an attended room has a one-action Return affordance while browsing;
+- Create Table is a dedicated task screen launched from Home;
+- Messages remain under People and are explicitly client/session-local until a durable server capability exists;
+- phone landscape is a first-class short-wide layout class, with Live layout A/B chosen by measured fit rather than a generic `wide` breakpoint.
+
+Implementation must follow the incremental slices in the v2 specification. In particular, browsing while
+an attended room remains active must not be enabled before safe task suspension and visibility-owned
+effects are in place.
