@@ -7,7 +7,7 @@ const app = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8').replace
 
 describe('focused Pregame surface', () => {
   test('App hosts Pregame outside the browsing shell and leaves browsing navigation hidden', () => {
-    const start = app.indexOf("if (probe === 'valid' && session.phase === 'ready' && hydrated && roomState.room.kind === 'pregame') {");
+    const start = app.indexOf("if (roomState.room.kind === 'pregame') {\n    const pregameReady");
     const end = app.indexOf('\n  return (', start);
     const host = app.slice(start, end);
     expect(host).toContain("<SafeAreaView edges={['top', 'right', 'bottom', 'left']}");
@@ -15,7 +15,13 @@ describe('focused Pregame surface', () => {
     expect(host).not.toContain('<ScrollView');
     expect(host).not.toContain('<BrowsingNavigation');
     expect(host).not.toContain('styles.appHeader');
-    expect(app).toContain("roomState.room.kind === 'pregame') {");
+    expect(host).toContain('const pregameReady = session.phase === \'ready\' && hydrated;');
+    expect(host).toContain('{pregameReady ? <PregameScreen backRef={pregameBackRef} /> : pregameConnectionStatus}');
+    expect(host).toContain('Session unavailable');
+    expect(host).toContain('Connection lost');
+    expect(host).toContain('Connecting to lobby');
+    expect(host).toContain('title="Retry"');
+    expect(app).not.toContain('content = <PregameScreen />');
   });
 
   test('root shows compact identity, roster and setup entries before a fixed role/start footer', () => {
@@ -31,7 +37,8 @@ describe('focused Pregame surface', () => {
     expect(root).not.toContain('<TableOptionsEditor');
     expect(root).not.toContain('spectators.map');
     expect(screen).toContain('import { isPregameLandscape } from \'../navigationPolicy\';');
-    expect(screen).toContain('const landscape = isPregameLandscape(width, height);');
+    expect(screen).toContain('const { availableWidth, availableHeight } = useResponsiveLayout();');
+    expect(screen).toContain('const landscape = isPregameLandscape(availableWidth, availableHeight);');
     expect(screen).toContain('const leaderName = users.find((user) => user.userID === room.data.owner)?.name');
     expect(screen).toContain('<Pill>Leader{leaderName === undefined ?');
     expect(screen).not.toContain('const { wide } = useResponsiveLayout()');

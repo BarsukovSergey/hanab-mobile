@@ -21,8 +21,8 @@ type PregameSurface = 'root' | 'table-settings' | 'spectators' | 'team-tools' | 
 
 export function PregameScreen({ backRef }: { backRef?: { current: (() => void) | null } }) {
   const { theme } = useHanabTheme();
-  const { width, height } = useResponsiveLayout();
-  const landscape = isPregameLandscape(width, height);
+  const { availableWidth, availableHeight } = useResponsiveLayout();
+  const landscape = isPregameLandscape(availableWidth, availableHeight);
   const session = useAppSelector((state) => state.session);
   const roomState = useAppSelector((state) => state.room);
   const room = roomState.room.kind === 'pregame' ? roomState.room : null;

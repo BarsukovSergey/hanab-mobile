@@ -531,13 +531,28 @@ function AppContent() {
     );
   }
 
-  if (probe === 'valid' && session.phase === 'ready' && hydrated && roomState.room.kind === 'pregame') {
+  if (roomState.room.kind === 'pregame') {
+    const pregameReady = session.phase === 'ready' && hydrated;
+    const pregameConnectionStatus = probe === 'indeterminate'
+      ? <Panel><SectionHeading title="Unable to check session" detail="The server could not confirm your current session." />
+        <Notice tone="error">{statusMessage || 'Network request failed.'}</Notice>
+        <ActionButton title="Retry" tone="primary" onPress={() => void runProbe()} /></Panel>
+      : session.phase === 'failed' || session.phase === 'closed'
+        ? <Panel><SectionHeading title="Connection lost" detail="Reconnect to continue using the table." />
+          {session.error !== null && <Notice tone="error">{session.error}</Notice>}
+          <ActionButton title="Retry" tone="primary" onPress={() => { lobbyRuntime.disconnect(); void runProbe(); }} /></Panel>
+        : probe === 'missing'
+          ? <Panel><SectionHeading title="Session unavailable" detail="Reconnect to continue using the table." />
+            <ActionButton title="Retry" tone="primary" onPress={() => void runProbe()} /></Panel>
+          : probe === 'checking'
+            ? <Panel><SectionHeading title="Checking session…" detail="Looking for an existing hanab.live session." /></Panel>
+            : <Panel><SectionHeading title="Connecting to lobby…" detail="Synchronizing tables and chat." /></Panel>;
     return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
         <View style={styles.focusedRoomShell}>
           {serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
-          <PregameScreen backRef={pregameBackRef} />
+          {pregameReady ? <PregameScreen backRef={pregameBackRef} /> : pregameConnectionStatus}
         </View>
         {lobbyNotice !== null && <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
           <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
