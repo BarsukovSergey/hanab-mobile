@@ -96,11 +96,11 @@ Hotfixes should remain small and isolated from unrelated feature work.
 
 - GitHub issue #4 — replay scrubber jank during rapid scrubbing.
   Optimize only after profiling; preserve current coalescing/final-position semantics.
-- GitHub issue #58 — compact mobile shell and Pregame information density.
-  Treat this as **input to the larger Mobile App Design phase**, not as the complete design task.
+- GitHub issue #58 — shell/Pregame acceptance thread under the ratified Mobile App Design v2.
+  Umbrella implementation tracking is GitHub issue #143; use `MOBILE_APP_DESIGN_V2.md` as authority rather than reopening the original design exploration.
 
-Physical upgrade/clean-install validation can still be recorded for beta.2, but the already distributed
-APK identity must not change under the same version.
+Focused install-over and clean-install validation for `v1.0.0-beta.3-hotfix.1` remains recorded in
+`BETA_3_PHYSICAL_SMOKE.md`; the frozen tester APK identity must not be silently replaced.
 
 ---
 
@@ -153,7 +153,7 @@ Tag removal and delete-all remain deferred; this slice has no tag mutation UI.
 
 **Design status: ratified on 2026-09-28. Implementation is the active next milestone.**
 
-The canonical design/implementation authority is `MOBILE_APP_DESIGN_V2.md`. Where the original design
+The canonical design/implementation authority is `MOBILE_APP_DESIGN_V2.md`. Umbrella execution is tracked in issue #143. Where the original design
 brief below differs from that document, **v2 wins**.
 
 Ratified shell decisions include:
