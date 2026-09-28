@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { measureWindow, SURFACE_METRICS, type MeasuredWindow } from './responsiveSurface';
+import { legacyResponsiveHints, measureWindow, reconcileWindow, type MeasuredWindow } from './responsiveSurface';
 
 type ThemePreference = 'system' | 'light' | 'dark';
 type ThemeScheme = 'light' | 'dark';
@@ -110,14 +110,22 @@ export function ResponsiveSurfaceProvider({ children }: { children: ReactNode })
   const frame = useSafeAreaFrame();
   const systemInsets = useSafeAreaInsets();
   const [imeOcclusion, setImeOcclusion] = useState(0);
+  const [confirmHeightResize, setConfirmHeightResize] = useState(false);
   const unoccluded = useRef<MeasuredWindow | null>(null);
   const current = measureWindow({ width: frame.width, height: frame.height }, systemInsets);
-  if (imeOcclusion === 0 || unoccluded.current === null) unoccluded.current = current;
-  const geometry = imeOcclusion === 0 ? current
-    : measureWindow(unoccluded.current.rawWindow, unoccluded.current.systemInsets, imeOcclusion);
-  // Android may resize the native frame as well as reporting keyboard height.
-  // Use the smaller measured task viewport without reclassifying the window.
-  if (imeOcclusion > 0) geometry.surfaceHeight = Math.min(geometry.surfaceHeight, current.availableHeight);
+  const resolved = reconcileWindow(unoccluded.current, current, imeOcclusion, confirmHeightResize);
+  unoccluded.current = resolved.baseline;
+  const { geometry } = resolved;
+  useEffect(() => {
+    if (!resolved.pendingHeightResize) {
+      setConfirmHeightResize(false);
+      return;
+    }
+    // Android reports adjustResize before keyboardDidShow. A sustained height-only
+    // change without an IME event is a real window resize.
+    const timer = setTimeout(() => setConfirmHeightResize(true), 400);
+    return () => clearTimeout(timer);
+  }, [resolved.pendingHeightResize, current.availableHeight, current.availableWidth]);
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => setImeOcclusion(event.endCoordinates.height));
@@ -131,13 +139,8 @@ export function ResponsiveSurfaceProvider({ children }: { children: ReactNode })
 export function useResponsiveLayout() {
   const geometry = useContext(ResponsiveWindowContext);
   if (geometry === null) throw new Error('useResponsiveLayout must be used inside ResponsiveSurfaceProvider');
-  const { width, height } = geometry;
-  const { windowClass, availableWidth, availableHeight } = geometry;
-  // Transitional presentation hints for legacy screens. New composition uses windowClass.
-  const wide = windowClass === 'medium' || windowClass === 'large';
-  const tablet = windowClass === 'large';
-  const contentMaxWidth = tablet ? SURFACE_METRICS.largeContentMaxWidth : SURFACE_METRICS.readingContentMaxWidth;
-  return { ...geometry, width, height, windowClass, availableWidth, availableHeight, wide, tablet, contentMaxWidth };
+  const { width, height, windowClass } = geometry;
+  return { ...geometry, ...legacyResponsiveHints({ width, height }, windowClass) };
 }
 
 export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {

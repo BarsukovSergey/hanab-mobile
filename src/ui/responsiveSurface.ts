@@ -40,10 +40,47 @@ export function measureWindow(rawWindow: WindowSize, systemInsets: SystemSafeIns
 
 export type MeasuredWindow = ReturnType<typeof measureWindow>;
 
-/** Text measurements let navigation grow for font scale instead of clipping labels. */
-export function measureNavigation(kind: 'bottom' | 'rail', labelWidth: number, labelHeight: number) {
+/** Temporary hints for screens that still use the pre-v2 layout thresholds. */
+export function legacyResponsiveHints(size: WindowSize, windowClass: WindowClass) {
+  const wide = windowClass !== 'short-wide' && (size.width >= 760 || (size.width >= 620 && size.width > size.height));
+  const tablet = windowClass !== 'short-wide' && size.width >= 900;
+  return { wide, tablet, contentMaxWidth: tablet ? 1280 : wide ? 1080 : 720 };
+}
+
+/** Keep an unoccluded baseline through Android's frame resize before keyboardDidShow. */
+export function reconcileWindow(
+  baseline: MeasuredWindow | null,
+  observed: MeasuredWindow,
+  imeOcclusion: number,
+  confirmHeightResize = false,
+) {
+  const keyboardHeight = nonNegative(imeOcclusion);
+  const candidate = keyboardHeight > 0
+    ? measureWindow({ width: observed.rawWindow.width, height: observed.rawWindow.height + keyboardHeight }, observed.systemInsets)
+    : observed;
+  const sameWidth = baseline !== null && candidate.availableWidth === baseline.availableWidth;
+  const heightShrink = sameWidth && candidate.availableHeight < baseline.availableHeight;
+  const keyboardSized = keyboardHeight > 0 && sameWidth
+    && observed.availableHeight <= baseline.availableHeight
+    && candidate.availableHeight >= baseline.availableHeight - 24;
+  const pendingHeightResize = keyboardHeight === 0 && heightShrink && !confirmHeightResize;
+  const nextBaseline = baseline !== null && (pendingHeightResize || keyboardSized) ? baseline : candidate;
+  const geometry = measureWindow(nextBaseline.rawWindow, nextBaseline.systemInsets, keyboardHeight);
+  geometry.surfaceHeight = Math.min(geometry.surfaceHeight, observed.availableHeight);
+  return { baseline: nextBaseline, geometry, pendingHeightResize };
+}
+
+/** labelWidth is the widest measured destination label; bottom width is the usable nav envelope. */
+export function measureNavigation(kind: 'bottom', labelWidth: number, labelHeight: number, availableWidth: number): { height: number; presentation: 'one-row' | 'two-row' };
+export function measureNavigation(kind: 'rail', labelWidth: number, labelHeight: number): { width: number; labelFits: boolean };
+export function measureNavigation(kind: 'bottom' | 'rail', labelWidth: number, labelHeight: number, availableWidth = 0) {
   if (kind === 'bottom') {
-    return { height: Math.max(SURFACE_METRICS.bottomNavNominalHeight, nonNegative(labelHeight) + 32) };
+    const oneRowFits = 4 * (nonNegative(labelWidth) + 16) <= availableWidth;
+    const rows = oneRowFits ? 1 : 2;
+    return {
+      height: Math.max(SURFACE_METRICS.bottomNavNominalHeight, rows * Math.max(SURFACE_METRICS.primaryTouchTarget, nonNegative(labelHeight) + 16)),
+      presentation: oneRowFits ? 'one-row' : 'two-row',
+    };
   }
   const requiredWidth = nonNegative(labelWidth) + 16;
   return {
