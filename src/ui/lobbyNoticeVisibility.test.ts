@@ -13,7 +13,8 @@ test('lobby notice is rendered in a shell overlay outside the main ScrollView', 
   expect(scrollEnd).toBeGreaterThan(scrollStart);
   expect(app.slice(scrollStart, scrollEnd)).not.toContain('lobbyNotice');
   expect(overlay).toBeGreaterThan(scrollEnd);
-  expect(app.slice(overlay, app.indexOf('<StatusBar', overlay))).toContain('<SafeAreaView edges={[\'top\']}');
+  expect(app.slice(0, scrollStart)).toContain("<SafeAreaView edges={['top', 'right', 'bottom', 'left']}");
+  expect(app.slice(overlay, app.indexOf('<StatusBar', overlay))).not.toContain('<SafeAreaView');
   expect(app.slice(overlay, app.indexOf('<StatusBar', overlay))).toContain('maxWidth: contentMaxWidth');
   expect(app.slice(overlay, app.indexOf('<StatusBar', overlay))).toContain('title="Dismiss"');
 });
