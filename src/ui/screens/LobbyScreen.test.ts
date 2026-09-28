@@ -13,6 +13,15 @@ describe('lobby table details and create selector', () => {
     expect(screen).toContain('<ActionButton compact title="Game history" onPress={onOpenHistory} />');
   });
 
+  test('stacks the hero copy above actions on narrow screens', () => {
+    expect(screen).toContain('<Panel style={[styles.hero, !wide && styles.heroNarrow]}>');
+    expect(screen).toContain('<View style={[styles.heroCopy, !wide && styles.heroCopyNarrow]}>');
+    expect(screen).toContain('<View style={[styles.heroActions, !wide && styles.heroActionsNarrow]}>');
+    expect(screen).toContain("heroNarrow: { alignItems: 'stretch', flexDirection: 'column', gap: 12 }");
+    expect(screen).toContain("heroCopyNarrow: { flex: 0 }");
+    expect(screen).toContain("heroActionsNarrow: { alignSelf: 'stretch', justifyContent: 'flex-start' }");
+  });
+
   test('formats authoritative players in server order and omits an empty roster', () => {
     expect(formatLobbyRoster(['Ada', 'Bob', 'Cy'])).toBe('Ada · Bob · Cy');
     expect(formatLobbyRoster([])).toBeNull();

@@ -30,7 +30,7 @@ test('dismisses on backdrop taps and stops dismissal inside the sheet', () => {
 
 test('bounds the More scroll viewport to the sheet so dynamic content remains reachable', () => {
   expect(liveSheet).toContain('<ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions}>');
-  expect(app).toContain("menuScroll: { flex: 1 }");
+  expect(app).toContain("menuScroll: { flexGrow: 0, flexShrink: 1 }");
   expect(app).toContain("sheet: { borderRadius: 16, borderWidth: 1, gap: 10, maxHeight: '90%'");
 });
 

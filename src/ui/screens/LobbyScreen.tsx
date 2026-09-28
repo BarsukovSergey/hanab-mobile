@@ -135,15 +135,15 @@ export function LobbyScreen({
 
   return (
     <View style={styles.root}>
-      <Panel style={styles.hero}>
-        <View style={styles.heroCopy}>
+      <Panel style={[styles.hero, !wide && styles.heroNarrow]}>
+        <View style={[styles.heroCopy, !wide && styles.heroCopyNarrow]}>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HANAB</Text>
           <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Lobby</Text>
           <Text style={[styles.heroDetail, { color: theme.colors.textMuted }]}>
             {tables.length} {tables.length === 1 ? 'table' : 'tables'} available
           </Text>
         </View>
-        <View style={styles.heroActions}>
+        <View style={[styles.heroActions, !wide && styles.heroActionsNarrow]}>
           <ActionButton compact title="People" onPress={onOpenPeople} />
           <ActionButton compact title="Game history" onPress={onOpenHistory} />
           <ActionButton compact title="Open game link" onPress={() => { setShowLiveGameLink(true); setLiveGameLinkError(null); }} />
@@ -487,8 +487,11 @@ function LobbyRoster({ table, friends }: { table: LobbyTable; friends: readonly 
 const styles = StyleSheet.create({
   root: { gap: 16 },
   hero: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  heroCopy: { flex: 1, gap: 2 },
+  heroNarrow: { alignItems: 'stretch', flexDirection: 'column', gap: 12 },
+  heroCopy: { flex: 1, gap: 2, minWidth: 0 },
+  heroCopyNarrow: { flex: 0 },
   heroActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
+  heroActionsNarrow: { alignSelf: 'stretch', justifyContent: 'flex-start' },
   linkPanel: { gap: 10 },
   linkInput: { minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
