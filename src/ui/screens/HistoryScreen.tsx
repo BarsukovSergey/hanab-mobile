@@ -30,6 +30,8 @@ const END_CONDITIONS = [
 export function HistoryScreen({
   roomOccupied,
   onBack,
+  backRef,
+  showEmbeddedBack = true,
   onWatchReplay,
   onWatchJSONReplay,
   onWatchReplayInput,
@@ -38,6 +40,8 @@ export function HistoryScreen({
 }: {
   roomOccupied: boolean;
   onBack: () => void;
+  backRef?: { current: (() => void) | null };
+  showEmbeddedBack?: boolean;
   onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
   onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
   onWatchReplayInput: (request: Exclude<ReplayInputResult, { kind: 'invalid' }>) => void;
@@ -83,6 +87,13 @@ export function HistoryScreen({
   const pendingRequest = showingTagged ? null : showingFriends ? history.friendPendingRequest : history.pendingRequest;
   const replayPending = history.pendingReplayCreate !== null;
   const comparing = history.pendingOtherScores !== null || history.otherScores !== null;
+  const handleBack = () => {
+    invalidateSeedCopy();
+    if (comparing) lobbyRuntime.dismissOtherScores();
+    onBack();
+  };
+  if (backRef) backRef.current = handleBack;
+  useEffect(() => () => { if (backRef) backRef.current = null; }, [backRef]);
   const returnFromComparison = () => {
     invalidateSeedCopy();
     const friends = history.otherScores?.friends ?? history.pendingOtherScores?.friends ?? false;
@@ -98,11 +109,7 @@ export function HistoryScreen({
             ? 'Games played on this seed.'
             : 'Open a finished game using the same authoritative replay path.'} />
         </View>
-        <ActionButton compact title="Back to lobby" onPress={() => {
-          invalidateSeedCopy();
-          if (comparing) lobbyRuntime.dismissOtherScores();
-          onBack();
-        }} />
+        {showEmbeddedBack && <ActionButton compact title="Back to lobby" onPress={handleBack} />}
       </Panel>
       {roomOccupied && <Notice>You're already in a room. History stays available for browsing, but return to the current room before opening another replay or starting this seed.</Notice>}
 

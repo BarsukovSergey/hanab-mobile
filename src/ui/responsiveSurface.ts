@@ -89,6 +89,22 @@ export function measureNavigation(kind: 'bottom' | 'rail', labelWidth: number, l
   };
 }
 
+/** Widths include the measured labels; touch padding and spacing belong to the app bar. */
+export function measureBrowsingAppBar(
+  availableWidth: number,
+  backLabelWidth: number,
+  titleWidth: number,
+  returnSlotWidth: number,
+  hasBack: boolean,
+  hasReturn: boolean,
+): { presentation: 'one-row' | 'stacked' } {
+  const backWidth = hasBack ? Math.max(SURFACE_METRICS.primaryTouchTarget, nonNegative(backLabelWidth) + 24) : 0;
+  const returnWidth = hasReturn ? Math.max(SURFACE_METRICS.primaryTouchTarget, nonNegative(returnSlotWidth) + 24) : 0;
+  const gaps = (hasBack ? 12 : 0) + (hasReturn ? 12 : 0);
+  const required = 32 + backWidth + nonNegative(titleWidth) + returnWidth + gaps;
+  return { presentation: required <= nonNegative(availableWidth) ? 'one-row' : 'stacked' };
+}
+
 /** The host consumes system insets once; child surfaces receive available geometry. */
 export function measureSurface(window: MeasuredWindow, kind: 'browsing' | 'task' | 'sheet', navigationHeight = 0, navigationWidth = 0) {
   const { outerGutter, browsingAppBarMinHeight } = SURFACE_METRICS;

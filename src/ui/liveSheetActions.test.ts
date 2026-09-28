@@ -41,8 +41,10 @@ test('keeps live-game header actions outlined, matched, and tall enough to tap',
   const headerActions = app.slice(headerStart, headerEnd);
   const buttons = headerActions.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
 
-  expect(buttons).toHaveLength(2);
-  const [chat, more] = buttons;
+  expect(buttons).toHaveLength(3);
+  const [browse, chat, more] = buttons;
+  expect(browse).toContain('title="Browse"');
+  expect(browse).toContain('onPress={browseFromRoom}');
   expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
   expect(chat).toContain("onPress={() => setLiveSheet('chat')}");
   expect(more).toContain('title="More"');

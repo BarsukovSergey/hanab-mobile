@@ -7,7 +7,11 @@ const read = (path: string) => readFileSync(resolve(__dirname, '../..', path), '
 test('global navigation belongs to authenticated browsing and uses responsive geometry', () => {
   const app = read('App.tsx');
   const nav = read('src/ui/BrowsingNavigation.tsx');
-  expect(app).toContain("roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen && !createTaskOpen");
+  const navPolicy = app.slice(app.indexOf('const showBrowsingNavigation ='), app.indexOf('const railNavigation ='));
+  expect(navPolicy).toContain("presentationFocus === 'browsing'");
+  expect(navPolicy).toContain('!passwordTaskOpen && !createTaskOpen');
+  expect(navPolicy).not.toContain("roomState.room.kind === 'none'");
+  expect(navPolicy).not.toContain('roomState.rematchTransition');
   expect(app).toContain("windowClass !== 'compact'");
   expect(app).toContain('<BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />');
   expect(app).not.toContain('<ActionButton compact title="Settings" tone="ghost"');
@@ -57,18 +61,17 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setLiveSheet(null);"));
   expect(hiddenEffect.slice(0, hiddenEffect.indexOf('}, [presentationFocus]);')))
     .toBe("if (presentationFocus !== 'room') setLiveSheet(null);\n  ");
-  expect(app).not.toContain('title="Browse"');
-  expect(app).not.toContain('title="Return"');
+  expect(app).toContain('title="Browse"');
+  expect(app).toContain('returnPresentation={returnPresentation} onReturn={returnToRoom}');
 });
 
-test('App passes only owned-room and recovery occupancy to Home and History before Browse exists', () => {
+test('App passes owned-room and recovery occupancy to browsing surfaces', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const predicate = app.slice(app.indexOf('  const browsingRoomOccupied ='), app.indexOf(';', app.indexOf('  const browsingRoomOccupied =')) + 1);
   expect(predicate).toBe("  const browsingRoomOccupied =\n    roomState.room.kind !== 'none'\n    || roomState.pendingRecovery !== null\n    || roomState.rematchTransition !== null;");
   expect(app).toContain('<HistoryScreen roomOccupied={browsingRoomOccupied}');
   expect(app).toContain('<LobbyScreen\n      roomOccupied={browsingRoomOccupied}');
-  expect(app).not.toContain('title="Browse"');
-  expect(app).not.toContain('title="Return"');
+  expect(app).toContain('roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}');
 });
 
 test('stable no-room waits for authoritative recovery and sign-out clears room ownership memory', () => {
@@ -85,11 +88,12 @@ test('stable no-room waits for authoritative recovery and sign-out clears room o
   expect(signOut).toContain("presentationFocusMemory.current = {\n        previousConnectionEpoch: session.connectionEpoch,\n        previousRoomKind: 'none',\n        preserveNextRoomEntry: false,\n      };");
 });
 
-test('hardware Back consumes bare Live attendance without sending Unattend', () => {
+test('hardware Back assigns browsing ownership before room attendance', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const hardwareBack = app.slice(app.indexOf("BackHandler.addEventListener('hardwareBackPress'"), app.indexOf('return () => subscription.remove();', app.indexOf("BackHandler.addEventListener('hardwareBackPress'")));
   const liveMenu = app.slice(app.indexOf("liveSheet === 'menu'"), app.indexOf(": liveSheet === 'chat'"));
-  expect(hardwareBack).toContain("if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {");
+  expect(hardwareBack.indexOf("if (presentationFocus === 'browsing')")).toBeLessThan(hardwareBack.indexOf("if (roomState.room.kind === 'pregame')"));
+  expect(hardwareBack).toContain("getFocusedRoomBackDecision(roomState.room)");
   expect(hardwareBack).not.toContain('lobbyRuntime.unattendLiveGame');
   expect(liveMenu).toContain('lobbyRuntime.unattendLiveGame(liveTableID);');
 });

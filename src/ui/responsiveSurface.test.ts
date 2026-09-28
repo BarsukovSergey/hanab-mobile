@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { legacyResponsiveHints, measureNavigation, measureSurface, measureWindow, reconcileWindow, SURFACE_METRICS, type WindowClass, type WindowSize } from './responsiveSurface';
+import { legacyResponsiveHints, measureBrowsingAppBar, measureNavigation, measureSurface, measureWindow, reconcileWindow, SURFACE_METRICS, type WindowClass, type WindowSize } from './responsiveSurface';
 
 const none = { top: 0, right: 0, bottom: 0, left: 0 };
 
@@ -67,6 +67,12 @@ describe('window classification', () => {
 });
 
 describe('surface envelopes', () => {
+  test('measured browsing app bar gives Return a full row when labels do not fit', () => {
+    expect(measureBrowsingAppBar(480, 32, 74, 180, true, true)).toEqual({ presentation: 'one-row' });
+    expect(measureBrowsingAppBar(320, 32, 74, 180, true, true)).toEqual({ presentation: 'stacked' });
+    expect(measureBrowsingAppBar(324, 32, 74, 180, false, true)).toEqual({ presentation: 'one-row' });
+    expect(measureBrowsingAppBar(150, 32, 74, 180, true, false)).toEqual({ presentation: 'stacked' });
+  });
   test.each([
     { width: 390, height: 844 },
     { width: 844, height: 390 },

@@ -21,6 +21,7 @@ import { replayExportActions } from './src/platform/replayExportActions';
 import { forgetAccount, getPasswordCredential, listRecentAccounts, rememberAccount, savePasswordCredential } from './src/platform/credentialAccounts';
 import { chatRuntime, lobbyRuntime, networkSession } from './src/runtime/application';
 import { lobbyActions } from './src/store/lobbySlice';
+import { roomActions } from './src/store/roomSlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
 import { ChatPanel } from './src/ui/ChatPanel';
@@ -53,6 +54,8 @@ import { getBrowsingBackAction } from './src/ui/navigationPolicy';
 import { reconcilePresentationFocus, type PresentationFocusMemory } from './src/ui/presentationFocus';
 import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
+import { BrowsingAppBar } from './src/ui/BrowsingAppBar';
+import { getFocusedRoomBackDecision, getRoomReturnPresentation, isOwnOngoingRewind } from './src/ui/roomReturnPresentation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { CreateTableScreen, type SpecificSeedCreatePrefill } from './src/ui/screens/CreateTableScreen';
 import { MoreScreen } from './src/ui/screens/MoreScreen';
@@ -108,6 +111,7 @@ function AppContent() {
   }, []);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const settingsBackRef = useRef<(() => void) | null>(null);
+  const historyBackRef = useRef<(() => void) | null>(null);
   const pregameBackRef = useRef<(() => void) | null>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [exportFeedback, setExportFeedback] = useState<{
@@ -134,6 +138,38 @@ function AppContent() {
     && roomState.room.kind === 'none'
     && roomState.pendingRecovery === null
     && roomState.rematchTransition === null;
+  const recoveringRoom = roomState.pendingRecovery !== null || (
+    session.phase !== 'ready'
+    && (roomState.room.kind !== 'none'
+      || presentationFocusMemory.current.preserveNextRoomEntry
+      || (presentationFocusMemory.current.previousRoomKind !== 'none'
+        && presentationFocusMemory.current.previousConnectionEpoch !== session.connectionEpoch))
+  );
+  const returnPresentation = getRoomReturnPresentation(roomState.room, recoveringRoom);
+  const browseFromRoom = () => {
+    setPresentationFocus('browsing');
+  };
+  const exitOwnRewind = () => {
+    if (!isOwnOngoingRewind(roomState.room) || roomState.room.kind !== 'live_game') return;
+    dispatch(roomActions.reviewSegmentSelected({
+      tableID: roomState.room.tableID,
+      gameLoadEpoch: roomState.room.gameLoadEpoch,
+      segment: null,
+    }));
+  };
+  const returnToRoom = () => {
+    if (returnPresentation === null) return;
+    if (returnPresentation.behavior === 'return-live') exitOwnRewind();
+    setPresentationFocus('room');
+  };
+  const backFromBrowsing = () => {
+    if (browsing.destination === 'history' && currentBrowsingSurface(browsing).kind === 'root'
+      && historyBackRef.current !== null) {
+      historyBackRef.current();
+      return;
+    }
+    setBrowsing((state) => backBrowsing(state));
+  };
   useLayoutEffect(() => {
     const result = reconcilePresentationFocus(presentationFocus, presentationFocusMemory.current, {
       connectionEpoch: session.connectionEpoch,
@@ -201,7 +237,23 @@ function AppContent() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (liveSheet === 'settings' || (roomState.room.kind === 'none' && isBrowsingSettings(browsing))) {
+      const authenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
+      if (presentationFocus === 'browsing') {
+        if (isBrowsingSettings(browsing)) {
+          settingsBackRef.current?.();
+          return true;
+        }
+        if (createTaskOpen) {
+          createBackRef.current?.();
+          return true;
+        }
+        if (getBrowsingBackAction(browsing, authenticated) === 'back') {
+          backFromBrowsing();
+          return true;
+        }
+        return false;
+      }
+      if (liveSheet === 'settings') {
         settingsBackRef.current?.();
         return true;
       }
@@ -209,28 +261,20 @@ function AppContent() {
         setLiveSheet(null);
         return true;
       }
-      if (createTaskOpen && roomState.room.kind === 'none') {
-        createBackRef.current?.();
+      if (roomState.room.kind === 'pregame') {
+        pregameBackRef.current?.();
         return true;
       }
-      const authenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
-      if (roomState.room.kind !== 'none' || roomState.rematchTransition !== null) {
-        if (roomState.room.kind === 'pregame') {
-          pregameBackRef.current?.();
-          return true;
-        }
-        return true;
+      if (roomState.room.kind === 'live_game') {
+        const decision = getFocusedRoomBackDecision(roomState.room);
+        if (decision === 'return-live') exitOwnRewind();
+        if (decision === 'browse-origin') setPresentationFocus('browsing');
       }
-      if (getBrowsingBackAction(browsing, authenticated) === 'back') {
-        setBrowsing((state) => backBrowsing(state));
-        return true;
-      }
-      return false;
+      return true;
     });
     return () => subscription.remove();
   }, [
-    browsing, createTaskOpen, hydrated, liveSheet, probe, roomState.rematchTransition,
-    roomState.pendingLeaveTableID,
+    browsing, createTaskOpen, hydrated, liveSheet, presentationFocus, probe,
     roomState.room, session.phase,
   ]);
 
@@ -391,6 +435,7 @@ function AppContent() {
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, { color: theme.colors.text }]}>{session.authenticatedUser?.username}</Text>
           </View>}
           <View style={[styles.headerActions, landscapePhone && styles.headerActionsLandscape]}>
+            <ActionButton compact title="Browse" tone="secondary" style={styles.liveHeaderAction} onPress={browseFromRoom} />
             <ActionButton
               compact
               title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
@@ -580,7 +625,7 @@ function AppContent() {
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
         <View style={styles.focusedRoomShell}>
           {serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
-          {pregameReady ? <PregameScreen backRef={pregameBackRef} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}
+          {pregameReady ? <PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}
         </View>
         {lobbyNotice !== null && <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
           <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
@@ -594,7 +639,13 @@ function AppContent() {
   }
 
   let content: ReactNode;
-  if (probe === 'checking') {
+  if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.pendingRecovery !== null) {
+    content = <Panel><SectionHeading title="Reconnecting…" detail="Recovering the current room." /></Panel>;
+  } else if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.room.kind === 'awaiting_game_bootstrap') {
+    content = <Panel><SectionHeading title="Loading game…" detail="Receiving the authoritative game state." /></Panel>;
+  } else if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.rematchTransition !== null) {
+    content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
+  } else if (probe === 'checking') {
     content = <Panel><SectionHeading title="Checking session…" detail="Looking for an existing hanab.live session." /></Panel>;
   } else if (probe === 'missing') {
     content = (
@@ -642,12 +693,9 @@ function AppContent() {
       <ActionButton title="Retry" tone="primary" onPress={() => { lobbyRuntime.disconnect(); void runProbe(); }} /></Panel>;
   } else if (session.phase !== 'ready' || !hydrated) {
     content = <Panel><SectionHeading title="Connecting to lobby…" detail="Synchronizing tables and chat." /></Panel>;
-  } else if (roomState.room.kind === 'awaiting_game_bootstrap') {
-    content = <Panel><SectionHeading title="Loading game…" detail="Receiving the authoritative game state." /></Panel>;
-  } else if (roomState.rematchTransition !== null) {
-    content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
   } else if (browsing.destination === 'history' && !isBrowsingSettings(browsing)) {
-    content = <HistoryScreen roomOccupied={browsingRoomOccupied} onBack={() => navigate('home')}
+    content = <HistoryScreen roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}
+      backRef={historyBackRef} onBack={() => navigate('home')}
       onPlaySeed={(prefill) => {
         setSpecificSeedCreatePrefill(prefill);
         navigate('home');
@@ -667,13 +715,14 @@ function AppContent() {
       specificSeedCreatePrefill={specificSeedCreatePrefill} />;
   } else if (isBrowsingSettings(browsing)) {
     content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()}
-      onPasswordTaskChange={setPasswordTaskOpen} backRef={settingsBackRef} />;
+      onPasswordTaskChange={setPasswordTaskOpen} backRef={settingsBackRef} showEmbeddedBack={false} />;
   } else if (browsing.destination === 'people') {
-    content = <PeopleScreen onBack={() => navigate('home')} />;
+    content = <PeopleScreen onBack={() => navigate('home')} roomOccupied={browsingRoomOccupied} showEmbeddedBack={false} />;
   } else if (browsing.destination === 'more') {
     const surface = currentBrowsingSurface(browsing);
     content = <MoreScreen surface={surface.kind === 'tools' || surface.kind === 'about' ? surface.kind : 'root'}
       username={session.authenticatedUser?.username ?? ''}
+      showEmbeddedBack={false}
       onBack={() => setBrowsing((state) => backBrowsing(state))}
       onSettings={() => setBrowsing((state) => openBrowsingSettings(state))}
       onTools={() => setBrowsing((state) => openMoreSurface(state, 'tools'))}
@@ -691,10 +740,24 @@ function AppContent() {
     />;
   }
 
-  const showBrowsingNavigation = probe === 'valid' && session.phase === 'ready' && hydrated
+  const showBrowsingNavigation = presentationFocus === 'browsing'
+    && probe === 'valid' && session.phase === 'ready' && hydrated
     && session.authenticatedUser !== null
-    && roomState.room.kind === 'none' && roomState.rematchTransition === null && !passwordTaskOpen && !createTaskOpen;
+    && !passwordTaskOpen && !createTaskOpen;
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
+  const browsingSurface = currentBrowsingSurface(browsing);
+  const browsingTitle = browsingSurface.kind === 'root'
+    ? { home: 'Home', history: 'History', people: 'People', more: 'More' }[browsingSurface.destination]
+    : { settings: 'Settings', tools: 'Tools', about: 'About' }[browsingSurface.kind];
+  const browsingAuthenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
+  const showBrowsingAppBar =
+    presentationFocus === 'browsing'
+    && (probe === 'valid' || returnPresentation !== null);
+  const appBarBack = isBrowsingSettings(browsing)
+    ? () => settingsBackRef.current?.()
+    : createTaskOpen ? () => createBackRef.current?.()
+      : getBrowsingBackAction(browsing, browsingAuthenticated) === 'back'
+        ? backFromBrowsing : undefined;
 
   const browsingPresentation = (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -703,18 +766,14 @@ function AppContent() {
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
       <View style={styles.browsingBody}>
       {railNavigation && <BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />}
+      <View style={styles.browsingMain}>
+      {showBrowsingAppBar && <BrowsingAppBar title={browsingTitle} username={session.authenticatedUser?.username ?? null}
+        onBack={appBarBack} returnPresentation={returnPresentation} onReturn={returnToRoom} />}
       <ScrollView ref={browsingScrollRef} style={styles.flex} contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <View style={styles.appHeader}>
-          <View style={styles.brandCopy}>
-            <Text style={[styles.brand, { color: theme.colors.text }]}>Hanab</Text>
-            {probe === 'valid' && session.authenticatedUser !== null && (
-              <Text style={[styles.authName, { color: theme.colors.textMuted }]}>{session.authenticatedUser.username}</Text>
-            )}
-          </View>
-        </View>
         {probe === 'valid' && serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
         {content}
       </ScrollView>
+      </View>
       </View>
       {showBrowsingNavigation && !railNavigation && <BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />}
       {lobbyNotice !== null && (
@@ -745,6 +804,7 @@ function AppContent() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   browsingBody: { flex: 1, flexDirection: 'row' },
+  browsingMain: { flex: 1, minWidth: 0 },
   focusedRoomShell: { flex: 1, gap: 8, maxWidth: 1280, paddingHorizontal: 12, paddingTop: 8, alignSelf: 'center', width: '100%' },
   container: { alignSelf: 'center', gap: 16, paddingBottom: 36, paddingHorizontal: 16, paddingTop: 16, width: '100%' },
   lobbyNoticeOverlay: { elevation: 10, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 },
@@ -757,13 +817,10 @@ const styles = StyleSheet.create({
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
-  appHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: 9 },
   gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: 8, paddingTop: 5 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
-  brand: { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
   gameIdentity: { fontSize: 18, fontWeight: '800', minWidth: 0 },
-  authName: { fontSize: 11, fontWeight: '700' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
   liveHeaderAction: { justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },

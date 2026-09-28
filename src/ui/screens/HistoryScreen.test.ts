@@ -5,6 +5,15 @@ import { describe, expect, test } from '@jest/globals';
 const screen = readFileSync(resolve(__dirname, 'HistoryScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('History screen source contract', () => {
+  test('both embedded and App-owned Back run local History cleanup before navigation', () => {
+    const handler = screen.slice(screen.indexOf('const handleBack ='), screen.indexOf('const returnFromComparison ='));
+    expect(handler).toContain('invalidateSeedCopy();');
+    expect(handler).toContain('if (comparing) lobbyRuntime.dismissOtherScores();');
+    expect(handler).toContain('onBack();');
+    expect(handler).toContain('backRef.current = handleBack;');
+    expect(handler).toContain('if (backRef) backRef.current = null;');
+    expect(screen).toContain('showEmbeddedBack && <ActionButton compact title="Back to lobby" onPress={handleBack}');
+  });
   test('renders authoritative tags only when non-empty', () => {
     expect(screen).toContain("item.tags !== '' && <Text");
     expect(screen).toContain('>{item.tags}</Text>');
@@ -80,7 +89,7 @@ describe('History screen source contract', () => {
     expect(screen).toContain('invalidateSeedCopy(); lobbyRuntime.clearTagSearch();');
     expect(screen).toContain('const returnFromComparison = () => {\n    invalidateSeedCopy();');
     expect(screen).toContain('invalidateSeedCopy(); lobbyRuntime.loadOtherScores(item.id, showingFriends);');
-    expect(screen).toContain('title="Back to lobby" onPress={() => {\n          invalidateSeedCopy();');
+    expect(screen).toContain('title="Back to lobby" onPress={handleBack}');
   });
 
   test('offers Friends history only for authoritative friends and uses its independent pages', () => {

@@ -12,9 +12,10 @@ type AccountNotice = { tone: 'error' | 'success'; message: string };
 
 type SettingsCategory = 'account' | 'appearance' | 'cards' | 'gameplay';
 
-export function SettingsScreen({ onBack, onSignOut, onPasswordTaskChange, backRef }: {
+export function SettingsScreen({ onBack, onSignOut, onPasswordTaskChange, backRef, showEmbeddedBack = true }: {
   onBack: () => void; onSignOut: () => void; onPasswordTaskChange?: (open: boolean) => void;
   backRef?: { current: (() => void) | null };
+  showEmbeddedBack?: boolean;
 }) {
   const [scenarioGalleryOpen, setScenarioGalleryOpen] = useState(false);
   const [category, setCategory] = useState<SettingsCategory | null>(null);
@@ -122,7 +123,7 @@ export function SettingsScreen({ onBack, onSignOut, onPasswordTaskChange, backRe
 
   return <View style={styles.screen}>
     <View style={styles.header}>
-      <ActionButton compact title="Back" onPress={handleBack} />
+      {showEmbeddedBack && <ActionButton compact title="Back" onPress={handleBack} />}
       <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{changePasswordOpen ? 'Change password' : category === null ? 'Settings' : category === 'account' ? 'Account & security' : category === 'appearance' ? 'Appearance' : category === 'cards' ? 'Cards' : 'Gameplay presentation'}</Text>
     </View>
     {category === null && <Panel>
