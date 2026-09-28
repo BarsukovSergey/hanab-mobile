@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
   liveHeaderAction: { justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },
   menuActions: { gap: 7 },
   liveUserRow: { alignItems: 'flex-start', gap: 4, paddingVertical: 2 },
-  menuScroll: { flex: 1 },
+  menuScroll: { flexGrow: 0, flexShrink: 1 },
   perspectiveChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   accountChoice: { alignItems: 'center', flexDirection: 'row', gap: 8 },
