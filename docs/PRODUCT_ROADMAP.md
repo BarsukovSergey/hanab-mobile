@@ -1,6 +1,6 @@
 # Hanab Mobile product roadmap
 
-Date: 2026-09-27
+Date: 2026-09-28
 
 Status: **current sequencing authority for post-beta product work**
 
@@ -10,6 +10,7 @@ than the C17 backlog and narrower than the upstream parity audit.
 Use the documents together:
 
 - `PRODUCT_ROADMAP.md` — sequencing, product stages, priorities, and milestone boundaries;
+- `MOBILE_APP_DESIGN_V2.md` — ratified Phase 2 product/design authority and incremental implementation contract;
 - `C17_BACKLOG.md` — inventory of deferred product ideas and known follow-up work;
 - `UPSTREAM_PARITY_AUDIT.md` — detailed comparison with Hanabi-Live and remaining parity gaps;
 - GitHub issues — concrete defects or scoped pieces of work selected for execution.
@@ -35,11 +36,9 @@ Hanab Mobile already has the difficult gameplay foundation:
 - account creation clarification plus Change password / Forgot password entry points;
 - standalone Android beta APK/release flow.
 
-The current tester binary is **1.0.0-beta.2**, frozen at
-`45d99d15960d04934ea0ce07fcb90db73eb206df`.
+The current post-beta.2 tester line is **1.0.0-beta.3**. The focused Android UI hotfix is published as `v1.0.0-beta.3-hotfix.1` from runtime candidate `36717a2284490c8179e35b882dca0bde15a14a75`; focused physical re-smoke remains the acceptance gate recorded in `BETA_3_PHYSICAL_SMOKE.md`.
 
-Post-beta work must not redefine that binary. Tester reports should continue to reference its frozen
-version/hash while new development proceeds on `main`.
+Post-beta design/implementation work must not rewrite that frozen tester identity. Tester reports should continue to reference the exact installed build while new development proceeds on `main`.
 
 ## Priority rules
 
@@ -74,9 +73,9 @@ These constraints apply across every roadmap phase:
 
 ---
 
-# Phase 0 — beta.2 feedback and stabilization
+# Phase 0 — beta.3 feedback and stabilization
 
-This lane is active while testers are using beta.2.
+This lane covers the beta.3 tester baseline and targeted hotfix validation.
 
 ## Do immediately when confirmed
 
@@ -151,6 +150,26 @@ Tag removal and delete-all remain deferred; this slice has no tag mutation UI.
 ---
 
 # Phase 2 — major Mobile App Design pass
+
+**Design status: ratified on 2026-09-28. Implementation is the active next milestone.**
+
+The canonical design/implementation authority is `MOBILE_APP_DESIGN_V2.md`. Where the original design
+brief below differs from that document, **v2 wins**.
+
+Ratified shell decisions include:
+
+- browsing navigation: `Home · History · People · More`;
+- authoritative room ownership is independent from browsing presentation focus;
+- no global bottom navigation inside Pregame/Live/Rewind/Replay/Shared/Hypothetical;
+- explicit `Browse` from Room Workspace and one-action Return from permitted browsing surfaces;
+- bare Android Back is consumed in ordinary player/spectator Pregame and Live rather than browsing or changing attendance;
+- browsing `More` is distinct from room-context `Table/Game/Review menu`;
+- Create Table is a dedicated task screen;
+- Messages remain under People and are client/session-local until durable server support exists;
+- short-wide phone landscape is its own layout class; gameplay uses measured A/B composition fit rather than a generic `wide` rule.
+
+Implementation follows the incremental slices in the v2 spec. Do not enable room-preserving Browse before
+safe task suspension/visibility ownership is implemented, and do not defer landscape foundation to final polish.
 
 This is a **required major product stage before treating Hanab as a mature store-facing mobile app**.
 
@@ -296,7 +315,7 @@ Landscape and tablet do not need identical UI to portrait; they should share sem
 
 ## 2.8 Expected design deliverables
 
-Before broad implementation, produce:
+These deliverables are now captured in `MOBILE_APP_DESIGN_V2.md`. Before broad implementation, keep them as the acceptance contract:
 
 1. app-level destination/flow map;
 2. navigation + Android Back contract;
@@ -309,7 +328,7 @@ Before broad implementation, produce:
 
 ## Definition of done for the Mobile App Design phase
 
-The phase is successful when:
+The design specification is complete; the implementation milestone is successful when:
 
 - a user can understand the app's main destinations without learning implementation history;
 - navigation feels like one mobile application rather than linked website-like screens;
@@ -461,24 +480,19 @@ specific-seed Create (#128–#129), reverse hands (#131), server-backed Create p
 show-timer-in-untimed (#133). Upstream #3136 and #3139 are merged; the #3139 JSON replay URL
 visibility semantics were sanity-checked against mobile and require no mobile code change.
 
-Before distributing beta.3:
+Current near-term order:
 
-1. keep only correctness/safety regressions eligible for runtime changes;
-2. reconcile release/version metadata and freeze one candidate SHA;
-3. build the beta.3 artifact;
-4. validate upgrade over beta.2 plus a clean install on a physical device;
-5. run the focused gameplay/replay/spectator/chat/background smoke;
-6. distribute the immutable candidate to testers.
-
-After beta.3:
-
-7. execute the Mobile App Design implementation as a coherent milestone, including the Chat /
-   Messaging redesign;
-8. run a new physical-device/product UX validation pass;
-9. deepen profiles/social/history;
-10. add advanced replay/review tools;
-11. add serious-player notes/clue-planning productivity features;
-12. complete store/AAB/release readiness when the product itself is ready.
+1. finish the focused physical re-smoke of `v1.0.0-beta.3-hotfix.1` and record beta.3 acceptance;
+2. execute `MOBILE_APP_DESIGN_V2.md` incrementally, beginning with contract/navigation separation and responsive/surface foundations;
+3. land Home/Create and Pregame only after those foundations are stable;
+4. land safe task/visibility ownership before enabling room-preserving Browse/Return;
+5. redesign Live portrait and then measured landscape A/B without changing gameplay authority;
+6. complete Chat/Menu, History/Review, People/session Messages/Profile, and Settings/More slices;
+7. run the full physical-device/product UX validation matrix;
+8. deepen profiles/social/history;
+9. add advanced replay/review tools;
+10. add serious-player notes/clue-planning productivity features;
+11. complete store/AAB/release readiness when the product itself is ready.
 
 This ordering is intentionally product-first. The remaining work should make Hanab feel increasingly
 like a deliberate mobile application, not merely maximize the number of Hanabi-Live features copied
