@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import packageMetadata from '../../package.json';
 
 import type {
   NetworkSession,
@@ -1362,7 +1363,7 @@ describe('deterministic lobby runtime', () => {
     expect(chat.submit('/version')).toBe(true);
     expect(socket.sent).toEqual([]);
     expect(store.getState().chat.messagesByRoom.lobby?.at(-1)).toMatchObject({
-      msg: 'You are running version 1.0.0-beta.2 of the client.',
+      msg: `You are running version ${packageMetadata.version} of the client.`,
       datetime: '2026-09-22T10:00:00.000Z',
       server: true,
       localType: 'info',
@@ -2788,7 +2789,7 @@ describe('deterministic lobby runtime', () => {
     expect(chat.submit('/pm Bob hello')).toBe(true);
     expect(socket.sent).toEqual(['chatPM {"msg":"hello","recipient":"Bob","room":"lobby"}']);
     expect(store.getState().chat.messagesByRoom.lobby?.[0]).toMatchObject({
-      msg: 'You are running version 1.0.0-beta.2 of the client.', localType: 'info',
+      msg: `You are running version ${packageMetadata.version} of the client.`, localType: 'info',
     });
   });
 

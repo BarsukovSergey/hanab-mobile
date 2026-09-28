@@ -1,56 +1,75 @@
 # Android Beta Release
 
-Current Android tester candidate: **1.0.0-beta.2**
+Planned Android tester candidate: **1.0.0-beta.3**
 
-Build status: **APK built successfully; physical-device smoke pending before broad distribution.**
+Build status: **release metadata prepared; runtime candidate freezes when the release-prep PR merges;
+APK build and physical-device smoke are still pending.**
 
-## Frozen beta.2 identity
+## Beta.3 version identity
+
+- version: `1.0.0-beta.3`
+- Android `versionCode`: `3`
+- workflow: `Android Beta APK`
+- workflow artifact: `Hanab-Mobile-1.0.0-beta.3`
+- expected APK: `Hanab-Mobile-1.0.0-beta.3.apk`
+- runtime candidate: **pending release-prep merge SHA**
+- ordinary CI: **pending candidate**
+- Android workflow run: **not started**
+- APK size / SHA-256: **not recorded yet**
+
+Once the release-prep PR merges, record its merge SHA as the immutable runtime candidate. If a later
+runtime fix is required, select a new candidate and rebuild. Documentation-only recording commits do
+not redefine the candidate binary.
+
+## Frozen beta.2 reference
+
+The previous tester release remains:
 
 - version: `1.0.0-beta.2`
 - Android `versionCode`: `2`
-- candidate commit: `45d99d15960d04934ea0ce07fcb90db73eb206df`
-- workflow: `Android Beta APK`
+- runtime candidate: `45d99d15960d04934ea0ce07fcb90db73eb206df`
 - workflow run: `#2` / run ID `35932310051`
-- workflow result: **success**
-- artifact: `Hanab-Mobile-1.0.0-beta.2`
-- artifact ID: `10781674355`
+- artifact: `Hanab-Mobile-1.0.0-beta.2` / artifact ID `10781674355`
 - APK: `Hanab-Mobile-1.0.0-beta.2.apk`
 - APK size: `134635991` bytes
 - APK SHA-256: `17f88df7ce70e4889495cda68eca9117540bc644f3ca3ba9e0e42757de6014f8`
 
-The workflow artifact metadata reports `head_sha = 45d99d15960d04934ea0ce07fcb90db73eb206df`, matching the frozen candidate.
+See `BETA_2_RELEASE_NOTES.md` for the historical tester packet.
 
-The binary identity is the candidate commit above plus the exact APK checksum. Documentation-only commits after that candidate do **not** redefine the beta.2 binary.
+## Beta.3 scope
 
-See [`BETA_2_RELEASE_NOTES.md`](./BETA_2_RELEASE_NOTES.md) for the tester-facing release packet.
+Beta.3 is the pre-redesign baseline. Major additions since the frozen beta.2 runtime include:
 
-## Beta.2 scope
+- richer account entry points and server-status/lobby progress handling;
+- native Pregame Kick / Find variant / Missing scores actions and the multi-bot picker;
+- read-only Tagged games and exact tag search in History;
+- stronger friend visibility and authoritative mute-state handling;
+- H-group/resource-state presentation cues and server-backed gameplay presentation settings;
+- Hypothetical card morph/unmorph controls;
+- arbitrary JSON replay import, finished-review `/copy` export/share, and canonical replay/game/pregame
+  link opening;
+- specific-seed Create and History prefill;
+- server-backed Reverse hands;
+- supported server-backed Create-table preference persistence;
+- Show turn timers in untimed games with upstream-compatible count-up semantics.
 
-Beta.2 intentionally batches the accumulated post-beta.1 product work instead of trying to empty the entire backlog.
+Upstream #3139 JSON replay URL visibility was sanity-checked against mobile and requires no beta.3 code
+change.
 
-Major areas included:
+Feature scope is frozen here. Chat / Messaging redesign, the major mobile shell/IA pass, richer
+profiles/social/history, advanced replay tooling, and serious-player productivity work remain
+post-beta.3.
 
-- dense real-card 4P–6P layout improvements and physical-fit fixes;
-- spectator perspective switching and spectator presentation fixes;
-- card-presentation settings including colorblind/styled-number modes;
-- lobby/pregame information and social improvements;
-- Friends history and same-seed Other Scores;
-- game tags and shared-replay creation/suggestion flows;
-- table-chat unread state and direct-reply correctness;
-- first-class session PM dialogs from People/Pregame/live-game user context;
-- focused Rewind, Hypothetical, note, clue and card-presentation fixes.
+Known non-blockers include:
 
-Known non-blockers:
-
-- rapid replay scrubber jank remains tracked in GitHub issue #4;
-- compact shell/Pregame information-density redesign remains tracked in issue #58;
-- `/copy` replay export is intentionally deferred;
-- broader account-management UX remains future product work;
+- rapid replay scrubber jank (#4);
+- compact shell/Pregame information-density redesign (#58);
+- session PM dialogs are not durable cross-reconnect account history;
 - this remains a standalone internal APK flow, not the Play Store/AAB pipeline.
 
 ## Build
 
-From a clean checkout of the frozen candidate:
+From a clean checkout of the frozen runtime candidate:
 
 ```bash
 npm ci
@@ -60,37 +79,27 @@ npm run android:beta-apk
 Expected APK:
 
 ```text
-dist/Hanab-Mobile-1.0.0-beta.2.apk
+dist/Hanab-Mobile-1.0.0-beta.3.apk
 ```
 
-The build runs Expo prebuild and Gradle `:app:assembleRelease`. It is intended for direct internal APK installation, not Play Store submission.
+The build runs Expo prebuild and Gradle `:app:assembleRelease`.
 
-## Acceptance before sharing
+## Physical acceptance before sharing
 
-Prefer validating beta.2 as an **upgrade over beta.1** on a physical Android device:
+Prefer an **upgrade over beta.2** on a physical Android device:
 
-1. confirm beta.1 is currently installed;
-2. install beta.2 over it without uninstalling;
-3. launch without Metro/development tooling;
-4. verify expected authenticated/session continuity;
-5. enter a normal 2P/3P table and complete ordinary actions;
-6. exercise Rewind and Return to Live;
-7. open a finished/shared replay and a relevant Hypothetical path;
-8. enter a spectator session and switch perspective;
-9. exercise table chat and a session PM dialog;
-10. background/foreground once and confirm no stale gameplay action fires.
+1. install beta.3 over beta.2 without uninstalling;
+2. verify launch/session continuity without Metro;
+3. complete ordinary 2P/3P actions;
+4. exercise Rewind / Return to Live;
+5. open finished/shared replay and Hypothetical;
+6. spectate and switch perspective;
+7. exercise tag discovery/search;
+8. verify Create preference restore/save;
+9. toggle Reverse hands and untimed timers in representative live games;
+10. exercise table chat and a private Dialog;
+11. background/foreground once and verify no stale gameplay action fires.
 
-Also perform at least one clean install before wider distribution.
+Also perform at least one clean install.
 
-Until this smoke is completed, beta.2 is a **built release candidate**, not a fully validated tester release.
-
-## Historical beta.1 reference
-
-The previously distributed beta.1 remains frozen at:
-
-- version: `1.0.0-beta.1`;
-- Android `versionCode`: `1`;
-- commit: `d297ad71153095f18fba3101f760e306ed69e214`;
-- artifact: `Hanab-Mobile-1.0.0-beta.1.apk`.
-
-That historical identity remains useful when reproducing beta.1 tester reports.
+Until this smoke is complete, beta.3 is a **built release candidate**, not a validated tester release.

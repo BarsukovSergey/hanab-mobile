@@ -1,149 +1,68 @@
 # Beta feedback triage and next tester release
 
-Date: 2026-09-22
+Date: 2026-09-28
 
-Status: maintainer guidance for the active `1.0.0-beta.1` tester window and the next Android tester build.
+Status: maintainer guidance for the frozen `1.0.0-beta.2` tester line and the planned
+`1.0.0-beta.3` Android tester build.
 
-## Frozen beta.1 reference
+## Frozen beta.2 reference
 
-The distributed tester APK is the frozen beta.1 binary built from:
+The previously distributed tester APK remains frozen at:
 
-- version: `1.0.0-beta.1`;
-- commit: `d297ad71153095f18fba3101f760e306ed69e214`;
-- Android `versionCode`: `1`;
-- artifact name: `Hanab-Mobile-1.0.0-beta.1.apk`.
+- version: `1.0.0-beta.2`;
+- Android `versionCode`: `2`;
+- runtime candidate: `45d99d15960d04934ea0ce07fcb90db73eb206df`;
+- APK: `Hanab-Mobile-1.0.0-beta.2.apk`;
+- APK SHA-256: `17f88df7ce70e4889495cda68eca9117540bc644f3ca3ba9e0e42757de6014f8`.
 
-Documentation-only commits after that point do not redefine what testers are running.
+Documentation-only commits after that runtime candidate do not redefine the beta.2 binary.
 
-When investigating tester reports, reproduce against that frozen commit before assuming current
-`main` reflects the reported behavior.
+## Beta.3 scope freeze
 
-## Feedback triage
+Beta.3 feature scope is frozen. The intended runtime line includes the small independent slices
+completed through PR #133 plus the reconciled planning state in PR #134. Do not add new product
+features to the candidate.
 
-Every incoming tester report should first be classified as one of three things.
+Only confirmed correctness/safety regressions should change runtime code before the beta.3 candidate
+is frozen. UX ideas and feature requests belong in the post-beta design/backlog unless they are
+required to make the candidate usable.
 
-### 1. Beta.1 bug
+## Versioning contract
 
-A concrete behavior that is broken relative to the beta.1 product/validation contract.
-
-Examples:
-
-- crash or freeze;
-- accidental Play/Discard/Clue send;
-- wrong authoritative state or stale state after rewind/reconnect;
-- note/card identity migration;
-- required 2P/3P controls clipped or unusable;
-- lifecycle/reconnect behavior that can trigger stale actions;
-- a reproducible protocol/correctness failure.
-
-Process:
-
-1. reproduce on the frozen beta.1 commit when possible;
-2. record device/Android/navigation/theme/font context from the tester report;
-3. decide whether it is blocking, hotfix-worthy, or can wait for the next broader beta;
-4. keep the fix narrowly scoped to the observed defect;
-5. do not mix unrelated post-beta feature work into the fix.
-
-If a beta.1 hotfix must be shipped before broader post-beta work is ready, branch the runtime fix from
-the frozen beta.1 code line or another explicitly chosen beta-maintenance base, not from a large
-unrelated feature branch.
-
-### 2. UX feedback
-
-The app is functionally correct, but a normal player cannot easily discover, understand, or operate
-the intended flow.
-
-Examples:
-
-- unclear navigation;
-- weak information hierarchy;
-- confusing labels;
-- excessive taps;
-- visually ambiguous state;
-- a tester cannot tell Live from Rewind;
-- a control exists but is hard to discover.
-
-Process:
-
-1. preserve the tester's observed problem, not their guessed implementation fix;
-2. compare it with the current C17 UX contract and existing backlog;
-3. promote to a concrete issue only when it is specific enough to implement/verify;
-4. otherwise consolidate it in the authoritative post-beta backlog.
-
-Do not automatically hotfix every UX preference during the feedback window.
-
-### 3. Post-beta idea
-
-A requested capability or enhancement that is not required by the beta.1 contract.
-
-Examples include already deferred 4P–6P redesign, lobby restructuring, bot conveniences, richer
-social/profile features, advanced replay tools, and optional gesture modes.
-
-Process:
-
-- add or reconcile it with `docs/C17_BACKLOG.md`;
-- avoid opening duplicate items for the same product need;
-- do not let it silently expand the beta.1 acceptance gate.
-
-## Severity / hotfix guidance
-
-Treat the following as strong hotfix candidates if reproducible in the certified beta.1 scope:
-
-- crash, hard freeze, or startup/login blocker;
-- accidental authoritative gameplay action;
-- replay/rewind mutating live gameplay;
-- stale/wrong authoritative state after reconnect or Return to Live;
-- corruption or migration of card-bound notes/actions;
-- required controls blocked by system UI on ordinary supported Android layouts;
-- inability to complete normal 2P/3P play;
-- security/correctness issue that should not remain in tester hands.
-
-Prefer next-beta batching for:
-
-- cosmetic polish;
-- small copy changes;
-- optional convenience controls;
-- known 4P–6P density shortcomings;
-- non-severe scrubber jank;
-- already deferred parity/features.
-
-This is guidance, not an automatic severity score; use the concrete tester impact and reproducibility.
-
-## Next tester build checklist
-
-Do not prepare the next tester binary until its scope is explicitly chosen from actual feedback plus
-deliberately selected post-beta work.
-
-For a planned `1.0.0-beta.2` build:
-
-### Versioning
-
-Update all release-facing version locations together:
+For `1.0.0-beta.3`, keep all release-facing version locations synchronized:
 
 - `package.json` version;
+- the root/package entry versions in `package-lock.json`;
 - `app.json` Expo version;
-- `app.json` Android `versionCode` to a value greater than `1`;
+- `app.json` Android `versionCode` = `3`;
 - `.github/workflows/android-beta.yml` artifact name.
 
-The local build script derives the APK filename from `app.json`, but the GitHub Actions artifact
-name is currently hard-coded separately. Verify both names show the intended beta version.
+The local build script derives the APK filename from `app.json`. The workflow artifact name is
+hard-coded separately and must match the intended beta version.
 
-Do not bump these fields merely for documentation/research work.
+Expected APK filename:
 
-### Candidate commit
+```text
+dist/Hanab-Mobile-1.0.0-beta.3.apk
+```
+
+## Candidate commit
+
+The release-prep merge commit becomes the beta.3 runtime candidate unless a subsequent runtime fix is
+required.
 
 Before building:
 
-1. identify one exact candidate commit SHA;
-2. ensure all intended runtime changes are merged;
-3. ensure unrelated experimental branches are not part of the candidate;
-4. run ordinary CI successfully on that exact code line;
-5. record which beta.1 tester reports are fixed, intentionally deferred, or not reproduced.
+1. record the exact candidate SHA;
+2. verify all intended runtime work is merged and no unrelated experimental branch is included;
+3. require ordinary CI to pass on the candidate code line;
+4. treat the candidate SHA as immutable for the produced APK;
+5. if runtime code changes afterward, choose a new candidate SHA and rebuild.
 
-Once selected, treat that SHA as immutable for the produced artifact. If code changes afterward,
-choose a new candidate SHA and rebuild.
+A later documentation-only commit may record the candidate/build identity without redefining the
+runtime binary.
 
-### Build
+## Build
 
 Keep the Android beta workflow manual-only.
 
@@ -154,87 +73,64 @@ npm ci
 npm run android:beta-apk
 ```
 
-Expected beta.2 filename after version bump:
+The GitHub Actions workflow must remain `workflow_dispatch` only unless CI policy is deliberately
+changed.
 
-```text
-dist/Hanab-Mobile-1.0.0-beta.2.apk
-```
+## Upgrade-over-beta.2 validation
 
-The GitHub Actions workflow must remain triggered by `workflow_dispatch` unless there is a deliberate
-separate decision to spend CI minutes on automatic Android builds.
+Validate beta.3 as an upgrade, not only as a clean install.
 
-### Upgrade-over-beta.1 validation
+On a physical Android device with beta.2 already installed:
 
-The next tester build must be tested as an **upgrade**, not only as a clean install.
+1. install beta.3 over beta.2 without uninstalling;
+2. confirm Android accepts the upgrade, proving package/signing/versionCode continuity;
+3. launch without Metro/development tooling;
+4. verify expected authenticated/session continuity;
+5. create or join a normal 2P/3P table and complete ordinary actions;
+6. exercise Rewind and Return to Live;
+7. open finished replay, shared review, and a relevant Hypothetical path;
+8. enter spectator mode and switch perspective;
+9. exercise History tag discovery / exact tag search;
+10. verify supported Create-table preferences restore and save correctly;
+11. verify Reverse hands and Show turn timers in untimed games;
+12. exercise table chat and a private Dialog;
+13. background/foreground once and confirm no stale gameplay action fires.
 
-On a physical Android device that already has the distributed beta.1 installed:
+Also perform at least one clean install before distribution.
 
-1. confirm the installed app is beta.1;
-2. install the new APK over it without uninstalling beta.1;
-3. confirm Android accepts the upgrade, proving package/signing/versionCode continuity;
-4. launch the app without Metro/development tooling;
-5. verify the expected authenticated/session behavior;
-6. verify no unexpected local app state is corrupted;
-7. enter a normal 2P/3P table and complete ordinary actions;
-8. exercise Rewind and Return to Live;
-9. open a replay/shared review/Hypothetical path relevant to the release scope;
-10. background/foreground once and confirm no stale action fires.
+For 4P–6P, one focused physical sanity pass is still useful because beta.3 inherits the dense C17
+layout from beta.2, but beta.3 does not reopen layout redesign as release scope.
 
-Also perform at least one clean install before distribution so upgrade success does not hide a fresh
-install/startup problem.
-
-### Regression focus
-
-At minimum, preserve the beta.1 high-priority guarantees:
-
-- explicit two-step Play/Discard safety;
-- no stale gameplay send after lifecycle interruption;
-- stable card `order` identity for notes/actions;
-- server-authoritative replay/live separation;
-- no unexpected Legacy fallback on accepted C17 paths;
-- usable Android system-inset/keyboard behavior;
-- accepted 2P/3P real-card gameplay.
-
-Add focused checks for each runtime area changed since beta.1 rather than rerunning unrelated deferred
-acceptance work by default.
-
-### Artifact identity
+## Artifact identity
 
 Before sending the APK to testers, record:
 
 - marketing version;
 - Android `versionCode`;
-- exact commit SHA;
+- exact runtime candidate SHA;
+- ordinary CI result;
+- Android workflow run ID/result;
+- artifact name and artifact ID;
 - APK filename;
 - APK byte size;
-- SHA-256;
-- build source: local or specific manual GitHub Actions run;
-- date distributed;
-- short release notes / tester-visible changes.
-
-Generate the checksum from the exact APK being distributed, for example:
-
-```bash
-sha256sum dist/Hanab-Mobile-1.0.0-beta.2.apk
-```
+- APK SHA-256;
+- build source/date;
+- short tester-facing release notes.
 
 Never replace an already distributed APK while keeping the same recorded version/hash identity.
 
-### Distribution notes
+## Distribution notes
 
 Tell testers:
 
-- whether this build should be installed over beta.1;
+- install beta.3 over beta.2 when possible;
 - the exact version they should see;
-- what changed since beta.1;
-- which known limitations still apply;
-- what areas deserve focused regression testing;
-- that reports should include the build/version when possible.
+- the main changes since beta.2;
+- the remaining known limitations;
+- the areas that deserve focused regression testing;
+- to include build/version, device model, Android version, and reproduction steps in reports.
 
 ## Relationship to Play Store work
 
-This checklist is for the current standalone internal APK flow.
-
-AAB packaging, store signing, Play Console policy, and production release versioning remain separate
-post-beta work. Do not couple Play Store setup to the next tester APK unless intentionally
-reprioritized.
+This remains the standalone internal APK flow. AAB packaging, store signing, Play Console policy, and
+production release versioning remain separate post-beta work.
