@@ -11,6 +11,18 @@ This directory mixes current product/technical authority with historical impleme
 - `ANDROID_BETA_RELEASE.md` — current internal APK version, build identity, acceptance checklist, and frozen-build policy.
 - `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the beta.1 tester window plus the version/upgrade checklist used to prepare beta.2.
 
+## Authority precedence
+
+For implementation tasks, use the narrowest applicable authority instead of reading every document:
+
+1. `MOBILE_APP_DESIGN_V2.md` — app shell, IA, navigation, Back/Browse/Return, room menus, responsive classes and Phase 2 slice order.
+2. `C17_UX_CONTRACT.md` / `C17_UX_DECISIONS.md` — gameplay interaction semantics.
+3. `ARCHITECTURE.md` — technical/runtime/network safety boundaries.
+4. `UPSTREAM.md` and local upstream notes — pinned upstream behavior.
+5. `PRODUCT_ROADMAP.md` — sequencing/priorities.
+
+When shell/menu/landscape text in older C17 material conflicts with Mobile App Design v2, v2 is the current authority. Historical/evidence documents never override a current authority document.
+
 ## Current authority
 
 - `PRODUCT_ROADMAP.md` — current post-beta sequencing authority: stabilization, mobile app redesign implementation, product depth, review tools, and store readiness.
