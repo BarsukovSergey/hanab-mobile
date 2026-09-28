@@ -1,27 +1,18 @@
-export type LocalScreen = 'lobby' | 'people' | 'history' | 'settings';
-export type BackAction = 'go_to_lobby' | 'leave_pregame' | 'unattend' | 'consume' | 'system';
+import type { BrowsingPresentationState } from './browsingNavigationState';
 
-type BackPresentationState = {
-  localScreen: LocalScreen;
-  authenticated: boolean;
-  roomKind: 'none' | 'pregame' | 'awaiting_game_bootstrap' | 'live_game';
-  roomRole: 'player' | 'spectator' | null;
-  rematchPending: boolean;
-};
+export type BrowsingBackAction = 'back' | 'system';
+export type RoomAttendanceBackAction = 'leave_pregame' | 'unattend' | 'consume';
 
-export function getBackAction(state: BackPresentationState): BackAction {
-  if (state.roomKind === 'awaiting_game_bootstrap' || state.rematchPending) return 'consume';
-  if (state.roomKind === 'pregame') {
-    return state.roomRole === 'spectator' ? 'leave_pregame' : 'consume';
-  }
-  if (state.roomKind === 'live_game') {
-    return state.roomRole === 'spectator' ? 'unattend' : 'consume';
-  }
-  if (!state.authenticated) return 'system';
-  if (
-    state.localScreen === 'people'
-    || state.localScreen === 'history'
-    || state.localScreen === 'settings'
-  ) return 'go_to_lobby';
-  return 'system';
+export function getBrowsingBackAction(state: BrowsingPresentationState, authenticated = true): BrowsingBackAction {
+  if (!authenticated) return 'system';
+  return state.stack.length > 1 || state.destination !== 'home' ? 'back' : 'system';
+}
+
+export function getRoomAttendanceBackAction(room: {
+  kind: 'pregame' | 'awaiting_game_bootstrap' | 'live_game';
+  role: 'player' | 'spectator';
+}): RoomAttendanceBackAction {
+  if (room.kind === 'pregame' && room.role === 'spectator') return 'leave_pregame';
+  if (room.kind === 'live_game' && room.role === 'spectator') return 'unattend';
+  return 'consume';
 }

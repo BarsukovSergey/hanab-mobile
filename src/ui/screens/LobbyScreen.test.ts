@@ -67,7 +67,7 @@ describe('lobby table details and create selector', () => {
   test('adopts a one-shot History prefill locally and leaves creation to the user', () => {
     expect(app).toContain('useState<SpecificSeedCreatePrefill | null>(null)');
     expect(app).toContain('setSpecificSeedCreatePrefill(prefill);');
-    expect(app).toContain('setLocalScreen(\'lobby\');');
+    expect(app).toContain("navigate('home');");
     expect(screen).toContain('setUseSpecificSeed(true);');
     expect(screen).toContain('setSeedSuffix(specificSeedCreatePrefill.seedSuffix);');
     expect(screen).toContain('setMaxPlayers(specificSeedCreatePrefill.maxPlayers);');

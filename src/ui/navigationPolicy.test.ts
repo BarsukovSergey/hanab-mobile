@@ -1,67 +1,23 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { getBackAction } from './navigationPolicy';
+import { getBrowsingBackAction, getRoomAttendanceBackAction } from './navigationPolicy';
+import { createBrowsingPresentation } from './browsingNavigationState';
 
-describe('C16A Android Back policy', () => {
-  const base = {
-    localScreen: 'lobby' as const,
-    authenticated: true,
-    roomKind: 'none' as const,
-    roomRole: null,
-    rematchPending: false,
-  };
-
-  test('History returns locally to Lobby', () => {
-    expect(getBackAction({ ...base, localScreen: 'history' })).toBe('go_to_lobby');
+describe('browsing and room attendance Back ownership', () => {
+  test('browsing Back returns from nested/non-home browsing surfaces', () => {
+    expect(getBrowsingBackAction(createBrowsingPresentation('home'))).toBe('system');
+    expect(getBrowsingBackAction(createBrowsingPresentation('history'))).toBe('back');
   });
 
-  test('Settings returns locally to Lobby', () => {
-    expect(getBackAction({ ...base, localScreen: 'settings' })).toBe('go_to_lobby');
+  test('room attendance Back policy remains outside browsing policy', () => {
+    expect(getRoomAttendanceBackAction({ kind: 'pregame', role: 'spectator' })).toBe('leave_pregame');
+    expect(getRoomAttendanceBackAction({ kind: 'live_game', role: 'spectator' })).toBe('unattend');
+    expect(getRoomAttendanceBackAction({ kind: 'pregame', role: 'player' })).toBe('consume');
+    expect(getRoomAttendanceBackAction({ kind: 'live_game', role: 'player' })).toBe('consume');
+    expect(getRoomAttendanceBackAction({ kind: 'awaiting_game_bootstrap', role: 'spectator' })).toBe('consume');
   });
 
-  test('People returns locally to Lobby', () => {
-    expect(getBackAction({ ...base, localScreen: 'people' })).toBe('go_to_lobby');
-  });
-
-  test('Lobby allows system Back', () => {
-    expect(getBackAction(base)).toBe('system');
-  });
-
-  test('pregame player consumes Back', () => {
-    expect(getBackAction({ ...base, roomKind: 'pregame', roomRole: 'player' })).toBe('consume');
-  });
-
-  test('pregame spectator leaves with Back', () => {
-    expect(getBackAction({ ...base, roomKind: 'pregame', roomRole: 'spectator' }))
-      .toBe('leave_pregame');
-  });
-
-  test('awaiting bootstrap consumes Back', () => {
-    expect(getBackAction({ ...base, roomKind: 'awaiting_game_bootstrap', roomRole: 'spectator' }))
-      .toBe('consume');
-  });
-
-  test('live player consumes Back', () => {
-    expect(getBackAction({ ...base, roomKind: 'live_game', roomRole: 'player' })).toBe('consume');
-  });
-
-  test('live spectator or replay unattends with Back', () => {
-    expect(getBackAction({ ...base, roomKind: 'live_game', roomRole: 'spectator' }))
-      .toBe('unattend');
-  });
-
-  test('authoritative live room remains protected while connection presentation is not ready', () => {
-    expect(getBackAction({
-      ...base, authenticated: false, roomKind: 'live_game', roomRole: 'player',
-    })).toBe('consume');
-  });
-
-  test('rematch transition consumes Back', () => {
-    expect(getBackAction({ ...base, rematchPending: true })).toBe('consume');
-  });
-
-  test('unauthenticated presentation allows system Back', () => {
-    expect(getBackAction({ ...base, authenticated: false, localScreen: 'history' }))
-      .toBe('system');
+  test('unauthenticated browsing allows system Back', () => {
+    expect(getBrowsingBackAction(createBrowsingPresentation('history'), false)).toBe('system');
   });
 });
