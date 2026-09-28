@@ -2,7 +2,7 @@
 
 Date: **2026-09-28**
 
-Status: **runtime candidate frozen; CI/build/physical validation in progress**
+Status: **APK built successfully; physical-device validation pending**
 
 ## Candidate identity
 
@@ -11,14 +11,14 @@ Status: **runtime candidate frozen; CI/build/physical validation in progress**
 - runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
 - ordinary CI: **success — run #719 / run ID `36361502403`**
 - Android workflow: `Android Beta APK`
-- Android workflow run: **not started**
+- Android workflow run: **success — #3 / run ID `36361833453`**
 - workflow artifact: `Hanab-Mobile-1.0.0-beta.3`
-- artifact ID: **not recorded yet**
+- artifact ID: `10945838465`
 - APK filename: `Hanab-Mobile-1.0.0-beta.3.apk`
-- APK byte size: **not recorded yet**
-- APK SHA-256: **not recorded yet**
+- APK byte size: `135761383`
+- APK SHA-256: `37daceaaac21c4867825876ff19e549654e5ae56f17c75482d08d1fcec92abcf`
 
-The runtime candidate is `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`. A subsequent runtime fix requires a new candidate and rebuild. Later documentation-only commits do not redefine the binary.
+The runtime candidate is `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`. Android workflow #3 ran from docs-only descendant `3d75474b92b7626086b1d55905f91dbbf5922f58`; the runtime content is equivalent to the candidate. A subsequent runtime fix requires a new candidate and rebuild.
 
 ## What changed since beta.2
 
@@ -81,5 +81,4 @@ confusing or incorrect.
 
 ## Distribution record
 
-Not yet distributed. Fill in the immutable candidate SHA, CI/build run, artifact identity, APK size,
-checksum, and distribution date before sending to testers.
+Build identity is frozen above. Physical smoke and distribution date remain to be recorded before sending to testers.
