@@ -6,17 +6,28 @@ const screen = readFileSync(resolve(__dirname, 'PregameScreen.tsx'), 'utf8').rep
 const app = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('focused Pregame surface', () => {
+  test('only root header offers Browse beside Table menu without changing local task state', () => {
+    const header = screen.slice(screen.indexOf('<View style={styles.header}>'), screen.indexOf('</View>', screen.indexOf('<View style={styles.header}>')) + 7);
+    expect(header).toContain("{surface === 'root' && <View style={styles.actionsRow}>");
+    expect(header).toContain('title="Browse" onPress={onBrowse}');
+    expect(header).toContain('title="Table menu"');
+    expect(screen.match(/title="Browse"/g)).toHaveLength(1);
+    expect(app).toContain('onBrowse={browseFromRoom}');
+    const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const exitOwnRewind ='));
+    expect(browse).toContain("setPresentationFocus('browsing')");
+    expect(browse).not.toContain('lobbyRuntime');
+  });
   test('App hosts Pregame outside the browsing shell and leaves browsing navigation hidden', () => {
     const start = app.indexOf("if (roomState.room.kind === 'pregame') {\n    const pregameReady");
     const end = app.indexOf('\n  let content: ReactNode;', start);
     const host = app.slice(start, end);
     expect(host).toContain("<SafeAreaView edges={['top', 'right', 'bottom', 'left']}");
-    expect(host).toContain('<PregameScreen backRef={pregameBackRef} presentationVisible={roomPresentationVisible} />');
+    expect(host).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom} presentationVisible={roomPresentationVisible} />');
     expect(host).not.toContain('<ScrollView');
     expect(host).not.toContain('<BrowsingNavigation');
     expect(host).not.toContain('styles.appHeader');
     expect(host).toContain('const pregameReady = session.phase === \'ready\' && hydrated;');
-    expect(host).toContain('{pregameReady ? <PregameScreen backRef={pregameBackRef} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}');
+    expect(host).toContain('{pregameReady ? <PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}');
     expect(host).toContain('Session unavailable');
     expect(host).toContain('Connection lost');
     expect(host).toContain('Connecting to lobby');

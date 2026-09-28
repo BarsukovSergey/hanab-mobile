@@ -15,7 +15,11 @@ import {
 import { getPeopleRows } from '../peoplePresentation';
 import { UserContextActions } from '../UserContextActions';
 
-export function PeopleScreen({ onBack }: { onBack: () => void }) {
+export function PeopleScreen({ onBack, roomOccupied, showEmbeddedBack = true }: {
+  onBack: () => void;
+  roomOccupied: boolean;
+  showEmbeddedBack?: boolean;
+}) {
   const { theme } = useHanabTheme();
   const users = useAppSelector(userSelectors.selectAll);
   const tables = useAppSelector(tableSelectors.selectAll);
@@ -34,11 +38,13 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
           title="People"
           detail={`${rows.length} ${rows.length === 1 ? 'person' : 'people'} online`}
         />
-        <ActionButton compact title="Back to Lobby" onPress={onBack} />
+        {showEmbeddedBack && <ActionButton compact title="Back to Lobby" onPress={onBack} />}
       </Panel>
 
       <Panel>
         {rows.length === 0 && <EmptyState>No users online.</EmptyState>}
+        {roomOccupied && rows.some((row) => row.tableAction !== null) &&
+          <Text style={{ color: theme.colors.textMuted }}>Return to the current room before spectating another table.</Text>}
         {rows.map((row) => {
           const tableAction = row.tableAction;
           return (
@@ -71,7 +77,11 @@ export function PeopleScreen({ onBack }: { onBack: () => void }) {
                     <ActionButton
                       compact
                       title={tableAction.label}
-                      onPress={() => lobbyRuntime.spectate(tableAction.tableID)}
+                      disabled={roomOccupied}
+                      onPress={() => {
+                        if (roomOccupied) return;
+                        lobbyRuntime.spectate(tableAction.tableID);
+                      }}
                     />
                   )}
                 </UserContextActions>

@@ -19,8 +19,9 @@ import { isPregameLandscape } from '../navigationPolicy';
 const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 type PregameSurface = 'root' | 'table-settings' | 'spectators' | 'team-tools' | 'table-menu';
 
-export function PregameScreen({ backRef, presentationVisible = true }: {
+export function PregameScreen({ backRef, onBrowse, presentationVisible = true }: {
   backRef?: { current: (() => void) | null };
+  onBrowse: () => void;
   presentationVisible?: boolean;
 }) {
   const { theme } = useHanabTheme();
@@ -155,7 +156,10 @@ export function PregameScreen({ backRef, presentationVisible = true }: {
     <View style={styles.header}>
       {surface !== 'root' && <ActionButton compact title="Back" onPress={handleBack} />}
       <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{surface === 'root' ? 'Pregame' : surface === 'table-settings' ? 'Table settings' : surface === 'team-tools' ? 'Team tools' : surface === 'table-menu' ? 'Table menu' : 'Spectators'}</Text>
-      {surface === 'root' && <ActionButton compact title="Table menu" onPress={() => setSurface('table-menu')} />}
+      {surface === 'root' && <View style={styles.actionsRow}>
+        <ActionButton compact title="Browse" onPress={onBrowse} />
+        <ActionButton compact title="Table menu" onPress={() => setSurface('table-menu')} />
+      </View>}
     </View>
 
     <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">

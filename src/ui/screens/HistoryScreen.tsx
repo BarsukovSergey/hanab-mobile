@@ -30,6 +30,7 @@ const END_CONDITIONS = [
 export function HistoryScreen({
   roomOccupied,
   onBack,
+  showEmbeddedBack = true,
   onWatchReplay,
   onWatchJSONReplay,
   onWatchReplayInput,
@@ -38,6 +39,7 @@ export function HistoryScreen({
 }: {
   roomOccupied: boolean;
   onBack: () => void;
+  showEmbeddedBack?: boolean;
   onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
   onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
   onWatchReplayInput: (request: Exclude<ReplayInputResult, { kind: 'invalid' }>) => void;
@@ -98,11 +100,11 @@ export function HistoryScreen({
             ? 'Games played on this seed.'
             : 'Open a finished game using the same authoritative replay path.'} />
         </View>
-        <ActionButton compact title="Back to lobby" onPress={() => {
+        {showEmbeddedBack && <ActionButton compact title="Back to lobby" onPress={() => {
           invalidateSeedCopy();
           if (comparing) lobbyRuntime.dismissOtherScores();
           onBack();
-        }} />
+        }} />}
       </Panel>
       {roomOccupied && <Notice>You're already in a room. History stays available for browsing, but return to the current room before opening another replay or starting this seed.</Notice>}
 
