@@ -163,6 +163,7 @@ export function PregameScreen({ backRef }: { backRef?: { current: (() => void) |
             <View style={styles.region}>{setupSummary}</View>
           </View>
           : <>{tableIdentity}{roster}{setupSummary}</>}
+        <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive />
       </>}
 
       {surface === 'table-settings' && <Panel style={styles.panel}>
@@ -249,7 +250,6 @@ export function PregameScreen({ backRef }: { backRef?: { current: (() => void) |
               }], { cancelable: false },
             )} />
       </Panel>}
-      <ChatPanel room={`table${room.tableID}`} title="Pre-game chat" />
     </ScrollView>
 
     {surface === 'root' && <View style={styles.footer}>

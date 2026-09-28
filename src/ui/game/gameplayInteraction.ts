@@ -28,7 +28,8 @@ export type GameplayInteractionAction =
   | { type: 'cancel-transient' }
   | { type: 'disarm-gameplay' }
   | { type: 'complete-card-action'; order: number }
-  | { type: 'reset-lifecycle-transients' }
+  | { type: 'interrupt-lifecycle' }
+  | { type: 'reset-for-game-load' }
   | {
     type: 'sync-hands';
     ownOrders: readonly number[];
@@ -52,6 +53,8 @@ export function gameplayInteractionReducer(
   action: GameplayInteractionAction,
 ): GameplayInteractionState {
   switch (action.type) {
+    case 'reset-for-game-load':
+      return { ...initialGameplayInteractionState };
     case 'select-card':
       return {
         ...state,
@@ -123,9 +126,15 @@ export function gameplayInteractionReducer(
         globalEmpathy: false,
       };
     case 'cancel-transient':
-    case 'reset-lifecycle-transients':
       return {
         ...state,
+        empathyPlayer: null,
+        persistentEmpathyPlayer: null,
+      };
+    case 'interrupt-lifecycle':
+      return {
+        ...state,
+        selectedCard: null,
         empathyPlayer: null,
         persistentEmpathyPlayer: null,
       };

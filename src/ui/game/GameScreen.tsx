@@ -3,7 +3,7 @@ import { C17GameScreen } from './C17GameScreen';
 import { GameScreen as LegacyGameScreen } from './LegacyGameScreen';
 import { isC17WorkspaceEligible } from './c17Workspace';
 
-export function GameScreen() {
+export function GameScreen({ presentationVisible = true }: { presentationVisible?: boolean }) {
   const room = useAppSelector((state) => state.room.room);
   const liveRoom = room.kind === 'live_game' ? room : null;
   const clientState = liveRoom?.clientState ?? null;
@@ -17,5 +17,7 @@ export function GameScreen() {
     sharedReplay: liveRoom?.sharedReplay ?? false,
   });
 
-  return useC17 ? <C17GameScreen /> : <LegacyGameScreen />;
+  return useC17
+    ? <C17GameScreen presentationVisible={presentationVisible} />
+    : <LegacyGameScreen presentationVisible={presentationVisible} />;
 }

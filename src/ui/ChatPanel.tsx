@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { chatRuntime, lobbyRuntime } from '../runtime/application';
 import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
@@ -12,14 +12,16 @@ import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme }
 type Props = {
   room: string;
   title: string;
+  readActive?: boolean;
 };
 
 const EMPTY_MESSAGES: readonly never[] = [];
 
-export function ChatPanel({ room, title }: Props) {
+export function ChatPanel({ room, title, readActive = true }: Props) {
   const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
   const historyRef = useRef<ScrollView>(null);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const ready = useAppSelector((state) => state.session.phase === 'ready');
   const lastPM = useAppSelector((state) => state.chat.lastPM);
   const draft = useAppSelector((state) => state.chat.draftByRoom[room] ?? '');
@@ -41,13 +43,20 @@ export function ChatPanel({ room, title }: Props) {
   };
 
   useEffect(() => {
-    historyRef.current?.scrollToEnd({ animated: false });
-  }, [messages.length, room]);
+    const subscription = AppState.addEventListener('change', (state) => setAppActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
+    if (!readActive || !appActive || !ready) return;
+    historyRef.current?.scrollToEnd({ animated: false });
+  }, [appActive, messages.length, readActive, ready, room]);
+
+  useEffect(() => {
+    if (!readActive || !appActive || !ready) return;
     dispatch(chatActions.roomRead({ room }));
     if (/^table[1-9]\d*$/.test(room)) lobbyRuntime.markChatRead(room);
-  }, [dispatch, messages.length, ready, room]);
+  }, [appActive, dispatch, messages.length, readActive, ready, room]);
 
   return (
     <Panel>

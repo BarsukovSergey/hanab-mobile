@@ -110,14 +110,33 @@ describe('gameplayInteractionReducer', () => {
       .toMatchObject({ globalEmpathy: true, empathyPlayer: null, persistentEmpathyPlayer: null });
   });
 
-  test('lifecycle interruption clears temporary empathy but keeps global empathy', () => {
+  test('lifecycle interruption clears card arming and temporary empathy but keeps the clue plan and note identity', () => {
     const global = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'toggle-global-empathy' });
-    const resetGlobal = gameplayInteractionReducer(global, { type: 'reset-lifecycle-transients' });
+    const resetGlobal = gameplayInteractionReducer(global, { type: 'interrupt-lifecycle' });
     expect(resetGlobal).toMatchObject({ globalEmpathy: true, empathyPlayer: null });
 
-    const held = gameplayInteractionReducer(initialGameplayInteractionState, { type: 'hold-empathy', playerIndex: 2 });
-    expect(gameplayInteractionReducer(held, { type: 'reset-lifecycle-transients' }))
-      .toMatchObject({ globalEmpathy: false, empathyPlayer: null });
+    const held = { ...global, selectedCard: 12, clueTarget: 2,
+      cluePreview: { type: 'rank' as const, value: 3 }, empathyPlayer: 1, noteCard: 20 };
+    expect(gameplayInteractionReducer(held, { type: 'interrupt-lifecycle' }))
+      .toMatchObject({ selectedCard: null, clueTarget: 2, cluePreview: held.cluePreview,
+        noteCard: 20, globalEmpathy: true, empathyPlayer: null });
+  });
+
+  test('presentation hide disarms card and clue without closing the note or global empathy', () => {
+    const active = { ...initialGameplayInteractionState, selectedCard: 12, clueTarget: 2,
+      cluePreview: { type: 'color' as const, value: 0 }, empathyPlayer: 1,
+      noteCard: 20, globalEmpathy: true };
+    expect(gameplayInteractionReducer(active, { type: 'disarm-gameplay' })).toMatchObject({
+      selectedCard: null, clueTarget: null, cluePreview: null, empathyPlayer: null,
+      noteCard: 20, globalEmpathy: true,
+    });
+  });
+
+  test('authoritative game load drops all prior local interaction state', () => {
+    const active = { ...initialGameplayInteractionState, selectedCard: 12, noteCard: 20 };
+    const reset = gameplayInteractionReducer(active, { type: 'reset-for-game-load' });
+    expect(reset).toEqual(initialGameplayInteractionState);
+    expect(reset).not.toBe(initialGameplayInteractionState);
   });
 
   test('sync drops stale card/clue/empathy references without retargeting note order', () => {

@@ -17,12 +17,16 @@ describe('chat composer keyboard submission', () => {
 });
 
 describe('table chat read contract', () => {
-  test('reads table chat on room/message transitions and never sends for lobby', () => {
+  test('reads only when presented, foreground, and session ready', () => {
     const source = readFileSync(join(__dirname, 'ChatPanel.tsx'), 'utf8');
-    const effect = source.match(/useEffect\(\(\) => \{\s*dispatch\(chatActions\.roomRead\([\s\S]*?\n  \}, \[dispatch, messages\.length, ready, room\]\);/)?.[0] ?? '';
+    const effect = source.match(/useEffect\(\(\) => \{\s*if \(!readActive \|\| !appActive \|\| !ready\) return;\s*dispatch\(chatActions\.roomRead\([\s\S]*?\n  \}, \[appActive, dispatch, messages\.length, readActive, ready, room\]\);/)?.[0] ?? '';
+    expect(source).toContain("useState(AppState.currentState === 'active')");
+    expect(source).toContain("AppState.addEventListener('change', (state) => setAppActive(state === 'active'))");
+    expect(source).toContain('readActive = true');
+    expect(source).toMatch(/if \(!readActive \|\| !appActive \|\| !ready\) return;\s*historyRef\.current\?\.scrollToEnd/);
+    expect(effect).toMatch(/dispatch\(chatActions\.roomRead\(\{ room \}\)\)/);
     expect(effect).toMatch(/lobbyRuntime\.markChatRead\(room\)/);
     expect(effect).toMatch(/\^table\[1-9\]/);
-    expect(effect).toMatch(/\[dispatch, messages\.length, ready, room\]/);
     expect(effect).not.toMatch(/render/);
   });
 });

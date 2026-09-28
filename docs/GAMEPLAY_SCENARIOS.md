@@ -133,8 +133,8 @@ Viewport/app lifecycle changes may recompute presentation but never mutate autho
 1. portrait -> landscape -> portrait uses the production `getGameplayLayout` calculation and the same authoritative game object;
 2. returning to the same viewport produces the same layout result deterministically;
 3. own-hand cards remain at least as large as opponent cards in both orientations;
-4. `GameScreen` drops every UI-only interaction reference on orientation change or when the app leaves `active`: selected card, clue target/preview, empathy, and note target;
-5. NoteEditor and DiscardViewer are also closed at those lifecycle boundaries;
+4. `GameScreen` clears selected-card arming and transient empathy on orientation change or when the app leaves `active`, while preserving the visible clue target/preview, global empathy, and Note target by card `order`;
+5. NoteEditor keeps its open edit transaction and unsaved draft across those lifecycle boundaries; DiscardViewer closes;
 6. durable server-derived knowledge, notes, replay actions, hands, stacks, turn state, and score are not rewritten by the lifecycle reset;
 7. no lifecycle rule may introduce per-hand horizontal scrolling.
 
