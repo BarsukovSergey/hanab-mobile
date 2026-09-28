@@ -1,0 +1,89 @@
+name: Publish Beta.3 Hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-beta3-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CANDIDATE_SHA: 36717a2284490c8179e35b882dca0bde15a14a75
+      RELEASE_TAG: v1.0.0-beta.3-hotfix.1
+      APK_PATH: dist/Hanab-Mobile-1.0.0-beta.3.apk
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - run: npm ci
+
+      - run: npm run android:beta-apk
+
+      - name: Record APK identity
+        id: apk
+        shell: bash
+        run: |
+          test -f "$APK_PATH"
+          bytes="$(stat -c%s "$APK_PATH")"
+          sha="$(sha256sum "$APK_PATH" | cut -d' ' -f1)"
+          echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hanab-Mobile-1.0.0-beta.3-hotfix.1
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK_BYTES: ${{ steps.apk.outputs.bytes }}
+          APK_SHA: ${{ steps.apk.outputs.sha }}
+        shell: bash
+        run: |
+          cat > release-notes.md <<EOF
+          Beta.3 hotfix for Android physical-smoke regressions.
+
+          Fixes:
+          - restores the live-game More menu on Android
+          - fixes the narrow-screen Lobby header layout
+          - restores direct 2-6 Max players buttons in Pregame
+
+          App version remains `1.0.0-beta.3`.
+          Android versionCode: `4`.
+
+          Runtime candidate: `$CANDIDATE_SHA`
+          APK bytes: `$APK_BYTES`
+          APK SHA-256: `$APK_SHA`
+          EOF
+
+          gh release create "$RELEASE_TAG" "$APK_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$CANDIDATE_SHA" \
+            --title "Hanab Mobile 1.0.0-beta.3 hotfix 1" \
+            --notes-file release-notes.md \
+            --prerelease
+
+          gh release edit v1.0.0-beta.3 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Hanab Mobile 1.0.0-beta.3 (superseded by hotfix 1)"
