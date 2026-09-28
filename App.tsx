@@ -124,15 +124,12 @@ function AppContent() {
     previousRoomKind: 'none',
     preserveNextRoomEntry: false,
   });
-  const resumeRoomHint =
-    (session.resumeHints?.playingAtTables.length ?? 0) > 0
-    || (session.resumeHints?.disconSpectatingTable ?? 0) > 0;
   const stableNoOwnedRoom =
     session.phase === 'ready'
     && hydrated
     && roomState.room.kind === 'none'
-    && roomState.rematchTransition === null
-    && !resumeRoomHint;
+    && roomState.pendingRecovery === null
+    && roomState.rematchTransition === null;
   useLayoutEffect(() => {
     const result = reconcilePresentationFocus(presentationFocus, presentationFocusMemory.current, {
       connectionEpoch: session.connectionEpoch,
@@ -297,7 +294,11 @@ function AppContent() {
       setProbe('missing');
       setBrowsing(createBrowsingPresentation('home'));
       setPresentationFocus('browsing');
-      presentationFocusMemory.current.preserveNextRoomEntry = false;
+      presentationFocusMemory.current = {
+        previousConnectionEpoch: session.connectionEpoch,
+        previousRoomKind: 'none',
+        preserveNextRoomEntry: false,
+      };
       setLiveSheet(null);
       setUsername('');
       setPassword('');

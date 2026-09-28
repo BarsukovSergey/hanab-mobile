@@ -76,6 +76,18 @@ describe('presentation focus reconciliation', () => {
     expect(settled.memory.preserveNextRoomEntry).toBe(false);
   });
 
+  test('a recovered room later reaching stable authoritative none returns to browsing', () => {
+    const lost = step('room', memory('live_game'), 'none', { connectionEpoch: 2 });
+    const recovered = step(lost.focus, lost.memory, 'live_game', { connectionEpoch: 2 });
+    const left = step(recovered.focus, recovered.memory, 'none', {
+      connectionEpoch: 2,
+      stableNoOwnedRoom: true,
+    });
+    expect(recovered.focus).toBe('room');
+    expect(left.focus).toBe('browsing');
+    expect(left.memory.preserveNextRoomEntry).toBe(false);
+  });
+
   test('initial startup recovery still focuses room', () => {
     const startup = step('browsing', memory(), 'none', { connectionEpoch: 2 });
     const recovered = step(startup.focus, startup.memory, 'live_game', { connectionEpoch: 2 });

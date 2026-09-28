@@ -61,6 +61,20 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   expect(app).not.toContain('title="Return"');
 });
 
+test('stable no-room waits for authoritative recovery and sign-out clears room ownership memory', () => {
+  const app = read('App.tsx').replace(/\r\n/g, '\n');
+  const guard = app.slice(app.indexOf('  const stableNoOwnedRoom ='), app.indexOf('  useLayoutEffect(', app.indexOf('  const stableNoOwnedRoom =')));
+  expect(guard).toContain("&& roomState.room.kind === 'none'");
+  expect(guard).toContain('&& roomState.pendingRecovery === null');
+  expect(guard).toContain('&& roomState.rematchTransition === null;');
+  expect(guard).not.toContain('resumeHints');
+
+  const signOut = app.slice(app.indexOf('  const signOut = async () => {'), app.indexOf('  if (signOutPending) {'));
+  expect(signOut).toContain("if (result.kind === 'signedOut') {");
+  expect(signOut).toContain("setPresentationFocus('browsing');");
+  expect(signOut).toContain("presentationFocusMemory.current = {\n        previousConnectionEpoch: session.connectionEpoch,\n        previousRoomKind: 'none',\n        preserveNextRoomEntry: false,\n      };");
+});
+
 test('hardware Back consumes bare Live attendance without sending Unattend', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const hardwareBack = app.slice(app.indexOf("BackHandler.addEventListener('hardwareBackPress'"), app.indexOf('return () => subscription.remove();', app.indexOf("BackHandler.addEventListener('hardwareBackPress'")));

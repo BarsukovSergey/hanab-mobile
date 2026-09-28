@@ -22,7 +22,7 @@ describe('App browsing ownership', () => {
     expect(app).toContain('} else if (roomState.rematchTransition !== null) {');
     expect(app).toContain("if (roomState.room.kind === 'pregame') {");
     expect(app).toContain("const pregameReady = session.phase === 'ready' && hydrated;");
-    expect(app).toContain('{pregameReady ? <PregameScreen backRef={pregameBackRef} /> : pregameConnectionStatus}');
+    expect(app).toContain('{pregameReady ? <PregameScreen backRef={pregameBackRef} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}');
     expect(app).not.toContain('content = <PregameScreen />');
   });
 });
