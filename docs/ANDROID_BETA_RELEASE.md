@@ -2,7 +2,7 @@
 
 Planned Android tester candidate: **1.0.0-beta.3**
 
-Build status: **runtime candidate frozen; ordinary CI is running on the exact candidate; APK build and physical-device smoke are still pending.**
+Build status: **runtime candidate frozen; ordinary CI passed on the exact candidate; APK build and physical-device smoke are still pending.**
 
 ## Beta.3 version identity
 
@@ -12,7 +12,7 @@ Build status: **runtime candidate frozen; ordinary CI is running on the exact ca
 - workflow artifact: `Hanab-Mobile-1.0.0-beta.3`
 - expected APK: `Hanab-Mobile-1.0.0-beta.3.apk`
 - runtime candidate: `fd9919bf7b764354c4f4cce75a96a90c1f2e5506`
-- ordinary CI: **run #719 / run ID `36361502403` — in progress**
+- ordinary CI: **success — run #719 / run ID `36361502403`**
 - Android workflow run: **not started**
 - APK size / SHA-256: **not recorded yet**
 
