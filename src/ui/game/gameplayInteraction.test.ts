@@ -134,8 +134,9 @@ describe('gameplayInteractionReducer', () => {
 
   test('authoritative game load drops all prior local interaction state', () => {
     const active = { ...initialGameplayInteractionState, selectedCard: 12, noteCard: 20 };
-    expect(gameplayInteractionReducer(active, { type: 'reset-for-game-load' }))
-      .toEqual(initialGameplayInteractionState);
+    const reset = gameplayInteractionReducer(active, { type: 'reset-for-game-load' });
+    expect(reset).toEqual(initialGameplayInteractionState);
+    expect(reset).not.toBe(initialGameplayInteractionState);
   });
 
   test('sync drops stale card/clue/empathy references without retargeting note order', () => {

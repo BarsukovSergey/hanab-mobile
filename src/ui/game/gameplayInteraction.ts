@@ -54,7 +54,7 @@ export function gameplayInteractionReducer(
 ): GameplayInteractionState {
   switch (action.type) {
     case 'reset-for-game-load':
-      return initialGameplayInteractionState;
+      return { ...initialGameplayInteractionState };
     case 'select-card':
       return {
         ...state,

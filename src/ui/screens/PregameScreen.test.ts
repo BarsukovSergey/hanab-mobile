@@ -29,7 +29,15 @@ describe('focused Pregame surface', () => {
     expect(root).toContain('{tableIdentity}');
     expect(root).toContain('{roster}');
     expect(root).toContain('{setupSummary}');
-    expect(screen).toContain('<ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive={surface === \'root\'} />');
+    expect(root).toContain('<ChatPanel room={`table${room.tableID}`} title="Pre-game chat" readActive />');
+    const nestedSurfaces = screen.slice(
+      screen.indexOf("{surface === 'table-settings'"),
+      screen.indexOf('</ScrollView>', screen.indexOf("{surface === 'table-settings'")),
+    );
+    expect(nestedSurfaces).not.toContain('<ChatPanel');
+    for (const surface of ['table-settings', 'spectators', 'team-tools', 'table-menu']) {
+      expect(screen).toContain(`{surface === '${surface}' &&`);
+    }
     expect(screen).toContain('<ScrollView style={styles.scroll}');
     expect(screen).toContain("{surface === 'root' && <View style={styles.footer}>");
     expect(root).not.toContain('formatPregamePlayerStats');
@@ -58,7 +66,8 @@ describe('focused Pregame surface', () => {
   });
 
   test('attendance exit is confirmed from Table menu and core room commands remain wired', () => {
-    const tableMenu = screen.slice(screen.indexOf("{surface === 'table-menu'"), screen.indexOf('<ChatPanel'));
+    const tableMenuStart = screen.indexOf("{surface === 'table-menu'");
+    const tableMenu = screen.slice(tableMenuStart, screen.indexOf('</ScrollView>', tableMenuStart));
     expect(tableMenu).toContain("room.role === 'player' ? 'Leave table' : 'Stop watching'");
     expect(tableMenu).toContain('Alert.alert(');
     expect(tableMenu).toContain("{ text: 'Cancel', style: 'cancel' }");
