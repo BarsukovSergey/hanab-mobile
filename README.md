@@ -35,7 +35,7 @@ See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug
 
 Prerequisites:
 
-- Node.js compatible with the checked-in Expo/React Native toolchain;
+- Node.js 24 (see `.nvmrc`, matching CI);
 - Android Studio / Android SDK for local Android builds;
 - an Android device or emulator.
 
@@ -71,12 +71,14 @@ npm run android:beta-apk
 
 The APK is written to `dist/Hanab-Mobile-1.0.0-beta.3.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
 
-Validation used in CI:
+Normal local validation:
 
 ```bash
-npm run typecheck
-npm test
+npm run validate
+git diff --check
 ```
+
+`npm run validate` runs the strict TypeScript check and the Jest suite. CI runs the same checks explicitly. There is no lint script.
 
 ## Project documentation
 
