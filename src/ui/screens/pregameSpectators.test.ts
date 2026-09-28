@@ -11,7 +11,7 @@ describe('pregame spectator presentation', () => {
     expect(source).toContain('{spectator.name}');
     expect(source).toContain('Watching {spectator.shadowingPlayerUsername}');
     expect(source).toContain("spectator.shadowingPlayerIndex !== -1");
-    expect(source).toContain('formatPregamePlayerStats(player, room.data.players.length)');
+    expect(source).not.toContain('formatPregamePlayerStats(player, room.data.players.length)');
     expect(source).toContain('<UserContextActions');
     expect(source).toContain('lobbyRuntime.startGame()');
   });
