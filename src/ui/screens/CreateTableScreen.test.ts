@@ -12,8 +12,10 @@ describe('Create Table task', () => {
     expect(app).toContain('setSpecificSeedCreatePrefill(prefill);\n        navigate(\'home\');\n        setCreateTaskOpen(true);');
     expect(app).toContain('<CreateTableScreen onBack={closeCreateTask} backRef={createBackRef}');
     expect(app).toContain('!passwordTaskOpen && !createTaskOpen');
-    expect(app).toContain("if (createTaskOpen && roomState.room.kind === 'none') {");
-    expect(app).toContain('createBackRef.current?.();');
+    const browsingBack = app.slice(app.indexOf("if (presentationFocus === 'browsing')"),
+      app.indexOf('return false;', app.indexOf("if (presentationFocus === 'browsing')")));
+    expect(browsingBack).toContain('if (createTaskOpen) {\n          createBackRef.current?.();');
+    expect(browsingBack).not.toMatch(/lobbyRuntime|unattend|leave/i);
   });
 
   test('keeps an accepted create pending on the task until authoritative room entry', () => {

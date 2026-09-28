@@ -10,6 +10,8 @@ test('fixed app bar owns browsing Back and keeps one complete Return control', (
   const start = app.indexOf('<View style={styles.browsingMain}>');
   expect(start).toBeGreaterThan(0);
   expect(app.indexOf('<BrowsingAppBar', start)).toBeLessThan(app.indexOf('<ScrollView ref={browsingScrollRef}', start));
+  expect(app).toContain('{showBrowsingAppBar && <BrowsingAppBar');
+  expect(app).toContain("presentationFocus === 'browsing'\n    && (probe === 'valid' || returnPresentation !== null)");
   expect(bar).toContain('minHeight: SURFACE_METRICS.primaryTouchTarget');
   expect(bar).toContain('returnPresentation.status');
   expect(bar).toContain('returnPresentation.action');
@@ -21,7 +23,7 @@ test('fixed app bar owns browsing Back and keeps one complete Return control', (
   for (const label of ['Reconnecting', 'YOUR TURN', 'SHARED REVIEW', 'LIVE · T9999', 'Return to hypothetical']) expect(bar).toContain(label);
   expect(app).toContain('onBack={appBarBack}');
   expect(app).toContain('() => settingsBackRef.current?.()');
-  expect(app).toContain('setBrowsing((state) => backBrowsing(state))');
+  expect(app).toContain('? backFromBrowsing : undefined;');
 });
 
 test('browsing hides embedded Back while room Settings keeps its own Back', () => {

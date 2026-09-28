@@ -111,6 +111,7 @@ function AppContent() {
   }, []);
   const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
   const settingsBackRef = useRef<(() => void) | null>(null);
+  const historyBackRef = useRef<(() => void) | null>(null);
   const pregameBackRef = useRef<(() => void) | null>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [exportFeedback, setExportFeedback] = useState<{
@@ -138,8 +139,9 @@ function AppContent() {
     && roomState.pendingRecovery === null
     && roomState.rematchTransition === null;
   const recoveringRoom = roomState.pendingRecovery !== null || (
-    roomState.room.kind === 'none' && session.phase !== 'ready'
-    && (presentationFocusMemory.current.preserveNextRoomEntry
+    session.phase !== 'ready'
+    && (roomState.room.kind !== 'none'
+      || presentationFocusMemory.current.preserveNextRoomEntry
       || (presentationFocusMemory.current.previousRoomKind !== 'none'
         && presentationFocusMemory.current.previousConnectionEpoch !== session.connectionEpoch))
   );
@@ -159,6 +161,14 @@ function AppContent() {
     if (returnPresentation === null) return;
     if (returnPresentation.behavior === 'return-live') exitOwnRewind();
     setPresentationFocus('room');
+  };
+  const backFromBrowsing = () => {
+    if (browsing.destination === 'history' && currentBrowsingSurface(browsing).kind === 'root'
+      && historyBackRef.current !== null) {
+      historyBackRef.current();
+      return;
+    }
+    setBrowsing((state) => backBrowsing(state));
   };
   useLayoutEffect(() => {
     const result = reconcilePresentationFocus(presentationFocus, presentationFocusMemory.current, {
@@ -238,7 +248,7 @@ function AppContent() {
           return true;
         }
         if (getBrowsingBackAction(browsing, authenticated) === 'back') {
-          setBrowsing((state) => backBrowsing(state));
+          backFromBrowsing();
           return true;
         }
         return false;
@@ -684,7 +694,8 @@ function AppContent() {
   } else if (session.phase !== 'ready' || !hydrated) {
     content = <Panel><SectionHeading title="Connecting to lobby…" detail="Synchronizing tables and chat." /></Panel>;
   } else if (browsing.destination === 'history' && !isBrowsingSettings(browsing)) {
-    content = <HistoryScreen roomOccupied={browsingRoomOccupied} showEmbeddedBack={false} onBack={() => navigate('home')}
+    content = <HistoryScreen roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}
+      backRef={historyBackRef} onBack={() => navigate('home')}
       onPlaySeed={(prefill) => {
         setSpecificSeedCreatePrefill(prefill);
         navigate('home');
@@ -739,11 +750,14 @@ function AppContent() {
     ? { home: 'Home', history: 'History', people: 'People', more: 'More' }[browsingSurface.destination]
     : { settings: 'Settings', tools: 'Tools', about: 'About' }[browsingSurface.kind];
   const browsingAuthenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
+  const showBrowsingAppBar =
+    presentationFocus === 'browsing'
+    && (probe === 'valid' || returnPresentation !== null);
   const appBarBack = isBrowsingSettings(browsing)
     ? () => settingsBackRef.current?.()
     : createTaskOpen ? () => createBackRef.current?.()
       : getBrowsingBackAction(browsing, browsingAuthenticated) === 'back'
-        ? () => setBrowsing((state) => backBrowsing(state)) : undefined;
+        ? backFromBrowsing : undefined;
 
   const browsingPresentation = (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -753,8 +767,8 @@ function AppContent() {
       <View style={styles.browsingBody}>
       {railNavigation && <BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />}
       <View style={styles.browsingMain}>
-      <BrowsingAppBar title={browsingTitle} username={session.authenticatedUser?.username ?? null}
-        onBack={appBarBack} returnPresentation={returnPresentation} onReturn={returnToRoom} />
+      {showBrowsingAppBar && <BrowsingAppBar title={browsingTitle} username={session.authenticatedUser?.username ?? null}
+        onBack={appBarBack} returnPresentation={returnPresentation} onReturn={returnToRoom} />}
       <ScrollView ref={browsingScrollRef} style={styles.flex} contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {probe === 'valid' && serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
         {content}

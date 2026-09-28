@@ -6,6 +6,29 @@ const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\
 const homeReset = "setBrowsing(createBrowsingPresentation('home'));";
 
 describe('App browsing ownership', () => {
+  test('retained disconnected room and 7B memory both suppress stale live Return status', () => {
+    const recovery = app.slice(app.indexOf('const recoveringRoom ='), app.indexOf('const returnPresentation ='));
+    expect(recovery).toContain('roomState.pendingRecovery !== null');
+    expect(recovery).toContain("session.phase !== 'ready'");
+    expect(recovery).toContain("roomState.room.kind !== 'none'");
+    expect(recovery).toContain('presentationFocusMemory.current.preserveNextRoomEntry');
+    expect(recovery).toContain('presentationFocusMemory.current.previousConnectionEpoch !== session.connectionEpoch');
+    expect(app).toContain('getRoomReturnPresentation(roomState.room, recoveringRoom)');
+    expect(recovery.indexOf("roomState.room.kind !== 'none'")).toBeGreaterThan(recovery.indexOf("session.phase !== 'ready'"));
+  });
+
+  test('History root Back uses its cleanup ref from app bar and hardware with fallback', () => {
+    const back = app.slice(app.indexOf('const backFromBrowsing ='), app.indexOf('useLayoutEffect(', app.indexOf('const backFromBrowsing =')));
+    expect(back).toContain("browsing.destination === 'history'");
+    expect(back).toContain("currentBrowsingSurface(browsing).kind === 'root'");
+    expect(back).toContain('historyBackRef.current !== null');
+    expect(back).toContain('historyBackRef.current();');
+    expect(back).toContain('setBrowsing((state) => backBrowsing(state));');
+    expect(app).toContain('backRef={historyBackRef} onBack={() => navigate(\'home\')}');
+    const hardware = app.slice(app.indexOf("BackHandler.addEventListener('hardwareBackPress'"), app.indexOf('return () => subscription.remove();'));
+    expect(hardware).toContain('backFromBrowsing();');
+    expect(app).toContain('? backFromBrowsing : undefined;');
+  });
   test('Browse and Return only alter focus except own Rewind exits through local review selection', () => {
     const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const exitOwnRewind ='));
     const returning = app.slice(app.indexOf('const returnToRoom ='), app.indexOf('useLayoutEffect(', app.indexOf('const returnToRoom =')));
