@@ -13,11 +13,12 @@ type Props = {
   room: string;
   title: string;
   readActive?: boolean;
+  sendEnabled?: boolean;
 };
 
 const EMPTY_MESSAGES: readonly never[] = [];
 
-export function ChatPanel({ room, title, readActive = true }: Props) {
+export function ChatPanel({ room, title, readActive = true, sendEnabled = true }: Props) {
   const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
   const historyRef = useRef<ScrollView>(null);
@@ -34,8 +35,10 @@ export function ChatPanel({ room, title, readActive = true }: Props) {
   );
   const pendingUpdate = useAppSelector((state) => state.room.pendingUpdate);
   const trimmed = draft.trim();
+  const canSend = ready && sendEnabled && trimmed.length > 0;
 
   const send = () => {
+    if (!canSend) return;
     dispatch(chatActions.draftSubmissionFinished({
       room,
       succeeded: chatRuntime.submit(draft),
@@ -106,7 +109,7 @@ export function ChatPanel({ room, title, readActive = true }: Props) {
         })}
       </ScrollView>
       <Field
-        editable={ready}
+        editable={ready && sendEnabled}
         maxLength={300}
         multiline
         onChangeText={(value) => dispatch(chatActions.draftChanged({
@@ -122,7 +125,7 @@ export function ChatPanel({ room, title, readActive = true }: Props) {
       />
       <View style={styles.footer}>
         <Text style={[styles.counter, { color: theme.colors.textMuted }]}>{draft.length}/300</Text>
-        <ActionButton compact disabled={!ready || trimmed.length === 0} title="Send" tone="primary" onPress={send} />
+        <ActionButton compact disabled={!canSend} title="Send" tone="primary" onPress={send} />
       </View>
     </Panel>
   );

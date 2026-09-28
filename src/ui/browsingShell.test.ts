@@ -61,6 +61,16 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   expect(app).not.toContain('title="Return"');
 });
 
+test('App passes only owned-room and recovery occupancy to Home and History before Browse exists', () => {
+  const app = read('App.tsx').replace(/\r\n/g, '\n');
+  const predicate = app.slice(app.indexOf('  const browsingRoomOccupied ='), app.indexOf(';', app.indexOf('  const browsingRoomOccupied =')) + 1);
+  expect(predicate).toBe("  const browsingRoomOccupied =\n    roomState.room.kind !== 'none'\n    || roomState.pendingRecovery !== null\n    || roomState.rematchTransition !== null;");
+  expect(app).toContain('<HistoryScreen roomOccupied={browsingRoomOccupied}');
+  expect(app).toContain('<LobbyScreen\n      roomOccupied={browsingRoomOccupied}');
+  expect(app).not.toContain('title="Browse"');
+  expect(app).not.toContain('title="Return"');
+});
+
 test('stable no-room waits for authoritative recovery and sign-out clears room ownership memory', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const guard = app.slice(app.indexOf('  const stableNoOwnedRoom ='), app.indexOf('  useLayoutEffect(', app.indexOf('  const stableNoOwnedRoom =')));

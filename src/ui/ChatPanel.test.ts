@@ -29,4 +29,14 @@ describe('table chat read contract', () => {
     expect(effect).toMatch(/\^table\[1-9\]/);
     expect(effect).not.toMatch(/render/);
   });
+
+  test('requires session readiness, send permission, and a nonempty draft before submission', () => {
+    const source = readFileSync(join(__dirname, 'ChatPanel.tsx'), 'utf8');
+    expect(source).toContain('sendEnabled?: boolean;');
+    expect(source).toContain('sendEnabled = true');
+    expect(source).toContain('const canSend = ready && sendEnabled && trimmed.length > 0;');
+    expect(source).toMatch(/const send = \(\) => \{\s*if \(!canSend\) return;\s*dispatch\(chatActions\.draftSubmissionFinished\(\{\s*room,\s*succeeded: chatRuntime\.submit\(draft\)/);
+    expect(source).toContain('editable={ready && sendEnabled}');
+    expect(source).toContain('disabled={!canSend} title="Send"');
+  });
 });
