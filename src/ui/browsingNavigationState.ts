@@ -2,7 +2,8 @@ export type BrowsingDestination = 'home' | 'history' | 'people' | 'more';
 
 export type BrowsingSurface =
   | { kind: 'root'; destination: BrowsingDestination }
-  | { kind: 'settings'; origin: BrowsingDestination };
+  | { kind: 'settings'; origin: BrowsingDestination }
+  | { kind: 'tools' | 'about'; origin: 'more' };
 
 export type BrowsingPresentationState = {
   destination: BrowsingDestination;
@@ -26,6 +27,16 @@ export function openBrowsingSettings(state: BrowsingPresentationState): Browsing
     ...state,
     stack: [...state.stack, { kind: 'settings', origin: state.destination }],
   };
+}
+
+export function openMoreSurface(state: BrowsingPresentationState, kind: 'tools' | 'about'): BrowsingPresentationState {
+  if (state.destination !== 'more') return state;
+  if (state.stack[state.stack.length - 1]?.kind === kind) return state;
+  return { ...state, stack: [{ kind: 'root', destination: 'more' }, { kind, origin: 'more' }] };
+}
+
+export function currentBrowsingSurface(state: BrowsingPresentationState): BrowsingSurface {
+  return state.stack[state.stack.length - 1] ?? { kind: 'root', destination: state.destination };
 }
 
 export function backBrowsing(state: BrowsingPresentationState): BrowsingPresentationState {

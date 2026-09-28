@@ -22,9 +22,10 @@ test('keeps Settings in More and removes Sign out', () => {
   expect(menuBranch).not.toContain('<ActionButton title="Sign out"');
 });
 
-test('dismisses on backdrop taps and stops dismissal inside the sheet', () => {
-  expect(liveSheet).toContain('onRequestClose={() => setLiveSheet(null)}');
-  expect(liveSheet).toContain('<Pressable onPress={() => setLiveSheet(null)} style={styles.sheetBackdrop}>');
+test('uses local Settings Back on modal dismissal and stops dismissal inside the sheet', () => {
+  expect(liveSheet).toContain("if (liveSheet === 'settings') settingsBackRef.current?.();");
+  expect(liveSheet).toContain('else setLiveSheet(null);');
+  expect(liveSheet).toContain('style={styles.sheetBackdrop}>');
   expect(liveSheet).toContain('<Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet,');
 });
 

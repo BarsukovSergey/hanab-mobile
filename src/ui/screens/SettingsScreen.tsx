@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Linking, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { HANAB_PASSWORD_RESET_URL } from '../../config/hanab';
@@ -10,8 +10,14 @@ import { GameplayScenarioGallery } from '../game/scenarios/GameplayScenarioGalle
 
 type AccountNotice = { tone: 'error' | 'success'; message: string };
 
-export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSignOut: () => void }) {
+type SettingsCategory = 'account' | 'appearance' | 'cards' | 'gameplay';
+
+export function SettingsScreen({ onBack, onSignOut, onPasswordTaskChange, backRef }: {
+  onBack: () => void; onSignOut: () => void; onPasswordTaskChange?: (open: boolean) => void;
+  backRef?: { current: (() => void) | null };
+}) {
   const [scenarioGalleryOpen, setScenarioGalleryOpen] = useState(false);
+  const [category, setCategory] = useState<SettingsCategory | null>(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -30,6 +36,25 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
     setNewPassword('');
     setConfirmNewPassword('');
   };
+
+  const handleBack = () => {
+    if (scenarioGalleryOpen) {
+      setScenarioGalleryOpen(false);
+    } else if (changePasswordOpen) {
+      clearPasswordFields();
+      setAccountNotice(null);
+      setChangePasswordOpen(false);
+      onPasswordTaskChange?.(false);
+    } else if (category !== null) {
+      setCategory(null);
+    } else {
+      onBack();
+    }
+  };
+
+  if (backRef) backRef.current = handleBack;
+
+  useEffect(() => () => onPasswordTaskChange?.(false), [onPasswordTaskChange]);
 
   const submitPasswordChange = async () => {
     if (authenticatedUsername === null) {
@@ -52,6 +77,7 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
       }
       clearPasswordFields();
       setChangePasswordOpen(false);
+      onPasswordTaskChange?.(false);
       setAccountNotice({ tone: 'success', message: 'Password changed.' });
     } catch (error) {
       clearPasswordFields();
@@ -84,7 +110,7 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
   };
 
   if (__DEV__ && scenarioGalleryOpen) {
-    return <GameplayScenarioGallery onBack={() => setScenarioGalleryOpen(false)} />;
+    return <GameplayScenarioGallery onBack={handleBack} />;
   }
 
   const passwordMismatch = confirmNewPassword.length > 0 && newPassword !== confirmNewPassword;
@@ -96,16 +122,23 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
 
   return <View style={styles.screen}>
     <View style={styles.header}>
-      <ActionButton compact title="Back" onPress={onBack} />
-      <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Settings</Text>
+      <ActionButton compact title="Back" onPress={handleBack} />
+      <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{changePasswordOpen ? 'Change password' : category === null ? 'Settings' : category === 'account' ? 'Account & security' : category === 'appearance' ? 'Appearance' : category === 'cards' ? 'Cards' : 'Gameplay presentation'}</Text>
     </View>
+    {category === null && <Panel>
+      <ActionButton title="Account & security" onPress={() => setCategory('account')} />
+      <ActionButton title="Appearance" onPress={() => setCategory('appearance')} />
+      <ActionButton title="Cards" onPress={() => setCategory('cards')} />
+      <ActionButton title="Gameplay presentation" onPress={() => setCategory('gameplay')} />
+    </Panel>}
+    {category === 'account' && <>
     <Panel>
       <SectionHeading
-        title="Account"
+        title="Account & security"
         detail={authenticatedUsername === null ? 'Account security.' : `Signed in as ${authenticatedUsername}. Hanab Mobile does not store your account password. Saved passwords are handled by your system password manager.`}
       />
       {accountNotice !== null && <Notice tone={accountNotice.tone}>{accountNotice.message}</Notice>}
-      {authenticatedUsername !== null && <ActionButton title="Sign out" tone="danger" onPress={confirmSignOut} />}
+      {!changePasswordOpen && authenticatedUsername !== null && <ActionButton title="Sign out" tone="danger" onPress={confirmSignOut} />}
       {changePasswordOpen ? <>
         <Notice>Use a new, unique password for hanab.live. Do not reuse one of your existing or previous passwords.</Notice>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setCurrentPassword} placeholder="Current password" secureTextEntry value={currentPassword} />
@@ -117,22 +150,25 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
           clearPasswordFields();
           setAccountNotice(null);
           setChangePasswordOpen(false);
+          onPasswordTaskChange?.(false);
         }} />
       </> : <>
         <ActionButton title="Change password" onPress={() => {
           setAccountNotice(null);
           setChangePasswordOpen(true);
+          onPasswordTaskChange?.(true);
         }} />
         <ActionButton title="Forgot password?" tone="ghost" onPress={() => void openPasswordReset()} />
       </>}
     </Panel>
-    <Panel>
+    </>}
+    {category === 'appearance' && <Panel>
       <SectionHeading title="Appearance" detail="Choose how Hanab follows the device theme." />
       <ThemeSwitcher />
-    </Panel>
-    <Panel>
+    </Panel>}
+    {category === 'cards' && <Panel>
       <SectionHeading
-        title="Card appearance"
+        title="Cards"
         detail="Colorblind mode takes presentation precedence when both options are enabled."
       />
       <View style={styles.settingRow}>
@@ -168,8 +204,8 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
           value={presentation.reverseHands}
         />
       </View>
-    </Panel>
-    <Panel>
+    </Panel>}
+    {category === 'gameplay' && <Panel>
       <SectionHeading title="Gameplay presentation" />
       <View style={styles.settingRow}>
         <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Show turn timers in untimed games</Text>
@@ -204,8 +240,8 @@ export function SettingsScreen({ onBack, onSignOut }: { onBack: () => void; onSi
           value={realLifeMode}
         />
       </View>
-    </Panel>
-    {__DEV__ && <Panel>
+    </Panel>}
+    {__DEV__ && category === null && <Panel>
       <SectionHeading title="Developer" detail="Render canonical gameplay states without joining a live table." />
       <ActionButton title="Gameplay scenarios" onPress={() => setScenarioGalleryOpen(true)} />
     </Panel>}
