@@ -21,6 +21,7 @@ export function navigateBrowsing(
 }
 
 export function openBrowsingSettings(state: BrowsingPresentationState): BrowsingPresentationState {
+  if (isBrowsingSettings(state)) return state;
   return {
     ...state,
     stack: [...state.stack, { kind: 'settings', origin: state.destination }],
@@ -28,7 +29,9 @@ export function openBrowsingSettings(state: BrowsingPresentationState): Browsing
 }
 
 export function backBrowsing(state: BrowsingPresentationState): BrowsingPresentationState {
-  if (state.stack.length <= 1) return state;
+  if (state.stack.length <= 1) {
+    return state.destination === 'home' ? state : createBrowsingPresentation('home');
+  }
   const stack = state.stack.slice(0, -1);
   const root = stack[0];
   return { destination: root?.kind === 'root' ? root.destination : state.destination, stack };

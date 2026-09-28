@@ -211,6 +211,7 @@ function AppContent() {
           await savePasswordCredential(loginUsername, loginPassword);
         }
         setProbe('valid');
+        setBrowsing(createBrowsingPresentation('home'));
         void lobbyRuntime.connect();
       } else {
         setProbe(result.kind === 'missing' ? 'missing' : 'indeterminate');
@@ -250,6 +251,7 @@ function AppContent() {
     const result = await lobbyRuntime.signOut();
     if (result.kind === 'signedOut') {
       setProbe('missing');
+      setBrowsing(createBrowsingPresentation('home'));
       setLiveSheet(null);
       setUsername('');
       setPassword('');

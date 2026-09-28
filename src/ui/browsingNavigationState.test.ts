@@ -22,18 +22,24 @@ describe('browsing presentation state', () => {
     expect(backBrowsing(state)).toEqual(createBrowsingPresentation('more'));
   });
 
+  test('opening Settings again does not append another entry', () => {
+    const settings = openBrowsingSettings(createBrowsingPresentation('people'));
+    expect(openBrowsingSettings(settings)).toBe(settings);
+    expect(settings.stack).toHaveLength(2);
+  });
+
+  test.each(['history', 'people', 'more'] as const)('root %s goes back to Home', (destination) => {
+    expect(backBrowsing(createBrowsingPresentation(destination))).toEqual(createBrowsingPresentation('home'));
+  });
+
+  test('root Home leaves system Back available', () => {
+    const home = createBrowsingPresentation('home');
+    expect(backBrowsing(home)).toBe(home);
+  });
+
   test('changing browsing root is a presentation-only transition', () => {
     const people = navigateBrowsing(createBrowsingPresentation('home'), 'people');
     expect(people).toEqual(createBrowsingPresentation('people'));
   });
 
-  test('room foreground ownership does not mutate browsing presentation state', () => {
-    const browsing = openBrowsingSettings(createBrowsingPresentation('people'));
-    const roomForeground = { kind: 'live_game', tableID: 12 };
-    expect(roomForeground.kind).toBe('live_game');
-    expect(browsing).toEqual({
-      destination: 'people',
-      stack: [{ kind: 'root', destination: 'people' }, { kind: 'settings', origin: 'people' }],
-    });
-  });
 });
