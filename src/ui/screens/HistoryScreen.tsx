@@ -28,6 +28,7 @@ const END_CONDITIONS = [
 ] as const;
 
 export function HistoryScreen({
+  roomOccupied,
   onBack,
   onWatchReplay,
   onWatchJSONReplay,
@@ -35,6 +36,7 @@ export function HistoryScreen({
   onPlaySeed,
   clipboardActions = replayInputActions,
 }: {
+  roomOccupied: boolean;
   onBack: () => void;
   onWatchReplay: (databaseID: number, visibility: 'solo' | 'shared') => void;
   onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
@@ -102,6 +104,7 @@ export function HistoryScreen({
           onBack();
         }} />
       </Panel>
+      {roomOccupied && <Notice>You're already in a room. History stays available for browsing, but return to the current room before opening another replay or starting this seed.</Notice>}
 
       {comparing && (
         <Panel style={styles.gameCard}>
@@ -151,8 +154,9 @@ export function HistoryScreen({
             onPress={() => setReplayVisibility('solo')} />
           <ActionButton compact title="Shared" tone={replayVisibility === 'shared' ? 'primary' : 'secondary'}
             onPress={() => setReplayVisibility('shared')} />
-          <ActionButton compact title="Open replay" disabled={replayPending || replayJSONText.trim() === ''}
+          <ActionButton compact title="Open replay" disabled={roomOccupied || replayPending || replayJSONText.trim() === ''}
             onPress={() => {
+              if (roomOccupied) return;
               const parsed = parseReplayInput(replayJSONText, replayVisibility);
               if (parsed.kind === 'invalid') { setReplayJSONError(parsed.reason); return; }
               setReplayJSONError(null);
@@ -225,7 +229,8 @@ export function HistoryScreen({
                     });
                   });
                 }} />}
-                {supported && seedSuffix !== null && <ActionButton compact title="Play this seed" tone="secondary" onPress={() => {
+                {supported && seedSuffix !== null && <ActionButton compact title="Play this seed" tone="secondary" disabled={roomOccupied} onPress={() => {
+                  if (roomOccupied) return;
                   onPlaySeed({
                     seedSuffix,
                     maxPlayers: item.options.numPlayers,
@@ -250,17 +255,17 @@ export function HistoryScreen({
               {item.tags !== '' && <Text style={[styles.tags, { color: theme.colors.textMuted }]}>{item.tags}</Text>}
               {!supported && <Notice tone="error">This game uses unsupported options.</Notice>}
               <ActionButton
-                disabled={!supported || replayPending}
+                disabled={roomOccupied || !supported || replayPending}
                 title={replayPending ? 'Opening replay…' : 'Watch replay'}
                 tone={supported ? 'primary' : 'secondary'}
-                onPress={() => onWatchReplay(item.id, 'solo')}
+                onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'solo'); }}
               />
               <ActionButton
                 compact
-                disabled={!supported || replayPending}
+                disabled={roomOccupied || !supported || replayPending}
                 title="Share replay"
                 tone="secondary"
-                onPress={() => onWatchReplay(item.id, 'shared')}
+                onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'shared'); }}
               />
               {!comparing && !showingTagged && <ActionButton
                 compact

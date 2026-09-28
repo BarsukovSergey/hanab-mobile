@@ -93,10 +93,10 @@ describe('History screen source contract', () => {
     expect(screen).toContain('history.friendHasMore');
     expect(screen).toContain('lobbyRuntime.loadMoreFriendsHistory() : lobbyRuntime.loadMoreHistory()');
     expect(screen).toContain('None of your friends have played any games yet.');
-    expect(screen).toContain("onPress={() => onWatchReplay(item.id, 'solo')}");
-    expect(screen).toContain("onPress={() => onWatchReplay(item.id, 'shared')}");
+    expect(screen).toContain("onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'solo'); }}");
+    expect(screen).toContain("onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'shared'); }}");
     expect(screen).toContain('title="Share replay"');
-    expect(screen).toContain('disabled={!supported || replayPending}');
+    expect(screen).toContain('disabled={roomOccupied || !supported || replayPending}');
     expect(screen).toContain('(comparing ? history.otherScores?.games ?? [] : items).map((item) => {');
   });
 
@@ -137,5 +137,24 @@ describe('History screen source contract', () => {
     expect(resetEffect).not.toContain('ensureFriendsHistory');
     expect(screen).toContain("setSelection({ epoch: session.connectionEpoch, mode: 'friends' });");
     expect(screen).toContain('lobbyRuntime.ensureFriendsHistory();');
+  });
+
+  test('blocks replay and seed actions while leaving history browsing available', () => {
+    expect(screen).toContain('roomOccupied: boolean;');
+    expect(screen).toContain("You're already in a room. History stays available for browsing, but return to the current room before opening another replay or starting this seed.");
+    expect(screen).toMatch(/title="Open replay" disabled=\{roomOccupied \|\| replayPending \|\| replayJSONText\.trim\(\) === ''\}[\s\S]*?onPress=\{\(\) => \{\s*if \(roomOccupied\) return;\s*const parsed/);
+    expect(screen).toMatch(/title="Play this seed"[^>]*disabled=\{roomOccupied\} onPress=\{\(\) => \{\s*if \(roomOccupied\) return;\s*onPlaySeed/);
+    expect(screen.match(/disabled=\{roomOccupied \|\| !supported \|\| replayPending\}/g)).toHaveLength(2);
+    expect(screen).toContain("if (roomOccupied) return; onWatchReplay(item.id, 'solo');");
+    expect(screen).toContain("if (roomOccupied) return; onWatchReplay(item.id, 'shared');");
+    for (const action of ['My history', 'Friends history', 'Tagged games', 'Search', 'Clear search', 'Copy seed', 'Other scores', 'Load more']) {
+      expect(screen).toContain(action);
+    }
+    expect(screen).toContain('title="Clear search" tone="secondary" disabled={!history.tagSearchActive}');
+    expect(screen).toContain('title="Copy seed" tone="secondary" onPress={() => {');
+    expect(screen).toContain('disabled={otherCount === 0 || history.pendingOtherScores !== null}');
+    expect(screen).toContain('disabled={pendingRequest !== null}');
+    expect(screen).toContain('lobbyRuntime.searchTag(tagInput)');
+    expect(screen).toContain('lobbyRuntime.loadOtherScores(item.id, showingFriends)');
   });
 });

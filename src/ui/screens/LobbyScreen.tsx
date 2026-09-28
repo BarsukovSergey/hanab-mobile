@@ -22,10 +22,12 @@ import { clipboardActions, type ClipboardActions } from '../../platform/replayIn
 
 export function LobbyScreen({
   onCreate,
+  roomOccupied,
   openGameLinkRequest = 0,
   clipboard = clipboardActions,
 }: {
   onCreate: () => void;
+  roomOccupied: boolean;
   openGameLinkRequest?: number;
   clipboard?: ClipboardActions;
 }) {
@@ -58,6 +60,7 @@ export function LobbyScreen({
     || roomState.pendingRecovery !== null
     || roomState.pendingJoin !== null
     || roomState.pendingCreate !== null;
+  const attendanceBlocked = roomOccupied || attendancePending;
 
   return (
     <View style={styles.root}>
@@ -70,11 +73,12 @@ export function LobbyScreen({
           </Text>
         </View>
         <View style={[styles.heroActions, !wide && styles.heroActionsNarrow]}>
-          <ActionButton compact title="Create" disabled={!showCreateTable} onPress={onCreate} />
+          <ActionButton compact title="Create" disabled={roomOccupied || !showCreateTable} onPress={onCreate} />
           <ActionButton compact title="Open game link" onPress={() => { setShowLiveGameLink(true); setLiveGameLinkError(null); }} />
         </View>
       </Panel>
       {!showCreateTable && <Text style={{ color: theme.colors.textMuted }}>Create is unavailable while you have a running game to rejoin.</Text>}
+      {roomOccupied && <Text style={{ color: theme.colors.textMuted }}>You're already in a room. You can browse Home, but return to the current room before creating, joining, spectating, or opening another game or review.</Text>}
 
       {showLiveGameLink && <Panel style={styles.linkPanel}>
         <SectionHeading title="Open game link" detail="Open a game or join a pregame table available in the Lobby." />
@@ -98,7 +102,8 @@ export function LobbyScreen({
               else { setLiveGameLink(text); setLiveGameLinkError(null); setLiveGameLinkPassword(''); }
             }).catch(() => setLiveGameLinkError('Could not read the clipboard.'));
           }} />
-          <ActionButton compact title="Open game" tone="primary" onPress={() => {
+          <ActionButton compact title="Open game" tone="primary" disabled={roomOccupied} onPress={() => {
+            if (roomOccupied) return;
             const parsed = parseLiveGameInput(liveGameLink);
             if (parsed.kind === 'invalid') { setLiveGameLinkError(parsed.reason); return; }
             if (parsed.kind === 'liveGame' && !lobbyRuntime.openLiveGameByID(parsed.tableID)) {
@@ -136,7 +141,7 @@ export function LobbyScreen({
           action={(table) => (
             <ActionButton
               compact
-              disabled={attendancePending}
+              disabled={attendanceBlocked}
               title="Rejoin game"
               tone="primary"
               onPress={() => lobbyRuntime.reattend(table.id)}
@@ -182,7 +187,7 @@ export function LobbyScreen({
                 )}
                 <View style={styles.actionsRow}>
                   {table.numPlayers < table.maxPlayers && (
-                    <ActionButton compact disabled={attendancePending} title="Join" tone="primary" onPress={() => {
+                    <ActionButton compact disabled={attendanceBlocked} title="Join" tone="primary" onPress={() => {
                       const secret = joinPasswordTableID === table.id ? joinPassword : undefined;
                       if (lobbyRuntime.join(table.id, secret)) {
                         setJoinPassword('');
@@ -192,7 +197,7 @@ export function LobbyScreen({
                   )}
                   <ActionButton
                     compact
-                    disabled={attendancePending}
+                    disabled={attendanceBlocked}
                     title="Spectate pregame"
                     onPress={() => lobbyRuntime.spectate(table.id)}
                   />
@@ -211,7 +216,7 @@ export function LobbyScreen({
             tables={runningTables}
             friends={friends}
             action={(table) => (
-              <ActionButton compact disabled={attendancePending} title="Spectate" onPress={() => lobbyRuntime.spectate(table.id)} />
+              <ActionButton compact disabled={attendanceBlocked} title="Spectate" onPress={() => lobbyRuntime.spectate(table.id)} />
             )}
           />
           <TableSection
@@ -220,12 +225,13 @@ export function LobbyScreen({
             tables={sharedReplays}
             friends={friends}
             action={(table) => (
-              <ActionButton compact disabled={attendancePending} title="Open review" onPress={() => lobbyRuntime.spectate(table.id)} />
+              <ActionButton compact disabled={attendanceBlocked} title="Open review" onPress={() => lobbyRuntime.spectate(table.id)} />
             )}
           />
         </View>
       </View>
-      <ChatPanel room="lobby" title="Lobby chat" />
+      {roomOccupied && <Text style={{ color: theme.colors.textMuted }}>Lobby chat is read-only while you are in a room. Use Table Chat from the current room to send messages.</Text>}
+      <ChatPanel room="lobby" title="Lobby chat" sendEnabled={!roomOccupied} />
     </View>
   );
 }

@@ -8,7 +8,7 @@ const screen = readFileSync(resolve(__dirname, 'LobbyScreen.tsx'), 'utf8').repla
 
 describe('Home catalog', () => {
   test('shows Create and Open game link with an explanation when creation is unavailable', () => {
-    expect(screen).toContain('title="Create" disabled={!showCreateTable} onPress={onCreate}');
+    expect(screen).toContain('title="Create" disabled={roomOccupied || !showCreateTable} onPress={onCreate}');
     expect(screen).toContain('title="Open game link"');
     expect(screen).toContain('Create is unavailable while you have a running game to rejoin.');
     expect(screen).not.toContain('title="People"');
@@ -86,5 +86,22 @@ describe('Home catalog', () => {
     expect(screen).toContain('Clipboard is empty.');
     expect(screen).toContain('Could not read the clipboard.');
     expect(screen).toContain('clipboard.readClipboard()');
+  });
+
+  test('blocks room-changing actions while occupied without closing Home browsing tasks', () => {
+    expect(screen).toContain('roomOccupied: boolean;');
+    expect(screen).toContain('const attendanceBlocked = roomOccupied || attendancePending;');
+    for (const title of ['Rejoin game', 'Join', 'Spectate pregame', 'Spectate', 'Open review']) {
+      expect(screen).toMatch(new RegExp(`disabled=\\{attendanceBlocked\\}\\s+title="${title}"`));
+    }
+    expect(screen).toContain('title="Open game link" onPress={() => { setShowLiveGameLink(true);');
+    expect(screen).toContain('{showLiveGameLink && <Panel style={styles.linkPanel}>');
+    expect(screen).toContain('title="Paste from clipboard"');
+    expect(screen).toContain('title="Cancel"');
+    expect(screen).toMatch(/title="Open game"[^>]*disabled=\{roomOccupied\} onPress=\{\(\) => \{\s*if \(roomOccupied\) return;\s*const parsed/);
+    expect(screen).toContain("You're already in a room. You can browse Home, but return to the current room before creating, joining, spectating, or opening another game or review.");
+    expect(screen).toContain('<ChatPanel room="lobby" title="Lobby chat" sendEnabled={!roomOccupied} />');
+    expect(screen).toContain('Lobby chat is read-only while you are in a room. Use Table Chat from the current room to send messages.');
+    expect(screen).not.toMatch(/lobbyRuntime\.(leave|unattend)/);
   });
 });

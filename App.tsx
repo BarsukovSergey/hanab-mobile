@@ -118,6 +118,10 @@ function AppContent() {
   const hydrated = useAppSelector(selectLobbyHydrated);
   const lobbyNotice = useAppSelector((state) => state.lobby.notice);
   const roomState = useAppSelector((state) => state.room);
+  const browsingRoomOccupied =
+    roomState.room.kind !== 'none'
+    || roomState.pendingRecovery !== null
+    || roomState.rematchTransition !== null;
   const [presentationFocus, setPresentationFocus] = useState<'room' | 'browsing'>('browsing');
   const presentationFocusMemory = useRef<PresentationFocusMemory>({
     previousConnectionEpoch: session.connectionEpoch,
@@ -643,7 +647,7 @@ function AppContent() {
   } else if (roomState.rematchTransition !== null) {
     content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
   } else if (browsing.destination === 'history' && !isBrowsingSettings(browsing)) {
-    content = <HistoryScreen onBack={() => navigate('home')}
+    content = <HistoryScreen roomOccupied={browsingRoomOccupied} onBack={() => navigate('home')}
       onPlaySeed={(prefill) => {
         setSpecificSeedCreatePrefill(prefill);
         navigate('home');
@@ -681,6 +685,7 @@ function AppContent() {
       onHistoryTools={() => navigate('history')} />;
   } else {
     content = <LobbyScreen
+      roomOccupied={browsingRoomOccupied}
       openGameLinkRequest={gameLinkRequest}
       onCreate={() => setCreateTaskOpen(true)}
     />;
