@@ -71,9 +71,15 @@ describe('C17 workspace route', () => {
 });
 
 
-test('eligible portrait Live uses a fixed View root even below 700dp', () => {
+test('Live keeps a stable ScrollView root across rotation with eligible portrait scrolling disabled', () => {
   expect(appSource).toContain('const gameRootScrollable = !c17Workspace || width > height;');
-  expect(appSource).toContain('const GameRoot = gameRootScrollable ? ScrollView : View;');
+  const liveRoot = appSource.match(/<SafeAreaView edges=\{\['bottom'\]\}[^>]*>\s*(<ScrollView[\s\S]*?<\/ScrollView>)\s*<\/SafeAreaView>/)?.[1] ?? '';
+  expect(liveRoot).toContain('scrollEnabled={gameRootScrollable}');
+  expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible} />');
+  expect(liveRoot).not.toMatch(/\bkey=/);
+  expect(appSource).not.toContain('const GameRoot');
+  expect(appSource).not.toContain('<GameRoot');
+  expect(appSource).not.toMatch(/gameRootScrollable\s*\?\s*(?:ScrollView|View)/);
   expect(appSource).not.toContain('|| height < 700');
   expect(c17ScreenSource).toContain('const compact = !portraitV2');
   expect(c17ScreenSource).toContain("ownHandPosition === 'top' ? { flexDirection: 'column-reverse'");

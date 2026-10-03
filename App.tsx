@@ -424,7 +424,6 @@ function AppContent() {
       sharedReplay: roomState.room.sharedReplay,
     });
     const gameRootScrollable = !c17Workspace || width > height;
-    const GameRoot = gameRootScrollable ? ScrollView : View;
     focusedRoomPresentation = (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -464,8 +463,7 @@ function AppContent() {
           </View>
         )}
         <SafeAreaView edges={['bottom']} style={styles.flex}>
-        <GameRoot
-          style={!gameRootScrollable ? [styles.gameContainer, styles.gameContainerC17, { maxWidth: contentMaxWidth }] : undefined}
+        <ScrollView
           contentContainerStyle={[
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
@@ -480,7 +478,7 @@ function AppContent() {
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
             <GameScreen presentationVisible={roomPresentationVisible} />
           </View>
-        </GameRoot>
+        </ScrollView>
         </SafeAreaView>
         <Modal animationType="fade" onRequestClose={() => {
           if (liveSheet === 'settings') settingsBackRef.current?.();
