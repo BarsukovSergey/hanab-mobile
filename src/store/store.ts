@@ -6,6 +6,7 @@ import { roomSlice } from './roomSlice';
 import { sessionSlice } from './sessionSlice';
 import { terminationSlice } from './terminationSlice';
 import { historySlice } from './historySlice';
+import { presentationPreferencesSlice } from './presentationPreferencesSlice';
 
 export function createAppStore() {
   return configureStore({
@@ -16,6 +17,7 @@ export function createAppStore() {
       chat: chatSlice.reducer,
       termination: terminationSlice.reducer,
       history: historySlice.reducer,
+      presentationPreferences: presentationPreferencesSlice.reducer,
     },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware({
       serializableCheck: {

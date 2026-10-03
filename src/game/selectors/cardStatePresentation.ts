@@ -77,7 +77,7 @@ export function getCardStatePresentation({
   };
 }
 
-function getDisplayedCardStatus(
+export function getDisplayedCardStatus(
   game: GameState,
   displaySuitIndex: number | null,
   displayRank: number | null,
@@ -85,4 +85,9 @@ function getDisplayedCardStatus(
   if (displaySuitIndex === null || displayRank === null) return CardStatus.NeedsToBePlayed;
   const suitStatuses = game.cardStatus[displaySuitIndex as SuitIndex];
   return suitStatuses?.[displayRank as Rank] ?? CardStatus.NeedsToBePlayed;
+}
+
+/** Engine truth for table/discard surfaces, independent of hand fade exclusions. */
+export function isEngineTrash(game: GameState, suitIndex: number | null, rank: number | null): boolean {
+  return getDisplayedCardStatus(game, suitIndex, rank) === CardStatus.Trash;
 }

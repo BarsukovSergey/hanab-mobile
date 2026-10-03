@@ -69,3 +69,20 @@ describe('C17 workspace route', () => {
     expect(isC17WorkspaceEligible(input)).toBe(false);
   });
 });
+
+
+test('eligible portrait Live uses a fixed View root even below 700dp', () => {
+  expect(appSource).toContain('const gameRootScrollable = !c17Workspace || width > height;');
+  expect(appSource).toContain('const GameRoot = gameRootScrollable ? ScrollView : View;');
+  expect(appSource).not.toContain('|| height < 700');
+  expect(c17ScreenSource).toContain('const compact = !portraitV2');
+  expect(c17ScreenSource).toContain("ownHandPosition === 'top' ? { flexDirection: 'column-reverse'");
+  expect(c17ScreenSource).toContain('const OpponentViewport = portraitV2 && layout.opponentsScrollable ? ScrollView : View;');
+});
+
+
+test('Bottom places own hand immediately above the pinned Workbench in roomy shells', () => {
+  expect(c17ScreenSource).toContain("height: portraitV2 && ownHandPosition === 'bottom' ? handsRegionHeight : layout.handsHeight");
+  expect(c17ScreenSource).toContain("ownHandPosition === 'bottom' ? { justifyContent: 'space-between'");
+  expect(c17ScreenSource).toContain("portraitV2 && ownHandPosition === 'top' && <View style={{ flex: 1 }}");
+});

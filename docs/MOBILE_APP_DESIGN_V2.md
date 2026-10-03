@@ -561,69 +561,53 @@ Landscape делит roster и setup summary, а не растягивает п�
 
 ---
 
-## 8. Live portrait specification
+## 8. Live portrait specification — Slice 8a
 
-### Постоянные области
+Portrait means `viewportWidth <= viewportHeight`. Slice 8a replaces the earlier Live portrait specifics. Landscape keeps its existing implementation until Slice 8b; the landscape design below is not implemented by this slice.
 
 ```text
-┌────────────────────────────────────────┐
-│ SYSTEM STATUS                          │
-├────────────────────────────────────────┤
-│ F [Browse] Game #123 [Chat 2] [Menu]    │
-│ F LIVE T41 · YOUR TURN                  │
-├────────────────────────────────────────┤
-│ F Score/Max · Clues · Strikes · Deck    │
-│ F Pace · Eff                           │
-│ F Fireworks       Discards summary     │
-│ F Last action…              [Recent]   │
-├────────────────────────────────────────┤
-│                                        │
-│ F Alice       [ ][ ][ ][ ]             │
-│ F Bob         [ ][ ][ ][ ]             │
-│ F …remaining opponents…                │
-│                                        │
-│ F YOU         [?][?][?][?]              │
-├────────────────────────────────────────┤
-│ F WORKBENCH — reserved rectangle       │
-│   Current tool / explicit target       │
-│   [Play] [Discard] / clue controls     │
-│   S only secondary detail overflow     │
-├────────────────────────────────────────┤
-│ SYSTEM NAVIGATION — NO GLOBAL TABS      │
-└────────────────────────────────────────┘
+[Home] <current variant> [Chat] [Menu]
+Turn → Pace → meaningful Eff/FRE
+[Score / Fireworks] [Clues / Strikes] [Deck]
+[Discard Pile]
+[Last Action + Rewind + Empathy + RECENT ›]
+[own hand if Top]
+[opponent real-card hands]
+[own hand if Bottom]
+[Workbench fixed at physical bottom above safe area]
 ```
 
-Нарисованные строки HUD — информационные группы, не требование к отдельной высокой панели для каждой. Реальная композиция группируется по измеренной ширине и font scale.
+Home always opens the browsing Home root, sets presentation focus to browsing, and preserves attended room/runtime. It never means the previous browsing destination and never sends Leave/Unattend. Pregame Browse is unchanged. Current variant is always visible, including standard/default variants; fitting/ellipsis is allowed. Username and game/table id do not appear in the portrait Live header.
 
-**Первый экран:** mode, actor, ресурсы, все руки в сертифицированном layout envelope и Workbench. Основное действие — текущая C17 task. Scroll всего normal gameplay отсутствует.
+Turn number, Pace and meaningful Eff/FRE stay near the top. No additional actor-name line is required; hand-row highlighting identifies the current player. Score is compactly shown as `Score 12 / 25` near real firework stacks. A read-only Deck with remaining count sits to their right. Bottom-Deck Blind-Play / deckPlays remains unsupported.
 
-### Иерархия информации
+Clues use a numeric count; Strikes use three compact square slots with active strikes marked. Keep resources beside fireworks when width meets `30dp * suitCount + 42dp deck + resourceRail + 28dp gaps/padding`, with `resourceRail = max(64, ceil(64 * min(fontScale, 1.5)))`. Otherwise move Clues/Strikes into their own compact row, preserving valid fireworks geometry.
 
-Score/Max, Clues, Strikes, Deck, Pace и значимый Eff/FRE остаются видимыми. Подробные объяснения метрик — в inspectors; значения и thresholds не меняются.
+Discard Pile is a separate tappable block opening the existing full DiscardViewer. Preserve max-clue red blocked and H-group yellow double-discard cues. Compact discard faces include only cards whose authoritative engine status is not `CardStatus.Trash`; hand-specific `shouldFade` is not the criterion. Preserve suit-stack order and individual duplicates, never aggregate as ×2. A local horizontal mini-card scroller is allowed. A nonempty all-trash pile shows `No relevant cards` and remains tappable. Full DiscardViewer shows every discard and fades engine-trash cards using the existing ~0.6 opacity.
 
-Fireworks и discard summary компактны. Last Action — короткий anchor, Recent — доступ к последовательности. Большая декоративная карточка Last Action не имеет права вытеснить руку.
+Last Action remains a readable compact panel with meaningful authoritative summary, RECENT ›, Rewind and Empathy. It must not deliberately collapse to one terse line.
 
-Собственная/observed рука — устойчивый anchor рядом с Workbench. Порядок игроков не зависит от текущего actor.
+### Hand ledger and preference
 
-### Workbench
+Settings → Gameplay presentation exposes Own hand position: Top / Bottom, default Bottom. This Redux presentation preference is independent of server/gameplay state and upstream/web keldonMode. It survives logout/account changes in the same app store/process; process restart may reset it. No persistence dependency is introduced.
 
-Workbench резервируется для набора обычных задач текущего room envelope, а не для открытого в данный момент tool. Переключение Card → Clue → Note read → Rewind не меняет geometry Ledger.
+Bottom orders opponents before the own/observed hand, immediately above Workbench. Top orders the own hand before opponents. Stable server-relative seating and durable `card.order` identity remain unchanged; current actor does not reorder hands.
 
-Сохраняются C17 действия:
+2P–5P always use real card faces with no per-hand scrolling. Shrink cards within valid readable bounds to fit the normal portrait envelope. Portrait CompactHandCardSummary and compact-overview are forbidden. In 6P first fit all five opponents normally; if this requires opponents below the 46dp dense floor, only opponents may vertically scroll. The own hand stays fixed on the selected side. Target four visible opponent rows plus own when four 46dp rows fit, otherwise three plus own. If three cannot fit at 46dp, shrink enough to show three real-card rows. No portrait root gameplay scroll, including short-height portrait escape.
 
-- own-card tap выбирает/инспектирует, отдельный Play/Discard отправляет;
-- short tap другой руки открывает Clue только при соответствующей existing eligibility;
-- long hold остаётся transient empathy;
-- single/double-tap note semantics не переопределяются новой навигацией;
-- вход в review disarms live actions.
+### Workbench and authoritative feedback
 
-Profile не открывается новым тапом по gameplay hand: это нарушило бы уже существующий gesture vocabulary. В Live User details доступны через participants/context surfaces.
+Workbench is pinned to the physical bottom above safe area, with one stable outer rectangle determined by shell viewport/player count, never the open tool. Card → Clue → Note → Rewind → Hypothetical changes do not move/resize hands. 2P–3P reserve 176dp at viewport height ≥780, 156dp at ≥640, otherwise 140dp. 4P–6P reserve 56dp. Long task content may scroll locally inside this rectangle. Idle is visually blank and keeps the same reserve.
 
-### Browse и Return
+Selected-card content shows applicable Play, Discard, Edit note and note preview only. Selection on the actual card identifies the target; Workbench does not show card.order, card #17, slot 3 or Actor card N. Internal durable routing state remains intact.
 
-Browse снимает unsafe selection/arming и закрывает видимый Clue Composer, то есть не оставляет скрытый clue plan. Recoverable note draft сохраняется по исходной карте.
+C17 temporal presentation derives `cardOutcome: played | discarded | misplayed | null` from authoritative post-state, including existing `isMisplayed` truth. No optimistic feedback. The mounted C17 workspace observes new authoritative segments and records local-player card confirmation as calm `Played`, `Discarded` or `Misplayed`, the actual face, and textual Close. Misplayed is not error/red/alarm styling. Feedback has no timer/toast and persists until Close, another Workbench task/tool, or a new gameLoadEpoch. Other-player actions do not dismiss it.
 
-После Return требуется новый deliberate action. Возврат, закрытие overlay и завершение reconnect сами по себе не подтверждают Play/Discard/Clue.
+Seed observation to the current latest segment on initial mount/reconnect; never synthesize stale feedback. New gameLoadEpoch clears and reseeds. Rotation, background and Home/Browse in the same game preserve feedback; Return may show own confirmation recorded while hidden.
+
+### Home/Browse and Return safety
+
+Hidden presentation still disarms selection/arming, closes discard inspection and clears visible Clue planning. Recoverable note draft retains its original card.order. Hidden authoritative feedback observation is allowed solely as harmless local presentation state: it sends nothing, mutates no authoritative state, never re-arms and never queues/retries/replays. Own-hand preference changes while hidden affect layout only. Return, closing overlays and reconnect never confirm an action; a new deliberate action is required.
 
 ---
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import {
   getC17CardLaneWidth,
+  getPortraitResourceRailFit,
   getC17DenseLayout,
   getC17AmbientEnvelope,
   getC17HandsRegionHeight,
@@ -231,5 +232,44 @@ describe('C17 dense portrait layout', () => {
     expect(result.opponentCardHeight).toBeGreaterThanOrEqual(46);
     expect(result.ownCardHeight).toBeGreaterThanOrEqual(result.opponentCardHeight);
     expect(result.handsHeight).toBeLessThanOrEqual(handsRegionHeight);
+  });
+});
+
+
+describe('Slice 8a portrait geometry', () => {
+  test.each([[780, 176], [640, 156], [639, 140]])('2P/3P height %i reserves %i without tool input', (height, expected) => {
+    expect(getC17WorkbenchHeight(height, 1, true)).toBe(expected);
+    expect(getC17WorkbenchHeight(height, 2, true)).toBe(expected);
+  });
+  test.each([3, 4, 5])('dense %i opponents reserve 56dp', (opponents) => {
+    expect(getC17WorkbenchHeight(900, opponents, true)).toBe(56);
+  });
+  test.each([1, 2, 3, 4])('%i opponents always retain real cards with no opponent scroll', (opponentCount) => {
+    const result = layout({ portraitV2: true, opponentCount, handsRegionHeight: 290 });
+    expect(result.mode).toBe('full-ledger');
+    expect(result.opponentsScrollable).toBe(false);
+    expect(result.handsHeight).toBeLessThanOrEqual(290);
+    expect(result.opponentCardHeight).toBeGreaterThan(1);
+  });
+  test('6P fits normally before using only an opponent viewport', () => {
+    const roomy = layout({ portraitV2: true, handsRegionHeight: 400 });
+    expect(roomy.opponentsScrollable).toBe(false);
+    expect(roomy.opponentCardHeight).toBeGreaterThanOrEqual(46);
+    for (const [height, rows] of [[290, 4], [240, 3], [160, 3]]) {
+      const result = layout({ portraitV2: true, handsRegionHeight: height });
+      expect(result.mode).toBe('full-ledger');
+      expect(result.opponentsScrollable).toBe(true);
+      expect(result.opponentViewportHeight).toBeGreaterThanOrEqual(rows! * result.opponentRowHeight + (rows! - 1) * 2);
+      expect(result.handsHeight).toBeLessThanOrEqual(height!);
+      if (height! < 200) expect(result.opponentCardHeight).toBeLessThan(46);
+      else expect(result.opponentCardHeight).toBe(46);
+    }
+  });
+  test('rail fit uses the exact suit/deck/resource/font threshold', () => {
+    expect(getPortraitResourceRailFit(283, 5, 1)).toBe(false);
+    expect(getPortraitResourceRailFit(284, 5, 1)).toBe(true);
+    expect(getPortraitResourceRailFit(315, 5, 2)).toBe(false);
+    expect(getPortraitResourceRailFit(316, 5, 2)).toBe(true);
+    expect(getPortraitResourceRailFit(314, 6, 1)).toBe(true);
   });
 });

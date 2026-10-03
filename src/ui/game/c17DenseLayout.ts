@@ -9,6 +9,8 @@ export type C17DenseLayout = {
   ownRowHeight: number;
   handsHeight: number;
   workbenchHeight: number;
+  opponentsScrollable?: boolean;
+  opponentViewportHeight?: number;
 };
 
 type Input = {
@@ -18,6 +20,7 @@ type Input = {
   opponentCount: number;
   cardsPerHand: number;
   workbenchHeight?: number;
+  portraitV2?: boolean;
 };
 
 const OPPONENT_CARD_GAP = 3;
@@ -50,8 +53,8 @@ const COMPACT_OPPONENT_ROW_HEIGHT = 32;
  * never from whichever tool happens to be open inside it. Overflowing tool content scrolls inside
  * the Workbench instead of stealing height from the Table Ledger.
  */
-export function getC17WorkbenchHeight(viewportHeight: number, opponentCount?: number): number {
-  if (opponentCount !== undefined && opponentCount <= 2) return 136;
+export function getC17WorkbenchHeight(viewportHeight: number, opponentCount?: number, portraitV2 = false): number {
+  if (!portraitV2 && opponentCount !== undefined && opponentCount <= 2) return 136;
   if (opponentCount !== undefined && opponentCount >= 3) return 56;
   if (viewportHeight >= 780) return 176;
   if (viewportHeight >= 640) return 156;
@@ -110,12 +113,32 @@ export function getC17DenseLayout({
   opponentCount,
   cardsPerHand,
   workbenchHeight = DEFAULT_WORKBENCH_HEIGHT,
+  portraitV2 = false,
 }: Input): C17DenseLayout {
   const opponents = Math.max(1, opponentCount);
   const capacity = Math.max(1, cardsPerHand);
   const usesSideLabels = opponents <= 2;
   const opponentWidthFit = cardHeightForWidth(opponentCardLaneWidth, capacity, OPPONENT_CARD_GAP);
   const ownWidthFit = cardHeightForWidth(ownCardLaneWidth, capacity, OWN_CARD_GAP);
+  if (portraitV2) {
+    const widthFit = Math.min(opponentWidthFit, ownWidthFit);
+    let cardHeight = Math.min(widthFit, opponents >= 3 ? 72 : widthFit);
+    const rowHeight = (height: number) => height + getCardTopHeadroom(height) + SIDE_LABEL_ROW_CHROME;
+    const totalHeight = (height: number, rows: number) => rows * rowHeight(height) + Math.max(0, rows - 2) * OPPONENT_ROW_GAP + HAND_ROW_GAP;
+    while (cardHeight > 1 && totalHeight(cardHeight, opponents + 1) > handsRegionHeight) cardHeight -= 1;
+    const opponentsScrollable = opponents === 5 && cardHeight < MIN_DENSE_OPPONENT_CARD_HEIGHT;
+    if (opponentsScrollable) {
+      cardHeight = Math.min(widthFit, MIN_DENSE_OPPONENT_CARD_HEIGHT);
+      const visibleOpponents = totalHeight(cardHeight, 5) <= handsRegionHeight ? 4 : 3;
+      while (cardHeight > 1 && totalHeight(cardHeight, visibleOpponents + 1) > handsRegionHeight) cardHeight -= 1;
+    }
+    const cardTopHeadroom = getCardTopHeadroom(cardHeight);
+    const ownRowHeight = rowHeight(cardHeight);
+    const handsHeight = Math.min(handsRegionHeight, totalHeight(cardHeight, opponents + 1));
+    return { mode: 'full-ledger', opponentCardHeight: cardHeight, ownCardHeight: cardHeight,
+      cardTopHeadroom, opponentRowHeight: ownRowHeight, ownRowHeight, handsHeight, workbenchHeight,
+      opponentsScrollable, opponentViewportHeight: Math.max(0, handsHeight - ownRowHeight - HAND_ROW_GAP) };
+  }
   if (opponents >= 3) {
     const protectedOwnHeight = Math.min(MAX_DENSE_OWN_CARD_HEIGHT, ownWidthFit);
     let ownCardHeight = protectedOwnHeight;
@@ -306,4 +329,10 @@ function getCardTopHeadroom(cardHeight: number): number {
 function cardHeightForWidth(width: number, cards: number, gap: number): number {
   const usableWidth = Math.max(1, width - Math.max(0, cards - 1) * gap);
   return Math.max(1, Math.floor(usableWidth / cards / HANABI_CARD_ASPECT_RATIO));
+}
+
+/** Deterministic rail fit; preserve the fireworks lane before moving resources. */
+export function getPortraitResourceRailFit(width: number, suitCount: number, fontScale: number): boolean {
+  const resourceRail = Math.max(64, Math.ceil(64 * Math.min(fontScale, 1.5)));
+  return width >= 30 * suitCount + 42 + resourceRail + 28;
 }

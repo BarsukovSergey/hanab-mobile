@@ -39,3 +39,25 @@ describe('gameplay presentation visibility', () => {
     expect(source).toMatch(/if \(presentationVisible\) return;\s*longPressedOpponent\.current = null;[\s\S]*?setMorphOrder\(null\);/);
   });
 });
+
+
+test('own-action feedback observes authoritative advancement while hidden without sending', () => {
+  const source = read('C17GameScreen.tsx');
+  const observation = source.slice(source.indexOf('// Hidden-safe observation:'), source.indexOf('  const takeWorkbenchTask ='));
+  expect(source).toContain('const lastObservedLiveSegmentRef = useRef(liveTransition.segment);');
+  expect(observation).toContain('feedbackGameLoadEpochRef.current !== gameLoadEpoch');
+  expect(observation).toContain('lastObservedLiveSegmentRef.current = liveTransition.segment;');
+  expect(observation).toContain('setWorkbenchFeedback(null);');
+  expect(observation).toContain('if (liveTransition.segment <= lastObservedLiveSegmentRef.current) return;');
+  expect(observation).toContain('getC17OwnActionFeedback(liveEntries, lastObservedLiveSegmentRef.current, seatingAnchorIndex)');
+  expect(observation).toContain('if (confirmation !== null');
+  expect(observation).not.toMatch(/presentationVisible|lobbyRuntime|dispatch|setTimeout|setInterval/);
+  const takeTask = source.slice(source.indexOf('  const takeWorkbenchTask ='), source.indexOf('  const [recentOpen'));
+  expect(takeTask).toContain('setWorkbenchFeedback(null);');
+  expect(takeTask).toContain('task();');
+  expect(source).toContain('title="Close" onPress={() => setWorkbenchFeedback(null)}');
+  const hidden = source.slice(source.indexOf('if (presentationVisible) return;'), source.indexOf('}, [presentationVisible]);'));
+  expect(hidden).not.toContain('setWorkbenchFeedback');
+  const rotation = source.slice(source.indexOf('if (orientationRef.current === orientation)'), source.indexOf('}, [orientation]);'));
+  expect(rotation).not.toContain('setWorkbenchFeedback');
+});

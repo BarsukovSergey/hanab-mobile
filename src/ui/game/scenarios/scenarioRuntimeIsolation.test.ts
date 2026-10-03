@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 function read(relativePath: string) {
-  return fs.readFileSync(path.join(process.cwd(), ...relativePath.split('/')), 'utf8');
+  return fs.readFileSync(path.join(process.cwd(), ...relativePath.split('/')), 'utf8').replace(/\r\n/g, '\n');
 }
 
 test('every production gameplay-screen runtime call is covered by the scenario-gallery command gate', () => {
@@ -48,8 +48,8 @@ test('Hypothetical Edit cards is a persistent controller-only interaction mode',
   expect(screen).toContain('canHypotheticalControl && !editHypotheticalCards && hypotheticalActor !== null');
   expect(screen).toContain('<ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />');
   expect(screen).toContain('<ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />');
-  expect(screen).toContain('onPress: () => editHypotheticalCards ? onSelectCard(order) : onInspectNote(order)');
-  expect(screen).toContain('onPress={() => editHypotheticalCards ? onSelectCard(order) : onInspectNote(order)}');
+  expect(screen).toContain('onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order))');
+  expect(screen).toContain('onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order))}');
   expect(screen).toContain('hypotheticalController ? <View style={styles.actionButtons}>');
   expect(lifecycle).toContain('if (!canHypotheticalControl) {\n      setEditHypotheticalCards(false);');
   expect(lifecycle).toMatch(/\} else if \(hypotheticalOperationPending\) \{\s*setMorphOrder\(null\);/);

@@ -4,7 +4,8 @@ import { Alert, Linking, StyleSheet, Switch, Text, View } from 'react-native';
 import { HANAB_PASSWORD_RESET_URL } from '../../config/hanab';
 import { savePasswordCredential } from '../../platform/credentialAccounts';
 import { lobbyRuntime, networkSession } from '../../runtime/application';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { presentationPreferencesActions } from '../../store/presentationPreferencesSlice';
 import { ActionButton, Field, Notice, Panel, SectionHeading, ThemeSwitcher, useHanabTheme } from '../designSystem';
 import { GameplayScenarioGallery } from '../game/scenarios/GameplayScenarioGallery';
 
@@ -18,6 +19,8 @@ export function SettingsScreen({ onBack, onSignOut, onPasswordTaskChange, backRe
   showEmbeddedBack?: boolean;
 }) {
   const [scenarioGalleryOpen, setScenarioGalleryOpen] = useState(false);
+  const dispatch = useAppDispatch();
+  const ownHandPosition = useAppSelector((state) => state.presentationPreferences.ownHandPosition);
   const [category, setCategory] = useState<SettingsCategory | null>(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -208,6 +211,16 @@ export function SettingsScreen({ onBack, onSignOut, onPasswordTaskChange, backRe
     </Panel>}
     {category === 'gameplay' && <Panel>
       <SectionHeading title="Gameplay presentation" />
+      <View style={styles.settingRow}>
+        <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Own hand position</Text>
+        {(['top', 'bottom'] as const).map((position) => <ActionButton
+          key={position}
+          compact
+          title={position === 'top' ? 'Top' : 'Bottom'}
+          tone={ownHandPosition === position ? 'primary' : 'secondary'}
+          onPress={() => dispatch(presentationPreferencesActions.ownHandPositionChanged(position))}
+        />)}
+      </View>
       <View style={styles.settingRow}>
         <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Show turn timers in untimed games</Text>
         <Switch

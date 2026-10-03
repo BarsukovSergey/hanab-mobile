@@ -11,6 +11,7 @@ export type C17TemporalEntry = {
   actionType: C17TemporalActionType;
   actorIndex: number | null;
   cardOrder: number | null;
+  cardOutcome: 'played' | 'discarded' | 'misplayed' | null;
   preActionSlot: number | null;
   cardIdentity: string | null;
   targetIndex: number | null;
@@ -30,6 +31,7 @@ export type C17TemporalContext = {
   newerActionCount: number;
   last: C17TemporalEntry;
   recent: readonly C17TemporalEntry[];
+  entries: readonly C17TemporalEntry[];
 };
 
 type Input = {
@@ -41,7 +43,7 @@ type Input = {
 
 type TransitionFacts = Pick<
   C17TemporalEntry,
-  'actionType' | 'actorIndex' | 'cardOrder' | 'preActionSlot' | 'cardIdentity' | 'targetIndex' | 'touchedSlots'
+  'actionType' | 'actorIndex' | 'cardOutcome' | 'cardOrder' | 'preActionSlot' | 'cardIdentity' | 'targetIndex' | 'touchedSlots'
 >;
 
 // Upstream stores reducer turns from zero; player-facing action turns count from one.
@@ -109,6 +111,7 @@ export function getC17TemporalContext({ states, selectedSegment, variantName, re
     newerActionCount: selectedIndex < 0 ? 0 : Math.max(0, available.length - selectedIndex - 1),
     last,
     recent,
+    entries,
   };
 }
 
@@ -161,6 +164,7 @@ function getTransitionFacts(before: GameState, after: GameState, variantName: st
 
       return {
         actionType: played ? 'play' : 'discard',
+        cardOutcome: afterCard.isMisplayed ? 'misplayed' : played ? 'played' : 'discarded',
         actorIndex: playerIndex,
         cardOrder: order,
         preActionSlot: displayedIndex + 1,
@@ -180,6 +184,7 @@ function getTransitionFacts(before: GameState, after: GameState, variantName: st
       .sort((a, b) => a - b);
     return {
       actionType: 'clue',
+      cardOutcome: null,
       actorIndex: newClue.giver,
       cardOrder: null,
       preActionSlot: null,
@@ -223,6 +228,7 @@ function getTransitionDetails(
 function emptyTransitionFacts(): TransitionFacts {
   return {
     actionType: 'other',
+    cardOutcome: null,
     actorIndex: null,
     cardOrder: null,
     preActionSlot: null,
@@ -236,4 +242,15 @@ function addDelta(details: string[], label: string, before: number, after: numbe
   const delta = after - before;
   if (delta === 0) return;
   details.push(`${label} ${delta > 0 ? '+' : ''}${delta}`);
+}
+
+export type C17WorkbenchFeedback = { segment: number; cardOrder: number; outcome: 'played' | 'discarded' | 'misplayed' };
+
+/** Only newly observed authoritative own confirmations replace existing feedback. */
+export function getC17OwnActionFeedback(
+  entries: readonly C17TemporalEntry[], afterSegment: number, ourPlayerIndex: number,
+): C17WorkbenchFeedback | null {
+  const entry = entries.filter((candidate) => candidate.segment > afterSegment
+    && candidate.actorIndex === ourPlayerIndex && candidate.cardOrder !== null && candidate.cardOutcome !== null).at(-1);
+  return entry === undefined ? null : { segment: entry.segment, cardOrder: entry.cardOrder!, outcome: entry.cardOutcome! };
 }

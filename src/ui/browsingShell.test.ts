@@ -61,7 +61,7 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setLiveSheet(null);"));
   expect(hiddenEffect.slice(0, hiddenEffect.indexOf('}, [presentationFocus]);')))
     .toBe("if (presentationFocus !== 'room') setLiveSheet(null);\n  ");
-  expect(app).toContain('title="Browse"');
+  expect(app).toContain('title={width <= height ? "Home" : "Browse"}');
   expect(app).toContain('returnPresentation={returnPresentation} onReturn={returnToRoom}');
 });
 
@@ -112,4 +112,14 @@ test('More routes to current task owners and reads the repository version', () =
   expect(more).toContain('Signed in as');
   expect(more).not.toContain('My Profile');
   expect(more).not.toContain('lobbyRuntime');
+});
+
+
+test('Live Home opens the Home root without changing room ownership; Pregame retains Browse', () => {
+  const app = read('App.tsx');
+  const home = app.slice(app.indexOf('  const homeFromLive ='), app.indexOf('  const exitOwnRewind ='));
+  expect(home).toContain("navigateBrowsing(state, 'home')");
+  expect(home).toContain("setPresentationFocus('browsing')");
+  expect(home).not.toMatch(/lobbyRuntime|dispatch|Leave|unattend/);
+  expect(app).toContain('onBrowse={browseFromRoom}');
 });
