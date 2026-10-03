@@ -4,6 +4,7 @@ import {
   countC17TemporalStatesAfter,
   getC17TemporalContext,
   getHumanTurnNumber,
+  getC17OwnActionFeedback,
 } from './c17Temporal';
 
 type CardState = GameState['deck'][number];
@@ -146,7 +147,8 @@ describe('C17 temporal presentation', () => {
     expect(context.last.preActionSlot).toBe(5);
     expect(context.last.cardIdentity).toBe('Red 3');
     expect(context.last.summary).toContain('Ada plays a card');
-    expect(context.last.summary).toContain('Red 3 · from slot 5');
+    expect(context.last.summary).toContain('Red 3');
+    expect(context.last.summary).not.toMatch(/from slot|\b[Cc]ards?\s+\d/);
     expect(context.last.summary).toContain('Score +1');
     expect(context.last.summary).toContain('Deck -1');
     expect(context.last.summary).not.toContain('Before');
@@ -154,6 +156,7 @@ describe('C17 temporal presentation', () => {
       states: [before, after], selectedSegment: 1, variantName: 'No Variant', reverseHands: true,
     });
     expect(reversedContext.last.preActionSlot).toBe(1);
+    expect(reversedContext.last.summary).toBe(context.last.summary);
   });
 
   test('reconstructs discard identity independently of a log slot sentence', () => {
@@ -186,12 +189,16 @@ describe('C17 temporal presentation', () => {
     expect(context.last.cardOrder).toBe(10);
     expect(context.last.preActionSlot).toBe(5);
     expect(context.last.cardIdentity).toBe('Red 4');
-    expect(context.last.summary).toContain('Red 4 · from slot 5');
+    expect(context.last.summary).toContain('Ada discards a card');
+    expect(context.last.summary).toContain('Red 4');
+    expect(context.last.summary).not.toMatch(/from slot|\b[Cc]ards?\s+\d/);
     expect(context.last.summary).toContain('Clues +1');
+    expect(context.last.summary).toContain('Deck -1');
     const reversedContext = getC17TemporalContext({
       states: [before, after], selectedSegment: 1, variantName: 'No Variant', reverseHands: true,
     });
     expect(reversedContext.last.preActionSlot).toBe(1);
+    expect(reversedContext.last.summary).toBe(context.last.summary);
   });
 
   test('reports clue touched slots in displayed ascending order', () => {
@@ -212,12 +219,14 @@ describe('C17 temporal presentation', () => {
     expect(context.last.actorIndex).toBe(0);
     expect(context.last.targetIndex).toBe(0);
     expect(context.last.touchedSlots).toEqual([1, 4]);
-    expect(context.last.summary).toContain('Cards 1, 4');
+    expect(context.last.summary).toContain('Ada tells Bea about two reds');
+    expect(context.last.summary).not.toMatch(/from slot|\b[Cc]ards?\s+\d/);
     expect(context.last.summary).toContain('Clues -1');
     const reversedContext = getC17TemporalContext({
       states: [before, after], selectedSegment: 1, variantName: 'No Variant', reverseHands: true,
     });
     expect(reversedContext.last.touchedSlots).toEqual([2, 5]);
+    expect(reversedContext.last.summary).toBe(context.last.summary);
   });
 
   test('exposes the exact before/after state pair for one focused action', () => {
@@ -314,4 +323,24 @@ describe('C17 temporal presentation', () => {
 
     expect(context.recent.map((entry) => entry.segment)).toEqual([2, 3, 4, 5, 6]);
   });
+});
+
+
+test.each(['played', 'discarded', 'misplayed'] as const)('cardOutcome %s comes from authoritative post-state', (outcome) => {
+  const before = state({ hands: [[10], [20]], deckState: deckWith(cardState({ order: 10 })) });
+  const afterCard = { ...cardState({ order: 10, suitIndex: 0, rank: 2, segmentPlayed: outcome === 'played' ? 1 : null, segmentDiscarded: outcome === 'played' ? null : 1 }), isMisplayed: outcome === 'misplayed' };
+  const after = state({ hands: [[], [20]], deckState: deckWith(afterCard) });
+  const context = getC17TemporalContext({ states: [before, after], selectedSegment: 1, variantName: 'No Variant', reverseHands: false });
+  expect(context.last.cardOutcome).toBe(outcome);
+  expect(getC17OwnActionFeedback(context.entries, 0, 0)).toEqual({ segment: 1, cardOrder: 10, outcome });
+  expect(getC17OwnActionFeedback(context.entries, 1, 0)).toBeNull(); // seeded first render/reconnect
+  expect(getC17OwnActionFeedback(context.entries, 0, 1)).toBeNull(); // another player cannot replace feedback
+});
+
+test('batched authoritative advancement retains own confirmation before an unrelated action', () => {
+  const before = state({ hands: [[10], [20]], deckState: deckWith(cardState({ order: 10 })) });
+  const after = state({ hands: [[], [20]], deckState: deckWith(cardState({ order: 10, suitIndex: 0, rank: 2, segmentPlayed: 1 })) });
+  const context = getC17TemporalContext({ states: [before, after, after], selectedSegment: 2, variantName: 'No Variant', reverseHands: false });
+  expect(context.last.cardOutcome).toBeNull();
+  expect(getC17OwnActionFeedback(context.entries, 0, 0)?.outcome).toBe('played');
 });

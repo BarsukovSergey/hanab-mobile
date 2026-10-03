@@ -73,12 +73,24 @@ test('Settings groups existing controls under the four canonical categories', ()
   expect(settings).toContain("category === 'gameplay'");
 });
 
-test('live-game identity contains only the authenticated username with single-line truncation', () => {
+test('portrait Live identity is always the current variant with single-line truncation', () => {
   const app = read('App.tsx');
-  const identity = app.slice(app.indexOf('{!landscapePhone && <View style={styles.brandCopy}'), app.indexOf('<View style={[styles.headerActions', app.indexOf('{!landscapePhone && <View style={styles.brandCopy}')));
-  expect(identity).toContain('session.authenticatedUser?.username');
+  const start = app.indexOf('{width <= height && <Text');
+  const identity = app.slice(start, app.indexOf('</Text>}', start));
+  expect(identity).toContain('liveClientState.metadata.options.variantName');
   expect(identity).toContain('numberOfLines={1}');
   expect(identity).toContain('ellipsizeMode="tail"');
-  expect(identity).not.toContain('Hanab');
-  expect(identity).not.toContain('authName');
+  expect(identity).not.toContain('username');
+  expect(identity).not.toContain('tableID');
+});
+
+
+test('Own hand position is a local Redux preference with Top and Bottom choices', () => {
+  const settings = read('src/ui/screens/SettingsScreen.tsx');
+  expect(settings).toContain('state.presentationPreferences.ownHandPosition');
+  expect(settings).toContain('Own hand position');
+  expect(settings).toContain("(['top', 'bottom'] as const)");
+  expect(settings).toContain("position === 'top' ? 'Top' : 'Bottom'");
+  expect(settings).toContain('dispatch(presentationPreferencesActions.ownHandPositionChanged(position))');
+  expect(settings).not.toContain('keldonMode');
 });

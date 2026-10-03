@@ -4,7 +4,7 @@ import { CardStatus } from '../upstream/enums/CardStatus';
 import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { CardState } from '../upstream/interfaces/CardState';
 import type { GameState } from '../upstream/interfaces/GameState';
-import { getCardStatePresentation } from './cardStatePresentation';
+import { getCardStatePresentation, isEngineTrash } from './cardStatePresentation';
 
 const baseCard = {
   order: 1,
@@ -196,4 +196,12 @@ describe('getCardStatePresentation', () => {
       state: { ...baseCard, inDoubleDiscard: true, isKnownTrashFromEmpathy: true } as CardState,
     }).doubleDiscard).toBe(false);
   });
+});
+
+
+test('discard engine-trash truth is independent of hand fade exclusions', () => {
+  expect(isEngineTrash(gameWith(CardStatus.Trash), 0, 2)).toBe(true);
+  expect(presentation({ status: CardStatus.Trash, state: { ...baseCard, location: 'discard', segmentDiscarded: 1 } as CardState }).shouldFade).toBe(false);
+  expect(isEngineTrash(gameWith(CardStatus.Critical), 0, 2)).toBe(false);
+  expect(isEngineTrash(gameWith(CardStatus.Trash), null, 2)).toBe(false);
 });

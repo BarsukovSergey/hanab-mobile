@@ -23,7 +23,7 @@ test('C17 shared replay presents authoritative leader and follow state without g
   expect(screen).toContain('onPress={() => lobbyRuntime.followReplayLeader()}');
   expect(screen).toContain('reviewActive && !finishedReplay && sharedReplay === null');
   expect(screen).toContain('if (isFinishedReplay || isSharedReplay) return;');
-  expect(screen).toContain("{hypothetical !== null ? <>");
+  expect(screen).toContain(": hypothetical !== null ? <>");
   expect(screen).toContain('{sharedReplay === null ? <>');
   expect(screen).toContain('title="Take leadership"');
   expect(screen).toContain('title={`Pass to ${name}`}');
@@ -45,7 +45,7 @@ test('C17 shared replay renders its leader once and groups priority controls com
   expect(sharedWorkbench).toContain('title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()}');
   expect(sharedWorkbench).toContain('title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)}');
   expect(sharedWorkbench).toContain('title={`Pass to ${name}`}');
-  expect(sharedWorkbench).toContain('title="Start Hypothetical" tone="primary" onPress={onStartHypothetical}');
+  expect(sharedWorkbench).toContain('title="Start Hypothetical" tone="primary" onPress={() => takeWorkbenchTask(onStartHypothetical)}');
   expect(sharedWorkbench).toContain('title="Quick rematch" tone="primary" onPress={onQuickRematch}');
   expect(sharedWorkbench).toContain('title="Remake table" onPress={onRemake}');
 });

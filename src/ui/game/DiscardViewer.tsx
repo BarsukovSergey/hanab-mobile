@@ -2,6 +2,7 @@ import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getGameTableSuits } from '../../game/selectors/gameplay';
+import { isEngineTrash } from '../../game/selectors/cardStatePresentation';
 import { useAppSelector } from '../../store/hooks';
 import { ActionButton, useHanabTheme } from '../designSystem';
 import { VisibleHanabiCard } from './GameCard';
@@ -48,6 +49,7 @@ export function DiscardViewer({
                 const authoritativeIdentity = cardIdentities?.[order];
                 return <VisibleHanabiCard
                   key={order}
+                  faded={isEngineTrash(game, authoritativeIdentity?.suitIndex ?? card.suitIndex, authoritativeIdentity?.rank ?? card.rank)}
                   rank={authoritativeIdentity?.rank ?? card.rank}
                   size="mini"
                   suitIndex={authoritativeIdentity?.suitIndex ?? card.suitIndex}

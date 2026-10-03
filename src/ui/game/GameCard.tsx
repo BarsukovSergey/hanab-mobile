@@ -145,6 +145,7 @@ export function VisibleHanabiCard({
   semanticBorder = null,
   empathyKnowledge = null,
   statePresentation = null,
+  faded = false,
   onPress,
   onDoublePress,
   onLongPress,
@@ -165,6 +166,7 @@ export function VisibleHanabiCard({
   semanticBorder?: string | null;
   empathyKnowledge?: CardKnowledgeViewModel | null;
   statePresentation?: CardStatePresentation | null;
+  faded?: boolean;
   onPress?: () => void;
   onDoublePress?: () => void;
   onLongPress?: () => void;
@@ -197,7 +199,7 @@ export function VisibleHanabiCard({
     styles.cardSurface,
     { borderRadius: geometry.radius },
     empathyActive && styles.empathyCard,
-    statePresentation?.shouldFade && styles.engineTrashCard,
+    (faded || statePresentation?.shouldFade) && styles.engineTrashCard,
   ]}>
     <UpstreamCardFace rank={faceRank} suitIndex={faceSuitIndex} variantName={variantName} />
     {activeSemanticBorder !== null && size === 'hand' && <SemanticBorder color={activeSemanticBorder} radius={geometry.radius} height={renderedCardHeight} />}

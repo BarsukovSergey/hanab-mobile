@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
 import type { DiscardResourceCue } from '../../game/selectors/gameResourcePresentation';
+import { getDiscardPresentation } from '../../game/selectors/discardPresentation';
+import { getDisplayedClueTokens } from '../../game/selectors/gameplay';
 import { getDiscardSummary } from '../../game/selectors/discardSummary';
 import { getGameTableSuits } from '../../game/selectors/gameplay';
 import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
 import { useAppSelector } from '../../store/hooks';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
+import { getPortraitResourceRailFit } from './c17DenseLayout';
 import { VisibleHanabiCard } from './GameCard';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
@@ -23,6 +26,7 @@ export function CompactTable({
   variantName,
   onOpenDiscards,
   dense = false,
+  portraitV2 = false,
   tightChrome = false,
   pulseDiscard,
   pulseEnabled = true,
@@ -33,6 +37,7 @@ export function CompactTable({
   variantName: string;
   onOpenDiscards?: () => void;
   dense?: boolean;
+  portraitV2?: boolean;
   tightChrome?: boolean;
   pulseDiscard?: number | null;
   pulseEnabled?: boolean;
@@ -40,6 +45,7 @@ export function CompactTable({
 }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
+  const { fontScale } = useWindowDimensions();
   const cardIdentities = useAppSelector((state) => (
     state.room.room.kind === 'live_game'
       ? state.room.room.clientState.cardIdentities
@@ -55,6 +61,10 @@ export function CompactTable({
     suits.length,
     landscapePhone,
   );
+
+  if (portraitV2) return <PortraitTable game={game} variantName={variantName}
+    cardIdentities={cardIdentities} discardResourceCue={discardResourceCue} onOpenDiscards={onOpenDiscards}
+    fontScale={fontScale} pulseDiscard={pulseDiscard} pulseEnabled={pulseEnabled} pulsePlay={pulsePlay} />;
 
   return <View style={[
     styles.surface,
@@ -156,6 +166,69 @@ export function CompactTable({
             </View>;
           })}</View>}
     </Pressable></AuthoritativePulse>
+  </View>;
+}
+
+function PortraitTable({ game, variantName, cardIdentities, discardResourceCue, onOpenDiscards,
+  fontScale, pulseDiscard, pulseEnabled, pulsePlay }: {
+  game: GameState; variantName: string;
+  cardIdentities?: readonly import('../../game/bootstrap/types').CardIdentity[];
+  discardResourceCue: DiscardResourceCue; onOpenDiscards?: () => void;
+  fontScale: number; pulseDiscard?: number | null; pulseEnabled: boolean;
+  pulsePlay?: { segment: number; suitIndex: number } | null;
+}) {
+  const { theme } = useHanabTheme();
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const suits = getGameTableSuits(variantName, game);
+  const visuals = getCardSuitVisuals(variantName);
+  const lateralRail = getPortraitResourceRailFit(availableWidth, suits.length, fontScale);
+  const resourceRail = Math.max(64, Math.ceil(64 * Math.min(fontScale, 1.5)));
+  const stackWidth = Math.max(30, Math.min(40, (availableWidth - 42 - 28 - (lateralRail ? resourceRail : 0)) / Math.max(1, suits.length)));
+  const stackHeight = stackWidth / HANABI_TABLE_CARD_ASPECT_RATIO;
+  const discard = getDiscardPresentation(game, cardIdentities);
+  const resources = <View style={{ minWidth: resourceRail, gap: 3, flexDirection: lateralRail ? 'column' : 'row', alignItems: 'center' }}>
+    <Text style={{ color: theme.colors.text }}>Clues {getDisplayedClueTokens(game.clueTokens, variantName)}</Text>
+    <View accessibilityLabel={`Strikes ${game.strikes.length}`} style={{ flexDirection: 'row', gap: 3 }}>
+      {[0, 1, 2].map((slot) => <View key={slot} style={{ width: 16, height: 16, borderWidth: 1, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: theme.colors.text, fontSize: 12 }}>{slot < game.strikes.length ? '\u00d7' : ''}</Text>
+      </View>)}
+    </View>
+  </View>;
+  return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4 }}>
+    <View style={[styles.surface, { padding: 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{ flexDirection: 'row', gap: 2, flex: 1 }}>
+          {suits.map((suit) => {
+            const order = game.playStacks[suit.suitIndex]?.at(-1);
+            const card = order === undefined ? undefined : game.deck[order];
+            const visual = visuals[suit.suitIndex];
+            return <AuthoritativePulse key={suit.suitIndex} enabled={pulseEnabled} pulseKey={pulsePlay?.suitIndex === suit.suitIndex ? pulsePlay.segment : null}>
+              {card ? <VisibleHanabiCard height={stackHeight} rank={card.rank} suitIndex={card.suitIndex} variantName={variantName} />
+                : <View style={[styles.emptyStack, { height: stackHeight, borderColor: theme.colors.borderStrong }]}>
+                  {visual && hasUpstreamSvgPip(visual.pip) && <UpstreamPip duplicatePip={visual.duplicatePip} fillColors={visual.fillColors} pip={visual.pip} size={14} suitName={visual.name} />}
+                </View>}
+            </AuthoritativePulse>;
+          })}
+        </View>
+        {lateralRail && resources}
+        <View accessible accessibilityLabel={`Deck ${game.cardsRemainingInTheDeck}`} style={{ width: 42, minHeight: 42, borderWidth: 1, borderRadius: 5, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: theme.colors.text, fontSize: 10 }}>Deck</Text>
+          <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{game.cardsRemainingInTheDeck}</Text>
+        </View>
+      </View>
+      {!lateralRail && resources}
+    </View>
+    <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseDiscard ?? null}>
+      <Pressable accessibilityRole="button" accessibilityLabel={discardResourceCue === 'blocked' ? 'Discard Pile. Unavailable because clues are at maximum' : discardResourceCue === 'double-discard' ? 'Discard Pile. Potential Double Discard' : 'Discard Pile'} onPress={onOpenDiscards} style={[styles.discard, { backgroundColor: theme.colors.surfaceMuted, borderColor: discardResourceCue === 'blocked' ? '#ff5555' : discardResourceCue === 'double-discard' ? '#ffd54f' : theme.colors.border }]}>
+        <Text style={{ color: theme.colors.text, fontSize: 11, fontWeight: '700' }}>Discard Pile</Text>
+        {discard.cards.length === 0 ? <Text style={{ color: theme.colors.textMuted }}>None</Text>
+          : discard.relevantCards.length === 0 ? <Text style={{ color: theme.colors.textMuted }}>No relevant cards</Text>
+          : <ScrollView horizontal nestedScrollEnabled contentContainerStyle={{ gap: 3 }}>
+            {discard.relevantCards.map((card) => <VisibleHanabiCard key={card.order} height={32} rank={card.rank} suitIndex={card.suitIndex} variantName={variantName} />)}
+          </ScrollView>}
+      </Pressable>
+    </AuthoritativePulse>
   </View>;
 }
 

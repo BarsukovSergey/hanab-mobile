@@ -61,3 +61,9 @@ describe('browsing presentation state', () => {
   });
 
 });
+
+
+test('Live Home intent resets any previous browsing destination to Home root', () => {
+  const settings = openBrowsingSettings(createBrowsingPresentation('more'));
+  expect(navigateBrowsing(settings, 'home')).toEqual(createBrowsingPresentation('home'));
+});

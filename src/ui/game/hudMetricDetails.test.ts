@@ -52,3 +52,22 @@ describe('Eff and Pace HUD details', () => {
     expect(paceModal).not.toMatch(/TextInput|onChangeText|editable=/);
   });
 });
+
+
+it('portrait moves resources into CompactTable while retaining Turn, Pace and Eff at the top', () => {
+  const table = readFileSync('src/ui/game/CompactTable.tsx', 'utf8');
+  const viewer = readFileSync('src/ui/game/DiscardViewer.tsx', 'utf8');
+  const cards = readFileSync('src/ui/game/GameCard.tsx', 'utf8');
+  expect(c17).toContain('<CompactTable portraitV2={portraitV2}');
+  expect(c17).toContain('{!portraitV2 && <>');
+  expect(c17).toContain('`LIVE T${liveTurn}`');
+  expect(c17).toContain('numberOfLines={portraitV2 ? undefined : 1}');
+  expect(table).toContain('Score {game.score} / {game.stats.maxScore}');
+  expect(table).toContain('[0, 1, 2].map');
+  expect(table).toContain('getPortraitResourceRailFit(availableWidth, suits.length, fontScale)');
+  expect(table).toContain('Discard Pile');
+  expect(table).toContain('No relevant cards');
+  expect(table).toContain('discard.relevantCards.map');
+  expect(viewer).toContain('faded={isEngineTrash(');
+  expect(cards).toContain('(faded || statePresentation?.shouldFade) && styles.engineTrashCard');
+});

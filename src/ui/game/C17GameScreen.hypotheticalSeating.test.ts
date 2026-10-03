@@ -122,9 +122,9 @@ describe('C17 hypothetical seating and action-hand separation', () => {
     expect(screen).toContain('seatingAnchorIndex={seatingAnchorIndex}');
     expect(screen).not.toContain('ourIndex={actionHandIndex ?? ourIndex}');
     expect(screen).toContain('const isActionHand = actionHandIndex === index;');
-    expect(screen).toContain('onSelect={() => onSelectCard(order)}');
-    expect(screen).toContain('if (canEnterClue && !isActionHand) onSelectClueTarget(index);');
-    expect(screen).toContain('if (canEnterClue && !anchoredIsActionHand) onSelectClueTarget(seatingAnchorIndex);');
+    expect(screen).toContain('onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}');
+    expect(screen).toContain('if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
+    expect(screen).toContain('if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex));');
     expect(screen).toContain('isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? \'YOU\' : \'YOUR HAND\'');
     expect(screen).not.toContain('`ACTOR · ${metadata.playerNames');
     expect(screen).toContain('lobbyRuntime.hypotheticalPlay(selectedCard)');
