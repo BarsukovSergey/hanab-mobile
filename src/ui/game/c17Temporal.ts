@@ -209,9 +209,8 @@ function getTransitionDetails(
     && facts.preActionSlot !== null
     && facts.cardIdentity !== null
   ) {
-    details.push(`${facts.cardIdentity} · from slot ${facts.preActionSlot}`);
+    details.push(facts.cardIdentity);
   }
-  if (facts.touchedSlots.length > 0) details.push(`Cards ${facts.touchedSlots.join(', ')}`);
 
   addDelta(details, 'Score', before.score, after.score);
   addDelta(

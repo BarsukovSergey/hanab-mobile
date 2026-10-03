@@ -57,6 +57,17 @@ test('C17 ordinary note inspector keeps note controls without card-number labels
   expect(screen).not.toContain('>{getCardLabel(');
 });
 
+test('C17 Note Editor title uses player context without card positions or orders', () => {
+  const screen = readC17Screen();
+  const cardLabel = screen.slice(screen.indexOf('function getCardLabel('), screen.indexOf('const styles = StyleSheet.create('));
+
+  expect(screen).toContain("title={noteCard === null ? 'Card note' : getCardLabel(game, metadata.playerNames, noteCard, reverseHands)}");
+  expect(cardLabel).toContain('} · Card note`');
+  expect(cardLabel).toContain("return 'Card note';");
+  expect(cardLabel).not.toContain('· card ${position + 1}');
+  expect(cardLabel).not.toMatch(/\$\{(?:position|order)\b|card #/);
+});
+
 test('C17 ordinary note actions never duplicate selected and inspected card editors', () => {
   const screen = readC17Screen();
   const ordinaryWorkbench = screen.slice(screen.indexOf('{canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>'));

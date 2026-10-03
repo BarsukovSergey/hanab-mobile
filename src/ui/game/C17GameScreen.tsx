@@ -1557,7 +1557,7 @@ function getCardLabel(game: GameState, playerNames: readonly string[], order: nu
   for (const [playerIndex, hand] of game.hands.entries()) {
     const displayed = getDisplayedHandOrders(hand, reverseHands);
     const position = displayed.findIndex((candidate) => candidate === order);
-    if (position >= 0) return `${playerNames[playerIndex] ?? `Player ${playerIndex + 1}`} · card ${position + 1}`;
+    if (position >= 0) return `${playerNames[playerIndex] ?? `Player ${playerIndex + 1}`} · Card note`;
   }
   return 'Card note';
 }
