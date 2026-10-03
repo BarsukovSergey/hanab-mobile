@@ -61,3 +61,18 @@ test('own-action feedback observes authoritative advancement while hidden withou
   const rotation = source.slice(source.indexOf('if (orientationRef.current === orientation)'), source.indexOf('}, [orientation]);'));
   expect(rotation).not.toContain('setWorkbenchFeedback');
 });
+
+test('deliberate Workbench tasks consume delayed confirmations without replacing their controls', () => {
+  const source = read('C17GameScreen.tsx');
+  const taskPolicy = source.slice(source.indexOf('  const workbenchTaskActive ='), source.indexOf('// Hidden-safe observation:'));
+  expect(taskPolicy).toContain('hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null');
+  expect(taskPolicy).toContain('selectedTarget !== null || selectedActionCard !== null || noteCard !== null');
+  expect(taskPolicy).not.toContain('presentationVisible');
+  expect(source.indexOf('  const selectedActionCard =')).toBeLessThan(source.indexOf('  const workbenchTaskActive ='));
+  expect(source).toContain('selectedCard !== null && displayedActionHand.some((order) => order === selectedCard) ? selectedCard : null');
+
+  const observation = source.slice(source.indexOf('// Hidden-safe observation:'), source.indexOf('  const takeWorkbenchTask ='));
+  expect(observation).toMatch(/const confirmation = getC17OwnActionFeedback\([^;]+;\s*lastObservedLiveSegmentRef.current = liveTransition.segment;\s*if \(confirmation !== null && !isSpectator && !workbenchTaskActive\) \{\s*setWorkbenchFeedback\(confirmation\);\s*\}/);
+  expect(observation).toContain('isSpectator, workbenchTaskActive]);');
+  expect(observation).not.toMatch(/presentationVisible|lobbyRuntime|dispatch|setTimeout|setInterval/);
+});

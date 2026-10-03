@@ -827,6 +827,10 @@ function C17DenseWorkspace({
   } | null>(null);
   const lastObservedLiveSegmentRef = useRef(liveTransition.segment);
   const feedbackGameLoadEpochRef = useRef(gameLoadEpoch);
+  const displayedActionHand = actionHandIndex === null ? [] : getDisplayedHandOrders(game.hands[actionHandIndex], reverseHands);
+  const selectedActionCard = selectedCard !== null && displayedActionHand.some((order) => order === selectedCard) ? selectedCard : null;
+  const workbenchTaskActive = hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
+    || selectedTarget !== null || selectedActionCard !== null || noteCard !== null;
   // Hidden-safe observation: presentation state only, with no command or authoritative mutation.
   useEffect(() => {
     if (feedbackGameLoadEpochRef.current !== gameLoadEpoch) {
@@ -838,10 +842,10 @@ function C17DenseWorkspace({
     if (liveTransition.segment <= lastObservedLiveSegmentRef.current) return;
     const confirmation = getC17OwnActionFeedback(liveEntries, lastObservedLiveSegmentRef.current, seatingAnchorIndex);
     lastObservedLiveSegmentRef.current = liveTransition.segment;
-    if (confirmation !== null && !isSpectator && !finishedReplay && sharedReplay === null) {
+    if (confirmation !== null && !isSpectator && !workbenchTaskActive) {
       setWorkbenchFeedback(confirmation);
     }
-  }, [gameLoadEpoch, liveTransition, liveEntries, seatingAnchorIndex, isSpectator, finishedReplay, sharedReplay]);
+  }, [gameLoadEpoch, liveTransition, liveEntries, seatingAnchorIndex, isSpectator, workbenchTaskActive]);
   const takeWorkbenchTask = (task: () => void) => {
     setWorkbenchFeedback(null);
     task();
@@ -947,7 +951,6 @@ function C17DenseWorkspace({
   );
   const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const anchoredHand = getDisplayedHandOrders(game.hands[seatingAnchorIndex], reverseHands);
-  const displayedActionHand = actionHandIndex === null ? [] : getDisplayedHandOrders(game.hands[actionHandIndex], reverseHands);
   const anchoredIsActionHand = actionHandIndex === seatingAnchorIndex;
   const displayIdentity = (order: number) => hypothetical?.morphedIdentities[order] ?? cardIdentities[order];
   const hasExplicitBlankMorph = (order: number) => {
@@ -955,7 +958,6 @@ function C17DenseWorkspace({
     return morph?.suitIndex === null && morph.rank === null;
   };
   const startingHandHidden = !hypothetical?.showDrawnCards && hypothetical?.startingPlayerIndex !== null;
-  const selectedActionCard = selectedCard !== null && displayedActionHand.some((order) => order === selectedCard) ? selectedCard : null;
   const inspectedNote = noteCard === null ? '' : notes[noteCard]?.text ?? '';
   const readOnlyReplay = finishedReplay || sharedReplay !== null;
   const inspectedReplayNotes = noteCard === null
