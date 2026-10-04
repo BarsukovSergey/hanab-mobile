@@ -635,13 +635,12 @@ All hands use the same card height; own/observed hand is never enlarged. Use exi
 | Players | Template | Own hand placement |
 |---|---|---|
 | 2P | 1 column × 2 rows | First/last for Top/Bottom |
-| 3P preferred | 1 column × 3 rows | First/last for Top/Bottom |
-| 3P fallback | Paired opponents + centered own single row | Above/below opponents |
+| 3P | 1 column × 3 rows only | First/last for Top/Bottom |
 | 4P | 2 × 2 | First/last cell |
 | 5P | Two paired opponent rows + centered own single row | Own row first/last |
 | 6P | 3 rows × 2 columns; never 2 rows × 3 columns | First/last cell |
 
-Evaluate 3P 1×3 first. Only if it fails the 68dp card floor may 2+1 be evaluated. If both fail, report layout failure. With the specified chrome, 1×3 already clears 68dp at every body height ≥294dp; the hand-only 2+1 candidate is tested below that height, while the complete shell still fails the right-column height gate.
+3P uses only 1 column × 3 rows. With the specified chrome, 1×3 already clears the 68dp card floor throughout every valid complete shell with body height ≥294dp. Below that height, the complete shell fails the right-column height gate.
 
 ### Pure geometry and elastic divider
 

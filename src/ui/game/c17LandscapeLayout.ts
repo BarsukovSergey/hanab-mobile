@@ -15,7 +15,7 @@ export type C17LandscapeLayout =
   | { fits: false; reason: 'invalid-envelope' | 'body-height' | 'card-floor' }
   | {
     fits: true;
-    template: '1x2' | '1x3' | '2+1' | '2x2' | '2+2+1' | '3x2';
+    template: '1x2' | '1x3' | '2x2' | '2+2+1' | '3x2';
     rows: readonly (readonly number[])[];
     cardHeight: number;
     cardTopHeadroom: number;
@@ -100,10 +100,7 @@ export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
   };
   switch (playerCount) {
     case 2: return solve('1x2', sequence.map((index) => [index]));
-    case 3: {
-      const preferred = solve('1x3', sequence.map((index) => [index]));
-      return preferred.fits ? preferred : solve('2+1', ownSingle(paired(opponents)));
-    }
+    case 3: return solve('1x3', sequence.map((index) => [index]));
     case 4: return solve('2x2', paired(sequence));
     case 5: return solve('2+2+1', ownSingle(paired(opponents)));
     default: return solve('3x2', paired(sequence));

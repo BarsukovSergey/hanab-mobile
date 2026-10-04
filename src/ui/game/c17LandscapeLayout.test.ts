@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { getC17LandscapeLayout, getC17LandscapeHandGrid, type C17LandscapeInput } from './c17LandscapeLayout';
+import { getC17LandscapeLayout, type C17LandscapeInput } from './c17LandscapeLayout';
 import { HANABI_CARD_ASPECT_RATIO } from './gameplayLayout';
 
 const envelope: C17LandscapeInput = { availableWidth: 860, availableHeight: 324, fontScale: 1,
@@ -20,24 +20,18 @@ describe('deterministic landscape hand templates', () => {
     expect(result.cellWidth).toBeCloseTo(5 * 112 * HANABI_CARD_ASPECT_RATIO + 12 + 8);
     expect(fit({ ownHandPosition: 'top' }).rows).toEqual([[0], [1]]);
   });
-  test('3P prefers 1x3 whenever its floor fits, even when 2+1 could enlarge cards', () => {
-    const result = fit({ playerCount: 3 });
+  test('3P uses 1x3 at the minimum valid complete-shell height', () => {
+    const result = fit({ playerCount: 3, availableHeight: 294 });
     expect(result.template).toBe('1x3');
     expect(result.rows).toEqual([[1], [2], [0]]);
     expect(result.cardHeight).toBeGreaterThanOrEqual(68);
-    expect(fit({ playerCount: 3, ownHandPosition: 'top' }).rows).toEqual([[0], [1], [2]]);
+    expect(fit({ playerCount: 3, availableHeight: 294, ownHandPosition: 'top' }).rows).toEqual([[0], [1], [2]]);
   });
-  test.each(['top', 'bottom'] as const)('3P hand candidate uses centered own row %s only after vertical floor failure', (ownHandPosition) => {
-    const input = { ...envelope, playerCount: 3, availableHeight: 276, ownHandPosition };
-    const grid = getC17LandscapeHandGrid(input);
-    expect(grid.fits).toBe(true);
-    if (!grid.fits) throw new Error(grid.reason);
-    expect(grid.template).toBe('2+1');
-    expect(grid.rows).toEqual(ownHandPosition === 'top' ? [[0], [1, 2]] : [[1, 2], [0]]);
-    expect(grid.cardHeight).toBeGreaterThanOrEqual(68);
-    // The complete shell still rejects this height: the mandatory right stack needs 294.
-    expect(getC17LandscapeLayout(input)).toEqual({ fits: false, reason: 'body-height' });
-    expect(getC17LandscapeHandGrid({ ...input, availableWidth: 400 }).fits).toBe(false);
+  test.each(['top', 'bottom'] as const)('3P own hand %s fails below the 294dp complete-shell floor', (ownHandPosition) => {
+    for (const availableHeight of [276, 293]) {
+      expect(getC17LandscapeLayout({ ...envelope, playerCount: 3, availableHeight, ownHandPosition }))
+        .toEqual({ fits: false, reason: 'body-height' });
+    }
   });
   test('4P standard four-card capacity uses equal 2x2 hands constrained by width', () => {
     const result = fit({ playerCount: 4, cardsPerHand: 4, availableWidth: 720 });

@@ -29,7 +29,7 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect((screen.match(/title=\{globalEmpathy \? 'All empathy/g) ?? []).length).toBe(0);
   expect(screen).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
   expect(screen).not.toContain("title={target ? 'Clue ✓' : 'Clue'}");
-  expect(screen).not.toContain("title={persistentEmpathy ✓ 'Emp ✓' : 'Emp'}");
+  expect(screen).not.toContain("title={persistentEmpathy ? 'Emp ✓' : 'Emp'}");
   expect(screen).not.toContain('title="Normal"');
 });
 
