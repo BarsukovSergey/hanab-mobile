@@ -423,7 +423,7 @@ function AppContent() {
       replayActive: roomState.room.clientState.replay.active,
       sharedReplay: roomState.room.sharedReplay,
     });
-    const gameRootScrollable = !c17Workspace || width > height;
+    const gameRootScrollable = !c17Workspace;
     focusedRoomPresentation = (
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -435,12 +435,9 @@ function AppContent() {
           landscapePhone && styles.gameBarLandscape,
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
-          {width > height && !landscapePhone && <View style={styles.brandCopy}>
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, { color: theme.colors.text }]}>{session.authenticatedUser?.username}</Text>
-          </View>}
-          <View style={[styles.headerActions, width <= height && styles.flex, landscapePhone && styles.headerActionsLandscape]}>
-            <ActionButton compact title={width <= height ? "Home" : "Browse"} tone="secondary" style={styles.liveHeaderAction} onPress={width <= height ? homeFromLive : browseFromRoom} />
-            {width <= height && <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{liveClientState.metadata.options.variantName}</Text>}
+          <View style={[styles.headerActions, styles.flex, landscapePhone && styles.headerActionsLandscape]}>
+            <ActionButton compact title="Home" tone="secondary" style={styles.liveHeaderAction} onPress={homeFromLive} />
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{liveClientState.metadata.options.variantName}</Text>
             <ActionButton
               compact
               title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
@@ -448,7 +445,7 @@ function AppContent() {
               style={styles.liveHeaderAction}
               onPress={() => setLiveSheet('chat')}
             />
-            <ActionButton compact title={width <= height ? "Menu" : "More"} tone="secondary" style={styles.liveHeaderAction} onPress={() => setLiveSheet('menu')} />
+            <ActionButton compact title="Menu" tone="secondary" style={styles.liveHeaderAction} onPress={() => setLiveSheet('menu')} />
           </View>
         </View>
         {liveConnectionProblem && (

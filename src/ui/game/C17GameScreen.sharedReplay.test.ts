@@ -27,7 +27,7 @@ test('C17 shared replay presents authoritative leader and follow state without g
   expect(screen).toContain('{sharedReplay === null ? <>');
   expect(screen).toContain('title="Take leadership"');
   expect(screen).toContain('title={`Pass to ${name}`}');
-  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
+  expect(screen).toContain('{ height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 }');
   expect(screen).toContain('{sharedReplay.amLeader && sharedReplayPassTargets.map((name) => <ActionButton');
   expect(screen).not.toContain('CardKnowledgeDetails');
 });
@@ -40,9 +40,12 @@ test('C17 shared replay renders its leader once and groups priority controls com
   );
 
   expect((sharedWorkbench.match(/Leader: \{sharedReplay\.leader\}/g) ?? []).length).toBe(1);
-  expect(sharedWorkbench).toContain('title="Back" onLongPress={onReviewStart} onPress={onReviewBack}');
-  expect(sharedWorkbench).toContain('title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward}');
-  expect(sharedWorkbench).toContain('title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()}');
+  const primaryControls = screen.slice(screen.indexOf('const replayPrimaryControls ='), screen.indexOf('const WorkbenchViewport ='));
+  expect(sharedWorkbench).toContain('{portraitV2 && replayPrimaryControls}');
+  expect(screen).toContain('styles.actionButtons]}>{replayPrimaryControls}');
+  expect(primaryControls).toContain('title="Back" onLongPress={onReviewStart} onPress={onReviewBack}');
+  expect(primaryControls).toContain('title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward}');
+  expect(primaryControls).toContain('title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()}');
   expect(sharedWorkbench).toContain('title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)}');
   expect(sharedWorkbench).toContain('title={`Pass to ${name}`}');
   expect(sharedWorkbench).toContain('title="Start Hypothetical" tone="primary" onPress={() => takeWorkbenchTask(onStartHypothetical)}');

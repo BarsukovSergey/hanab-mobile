@@ -71,8 +71,8 @@ describe('C17 workspace route', () => {
 });
 
 
-test('Live keeps a stable ScrollView root across rotation with eligible portrait scrolling disabled', () => {
-  expect(appSource).toContain('const gameRootScrollable = !c17Workspace || width > height;');
+test('Live keeps a stable ScrollView root across rotation with eligible scrolling disabled in both orientations', () => {
+  expect(appSource).toContain('const gameRootScrollable = !c17Workspace;');
   const liveRoot = appSource.match(/<SafeAreaView edges=\{\['bottom'\]\}[^>]*>\s*(<ScrollView[\s\S]*?<\/ScrollView>)\s*<\/SafeAreaView>/)?.[1] ?? '';
   expect(liveRoot).toContain('scrollEnabled={gameRootScrollable}');
   expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible} />');
@@ -81,7 +81,8 @@ test('Live keeps a stable ScrollView root across rotation with eligible portrait
   expect(appSource).not.toContain('<GameRoot');
   expect(appSource).not.toMatch(/gameRootScrollable\s*\?\s*(?:ScrollView|View)/);
   expect(appSource).not.toContain('|| height < 700');
-  expect(c17ScreenSource).toContain('const compact = !portraitV2');
+  expect(c17ScreenSource).not.toContain('CompactHandCardSummary');
+  expect(c17ScreenSource).toContain('style={styles.landscapeBody}');
   expect(c17ScreenSource).toContain("ownHandPosition === 'top' ? { flexDirection: 'column-reverse'");
   expect(c17ScreenSource).toContain('const OpponentViewport = portraitV2 && layout.opponentsScrollable ? ScrollView : View;');
 });

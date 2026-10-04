@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import type { GameState } from '../../game/bootstrap/types';
-import type { DiscardResourceCue } from '../../game/selectors/gameResourcePresentation';
+import type { ClueResourceCue, DiscardResourceCue } from '../../game/selectors/gameResourcePresentation';
 import { getDiscardPresentation } from '../../game/selectors/discardPresentation';
 import { getDisplayedClueTokens } from '../../game/selectors/gameplay';
 import { getDiscardSummary } from '../../game/selectors/discardSummary';
@@ -20,24 +20,34 @@ import {
   HANABI_TABLE_CARD_ASPECT_RATIO,
 } from './tableLayout';
 
+type LandscapeResourceFeedback = {
+  before: GameState | undefined;
+  segment: number | null;
+  clueCue: ClueResourceCue;
+  lowScorePhase: boolean;
+  colorblindMode: boolean;
+};
+
 export function CompactTable({
   game,
   discardResourceCue = 'default',
   variantName,
   onOpenDiscards,
   dense = false,
-  portraitV2 = false,
+  presentation = 'legacy',
   tightChrome = false,
   pulseDiscard,
   pulseEnabled = true,
   pulsePlay,
+  landscapeResourceFeedback,
 }: {
   game: GameState;
+  landscapeResourceFeedback?: LandscapeResourceFeedback;
   discardResourceCue?: DiscardResourceCue;
   variantName: string;
   onOpenDiscards?: () => void;
   dense?: boolean;
-  portraitV2?: boolean;
+  presentation?: 'legacy' | 'portrait-v2' | 'landscape-v2';
   tightChrome?: boolean;
   pulseDiscard?: number | null;
   pulseEnabled?: boolean;
@@ -62,9 +72,10 @@ export function CompactTable({
     landscapePhone,
   );
 
-  if (portraitV2) return <PortraitTable game={game} variantName={variantName}
+  if (presentation !== 'legacy') return <V2Table landscape={presentation === 'landscape-v2'} game={game} variantName={variantName}
     cardIdentities={cardIdentities} discardResourceCue={discardResourceCue} onOpenDiscards={onOpenDiscards}
-    fontScale={fontScale} pulseDiscard={pulseDiscard} pulseEnabled={pulseEnabled} pulsePlay={pulsePlay} />;
+    fontScale={fontScale} pulseDiscard={pulseDiscard} pulseEnabled={pulseEnabled} pulsePlay={pulsePlay}
+    resourceFeedback={landscapeResourceFeedback} />;
 
   return <View style={[
     styles.surface,
@@ -169,9 +180,10 @@ export function CompactTable({
   </View>;
 }
 
-function PortraitTable({ game, variantName, cardIdentities, discardResourceCue, onOpenDiscards,
-  fontScale, pulseDiscard, pulseEnabled, pulsePlay }: {
-  game: GameState; variantName: string;
+function V2Table({ landscape, game, variantName, cardIdentities, discardResourceCue, onOpenDiscards,
+  fontScale, pulseDiscard, pulseEnabled, pulsePlay, resourceFeedback }: {
+  landscape: boolean; game: GameState; variantName: string;
+  resourceFeedback?: LandscapeResourceFeedback;
   cardIdentities?: readonly import('../../game/bootstrap/types').CardIdentity[];
   discardResourceCue: DiscardResourceCue; onOpenDiscards?: () => void;
   fontScale: number; pulseDiscard?: number | null; pulseEnabled: boolean;
@@ -181,22 +193,28 @@ function PortraitTable({ game, variantName, cardIdentities, discardResourceCue, 
   const [availableWidth, setAvailableWidth] = useState(0);
   const suits = getGameTableSuits(variantName, game);
   const visuals = getCardSuitVisuals(variantName);
-  const lateralRail = getPortraitResourceRailFit(availableWidth, suits.length, fontScale);
-  const resourceRail = Math.max(64, Math.ceil(64 * Math.min(fontScale, 1.5)));
+  const lateralRail = landscape || getPortraitResourceRailFit(availableWidth, suits.length, fontScale);
+  const resourceRail = landscape ? 58 : Math.max(64, Math.ceil(64 * Math.min(fontScale, 1.5)));
   const stackWidth = Math.max(30, Math.min(40, (availableWidth - 42 - 28 - (lateralRail ? resourceRail : 0)) / Math.max(1, suits.length)));
-  const stackHeight = stackWidth / HANABI_TABLE_CARD_ASPECT_RATIO;
+  const stackHeight = landscape ? 30 : stackWidth / HANABI_TABLE_CARD_ASPECT_RATIO;
   const discard = getDiscardPresentation(game, cardIdentities);
+  const resourcePulse = (before: number | undefined, after: number) => landscape && before !== undefined && before !== after
+    ? resourceFeedback?.segment ?? null : null;
+  const clueColor = !landscape ? theme.colors.text
+    : resourceFeedback?.clueCue === 'no-clues' ? '#ff5555'
+    : resourceFeedback?.clueCue === 'one-clue' ? '#ffd54f'
+    : resourceFeedback?.clueCue === 'max-clues' ? '#aaff00' : theme.colors.text;
   const resources = <View style={{ minWidth: resourceRail, gap: 3, flexDirection: lateralRail ? 'column' : 'row', alignItems: 'center' }}>
-    <Text style={{ color: theme.colors.text }}>Clues {getDisplayedClueTokens(game.clueTokens, variantName)}</Text>
-    <View accessibilityLabel={`Strikes ${game.strikes.length}`} style={{ flexDirection: 'row', gap: 3 }}>
-      {[0, 1, 2].map((slot) => <View key={slot} style={{ width: 16, height: 16, borderWidth: 1, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: theme.colors.text, fontSize: 12 }}>{slot < game.strikes.length ? '\u00d7' : ''}</Text>
+    <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.clueTokens, game.clueTokens)}><Text numberOfLines={landscape ? 1 : undefined} style={{ color: clueColor, ...(landscape ? { fontSize: 10 } : {}) }}>Clues {getDisplayedClueTokens(game.clueTokens, variantName)}</Text></AuthoritativePulse>
+    <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.strikes.length, game.strikes.length)}><View accessibilityLabel={`Strikes ${game.strikes.length}`} style={{ flexDirection: 'row', gap: 3 }}>
+      {[0, 1, 2].map((slot) => <View key={slot} style={{ width: landscape ? 12 : 16, height: landscape ? 12 : 16, borderWidth: 1, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: theme.colors.text, fontSize: landscape ? 9 : 12 }}>{slot < game.strikes.length ? '\u00d7' : ''}</Text>
       </View>)}
-    </View>
+    </View></AuthoritativePulse>
   </View>;
-  return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4 }}>
-    <View style={[styles.surface, { padding: 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text>
+  return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4, ...(landscape ? { height: 92, flexShrink: 0 } : {}) }}>
+    <View style={[styles.surface, { ...(landscape ? { height: 62, gap: 0 } : {}), padding: landscape ? 3 : 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.score, game.score)}><Text style={{ color: landscape && resourceFeedback?.lowScorePhase ? '#00ffff' : theme.colors.text, ...(landscape && resourceFeedback?.lowScorePhase && resourceFeedback.colorblindMode ? { textDecorationLine: 'underline' as const } : {}), fontSize: landscape ? 10 : 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text></AuthoritativePulse>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <View style={{ flexDirection: 'row', gap: 2, flex: 1 }}>
           {suits.map((suit) => {
@@ -212,20 +230,20 @@ function PortraitTable({ game, variantName, cardIdentities, discardResourceCue, 
           })}
         </View>
         {lateralRail && resources}
-        <View accessible accessibilityLabel={`Deck ${game.cardsRemainingInTheDeck}`} style={{ width: 42, minHeight: 42, borderWidth: 1, borderRadius: 5, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+        <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)}><View accessible accessibilityLabel={`Deck ${game.cardsRemainingInTheDeck}`} style={{ width: landscape ? 34 : 42, minHeight: landscape ? 30 : 42, borderWidth: 1, borderRadius: 5, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: theme.colors.text, fontSize: 10 }}>Deck</Text>
-          <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{game.cardsRemainingInTheDeck}</Text>
-        </View>
+          <Text style={{ color: theme.colors.text, fontWeight: '700', ...(landscape ? { fontSize: 12 } : {}) }}>{game.cardsRemainingInTheDeck}</Text>
+        </View></AuthoritativePulse>
       </View>
       {!lateralRail && resources}
     </View>
     <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseDiscard ?? null}>
-      <Pressable accessibilityRole="button" accessibilityLabel={discardResourceCue === 'blocked' ? 'Discard Pile. Unavailable because clues are at maximum' : discardResourceCue === 'double-discard' ? 'Discard Pile. Potential Double Discard' : 'Discard Pile'} onPress={onOpenDiscards} style={[styles.discard, { backgroundColor: theme.colors.surfaceMuted, borderColor: discardResourceCue === 'blocked' ? '#ff5555' : discardResourceCue === 'double-discard' ? '#ffd54f' : theme.colors.border }]}>
-        <Text style={{ color: theme.colors.text, fontSize: 11, fontWeight: '700' }}>Discard Pile</Text>
-        {discard.cards.length === 0 ? <Text style={{ color: theme.colors.textMuted }}>None</Text>
-          : discard.relevantCards.length === 0 ? <Text style={{ color: theme.colors.textMuted }}>No relevant cards</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={discardResourceCue === 'blocked' ? 'Discard Pile. Unavailable because clues are at maximum' : discardResourceCue === 'double-discard' ? 'Discard Pile. Potential Double Discard' : 'Discard Pile'} onPress={onOpenDiscards} style={[styles.discard, landscape && { height: 26, padding: 2, flexDirection: 'row', alignItems: 'center', gap: 4 }, { backgroundColor: theme.colors.surfaceMuted, borderColor: discardResourceCue === 'blocked' ? '#ff5555' : discardResourceCue === 'double-discard' ? '#ffd54f' : theme.colors.border }]}>
+        <Text style={{ color: theme.colors.text, fontSize: landscape ? 10 : 11, fontWeight: '700' }}>Discard Pile</Text>
+        {discard.cards.length === 0 ? <Text style={{ color: theme.colors.textMuted, ...(landscape ? { fontSize: 10 } : {}) }}>None</Text>
+          : discard.relevantCards.length === 0 ? <Text style={{ color: theme.colors.textMuted, ...(landscape ? { fontSize: 10 } : {}) }}>No relevant cards</Text>
           : <ScrollView horizontal nestedScrollEnabled contentContainerStyle={{ gap: 3 }}>
-            {discard.relevantCards.map((card) => <VisibleHanabiCard key={card.order} height={32} rank={card.rank} suitIndex={card.suitIndex} variantName={variantName} />)}
+            {discard.relevantCards.map((card) => <VisibleHanabiCard key={card.order} height={landscape ? 20 : 32} rank={card.rank} suitIndex={card.suitIndex} variantName={variantName} />)}
           </ScrollView>}
       </Pressable>
     </AuthoritativePulse>
