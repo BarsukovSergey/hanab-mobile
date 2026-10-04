@@ -166,7 +166,7 @@ Ratified shell decisions include:
 - browsing `More` is distinct from room-context `Table/Game/Review menu`;
 - Create Table is a dedicated task screen;
 - Messages remain under People and are client/session-local until durable server support exists;
-- short-wide phone landscape is its own layout class; gameplay uses measured A/B composition fit rather than a generic `wide` rule.
+- phone landscape remains a first-class short-wide layout class; Live uses one measured Slice 8b landscape composition/topology rather than a generic `wide` rule. Alternate landscape geometry or a user preference remains future work.
 
 Implementation follows the incremental slices in the v2 spec. Do not enable room-preserving Browse before
 safe task suspension/visibility ownership is implemented, and do not defer landscape foundation to final polish.
@@ -486,7 +486,7 @@ Current near-term order:
 2. execute `MOBILE_APP_DESIGN_V2.md` incrementally, beginning with contract/navigation separation and responsive/surface foundations;
 3. land Home/Create and Pregame only after those foundations are stable;
 4. land safe task/visibility ownership before enabling room-preserving Browse/Return;
-5. redesign Live portrait and then measured landscape A/B without changing gameplay authority;
+5. redesign Live portrait and then the single measured Slice 8b landscape composition without changing gameplay authority; alternate landscape geometry or a user preference remains future work;
 6. complete Chat/Menu, History/Review, People/session Messages/Profile, and Settings/More slices;
 7. run the full physical-device/product UX validation matrix;
 8. deepen profiles/social/history;
