@@ -103,10 +103,10 @@ export function useHanabTheme() {
   return value;
 }
 
-const ResponsiveWindowContext = createContext<(MeasuredWindow & { width: number; height: number }) | null>(null);
+const ResponsiveWindowContext = createContext<(MeasuredWindow & { width: number; height: number; fontScale: number }) | null>(null);
 
 export function ResponsiveSurfaceProvider({ children }: { children: ReactNode }) {
-  const { width, height } = useWindowDimensions();
+  const { fontScale } = useWindowDimensions();
   const frame = useSafeAreaFrame();
   const systemInsets = useSafeAreaInsets();
   const [imeOcclusion, setImeOcclusion] = useState(0);
@@ -133,7 +133,7 @@ export function ResponsiveSurfaceProvider({ children }: { children: ReactNode })
       () => setImeOcclusion(0));
     return () => { show.remove(); hide.remove(); };
   }, []);
-  return <ResponsiveWindowContext.Provider value={{ ...geometry, width, height }}>{children}</ResponsiveWindowContext.Provider>;
+  return <ResponsiveWindowContext.Provider value={{ ...geometry, width: geometry.rawWindow.width, height: geometry.rawWindow.height, fontScale }}>{children}</ResponsiveWindowContext.Provider>;
 }
 
 export function useResponsiveLayout() {

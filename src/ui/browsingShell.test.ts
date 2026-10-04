@@ -38,9 +38,9 @@ test('focused rooms stay mounted in an App-owned layer while browsing has focus'
   expect(live).toContain('focusedRoomPresentation = (');
   expect(live).toContain('const gameRootScrollable = !c17Workspace;');
   expect(live).toContain('scrollEnabled={gameRootScrollable}');
-  expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible} />');
-  expect(live).toContain('visible={roomPresentationVisible && liveSheet !== null}');
-  expect(live).toContain("readActive={roomPresentationVisible && liveSheet === 'chat'}");
+  expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} />');
+  expect(live).toContain('const childVisible = roomPresentationVisible && roomChild !== null;');
+  expect(live).toContain("readActive={roomPresentationVisible && roomChild === 'chat'}");
   expect(live).not.toMatch(/\breturn\s*\(\s*<KeyboardAvoidingView/);
   expect(pregame).toContain('focusedRoomPresentation = <KeyboardAvoidingView');
   expect(pregame).not.toContain('return <KeyboardAvoidingView');
@@ -60,9 +60,9 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   expect(app).toContain('useLayoutEffect(() => {\n    const result = reconcilePresentationFocus(');
   expect(app).toContain('roomMigrationPending: roomState.rematchTransition !== null');
   expect(app).toContain('if (result.enteredRoom) closeCreateTask();');
-  const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setLiveSheet(null);"));
+  const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setRoomChild(null);"));
   expect(hiddenEffect.slice(0, hiddenEffect.indexOf('}, [presentationFocus]);')))
-    .toBe("if (presentationFocus !== 'room') setLiveSheet(null);\n  ");
+    .toBe("if (presentationFocus !== 'room') setRoomChild(null);\n  ");
   expect(app).toContain('title="Home"');
   expect(app).toContain('returnPresentation={returnPresentation} onReturn={returnToRoom}');
 });
@@ -93,7 +93,7 @@ test('stable no-room waits for authoritative recovery and sign-out clears room o
 test('hardware Back assigns browsing ownership before room attendance', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const hardwareBack = app.slice(app.indexOf("BackHandler.addEventListener('hardwareBackPress'"), app.indexOf('return () => subscription.remove();', app.indexOf("BackHandler.addEventListener('hardwareBackPress'")));
-  const liveMenu = app.slice(app.indexOf("liveSheet === 'menu'"), app.indexOf(": liveSheet === 'chat'"));
+  const liveMenu = app.slice(app.indexOf("{roomChild === 'menu' ? <>"), app.indexOf("</> : roomChild === 'menu-participants'"));
   expect(hardwareBack.indexOf("if (presentationFocus === 'browsing')")).toBeLessThan(hardwareBack.indexOf("if (roomState.room.kind === 'pregame')"));
   expect(hardwareBack).toContain("getFocusedRoomBackDecision(roomState.room)");
   expect(hardwareBack).not.toContain('lobbyRuntime.unattendLiveGame');

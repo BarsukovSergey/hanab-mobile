@@ -1,9 +1,13 @@
+import type { ReactNode } from 'react';
+import { View } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { C17GameScreen } from './C17GameScreen';
 import { GameScreen as LegacyGameScreen } from './LegacyGameScreen';
 import { isC17WorkspaceEligible } from './c17Workspace';
 
-export function GameScreen({ presentationVisible = true }: { presentationVisible?: boolean }) {
+export type RoomChildren = (landscapeRightWidth: number | null) => ReactNode;
+
+export function GameScreen({ presentationVisible = true, roomChildren }: { presentationVisible?: boolean; roomChildren?: RoomChildren }) {
   const room = useAppSelector((state) => state.room.room);
   const liveRoom = room.kind === 'live_game' ? room : null;
   const clientState = liveRoom?.clientState ?? null;
@@ -18,6 +22,6 @@ export function GameScreen({ presentationVisible = true }: { presentationVisible
   });
 
   return useC17
-    ? <C17GameScreen presentationVisible={presentationVisible} />
-    : <LegacyGameScreen presentationVisible={presentationVisible} />;
+    ? <C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} />
+    : <View style={{ flex: 1 }}><View pointerEvents={presentationVisible ? 'auto' : 'none'} accessibilityElementsHidden={!presentationVisible} importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'}><LegacyGameScreen presentationVisible={presentationVisible} /></View>{roomChildren?.(null)}</View>;
 }
