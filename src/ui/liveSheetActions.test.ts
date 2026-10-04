@@ -43,11 +43,11 @@ test('keeps live-game header actions outlined, matched, and tall enough to tap',
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
-  expect(browse).toContain('title={width <= height ? "Home" : "Browse"}');
-  expect(browse).toContain('onPress={width <= height ? homeFromLive : browseFromRoom}');
+  expect(browse).toContain('title="Home"');
+  expect(browse).toContain('onPress={homeFromLive}');
   expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
   expect(chat).toContain("onPress={() => setLiveSheet('chat')}");
-  expect(more).toContain('title={width <= height ? "Menu" : "More"}');
+  expect(more).toContain('title="Menu"');
   expect(more).toContain("onPress={() => setLiveSheet('menu')}");
   for (const button of buttons) {
     expect(button).toContain('compact');
@@ -68,4 +68,16 @@ test('uses explicit export feedback tone instead of inferring it from message te
   expect(liveSheet).toContain("message: 'Could not copy replay link.', tone: 'error'");
   expect(liveSheet).toContain("message: 'Could not share replay link.', tone: 'error'");
   expect(liveSheet).toContain("message: 'Could not copy replay JSON.', tone: 'error'");
+});
+
+
+test('Live header shares Home variant Chat Menu in both orientations', () => {
+  const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
+  expect(header).toContain('title="Home"');
+  expect(header).toContain('onPress={homeFromLive}');
+  expect(header).toContain('liveClientState.metadata.options.variantName');
+  expect(header).toContain('title="Menu"');
+  expect(header).toContain("onPress={() => setLiveSheet('chat')}");
+  expect(header).not.toMatch(/Browse|More|username|YOUR TURN|LIVE T/);
+  expect(header).not.toContain('width <= height');
 });

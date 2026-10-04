@@ -58,10 +58,10 @@ it('portrait moves resources into CompactTable while retaining Turn, Pace and Ef
   const table = readFileSync('src/ui/game/CompactTable.tsx', 'utf8');
   const viewer = readFileSync('src/ui/game/DiscardViewer.tsx', 'utf8');
   const cards = readFileSync('src/ui/game/GameCard.tsx', 'utf8');
-  expect(c17).toContain('<CompactTable portraitV2={portraitV2}');
-  expect(c17).toContain('{!portraitV2 && <>');
+  expect(c17).toContain("<CompactTable presentation={portraitV2 ? 'portrait-v2' : 'landscape-v2'}");
+  expect(c17).toContain('landscapeMetricStrip: { height: 34');
   expect(c17).toContain('`LIVE T${liveTurn}`');
-  expect(c17).toContain('numberOfLines={portraitV2 ? undefined : 1}');
+  expect(c17).toContain('numberOfLines={portraitV2 ? undefined : 2}');
   expect(table).toContain('Score {game.score} / {game.stats.maxScore}');
   expect(table).toContain('[0, 1, 2].map');
   expect(table).toContain('getPortraitResourceRailFit(availableWidth, suits.length, fontScale)');
@@ -70,4 +70,21 @@ it('portrait moves resources into CompactTable while retaining Turn, Pace and Ef
   expect(table).toContain('discard.relevantCards.map');
   expect(viewer).toContain('faded={isEngineTrash(');
   expect(cards).toContain('(faded || statePresentation?.shouldFade) && styles.engineTrashCard');
+});
+
+
+it('CompactTable defaults to Legacy and packs landscape resources plus individual relevant discards into 92dp', () => {
+  const table = readFileSync('src/ui/game/CompactTable.tsx', 'utf8');
+  expect(table).toContain("presentation = 'legacy'");
+  expect(table).toContain("presentation?: 'legacy' | 'portrait-v2' | 'landscape-v2'");
+  const v2 = table.slice(table.indexOf('function V2Table('), table.indexOf('function compactSuitName('));
+  expect(v2).toContain('height: 92, flexShrink: 0');
+  expect(v2).toContain('height: 62, gap: 0');
+  expect(v2).toContain('height: 26');
+  expect(v2).toContain('getDiscardPresentation(game, cardIdentities)');
+  expect(v2).toContain('discard.relevantCards.map');
+  expect(v2).toContain('key={card.order}');
+  expect(v2).not.toContain('getDiscardSummary');
+  expect(v2).not.toContain('count > 1');
+  expect(v2).not.toContain('deckPlays');
 });

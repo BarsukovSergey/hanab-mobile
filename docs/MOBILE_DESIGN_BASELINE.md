@@ -163,7 +163,7 @@ Key ratified decisions:
 - an attended room has a one-action Return affordance while browsing;
 - Create Table is a dedicated task screen launched from Home;
 - Messages remain under People and are explicitly client/session-local until a durable server capability exists;
-- phone landscape is a first-class short-wide layout class, with Live layout A/B chosen by measured fit rather than a generic `wide` breakpoint.
+- phone landscape remains a first-class short-wide layout class, with Live using the single measured Slice 8b landscape composition and no generic `wide` breakpoint.
 
 Implementation must follow the incremental slices in the v2 specification. In particular, browsing while
 an attended room remains active must not be enabled before safe task suspension and visibility-owned

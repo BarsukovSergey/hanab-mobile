@@ -135,13 +135,11 @@ describe('C17 hypothetical seating and action-hand separation', () => {
 
   test('uses dense clue controls for hypothetical planning and preserves ordinary clue presentation', () => {
     const screen = readC17Screen();
-    const hypotheticalBranchStart = screen.indexOf('{hypothetical !== null ? <>');
-    const hypotheticalClueStart = screen.indexOf('{selectedTarget !== null ? <ClueComposer', hypotheticalBranchStart);
-    const ordinaryClueStart = screen.indexOf('</> : selectedTarget !== null ? <ClueComposer', hypotheticalClueStart);
-    const hypotheticalComposer = screen.slice(hypotheticalClueStart, screen.indexOf('/> : canPlayGameplay', hypotheticalClueStart));
-    const ordinaryComposer = screen.slice(ordinaryClueStart, screen.indexOf('/> : canPlayGameplay', ordinaryClueStart));
-
-    expect(hypotheticalComposer.replaceAll('\r\n', '\n')).toContain('\n            dense\n');
-    expect(ordinaryComposer).toContain('dense={usesDenseSideLabels}');
+    const hypotheticalControls = screen.slice(screen.indexOf('const hypotheticalTaskControls ='), screen.indexOf('const WorkbenchViewport ='));
+    const ordinaryComposer = screen.slice(screen.indexOf('</> : selectedTarget !== null ? <ClueComposer'));
+    expect(hypotheticalControls.replaceAll('\r\n', '\n')).toContain('\n            dense\n');
+    expect(ordinaryComposer).toContain('dense={!portraitV2 || usesDenseSideLabels}');
+    expect(screen).toContain('{portraitV2 && hypotheticalTaskControls}');
+    expect(screen).toContain('style={styles.landscapePrimaryControls}>{hypotheticalTaskControls}');
   });
 });

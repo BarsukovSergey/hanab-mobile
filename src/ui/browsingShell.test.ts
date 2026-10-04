@@ -36,6 +36,8 @@ test('focused rooms stay mounted in an App-owned layer while browsing has focus'
   const finalRender = app.slice(app.indexOf('  const browsingPresentation = ('));
   expect(app).toContain('let focusedRoomPresentation: ReactNode = null;');
   expect(live).toContain('focusedRoomPresentation = (');
+  expect(live).toContain('const gameRootScrollable = !c17Workspace;');
+  expect(live).toContain('scrollEnabled={gameRootScrollable}');
   expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible} />');
   expect(live).toContain('visible={roomPresentationVisible && liveSheet !== null}');
   expect(live).toContain("readActive={roomPresentationVisible && liveSheet === 'chat'}");
@@ -61,7 +63,7 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setLiveSheet(null);"));
   expect(hiddenEffect.slice(0, hiddenEffect.indexOf('}, [presentationFocus]);')))
     .toBe("if (presentationFocus !== 'room') setLiveSheet(null);\n  ");
-  expect(app).toContain('title={width <= height ? "Home" : "Browse"}');
+  expect(app).toContain('title="Home"');
   expect(app).toContain('returnPresentation={returnPresentation} onReturn={returnToRoom}');
 });
 

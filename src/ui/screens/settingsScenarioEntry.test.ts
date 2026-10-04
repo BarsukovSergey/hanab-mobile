@@ -73,15 +73,20 @@ test('Settings groups existing controls under the four canonical categories', ()
   expect(settings).toContain("category === 'gameplay'");
 });
 
-test('portrait Live identity is always the current variant with single-line truncation', () => {
+test('Live identity in both orientations is always the current variant with single-line truncation', () => {
   const app = read('App.tsx');
-  const start = app.indexOf('{width <= height && <Text');
-  const identity = app.slice(start, app.indexOf('</Text>}', start));
+  const start = app.indexOf('<Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex');
+  const identity = app.slice(start, app.indexOf('</Text>', start));
   expect(identity).toContain('liveClientState.metadata.options.variantName');
   expect(identity).toContain('numberOfLines={1}');
   expect(identity).toContain('ellipsizeMode="tail"');
   expect(identity).not.toContain('username');
   expect(identity).not.toContain('tableID');
+  expect(identity).not.toContain('width <= height');
+  const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
+  expect(header).not.toContain('username');
+  expect(header).not.toContain('title="Browse"');
+  expect(header).not.toContain('title="More"');
 });
 
 

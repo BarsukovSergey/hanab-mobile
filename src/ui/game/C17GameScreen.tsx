@@ -22,7 +22,6 @@ import { getLastCluePresentationFromState } from '../../game/selectors/lastClue'
 import { getGameResourcePresentation } from '../../game/selectors/gameResourcePresentation';
 import {
   canDiscardForVariant,
-  getDisplayedClueTokens,
   getDisplayedClockString,
   getGameplayPresentation,
   getGameplayCardsPerHand,
@@ -35,6 +34,7 @@ import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { ActionButton, Notice, useHanabTheme } from '../designSystem';
+import { getC17LandscapeLayout, C17_LANDSCAPE_REGION_GAP, C17_LANDSCAPE_COLUMN_GAP, C17_LANDSCAPE_ROW_GAP } from './c17LandscapeLayout';
 import { C17RewindScrubber } from './C17RewindScrubber';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
 import { getPaceRiskColor, PaceDetailsModal } from './PaceDetailsModal';
@@ -42,9 +42,10 @@ import { ClueComposer } from './ClueComposer';
 import { CompactTable } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
-import { CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';
+import { GameCard, VisibleHanabiCard } from './GameCard';
 import { NoteEditor } from './NoteEditor';
 import {
+  type C17DenseLayout,
   getC17CardLaneWidth,
   C17_SIDE_LABEL_LANE_WIDTH,
   C17_SIDE_LABEL_ROW_GAP,
@@ -860,9 +861,8 @@ function C17DenseWorkspace({
   const opponents = getC17HandRows(metadata.playerNames.length, seatingAnchorIndex, actionHandIndex).opponentIndices;
   const usesSideLabels = opponents.length <= 2;
   const usesDenseSideLabels = opponents.length >= 3;
-  const usesSideLabelRows = usesSideLabels || usesDenseSideLabels;
-  const usesCompactWorkbench = usesSideLabels;
-  const workbenchHeight = getC17WorkbenchHeight(viewportHeight, opponents.length, portraitV2);
+  const usesSideLabelRows = portraitV2 && (usesSideLabels || usesDenseSideLabels);
+  const workbenchHeight = portraitV2 ? getC17WorkbenchHeight(viewportHeight, opponents.length, true) : 0;
   const shellKey = `${Math.round(viewportWidth)}:${Math.round(viewportHeight)}:${fontScale.toFixed(2)}:${opponents.length}:${cardsPerHand}:${workbenchHeight}`;
   const [layoutMetrics, setLayoutMetrics] = useState({
     shellKey: '',
@@ -890,24 +890,46 @@ function C17DenseWorkspace({
     layoutMetrics.ambientBodyWidth,
     usesSideLabelRows ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
   );
-  const layout = getC17DenseLayout({
+  const landscapeLayout = getC17LandscapeLayout({
+    availableWidth: layoutMetrics.ambientBodyWidth,
+    availableHeight: layoutMetrics.ambientBodyHeight,
+    fontScale,
+    playerCount: metadata.playerNames.length,
+    cardsPerHand,
+    seatingAnchorIndex,
+    ownHandPosition,
+  });
+  const layout: C17DenseLayout = portraitV2 ? getC17DenseLayout({
     opponentCardLaneWidth: cardLaneWidth,
     handsRegionHeight,
     ownCardLaneWidth: cardLaneWidth,
     opponentCount: opponents.length,
     cardsPerHand,
     workbenchHeight,
-    portraitV2,
-  });
+    portraitV2: true,
+  }) : landscapeLayout.fits ? {
+    mode: 'full-ledger',
+    opponentCardHeight: landscapeLayout.cardHeight,
+    ownCardHeight: landscapeLayout.cardHeight,
+    opponentRowHeight: landscapeLayout.rowHeight,
+    ownRowHeight: landscapeLayout.rowHeight,
+    cardTopHeadroom: landscapeLayout.cardTopHeadroom,
+    handsHeight: landscapeLayout.gridHeight,
+    workbenchHeight: landscapeLayout.workbenchHeight,
+  } : {
+    // Failed geometry renders only the notice; no legacy allocation is used.
+    mode: 'full-ledger', opponentCardHeight: 0, ownCardHeight: 0, cardTopHeadroom: 0,
+    opponentRowHeight: 0, ownRowHeight: 0, handsHeight: 0, workbenchHeight: 0,
+  };
   const OpponentViewport = portraitV2 && layout.opponentsScrollable ? ScrollView : View;
   const captureAmbientBody = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((currentMetrics) => {
       const sameShell = currentMetrics.shellKey === shellKey;
-      const envelope = getC17AmbientEnvelope(
+      const envelope = portraitV2 ? getC17AmbientEnvelope(
         { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
         { height: next.height, width: next.width },
         sameShell,
-      );
+      ) : next;
       if (sameShell && !hasC17AmbientRegionChanged(
         { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
         envelope,
@@ -931,7 +953,6 @@ function C17DenseWorkspace({
     showCurrentPlayerCue: !hypothetical && !reviewActive && !finishedReplay && sharedReplay === null,
   });
   const actorPulse = liveBefore !== undefined && liveBefore.turn.currentPlayerIndex !== current ? livePulseSegment : null;
-  const resourcePulse = (before: number, after: number) => before !== after ? livePulseSegment : null;
   const playPulse = livePulseSegment !== null && liveTransition.actionType === 'play' && liveTransition.cardOrder !== null
     ? { segment: livePulseSegment, suitIndex: game.deck[liveTransition.cardOrder]?.suitIndex ?? -1 }
     : null;
@@ -940,16 +961,11 @@ function C17DenseWorkspace({
     (liveTransition.actionType === 'play' || liveTransition.actionType === 'discard')
       && liveTransition.actorIndex === index ? livePulseSegment : null
   );
-  const clueTargetPulse = (index: number) => (
-    liveTransition.actionType === 'clue'
-      && liveTransition.targetIndex === index ? livePulseSegment : null
-  );
   const cluePulse = (index: number, position: number) => (
     liveTransition.actionType === 'clue'
       && liveTransition.targetIndex === index
       && liveTransition.touchedSlots.includes(position + 1) ? livePulseSegment : null
   );
-  const currentName = current === null ? 'No current player' : metadata.playerNames[current] ?? `Player ${current + 1}`;
   const anchoredHand = getDisplayedHandOrders(game.hands[seatingAnchorIndex], reverseHands);
   const anchoredIsActionHand = actionHandIndex === seatingAnchorIndex;
   const displayIdentity = (order: number) => hypothetical?.morphedIdentities[order] ?? cardIdentities[order];
@@ -966,361 +982,353 @@ function C17DenseWorkspace({
   const hasAvailableNote = (order: number) => readOnlyReplay
     ? (replayNotes[order]?.some((entry) => entry.text.trim().length > 0) ?? false)
     : (notes[order]?.text.trim().length ?? 0) > 0;
-  const showWorkbench = (portraitV2 && workbenchFeedback !== null) || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
+  const showWorkbench = workbenchFeedback !== null || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedActionCard !== null || noteCard !== null || pendingText !== null;
-  const denseClueWorkbench = !portraitV2 && usesDenseSideLabels && selectedTarget !== null
-    && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null;
-  const denseClueAvailableHeight = Math.max(
-    layout.workbenchHeight,
-    handsRegionHeight + layout.workbenchHeight - layout.handsHeight,
-  );
-  const compactOrdinaryWorkbench = !portraitV2 && usesCompactWorkbench
-    && hypothetical === null
-    && !reviewActive
-    && !finishedReplay
-    && sharedReplay === null
-    && selectedTarget === null
-    && (selectedActionCard !== null || noteCard !== null);
-  const compactCappedWorkbench = !portraitV2 && usesCompactWorkbench && (compactOrdinaryWorkbench
-    || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);
   const showRewindScrubber = reviewActive;
   const finishedReason = result?.reason;
   const finishedStatus = finishedReason === null || finishedReason === undefined
     ? 'FINAL'
     : `FINAL · ${finishedReason}`;
-  return <View style={styles.workspace}>
-    <View style={styles.ledgerChrome}>
-      <View style={[styles.hud, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-        <View style={styles.grow}>
-          <Text numberOfLines={1} style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
-            ? `SHARED REVIEW T${selectedTurn}`
-            : hypothetical !== null
-              ? 'HYPOTHETICAL'
-            : finishedReplay
-            ? finishedStatus
-            : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
-          {!portraitV2 && <AuthoritativePulse enabled={livePulseEnabled} pulseKey={actorPulse}><Text numberOfLines={1} style={[styles.turn, { color: theme.colors.text }]}>{canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName}</Text></AuthoritativePulse>}
-          {hGroupStatus.currentPlayerCue !== null && <Text numberOfLines={1} style={[styles.hGroupCue, { color: theme.colors.textMuted }]}>
-            {hGroupStatus.currentPlayerCue === 'locked' ? 'Locked · may not be able to discard' : 'Potential Double Discard'}
-          </Text>}
-        </View>
-        {!portraitV2 && <>
-        <HudStat label="Score" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.score, game.score)} value={game.score}
-          valueColor={hGroupStatus.lowScorePhase ? '#00ffff' : undefined}
-          valueEmphasized={hGroupStatus.lowScorePhase && colorblindMode} />
-        <HudStat label="Max" value={game.stats.maxScore} />
-        <HudStat label="Clues" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(getDisplayedClueTokens(liveBefore.clueTokens, variantName), getDisplayedClueTokens(game.clueTokens, variantName))} value={getDisplayedClueTokens(game.clueTokens, variantName)}
-          valueColor={resourcePresentation.clueCue === 'no-clues' ? '#ff5555' : resourcePresentation.clueCue === 'one-clue' ? '#ffd54f' : resourcePresentation.clueCue === 'max-clues' ? '#aaff00' : undefined}
-          accessibilityLabel={`Clues ${getDisplayedClueTokens(game.clueTokens, variantName)}${resourcePresentation.clueCue === 'no-clues' ? ', no clues available' : resourcePresentation.clueCue === 'one-clue' ? ', one clue available' : resourcePresentation.clueCue === 'max-clues' ? ', maximum clues' : ''}`} />
-        <HudStat label="Strikes" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.strikes.length, game.strikes.length)} value={game.strikes.length} />
-        <HudStat label="Deck" pulseEnabled={livePulseEnabled} pulseKey={liveBefore === undefined ? null : resourcePulse(liveBefore.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)} value={game.cardsRemainingInTheDeck} />
-        </>}
-        <HudStat label="Pace" value={gameplayPresentation.pace}
-          valueColor={getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)}
-          accessibilityLabel={`Pace ${gameplayPresentation.pace}`}
-          accessibilityHint="Opens read-only Pace details"
-          onPress={() => setPaceDetailsOpen(true)} />
-        <HudStat label="Eff" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
-          valueColor={gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined}
-          accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
-          accessibilityHint="Opens read-only efficiency calculation details"
-          onPress={() => setEfficiencyDetailsOpen(true)} />
-      </View>
-
-      <CompactTable portraitV2={portraitV2} dense tightChrome={usesDenseSideLabels} game={game} discardResourceCue={resourcePresentation.discardCue} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
-
-      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, !portraitV2 && usesDenseSideLabels && styles.denseLastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-        {!portraitV2 && usesDenseSideLabels ? <View style={styles.denseLastActionRow}>
-          <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.denseLastActionSummary}>
-            <Text numberOfLines={1} style={[styles.lastActionText, { color: theme.colors.text }]}>{reviewActive ? `LAST T${selectedTurn}` : 'LAST'} · {lastAction}</Text>
-            <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
-          </Pressable>
-          <View style={styles.denseLastActionActions}>
-            {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)} />}
-            <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
-          </View>
-        </View> : <>
-        <View style={[styles.rowBetween, styles.lastActionHeader]}>
-          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
-          <View style={styles.actionButtons}>
-            {!reviewActive &&
-              <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)} />}
-            <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
-          </View>
-        </View>
-        <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={styles.lastActionPressable}>
-          <Text numberOfLines={portraitV2 ? undefined : 1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
-          <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
-        </Pressable>
-        </>}
-      </View></AuthoritativePulse>
-    </View>
-
-    <View onLayout={captureAmbientBody} style={styles.workspaceBody}>
-      <View
-        style={[
-          styles.hands,
-          shellMeasured ? { height: portraitV2 && ownHandPosition === 'bottom' ? handsRegionHeight : layout.handsHeight, ...(portraitV2 && ownHandPosition === 'bottom' ? { justifyContent: 'space-between' as const } : {}), ...(portraitV2 && ownHandPosition === 'top' ? { flexDirection: 'column-reverse' as const } : {}) } : styles.handsPending,
-          !shellMeasured && styles.shellPending,
-        ]}
-      >
-      <OpponentViewport nestedScrollEnabled
-        style={portraitV2 && layout.opponentsScrollable ? { height: layout.opponentViewportHeight, flexGrow: 0, flexShrink: 0 } : styles.opponents}
-        contentContainerStyle={styles.opponents}>
-        {opponents.map((index) => {
-          const currentActor = current === index;
-          const isActionHand = actionHandIndex === index;
-          const compact = !portraitV2 && layout.mode === 'compact-overview';
-          const empathizing = globalEmpathy || empathyPlayer === index;
-          const target = selectedTarget === index;
-          const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
-          return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={compact ? (clueTargetPulse(index) ?? sourcePulse(index)) : sourcePulse(index)}><Pressable
-            accessibilityLabel={`Player ${playerName}`}
-            accessibilityRole="button"
-            delayLongPress={350}
-            onPressIn={() => { longPressedOpponent.current = null; }}
-            onLongPress={globalEmpathy ? undefined : () => {
-              longPressedOpponent.current = index;
-              onHoldEmpathy(index);
-            }}
-            onPress={() => {
-              if (longPressedOpponent.current === index) {
-                longPressedOpponent.current = null;
-                return;
-              }
-              if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));
-            }}
-            onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
-            style={[
-              styles.opponentRow,
-              compact && styles.compactOpponentRow,
-              !compact && usesSideLabelRows && styles.sideLabelRow,
-              { height: layout.opponentRowHeight },
-              currentActor && (usesSideLabelRows
-                ? { backgroundColor: theme.colors.surfaceMuted }
-                : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }),
-              target && { borderColor: theme.colors.accent },
-            ]}
-          >
-            <View style={compact ? styles.compactOpponentNameLane : usesSideLabelRows ? styles.sideLabelLane : styles.opponentMeta}>
-              <View style={[styles.namePeekArea, usesSideLabelRows && styles.sideLabelPeekArea]}>
-                {usesSideLabelRows && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
-                <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
-                  {playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}
-                </Text>
-                {liveClock !== null && <C17LiveClockText
-                  clock={liveClock}
-                  paused={clockPaused}
-                  timed={metadata.options.timed === true}
-                  playerIndex={index}
-                />}
-              </View>
-            </View>
-            <View style={compact ? styles.compactOpponentCards : [styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: (portraitV2 ? 0 : 2) + layout.cardTopHeadroom }]}>
-              {getDisplayedHandOrders(game.hands[index], reverseHands).map((order, position) => {
-                const card = game.deck[order];
-                if (card === undefined) return null;
-                const cardNote = notes[order];
-                const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === index;
-                if (isActionHand) {
-                  const actionEmpathy = empathizing || forcedStartingEmpathy;
-                  const actionKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, actionEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
-                  const actionPresentation = getCardStatePresentation({
-                    game,
-                    state: card,
-                    note: cardNote,
-                    displaySuitIndex: actionKnowledge.displaySuitIndex,
-                    displayRank: actionKnowledge.displayRank,
-                    empathy: actionEmpathy,
-                    finished: finishedReplay,
-                    variantName,
-                    speedrun,
-                    hyphenatedConventions,
-                    hardVariant: metadata.hardVariant,
-                  });
-                  return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><GameCard
-                    cardTopHeadroom={layout.cardTopHeadroom}
-                    clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
-                    hasNote={hasAvailableNote(order)}
-                    height={layout.opponentCardHeight}
-                    knowledge={actionKnowledge}
-                    onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
-                    onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
-                    onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
-                    position={position}
-                    selected={selectedActionCard === order}
-                    statePresentation={actionPresentation}
-                    variantName={variantName}
-                  /></AuthoritativePulse>;
-                }
-                const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
-                const empathyKnowledge = empathizing || forcedStartingEmpathy
-                  ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
-                  : null;
-                const activeKnowledge = empathyKnowledge ?? normalKnowledge;
-                const statePresentation = getCardStatePresentation({
-                  game,
-                  state: card,
-                  note: cardNote,
-                  displaySuitIndex: activeKnowledge.displaySuitIndex,
-                  displayRank: activeKnowledge.displayRank,
-                  empathy: empathizing,
-                  finished: finishedReplay,
-                  variantName,
-                  speedrun,
-                  hyphenatedConventions,
-                  hardVariant: metadata.hardVariant,
-                });
-                const cardProps = {
-                  empathyKnowledge,
-                  hasNote: hasAvailableNote(order),
-                  height: layout.opponentCardHeight,
-                  clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata),
-                  previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)
-                    ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null,
-                  onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order)),
-                  onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index),
-                  onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order)),
-                  onPressOut: globalEmpathy ? undefined : () => onHoldEmpathy(null),
-                  position,
-                  rank: hypothetical === null ? card.rank : normalKnowledge.displayRank,
-                  semanticBorder: normalKnowledge.borderColor,
-                  statePresentation,
-                  suitIndex: hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex,
-                  variantName,
-                };
-                return compact
-                  ? <CompactHandCardSummary key={order} {...cardProps} />
-                  : <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}>
-                    <VisibleHanabiCard {...cardProps} cardTopHeadroom={layout.cardTopHeadroom} size="hand" />
-                  </AuthoritativePulse>;
-              })}
-            </View>
-          </Pressable></AuthoritativePulse>;
-        })}
-      </OpponentViewport>
-
-      <AuthoritativePulse enabled={livePulseEnabled} pulseKey={sourcePulse(seatingAnchorIndex)}><Pressable
-        accessibilityLabel={`Player ${metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}`}`}
-        accessibilityRole="button"
-        delayLongPress={350}
-        disabled={globalEmpathy}
-        onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}
-        onPress={() => { if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
-        onPressOut={() => onHoldEmpathy(null)}
-        style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: portraitV2 && current === seatingAnchorIndex ? theme.colors.accent : theme.colors.border }]}
-      >
-        <View style={[styles.ownTitleLane, usesSideLabelRows && styles.sideLabelLane]}>
-          <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
+  // Private hand renderers share card identity, knowledge, notes, gestures and pulses.
+  const renderOpponentHand = (index: number) => {
+    const currentActor = current === index;
+    const isActionHand = actionHandIndex === index;
+    const empathizing = globalEmpathy || empathyPlayer === index;
+    const target = selectedTarget === index;
+    const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
+    return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={sourcePulse(index) ?? (!portraitV2 && current === index ? actorPulse : null)}><Pressable
+      accessibilityLabel={`Player ${playerName}`}
+      accessibilityRole="button"
+      delayLongPress={350}
+      onPressIn={() => { longPressedOpponent.current = null; }}
+      onLongPress={globalEmpathy ? undefined : () => {
+        longPressedOpponent.current = index;
+        onHoldEmpathy(index);
+      }}
+      onPress={() => {
+        if (longPressedOpponent.current === index) {
+          longPressedOpponent.current = null;
+          return;
+        }
+        if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));
+      }}
+      onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
+      style={[
+        styles.opponentRow,
+        usesSideLabelRows && styles.sideLabelRow,
+        { height: layout.opponentRowHeight },
+        !portraitV2 && styles.landscapeHandCell,
+        currentActor && (usesSideLabelRows
+          ? { backgroundColor: theme.colors.surfaceMuted }
+          : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.accent }),
+        target && { borderColor: theme.colors.accent },
+      ]}
+    >
+      <View style={usesSideLabelRows ? styles.sideLabelLane : styles.opponentMeta}>
+        <View style={[styles.namePeekArea, usesSideLabelRows && styles.sideLabelPeekArea]}>
+          {usesSideLabelRows && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
+          <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
+            {playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}
+          </Text>
           {liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
             timed={metadata.options.timed === true}
-            playerIndex={seatingAnchorIndex}
+            playerIndex={index}
           />}
         </View>
-        <View style={[styles.ownCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: (portraitV2 ? 0 : 2) + layout.cardTopHeadroom }]}>
-          {anchoredHand.map((order, position) => {
-            const card = game.deck[order];
-            if (card === undefined) return null;
-            const ownEmpathy = globalEmpathy || empathyPlayer === seatingAnchorIndex
-              || (startingHandHidden && hypothetical?.startingPlayerIndex === seatingAnchorIndex);
-            const cardNote = notes[order];
-            const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, ownEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
-            const statePresentation = getCardStatePresentation({
+      </View>
+      <View style={[styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
+        {getDisplayedHandOrders(game.hands[index], reverseHands).map((order, position) => {
+          const card = game.deck[order];
+          if (card === undefined) return null;
+          const cardNote = notes[order];
+          const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === index;
+          if (isActionHand) {
+            const actionEmpathy = empathizing || forcedStartingEmpathy;
+            const actionKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, actionEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
+            const actionPresentation = getCardStatePresentation({
               game,
               state: card,
               note: cardNote,
-              displaySuitIndex: knowledge.displaySuitIndex,
-              displayRank: knowledge.displayRank,
-              empathy: ownEmpathy,
+              displaySuitIndex: actionKnowledge.displaySuitIndex,
+              displayRank: actionKnowledge.displayRank,
+              empathy: actionEmpathy,
               finished: finishedReplay,
               variantName,
               speedrun,
               hyphenatedConventions,
               hardVariant: metadata.hardVariant,
             });
-            if (!anchoredIsActionHand) {
-              const anchoredEmpathizing = globalEmpathy || empathyPlayer === seatingAnchorIndex;
-              const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === seatingAnchorIndex;
-              const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
-              const empathyKnowledge = anchoredEmpathizing || forcedStartingEmpathy
-                ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
-                : null;
-              const activeKnowledge = empathyKnowledge ?? normalKnowledge;
-              const nonActionPresentation = getCardStatePresentation({
-                game,
-                state: card,
-                note: cardNote,
-                displaySuitIndex: activeKnowledge.displaySuitIndex,
-                displayRank: activeKnowledge.displayRank,
-                empathy: anchoredEmpathizing,
-                finished: finishedReplay,
-                variantName,
-                speedrun,
-                hyphenatedConventions,
-                hardVariant: metadata.hardVariant,
-              });
-              return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(seatingAnchorIndex, position)}><VisibleHanabiCard
-                cardTopHeadroom={layout.cardTopHeadroom}
-                clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
-                empathyKnowledge={empathyKnowledge}
-                hasNote={hasAvailableNote(order)}
-                height={layout.ownCardHeight}
-                onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
-                onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order))}
-                onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
-                position={position}
-                previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
-                  ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
-                rank={hypothetical === null ? card.rank : normalKnowledge.displayRank}
-                semanticBorder={normalKnowledge.borderColor}
-                statePresentation={nonActionPresentation}
-                suitIndex={hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex}
-                variantName={variantName}
-              /></AuthoritativePulse>;
-            }
-            return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(seatingAnchorIndex, position)}><GameCard
-              hasNote={hasAvailableNote(order)}
-              height={layout.ownCardHeight}
-              knowledge={knowledge}
-              clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
-              previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
-                ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
+            return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><GameCard
               cardTopHeadroom={layout.cardTopHeadroom}
-              onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order))}
-              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
+              clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+              hasNote={hasAvailableNote(order)}
+              height={layout.opponentCardHeight}
+              knowledge={actionKnowledge}
+              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
               position={position}
               selected={selectedActionCard === order}
-              statePresentation={statePresentation}
+              statePresentation={actionPresentation}
               variantName={variantName}
             /></AuthoritativePulse>;
-          })}
-        </View>
-      </Pressable></AuthoritativePulse>
+          }
+          const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
+          const empathyKnowledge = empathizing || forcedStartingEmpathy
+            ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
+            : null;
+          const activeKnowledge = empathyKnowledge ?? normalKnowledge;
+          const statePresentation = getCardStatePresentation({
+            game,
+            state: card,
+            note: cardNote,
+            displaySuitIndex: activeKnowledge.displaySuitIndex,
+            displayRank: activeKnowledge.displayRank,
+            empathy: empathizing,
+            finished: finishedReplay,
+            variantName,
+            speedrun,
+            hyphenatedConventions,
+            hardVariant: metadata.hardVariant,
+          });
+          const cardProps = {
+            empathyKnowledge,
+            hasNote: hasAvailableNote(order),
+            height: layout.opponentCardHeight,
+            clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata),
+            previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)
+              ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null,
+            onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order)),
+            onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index),
+            onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order)),
+            onPressOut: globalEmpathy ? undefined : () => onHoldEmpathy(null),
+            position,
+            rank: hypothetical === null ? card.rank : normalKnowledge.displayRank,
+            semanticBorder: normalKnowledge.borderColor,
+            statePresentation,
+            suitIndex: hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex,
+            variantName,
+          };
+          return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}>
+              <VisibleHanabiCard {...cardProps} cardTopHeadroom={layout.cardTopHeadroom} size="hand" />
+            </AuthoritativePulse>;
+        })}
       </View>
+    </Pressable></AuthoritativePulse>;
 
-      {portraitV2 && ownHandPosition === 'top' && <View style={{ flex: 1 }} />}
-      {(!shellMeasured || showWorkbench) ? <View style={[
+  };
+  const renderAnchoredHand = () => (
+    <AuthoritativePulse enabled={livePulseEnabled} key={seatingAnchorIndex} pulseKey={sourcePulse(seatingAnchorIndex) ?? (!portraitV2 && current === seatingAnchorIndex ? actorPulse : null)}><Pressable
+      accessibilityLabel={`Player ${metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}`}`}
+      accessibilityRole="button"
+      delayLongPress={350}
+      disabled={globalEmpathy}
+      onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}
+      onPress={() => { if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
+      onPressOut={() => onHoldEmpathy(null)}
+      style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, !portraitV2 && styles.landscapeHandCell, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: current === seatingAnchorIndex ? theme.colors.accent : theme.colors.border }]}
+    >
+      <View style={[styles.ownTitleLane, usesSideLabelRows && styles.sideLabelLane]}>
+        <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
+        {liveClock !== null && <C17LiveClockText
+          clock={liveClock}
+          paused={clockPaused}
+          timed={metadata.options.timed === true}
+          playerIndex={seatingAnchorIndex}
+        />}
+      </View>
+      <View style={[styles.ownCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
+        {anchoredHand.map((order, position) => {
+          const card = game.deck[order];
+          if (card === undefined) return null;
+          const ownEmpathy = globalEmpathy || empathyPlayer === seatingAnchorIndex
+            || (startingHandHidden && hypothetical?.startingPlayerIndex === seatingAnchorIndex);
+          const cardNote = notes[order];
+          const knowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, ownEmpathy, displayIdentity(order), hasExplicitBlankMorph(order));
+          const statePresentation = getCardStatePresentation({
+            game,
+            state: card,
+            note: cardNote,
+            displaySuitIndex: knowledge.displaySuitIndex,
+            displayRank: knowledge.displayRank,
+            empathy: ownEmpathy,
+            finished: finishedReplay,
+            variantName,
+            speedrun,
+            hyphenatedConventions,
+            hardVariant: metadata.hardVariant,
+          });
+          if (!anchoredIsActionHand) {
+            const anchoredEmpathizing = globalEmpathy || empathyPlayer === seatingAnchorIndex;
+            const forcedStartingEmpathy = startingHandHidden && hypothetical?.startingPlayerIndex === seatingAnchorIndex;
+            const normalKnowledge = getCardKnowledgeViewModel(variantName, card, cardNote, false, false, displayIdentity(order), hasExplicitBlankMorph(order));
+            const empathyKnowledge = anchoredEmpathizing || forcedStartingEmpathy
+              ? getCardKnowledgeViewModel(variantName, card, cardNote, false, true, displayIdentity(order), hasExplicitBlankMorph(order))
+              : null;
+            const activeKnowledge = empathyKnowledge ?? normalKnowledge;
+            const nonActionPresentation = getCardStatePresentation({
+              game,
+              state: card,
+              note: cardNote,
+              displaySuitIndex: activeKnowledge.displaySuitIndex,
+              displayRank: activeKnowledge.displayRank,
+              empathy: anchoredEmpathizing,
+              finished: finishedReplay,
+              variantName,
+              speedrun,
+              hyphenatedConventions,
+              hardVariant: metadata.hardVariant,
+            });
+            return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(seatingAnchorIndex, position)}><VisibleHanabiCard
+              cardTopHeadroom={layout.cardTopHeadroom}
+              clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+              empathyKnowledge={empathyKnowledge}
+              hasNote={hasAvailableNote(order)}
+              height={layout.ownCardHeight}
+              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
+              onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order))}
+              onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
+              position={position}
+              previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
+                ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
+              rank={hypothetical === null ? card.rank : normalKnowledge.displayRank}
+              semanticBorder={normalKnowledge.borderColor}
+              statePresentation={nonActionPresentation}
+              suitIndex={hypothetical === null ? card.suitIndex : normalKnowledge.displaySuitIndex}
+              variantName={variantName}
+            /></AuthoritativePulse>;
+          }
+          return <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(seatingAnchorIndex, position)}><GameCard
+            hasNote={hasAvailableNote(order)}
+            height={layout.ownCardHeight}
+            knowledge={knowledge}
+            clueMarker={getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)}
+            previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
+              ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
+            cardTopHeadroom={layout.cardTopHeadroom}
+            onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order))}
+            onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
+            onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
+            onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
+            position={position}
+            selected={selectedActionCard === order}
+            statePresentation={statePresentation}
+            variantName={variantName}
+          /></AuthoritativePulse>;
+        })}
+      </View>
+    </Pressable></AuthoritativePulse>
+  );
+  const metricStrip = (
+    <View style={[styles.hud, !portraitV2 && styles.landscapeMetricStrip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View style={styles.grow}>
+        <Text numberOfLines={1} style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
+          ? `SHARED REVIEW T${selectedTurn}`
+          : hypothetical !== null
+            ? 'HYPOTHETICAL'
+          : finishedReplay
+          ? finishedStatus
+          : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
+
+        {hGroupStatus.currentPlayerCue !== null && <Text numberOfLines={1} style={[styles.hGroupCue, { color: theme.colors.textMuted }]}>
+          {hGroupStatus.currentPlayerCue === 'locked' ? 'Locked · may not be able to discard' : 'Potential Double Discard'}
+        </Text>}
+      </View>
+      <HudStat label="Pace" value={gameplayPresentation.pace}
+        valueColor={getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)}
+        accessibilityLabel={`Pace ${gameplayPresentation.pace}`}
+        accessibilityHint="Opens read-only Pace details"
+        onPress={() => setPaceDetailsOpen(true)} />
+      <HudStat label="Eff" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
+        valueColor={gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined}
+        accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
+        accessibilityHint="Opens read-only efficiency calculation details"
+        onPress={() => setEfficiencyDetailsOpen(true)} />
+    </View>
+  );
+  const tableResources = (
+    <CompactTable presentation={portraitV2 ? 'portrait-v2' : 'landscape-v2'}
+      landscapeResourceFeedback={{ before: liveBefore, segment: livePulseSegment, clueCue: resourcePresentation.clueCue, lowScorePhase: hGroupStatus.lowScorePhase, colorblindMode }} dense tightChrome={usesDenseSideLabels} game={game} discardResourceCue={resourcePresentation.discardCue} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
+  );
+  const lastActionPanel = (
+    <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, !portraitV2 && styles.landscapeLastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+      <View style={[styles.rowBetween, styles.lastActionHeader, !portraitV2 && styles.landscapeLastActionHeader]}>
+        <Text numberOfLines={1} style={[styles.eyebrow, !portraitV2 && styles.grow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
+        <View style={[styles.actionButtons, !portraitV2 && styles.landscapeActionButtons]}>
+          {!reviewActive &&
+            <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)} />}
+          <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+        </View>
+      </View>
+      <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={[styles.lastActionPressable, !portraitV2 && styles.landscapeLastActionSummary]}>
+        <Text adjustsFontSizeToFit={!portraitV2} minimumFontScale={0.8} numberOfLines={portraitV2 ? undefined : 2} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+        <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
+      </Pressable>
+    </View></AuthoritativePulse>
+  );
+  const cardActions = (
+    canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>
+            <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
+            <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
+            {(noteCard === null || noteCard === selectedActionCard) && <ActionButton compact title="Edit note" onPress={() => takeWorkbenchTask(() => onEditNote(selectedActionCard))} />}
+          </View>
+  );
+  const hypotheticalTaskControls = (
+    selectedTarget !== null ? <ClueComposer
+            dense
+            choices={clueChoices}
+            variantName={variantName}
+            enabled={clueEnabled}
+            onClear={onClearCluePreview}
+            onConfirm={onConfirmClue}
+            onPreview={onPreviewClue}
+            preview={cluePreview}
+            previewState={cluePreviewState}
+            targetName={targetName}
+          /> : canPlayGameplay && selectedActionCard !== null ? <View style={styles.rowBetween}>
+            <View style={styles.actionButtons}>
+              <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
+              <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
+            </View>
+          </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>{editHypotheticalCards ? 'Choose any visible hand card to edit its identity.' : 'Select a card from the hypothetical actor hand or a player to plan a clue.'}</Text> : null
+  );
+  const replayPrimaryControls = <>
+    <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
+    <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
+    {sharedReplay !== null && !sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+  </>;
+  const WorkbenchViewport = !portraitV2 && selectedTarget !== null && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null ? View : ScrollView;
+  const workbench = (
+    (!shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
-      compactOrdinaryWorkbench ? styles.compactWorkbenchReserve : { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
-      portraitV2 ? { height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 } : denseClueWorkbench
-        ? [styles.denseClueWorkbench, { maxHeight: denseClueAvailableHeight }]
-        : compactCappedWorkbench ? { height: layout.workbenchHeight } : shellMeasured ? styles.workbenchExpanded : { height: layout.workbenchHeight },
-      usesDenseSideLabels && { minHeight: layout.workbenchHeight },
+      { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
+      { height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 },
+      !portraitV2 && { marginTop: 'auto' },
       !shellMeasured && styles.shellPending,
     ]}>
-      {showRewindScrubber && <View style={styles.workbenchScrubber}>
+      {!portraitV2 && reviewActive && !finishedReplay && sharedReplay === null && <View style={styles.landscapePrimaryControls}>
+          <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
+          <View style={styles.rowBetween}>
+            <View style={styles.actionButtons}>
+              <ActionButton compact disabled={!canReviewBack} title={portraitV2 ? "← Back" : "Back"} onLongPress={onReviewStart} onPress={onReviewBack} />
+              <ActionButton compact disabled={!canReviewForward} title={portraitV2 ? "Forward →" : "Forward"} onLongPress={onReviewEnd} onPress={onReviewForward} />
+            </View>
+            <ActionButton compact title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"} tone="primary" onPress={onReturnLive} />
+          </View>
+      </View>}
+      {showRewindScrubber && portraitV2 && <View style={styles.workbenchScrubber}>
         <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
       </View>}
-      <ScrollView contentContainerStyle={denseClueWorkbench ? styles.denseClueWorkbenchContent : styles.workbenchContent} nestedScrollEnabled style={[
-        styles.workbenchScroll,
-        denseClueWorkbench && styles.denseClueScroll,
-        compactOrdinaryWorkbench && [styles.compactWorkbenchTray, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong }],
-      ]}>
-        {portraitV2 && workbenchFeedback !== null ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {!portraitV2 && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null && <View style={styles.landscapePrimaryControls}>
+        {cardActions}
+      </View>}
+      {!portraitV2 && hypothetical !== null && <View style={styles.landscapePrimaryControls}>{hypotheticalTaskControls}</View>}
+      {!portraitV2 && hypothetical === null && (finishedReplay || sharedReplay !== null) && <View style={[styles.landscapePrimaryControls, styles.actionButtons]}>{replayPrimaryControls}</View>}
+      <WorkbenchViewport contentContainerStyle={[styles.workbenchContent, !portraitV2 && styles.landscapeWorkbenchContent]} nestedScrollEnabled style={[styles.workbenchScroll, WorkbenchViewport === View && styles.landscapeWorkbenchContent]}>
+        {!portraitV2 && showRewindScrubber && <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />}
+        {workbenchFeedback !== null ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={[styles.workbenchText, { color: theme.colors.text }]}>{workbenchFeedback.outcome === 'played' ? 'Played' : workbenchFeedback.outcome === 'discarded' ? 'Discarded' : 'Misplayed'}</Text>
           <VisibleHanabiCard height={40}
             rank={cardIdentities[workbenchFeedback.cardOrder]?.rank ?? game.deck[workbenchFeedback.cardOrder]?.rank ?? null}
@@ -1349,32 +1357,18 @@ function C17DenseWorkspace({
               onPress={() => lobbyRuntime.setSharedReplayLeader(name)}
             />)}
           </View>}
-          {selectedTarget !== null ? <ClueComposer
-            dense
-            choices={clueChoices}
-            variantName={variantName}
-            enabled={clueEnabled}
-            onClear={onClearCluePreview}
-            onConfirm={onConfirmClue}
-            onPreview={onPreviewClue}
-            preview={cluePreview}
-            previewState={cluePreviewState}
-            targetName={targetName}
-          /> : canPlayGameplay && selectedActionCard !== null ? <View style={styles.rowBetween}>
-            <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
-              <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
-            </View>
-          </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>{editHypotheticalCards ? 'Choose any visible hand card to edit its identity.' : 'Select a card from the hypothetical actor hand or a player to plan a clue.'}</Text> : null}
+          {portraitV2 && hypotheticalTaskControls}
         </> : reviewActive && !finishedReplay && sharedReplay === null ? <>
+          {portraitV2 && <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canReviewBack} title="← Back" onLongPress={onReviewStart} onPress={onReviewBack} />
-              <ActionButton compact disabled={!canReviewForward} title="Forward →" onLongPress={onReviewEnd} onPress={onReviewForward} />
+              <ActionButton compact disabled={!canReviewBack} title={portraitV2 ? "← Back" : "Back"} onLongPress={onReviewStart} onPress={onReviewBack} />
+              <ActionButton compact disabled={!canReviewForward} title={portraitV2 ? "Forward →" : "Forward"} onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
-            <ActionButton compact title={`Exit · Live T${liveTurn}`} tone="primary" onPress={onReturnLive} />
+            <ActionButton compact title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"} tone="primary" onPress={onReturnLive} />
           </View>
+          </>}
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={() => takeWorkbenchTask(onStartHypothetical)} />}
           {noteCard !== null && <View style={styles.noteInspect}>
             <View style={styles.rowBetween}>
@@ -1389,8 +1383,7 @@ function C17DenseWorkspace({
             <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>{`Replay T${selectedTurn}${selectedActionSegment === actionSegments.at(-1) ? ' · End' : ''}`}</Text>
             <View style={styles.rowBetween}>
               <View style={styles.actionButtons}>
-                <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
-                <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
+                {portraitV2 && replayPrimaryControls}
               </View>
             </View>
             {(canQuickRematch || canRemake) && <View style={styles.actionButtons}>
@@ -1408,9 +1401,7 @@ function C17DenseWorkspace({
               <ActionButton compact title="Dismiss" onPress={onDismissReplaySuggestion} />
             </View>}
             <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
-              <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
-              {!sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+              {portraitV2 && replayPrimaryControls}
               {!sharedReplay.amLeader && sharedReplayOwnName !== null && <ActionButton compact title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)} />}
               {sharedReplay.amLeader && sharedReplayPassTargets.map((name) => <ActionButton
                 compact
@@ -1431,7 +1422,7 @@ function C17DenseWorkspace({
             </Text>
           </View>}
         </> : selectedTarget !== null ? <ClueComposer
-          dense={usesDenseSideLabels}
+          dense={!portraitV2 || usesDenseSideLabels}
           choices={clueChoices}
           variantName={variantName}
           enabled={clueEnabled}
@@ -1442,11 +1433,7 @@ function C17DenseWorkspace({
           previewState={cluePreviewState}
           targetName={targetName}
         /> : <>
-          {canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>
-            <ActionButton compact disabled={!canPlayCard} title="Play" tone="primary" onPress={onPlay} />
-            <ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />
-            {(noteCard === null || noteCard === selectedActionCard) && <ActionButton compact title="Edit note" onPress={() => takeWorkbenchTask(() => onEditNote(selectedActionCard))} />}
-          </View>}
+          {portraitV2 && cardActions}
 
           {selectedActionCard !== null && noteCard === null && (notes[selectedActionCard]?.text.trim().length ?? 0) > 0 && <Text style={[styles.notePreview, { color: theme.colors.text }]}>
             {notes[selectedActionCard]?.text}
@@ -1461,11 +1448,51 @@ function C17DenseWorkspace({
 
           {pendingText !== null && <Text style={[styles.pendingText, { color: theme.colors.textMuted }]}>{pendingText}… awaiting server</Text>}
         </>}
-      </ScrollView>
-    </View> : <View style={[styles.idleWorkbench, portraitV2 ? { height: layout.workbenchHeight, flex: 0, flexShrink: 0 } : usesDenseSideLabels && { minHeight: layout.workbenchHeight }]}>
-      {!portraitV2 && canEnterClue && <Text numberOfLines={1} style={[styles.clueEntryHint, { color: theme.colors.textMuted }]}>Tap another player's hand to give a clue</Text>}
-    </View>}
+      </WorkbenchViewport>
+    </View> : <View style={[styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }, !portraitV2 && { marginTop: 'auto' }]} />
+  );
+  return <View style={styles.workspace}>
+    {portraitV2 ? <>
+      <View style={styles.ledgerChrome}>{metricStrip}{tableResources}{lastActionPanel}</View>
+    <View onLayout={portraitV2 ? captureAmbientBody : undefined} style={styles.workspaceBody}>
+      <View
+        style={[
+          styles.hands,
+          shellMeasured ? { height: portraitV2 && ownHandPosition === 'bottom' ? handsRegionHeight : layout.handsHeight, ...(portraitV2 && ownHandPosition === 'bottom' ? { justifyContent: 'space-between' as const } : {}), ...(portraitV2 && ownHandPosition === 'top' ? { flexDirection: 'column-reverse' as const } : {}) } : styles.handsPending,
+          !shellMeasured && styles.shellPending,
+        ]}
+      >
+      <OpponentViewport nestedScrollEnabled
+        style={portraitV2 && layout.opponentsScrollable ? { height: layout.opponentViewportHeight, flexGrow: 0, flexShrink: 0 } : styles.opponents}
+        contentContainerStyle={styles.opponents}>
+        {opponents.map(renderOpponentHand)}
+      </OpponentViewport>
+
+      {renderAnchoredHand()}
+      </View>
+
+      {portraitV2 && ownHandPosition === 'top' && <View style={{ flex: 1 }} />}
+      {workbench}
     </View>
+    </> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>
+      {!shellMeasured ? null : !landscapeLayout.fits ? <View style={styles.landscapeFailure}>
+        <Text style={{ color: theme.colors.text }}>This landscape size cannot fit the Live workspace. Rotate the device or use a larger window.</Text>
+      </View> : <>
+        <View style={[styles.landscapeGrid, { width: landscapeLayout.leftWidth }]}>
+          {landscapeLayout.rows.map((row, rowIndex) => <View key={rowIndex} style={styles.landscapeGridRow}>
+            {row.map((index) => <View key={index} style={{ width: landscapeLayout.cellWidth }}>
+              {index === seatingAnchorIndex ? renderAnchoredHand() : renderOpponentHand(index)}
+            </View>)}
+          </View>)}
+        </View>
+        <View style={[styles.landscapeLiveColumn, { width: landscapeLayout.rightWidth }]}>
+          {metricStrip}
+          {tableResources}
+          {lastActionPanel}
+          {workbench}
+        </View>
+      </>}
+    </View>}
 
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={presentationVisible && recentOpen}>
       <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
@@ -1564,6 +1591,20 @@ function getCardLabel(game: GameState, playerNames: readonly string[], order: nu
 
 const styles = StyleSheet.create({
   workspace: { flex: 1, minHeight: 0 },
+  landscapeBody: { flex: 1, minHeight: 0, flexDirection: 'row', gap: C17_LANDSCAPE_REGION_GAP },
+  landscapeGrid: { alignItems: 'center', justifyContent: 'center', gap: C17_LANDSCAPE_ROW_GAP },
+  landscapeGridRow: { flexDirection: 'row', justifyContent: 'center', gap: C17_LANDSCAPE_COLUMN_GAP },
+  landscapeHandCell: { paddingHorizontal: 3, paddingVertical: 1 },
+  landscapeCards: { justifyContent: 'center' },
+  landscapeLiveColumn: { gap: 4, minHeight: 0 },
+  landscapeMetricStrip: { height: 34, flexShrink: 0, paddingVertical: 0 },
+  landscapeLastAction: { height: 68, flexShrink: 0, gap: 0, paddingVertical: 2 },
+  landscapeLastActionHeader: { flexWrap: 'nowrap' },
+  landscapeLastActionSummary: { flex: 1, minHeight: 0 },
+  landscapeActionButtons: { flexWrap: 'nowrap' },
+  landscapePrimaryControls: { paddingHorizontal: 4, paddingVertical: 3, gap: 2 },
+  landscapeWorkbenchContent: { paddingHorizontal: 4, paddingVertical: 4, gap: 3 },
+  landscapeFailure: { flex: 1, justifyContent: 'center', padding: 12 },
   workspaceBody: { flex: 1, minHeight: 0 },
   ledgerChrome: { gap: 5 },
   grow: { flex: 1, minWidth: 0 },

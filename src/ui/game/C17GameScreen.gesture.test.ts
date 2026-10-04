@@ -18,8 +18,8 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
-  expect(screen).toContain('styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: (portraitV2 ? 0 : 2) + layout.cardTopHeadroom }');
-  expect(screen).toContain('styles.ownCards, usesSideLabelRows && styles.sideLabelCards, { marginTop: (portraitV2 ? 0 : 2) + layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.ownCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }');
   expect(screen).toContain('if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
   const opponentStart = screen.indexOf('accessibilityLabel={`Player ${playerName}`}');
   const opponentRow = screen.slice(opponentStart, opponentStart + 1000);
@@ -33,19 +33,17 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).not.toContain('title="Normal"');
 });
 
-test('C17 uses summaries only for landscape compact opponents while retaining full own cards', () => {
+test('C17 landscape shares real hand renderers and equal allocator card heights', () => {
   const screen = readC17Screen();
-
-  expect(screen).toContain("import { CompactHandCardSummary, GameCard, VisibleHanabiCard } from './GameCard';");
-  expect(screen).toContain("const compact = !portraitV2 && layout.mode === 'compact-overview';");
-  expect(screen).toContain('? <CompactHandCardSummary key={order} {...cardProps} />');
-  expect(screen).toContain('<VisibleHanabiCard {...cardProps} cardTopHeadroom={layout.cardTopHeadroom} size="hand" />');
-  expect(screen).not.toContain("size={compact ? 'mini' : 'hand'}");
-  expect(screen).toContain('height={layout.ownCardHeight}');
+  expect(screen).not.toContain('CompactHandCardSummary');
+  expect(screen).not.toContain("layout.mode === 'compact-overview'");
+  expect(screen).toContain('opponentCardHeight: landscapeLayout.cardHeight');
+  expect(screen).toContain('ownCardHeight: landscapeLayout.cardHeight');
+  expect(screen).toContain('opponents.map(renderOpponentHand)');
+  expect(screen).toContain('index === seatingAnchorIndex ? renderAnchoredHand() : renderOpponentHand(index)');
   expect(screen).toContain('clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order))');
-  expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
 });
 
 test('C17 ordinary note inspector keeps note controls without card-number labels or knowledge details', () => {
@@ -70,7 +68,7 @@ test('C17 Note Editor title uses player context without card positions or orders
 
 test('C17 ordinary note actions never duplicate selected and inspected card editors', () => {
   const screen = readC17Screen();
-  const ordinaryWorkbench = screen.slice(screen.indexOf('{canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>'));
+  const ordinaryWorkbench = screen.slice(screen.indexOf('const cardActions ='));
 
   expect(ordinaryWorkbench).toContain('{(noteCard === null || noteCard === selectedActionCard) && <ActionButton compact title="Edit note" onPress={() => takeWorkbenchTask(() => onEditNote(selectedActionCard))} />}');
   expect(ordinaryWorkbench).toContain('{noteCard !== selectedActionCard && <View style={styles.rowBetween}>');
@@ -79,16 +77,12 @@ test('C17 ordinary note actions never duplicate selected and inspected card edit
   expect(ordinaryWorkbench).toContain('<ActionButton compact disabled={!canDiscardCard} title="Discard" onPress={onDiscard} />');
 });
 
-test('C17 pulses only the compact clue target row while keeping full-card clue pulses', () => {
+test('C17 real hands retain authoritative source and per-card clue pulses', () => {
   const screen = readC17Screen();
-
-  expect(screen).toContain("const clueTargetPulse = (index: number) => (");
-  expect(screen).toContain("liveTransition.actionType === 'clue'");
-  expect(screen).toContain('liveTransition.targetIndex === index ? livePulseSegment : null');
-  expect(screen).toContain('pulseKey={compact ? (clueTargetPulse(index) ?? sourcePulse(index)) : sourcePulse(index)}');
+  expect(screen).toContain('pulseKey={sourcePulse(index) ?? (!portraitV2 && current === index ? actorPulse : null)}');
   expect(screen).toContain('pulseKey={cluePulse(index, position)}');
-  expect(screen).toContain('? <CompactHandCardSummary key={order} {...cardProps} />');
-  expect(screen).not.toContain('? <AuthoritativePulse enabled={livePulseEnabled} key={order} pulseKey={cluePulse(index, position)}><CompactHandCardSummary');
+  expect(screen).toContain('liveTransition.touchedSlots.includes(position + 1)');
+  expect(screen).not.toContain('CompactHandCardSummary');
 });
 
 test('C17 clears a stale opponent long-press latch across lifecycle interruption', () => {
@@ -107,20 +101,20 @@ test('C17 keeps spectator interaction observational while retaining the workspac
   expect(screen).toContain('const empathyPlayers = useMemo(() => clientState?.metadata.playerNames');
   expect(screen).toContain('empathyPlayers,');
   expect(screen).toContain('isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? \'YOU\' : \'YOUR HAND\'');
-  expect(screen).toContain("canPlayGameplay && current === seatingAnchorIndex ? 'YOUR TURN' : currentName");
+  expect(screen).toContain('current === seatingAnchorIndex ? theme.colors.accent');
   expect(screen).toContain('if (!clueEnabled || selectedTarget === null || interaction.cluePreview === null) return;');
   expect(screen).toContain('if ((isPlayingPlayer && !replay.active) || canHypotheticalControl) {');
   expect(screen).toContain('const selectedTarget = currentGameLoad && presentationVisible && (isPlayingPlayer || canHypotheticalControl) ? interaction.clueTarget : null;');
-  expect(screen).toContain('{canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>');
+  expect(screen).toContain('canPlayGameplay && selectedActionCard !== null && <View style={styles.actionButtons}>');
 });
 
 test('C17 uses ordinary side labels without confusing the current actor with a clue target', () => {
   const screen = readC17Screen();
-  const lastAction = screen.slice(screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]}>'), screen.indexOf('</View></AuthoritativePulse>', screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]>')));
+  const lastAction = screen.slice(screen.indexOf('const lastActionPanel ='), screen.indexOf('</View></AuthoritativePulse>', screen.indexOf('<View style={[styles.rowBetween, styles.lastActionHeader]>')));
 
   expect(screen).toContain('const usesSideLabels = opponents.length <= 2;');
   expect(screen).toContain('const usesDenseSideLabels = opponents.length >= 3;');
-  expect(screen).toContain('const usesCompactWorkbench = usesSideLabels;');
+  expect(screen).toContain('const usesSideLabelRows = portraitV2 &&');
   expect(screen).toContain("{playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}");
   expect(screen).toContain('currentActorDot');
   expect(screen).toContain('currentActor && (usesSideLabelRows');
@@ -130,45 +124,46 @@ test('C17 uses ordinary side labels without confusing the current actor with a c
   expect(lastAction).toContain('title="Rewind"');
 });
 
-test('C17 reserves the ordinary Workbench slot while keeping a selected-card tray content-sized', () => {
+test('C17 landscape pins ordinary card actions above locally scrolling notes', () => {
   const screen = readC17Screen();
-
-  expect(screen).toContain('const compactOrdinaryWorkbench = !portraitV2 && usesCompactWorkbench');
-  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
-  expect(screen).toContain('compactWorkbenchReserve');
-  expect(screen).toContain('compactWorkbenchTray');
-  expect(screen).toContain("compactWorkbenchTray: { alignSelf: 'stretch'");
-  expect(screen).toContain("flex: 0, flexGrow: 0");
+  const workbench = screen.slice(screen.indexOf('const workbench ='), screen.indexOf('return <View style={styles.workspace}>'));
+  expect(workbench.indexOf('{cardActions}')).toBeLessThan(workbench.indexOf('<WorkbenchViewport'));
+  expect(screen).toContain('const cardActions = (');
+  expect(screen).toContain('disabled={!canPlayCard} title="Play"');
+  expect(screen).toContain('disabled={!canDiscardCard} title="Discard"');
 });
 
-test('C17 gives dense hands a compact shell and the same Workbench minimum when idle or active', () => {
+test('C17 landscape uses a dedicated grid and fixed right semantic stack', () => {
   const screen = readC17Screen();
-
-  expect(screen).toContain('tightChrome={usesDenseSideLabels}');
-  expect(screen).toContain('usesDenseSideLabels && styles.denseLastAction');
-  expect(screen).toContain('!portraitV2 && usesDenseSideLabels ? <View style={styles.denseLastActionRow}>');
-  expect(screen).toContain('onPress={() => setRecentOpen(true)} style={styles.denseLastActionSummary}');
-  expect(screen).toContain('title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)}');
-  expect(screen).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
-  expect(screen).toContain('usesDenseSideLabels && { minHeight: layout.workbenchHeight }');
-  expect(screen).toContain('styles.workbenchScroll');
-  expect(screen).toContain('styles.idleWorkbench, portraitV2 ? { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
-  expect(screen).toContain('const usesCompactWorkbench = usesSideLabels;');
+  expect(screen).toContain('style={styles.landscapeBody}');
+  expect(screen).toContain('landscapeLayout.rows.map');
+  expect(screen).toContain('width: landscapeLayout.leftWidth');
+  expect(screen).toContain('width: landscapeLayout.rightWidth');
+  expect(screen).toContain('landscapeMetricStrip: { height: 34');
+  expect(screen).toContain('landscapeLastAction: { height: 68');
+  expect(screen).toContain("presentation={portraitV2 ? 'portrait-v2' : 'landscape-v2'}");
+  const lastAction = screen.slice(screen.indexOf('const lastActionPanel ='), screen.indexOf('const cardActions ='));
+  expect(lastAction).not.toContain('denseLastActionRow');
+  expect(lastAction).toContain('numberOfLines={portraitV2 ? undefined : 2}');
+  expect(lastAction).toContain('RECENT ›');
+  expect(lastAction).toContain('title="Rewind"');
+  expect(lastAction).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");
 });
 
-test('C17 caps every side-label stateful Workbench mode at the stable physical slot', () => {
+test('C17 Workbench geometry is derived before any tool and keeps primary Rewind accessible', () => {
   const screen = readC17Screen();
-
-  expect(screen).toContain('const compactCappedWorkbench = !portraitV2 && usesCompactWorkbench && (compactOrdinaryWorkbench');
-  expect(screen).toContain('|| hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null);');
-  expect(screen).toContain('compactCappedWorkbench ? { height: layout.workbenchHeight }');
-  expect(screen).toContain('styles.workbenchScroll');
-  expect(screen).toContain('<C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />');
-  expect(screen).toContain('title="← Back"');
-  expect(screen).toContain('title="Forward →"');
-  expect(screen).toContain('title={`Exit · Live T${liveTurn}`}');
+  expect(screen).toContain('workbenchHeight: landscapeLayout.workbenchHeight');
+  expect(screen).toContain('{ height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 }');
+  expect(screen).toContain('styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
+  expect(screen).toContain('title={portraitV2 ? "← Back" : "Back"}');
+  expect(screen).toContain('title={portraitV2 ? "Forward →" : "Forward"}');
+  expect(screen).toContain('title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"}');
   expect(screen).toContain('title="Start Hypothetical"');
-  expect(screen).toContain('getC17WorkbenchHeight(viewportHeight, opponents.length, portraitV2)');
+  expect(screen).toContain('getC17WorkbenchHeight(viewportHeight, opponents.length, true)');
+  const allocator = screen.slice(screen.indexOf('const landscapeLayout ='), screen.indexOf('const layout: C17DenseLayout ='));
+  expect(allocator).toContain('cardsPerHand,');
+  expect(allocator).toContain('ownHandPosition,');
+  expect(allocator).not.toMatch(/selectedTarget|selectedCard|noteCard|reviewActive|hypothetical|hands\[/);
 });
 
 test('C17 gives Play and Discard separate eligibility at maximum clue tokens', () => {
@@ -232,32 +227,23 @@ test('dense ClueComposer keeps a two-row palette beside explicit Close and Give 
   expect(composer).toContain('title="Give clue"');
 });
 
-test('C17 idle Workbench hints at clue entry only when authoritative eligibility allows targeting', () => {
+test('C17 idle Workbench is blank and preserves its fixed rectangle', () => {
   const screen = readC17Screen();
-  const idleStart = screen.indexOf('</View> : <View style={[styles.idleWorkbench');
-  const idleWorkbench = screen.slice(idleStart, screen.indexOf('</View>}', idleStart));
-
-  expect(idleWorkbench).toContain('{!portraitV2 && canEnterClue && <Text numberOfLines={1}');
-  expect(idleWorkbench).toContain("Tap another player's hand to give a clue");
-  expect(idleWorkbench).not.toContain('<ClueComposer');
+  expect(screen).not.toContain("Tap another player's hand to give a clue");
+  expect(screen).toContain('styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
   expect(screen).toContain('canEnterClue={enabled || hypotheticalEnabled}');
   expect(screen).toContain('if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
-  expect(screen).toContain('</> : selectedTarget !== null ? <ClueComposer');
-  expect(screen).toContain('const showWorkbench = (portraitV2 && workbenchFeedback !== null) || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null');
-  expect(screen).toContain('styles.idleWorkbench, portraitV2 ? { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
+  expect(screen).toContain('const showWorkbench = workbenchFeedback !== null');
 });
 
-test('dense clue Workbench reserves content height without moving Ledger hands', () => {
+test('landscape Clue keeps dense choices and Give outside a secondary scroll', () => {
   const screen = readC17Screen();
-
-  expect(screen).not.toContain('DENSE_CLUE_WORKBENCH_HEIGHT');
-  expect(screen).toContain('getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight)');
-  expect(screen).toContain('workbenchHeight,');
-  expect(screen).toContain('const denseClueWorkbench = !portraitV2 && usesDenseSideLabels && selectedTarget !== null');
-  expect(screen).toContain('denseClueWorkbench\n        ? [styles.denseClueWorkbench, { maxHeight: denseClueAvailableHeight }]');
-  expect(screen).toContain('contentContainerStyle={denseClueWorkbench ? styles.denseClueWorkbenchContent : styles.workbenchContent}');
-  expect(screen).toContain('denseClueWorkbench && styles.denseClueScroll');
-  expect(screen).toContain('dense={usesDenseSideLabels}');
+  expect(screen).toContain('dense={!portraitV2 || usesDenseSideLabels}');
+  expect(screen).toContain('const WorkbenchViewport = !portraitV2 && selectedTarget !== null');
+  expect(screen).toContain('? View : ScrollView');
+  expect(screen).not.toContain('denseClueAvailableHeight');
+  expect(screen).not.toContain('compactCappedWorkbench');
+  expect(screen).toContain('This landscape size cannot fit the Live workspace. Rotate the device or use a larger window.');
 });
 
 test('C17 renders authoritative clocks for an eligible timed or opted-in untimed live game', () => {
@@ -275,8 +261,8 @@ test('C17 renders authoritative clocks for an eligible timed or opted-in untimed
   expect(eligibility).toContain('ongoingGame.turn.currentPlayerIndex !== null');
   expect(eligibility).toContain('liveRoom.clock !== null');
   expect(screen).toContain('clockPaused={clientState.pause.active}');
-  expect(screen).toContain('<C17LiveClockText\n                  clock={liveClock}\n                  paused={clockPaused}\n                  timed={metadata.options.timed === true}\n                  playerIndex={index}');
-  expect(screen).toContain('<C17LiveClockText\n            clock={liveClock}\n            paused={clockPaused}\n            timed={metadata.options.timed === true}\n            playerIndex={seatingAnchorIndex}');
+  expect(screen).toMatch(/<C17LiveClockText\s+clock=\{liveClock\}\s+paused=\{clockPaused\}\s+timed=\{metadata.options.timed === true\}\s+playerIndex=\{index\}/);
+  expect(screen).toMatch(/<C17LiveClockText\s+clock=\{liveClock\}\s+paused=\{clockPaused\}\s+timed=\{metadata.options.timed === true\}\s+playerIndex=\{seatingAnchorIndex\}/);
   expect(clockComponent).toContain('getDisplayedClockString(clock, playerIndex, paused, now, timed)');
   expect(clockComponent).toContain('if (paused) return undefined;');
   expect(clockComponent).toContain('setInterval(() => setNow(Date.now()), 1000)');
@@ -286,12 +272,12 @@ test('C17 renders authoritative clocks for an eligible timed or opted-in untimed
 
 test('portrait idle reserve is blank and confirmation uses calm face plus textual Close', () => {
   const screen = readC17Screen();
-  expect(screen).toContain('portraitV2 ? { height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 }');
-  expect(screen).toContain('portraitV2 ? { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
-  expect(screen).toContain('{!portraitV2 && canEnterClue && <Text');
+  expect(screen).toContain('{ height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 }');
+  expect(screen).toContain('{ height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
+  expect(screen).not.toContain("Tap another player's hand to give a clue");
   expect(screen).not.toContain('Actor card ');
   expect(screen).not.toContain('card #');
-  const feedback = screen.slice(screen.indexOf('{portraitV2 && workbenchFeedback !== null ?'), screen.indexOf(': hypothetical !== null ? <>', screen.indexOf('{portraitV2 && workbenchFeedback !== null ?')));
+  const feedback = screen.slice(screen.indexOf('{workbenchFeedback !== null ?'), screen.indexOf(': hypothetical !== null ? <>', screen.indexOf('{workbenchFeedback !== null ?')));
   expect(feedback).toContain("'Played' : workbenchFeedback.outcome === 'discarded' ? 'Discarded' : 'Misplayed'");
   expect(feedback).toContain('<VisibleHanabiCard');
   expect(feedback).toContain('title="Close"');

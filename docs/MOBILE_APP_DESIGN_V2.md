@@ -563,7 +563,7 @@ Landscape делит roster и setup summary, а не растягивает п�
 
 ## 8. Live portrait specification — Slice 8a
 
-Portrait means `viewportWidth <= viewportHeight`. Slice 8a replaces the earlier Live portrait specifics. Landscape keeps its existing implementation until Slice 8b; the landscape design below is not implemented by this slice.
+Portrait means `viewportWidth <= viewportHeight`. Slice 8a replaces the earlier Live portrait specifics. Slice 8b adds landscape in §9 without changing this portrait contract.
 
 ```text
 [Home] <current variant> [Chat] [Menu]
@@ -611,211 +611,78 @@ Hidden presentation still disarms selection/arming, closes discard inspection an
 
 ---
 
-## 9. Live landscape: две композиции и измеримые fit rules
+## 9. Live landscape — Slice 8b
 
-Текущие landscape screenshots остаются evidence против stretched portrait. Само наличие широкого окна не доказывает пригодность двух колонок: нужно учитывать и высоту, и содержание задачи.
-
-### A. Ledger/table region + side Workbench
+Slice 8b implements one landscape topology, superseding the earlier A-preferred/B-fallback selection, separate enlarged own-hand anchor and 860 × 388 A/B example. Alternate landscape geometry and a preference/toggle remain future work.
 
 ```text
-┌──────────────────────────────────────────────────────────────────┐
-│ SYSTEM STATUS / CUTOUT / SIDE NAVIGATION INSETS                   │
-├──────────────────────────────────────────────────────────────────┤
-│ F [Browse] #123 · LIVE T41 · YOUR TURN             [Chat] [Menu]  │
-├──────────────────────────────────────┬───────────────────────────┤
-│ F LEDGER                             │ F Score/Max · Clues       │
-│                                      │   Strikes · Deck          │
-│ Alice             Bob                │   Pace · Eff              │
-│ [ ][ ][ ][ ]      [ ][ ][ ][ ]        │   Fireworks / Discards    │
-│                                      │───────────────────────────│
-│ Carol             Dan                │ F Last action… [Recent]   │
-│ [ ][ ][ ][ ]      [ ][ ][ ][ ]        │───────────────────────────│
-│                                      │ F WORKBENCH               │
-│ Eve                                  │   Selected target         │
-│ [ ][ ][ ][ ]                         │   Color / rank choices    │
-│──────────────────────────────────────│   [Give clue]             │
-│ YOU             [?][?][?][?]         │                           │
-├──────────────────────────────────────┴───────────────────────────┤
-│ SYSTEM NAVIGATION — NO GLOBAL NAVIGATION                          │
-└──────────────────────────────────────────────────────────────────┘
+[Home]                 <current variant>                 [Chat] [Menu]
++------------------------------+-----------------------------------+
+| HAND GRID                    | Mode / Turn · Pace · Eff/FRE      |
+|                              | Score / Fireworks · Deck          |
+| Equal-size real-card hands   | Clues / Strikes · Discard Pile     |
+| Deterministic seating        | Last Action · RECENT ›            |
+|                              | Workbench                         |
++------------------------------+-----------------------------------+
 ```
 
-Ledger использует одну или две колонки opponent hands по результату fit. Own/observed anchor занимает нижнюю полосу Ledger.
+The full-width single-row header uses portrait Home-to-browsing-Home behavior, preserving attended room/runtime. Always show the current variant, including standard/default; fitting/ellipsis is allowed. Chat/Menu keep existing actions; Slice 9 supplies their later geometry. No username, game/table id, Browse/More or turn clutter in the Live header. Pregame remains unchanged.
 
-HUD, table summary, Last Action и Workbench расположены в dock справа. Только secondary details внутри dock могут прокручиваться. Candidate controls и commit action обычной задачи не уходят в скрытый scroll.
+### Deterministic grid
 
-**Преимущество:** инструменты не отнимают высоту каждой руки.  
-**Ограничение:** 5 opponent hands плюс own anchor могут не поместиться по высоте даже при достаточной ширине.
+All hands use the same card height; own/observed hand is never enlarged. Use existing seatingAnchorIndex/server-relative order. Own hand Top/Bottom is the existing presentationPreferences setting, with no new state or persistence. Actor highlighting never reorders cells.
 
-### B. Seating grid + horizontal Workbench
+| Players | Template | Own hand placement |
+|---|---|---|
+| 2P | 1 column × 2 rows | First/last for Top/Bottom |
+| 3P | 1 column × 3 rows only | First/last for Top/Bottom |
+| 4P | 2 × 2 | First/last cell |
+| 5P | Two paired opponent rows + centered own single row | Own row first/last |
+| 6P | 3 rows × 2 columns; never 2 rows × 3 columns | First/last cell |
 
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│ SYSTEM STATUS / CUTOUT / SIDE NAVIGATION INSETS                   │
-├──────────────────────────────────────────────────────────────────┤
-│ F [Browse] #123 · LIVE T41 · YOUR TURN             [Chat] [Menu]  │
-├──────────────────────────────────────────────────────────────────┤
-│ F Resources · Fireworks · Discards · Last action / Recent         │
-├─────────────────────┬─────────────────────┬──────────────────────┤
-│ F Alice             │ F Bob               │ F Carol              │
-│   [ ][ ][ ][ ]      │   [ ][ ][ ][ ]      │   [ ][ ][ ][ ]       │
-├─────────────────────┼─────────────────────┼──────────────────────┤
-│ F Dan               │ F Eve               │ F YOU                │
-│   [ ][ ][ ][ ]      │   [ ][ ][ ][ ]      │   [?][?][?][?]       │
-├─────────────────────┴─────────────────────┴──────────────────────┤
-│ F WORKBENCH                                                      │
-│   Candidate controls / card actions / timeline       [Confirm]   │
-├──────────────────────────────────────────────────────────────────┤
-│ SYSTEM NAVIGATION — NO GLOBAL NAVIGATION                          │
-└──────────────────────────────────────────────────────────────────┘
-```
+3P uses only 1 column × 3 rows. With the specified chrome, 1×3 already clears the 68dp card floor throughout every valid complete shell with body height ≥294dp. Below that height, the complete shell fails the right-column height gate.
 
-Сетка использует две или три колонки. Порядок — deterministic seating order относительно anchor; own/observed hand находится в последней ячейке нижнего занятого ряда, рядом с Workbench.
+### Pure geometry and elastic divider
 
-Пустые ячейки не заполняются навигацией или нестабильными инструментами. Уменьшение количества карт в конце игры не перестраивает сетку.
+The allocator takes only availableWidth, availableHeight, fontScale, playerCount, cardsPerHand, seatingAnchorIndex and ownHandPosition. Capacity comes from getGameplayCardsPerHand(metadata), never remaining hand length. Turn, tool, note, clue, review and depletion cannot change template, divider, cards or Workbench rectangle.
 
-**Преимущество:** меньше вертикальных рядов рук.  
-**Ограничение:** уменьшается ширина отдельной hand cell; extra-card capacity может сделать B непригодной раньше, чем кажется по скриншоту.
+Use HANABI_CARD_ASPECT_RATIO = 286 / 406. Card gap 3dp; hand-column gap 6dp; hand-row gap 4dp; left/right gap 8dp; hand-cell horizontal padding 8dp total; label chrome 18dp plus existing card headroom. Card floor 68dp; comfort maximum 112dp.
 
-### 9.1 Входные данные fit
+Solve the largest integer vertical and horizontal card heights ≤112 fitting all rows and the widest row while reserving rightMin. cardHeight = min(verticalMax, horizontalMax, 112). Below 68 fails; older 42/46dp floors and compact summaries are not landscape solutions.
 
-Раскладка получает:
+- scaledFont = clamp(fontScale, 1, 1.5)
+- rightMin = 252 + ceil(48 × (scaledFont − 1))
+- rightComfort = 320 + ceil(32 × (scaledFont − 1))
+- leftNeeded = actual widest grid-row width
+- maxRight = availableWidth − 8 − leftNeeded; fail if maxRight < rightMin
+- rightWidth = min(rightComfort, maxRight)
+- leftWidth = availableWidth − 8 − rightWidth
 
-| Параметр | Правило |
+Center the grid inside leftWidth. Readable hands take priority, then a valid right minimum, then comfortable right width. Whitespace is allowed; no percentage split or card stretching merely to fill space.
+
+### Right Live column
+
+| Region | Fixed envelope |
 |---|---|
-| Available width/height | Реальная window geometry после safe-area/system-navigation insets |
-| Player count | Authoritative metadata |
-| Card capacity | Максимальная вместимость руки для текущих options, не текущее количество оставшихся карт |
-| Font scale | Фактический системный масштаб |
-| Card aspect ratio | Существующий renderer, без изменения artwork |
-| Card readability floor | Не ниже согласованного baseline и результатов physical validation |
-| Touch geometry | Непересекающиеся actionable regions |
-| Workbench envelope | Максимум требований обычных tools, которые могут использоваться в этом room |
-| Header/HUD geometry | Измеренные размеры с реальными labels, timers и mode states |
+| Metric strip: mode/Turn, Pace, meaningful Eff/FRE | 34dp |
+| Table/resources plus separate Discard Pile | 92dp |
+| Readable Last Action, RECENT ›, Rewind, Empathy | 68dp |
+| Three region gaps | 12dp |
+| Workbench | Minimum 88dp, comfortable maximum 128dp |
 
-IME **не меняет выбранную базовую композицию A/B**. Клавиатурная задача получает отдельную overlay/task composition.
+Minimum body height is 294dp. Workbench height = min(128, bodyHeight − 34 − 92 − 68 − 12), pinned to the right-column bottom. Extra vertical space is allowed. Reserve H-group cue space inside the metric strip, fitting/truncating without changing height. The highlighted hand identifies the actor; no separate actor-name line.
 
-### 9.2 Горизонтальная проверка руки
+CompactTable uses explicit landscape-v2 / portrait-v2 modes, with legacy as the default. Keep Score n / max, real fireworks, read-only visual Deck/count, numeric Clues, three strike slots and relevant individual discard faces inside 92dp. Reuse the portrait discard selector: CardStatus.Trash relevance, duplicates individually, red max-clue blocked/yellow H-group double-discard cues, full DiscardViewer, and `No relevant cards` for nonempty all-trash piles. No deckPlays or ×2 aggregation.
 
-Для capacity \(C\), высоты card face \(h\), отношения ширины к высоте \(r\), card gap \(g_c\):
+Last Action wraps in a readable block, replacing the dense one-line ticker. Workbench idle is blank. The same fixed rectangle hosts card actions, dense two-row Clue palette with Close/Give, Note, Rewind/replay, Hypothetical and authoritative Played/Discarded/Misplayed face + Close feedback. Primary Play/Discard, clue commit and temporal/return-to-live controls stay accessible; long notes and secondary temporal/hypothetical details may scroll locally. Feedback retains Slice 8a lifetime and calm styling.
 
-\[
-W_{\text{hand}} =
-C \cdot \max(rh,\; W_{\text{touch}})
-+ (C-1)g_c
-+ P_{\text{hand}}
-\]
+### Failure and lifecycle
 
-Здесь \(W_{\text{touch}}\) — требуемая ширина независимой interactive области, а не обязательно ширина нарисованного лица.
+Eligible C17 never root-scrolls in either orientation. Keep one stable App ScrollView with gameRootScrollable = !c17Workspace. Grid/right column do not scroll. Shared private hand renderers preserve card.order, selection, notes, clue/preview markers, empathy, card state, hold gestures, clocks, actor indication, pulses and eligibility.
 
-Для индивидуально actionable cards базовая цель — 48 dp. Нельзя объявить её выполненной за счёт перекрывающихся hit slop.
+Insufficient width, card floor or body below 294dp produces explicit allocation failure and a bounded non-scrolling notice: “This landscape size cannot fit the Live workspace. Rotate the device or use a larger window.” This is a layout blocker/evidence path, not accepted normal 6P fit. No alternate topology, hidden mandatory controls or compact summaries. Physical device fit remains pending.
 
-Имя/роль игрока либо находятся над рукой, либо занимают отдельную измеренную lane. Их ширина не вычитается «на глаз».
-
-### 9.3 Вертикальная проверка
-
-Высота hand row включает label, card headroom, face/touch region и padding.
-
-**Для A:**
-
-\[
-H_{\text{ledger}} =
-\left\lceil\frac{P-1}{k}\right\rceil H_{\text{opponent-row}}
-+ G_{\text{opponent-rows}}
-+ G_{\text{anchor}}
-+ H_{\text{own-row}}
-\]
-
-где \(k\) — одна или две колонки opponent hands.
-
-Одновременно должны выполняться:
-
-\[
-W_{\text{ledger}} + G_{\text{dock}} + W_{\text{dock}} \le W
-\]
-
-\[
-H_{\text{ledger}} \le H_{\text{body}}
-\]
-
-\[
-H_{\text{HUD}} + H_{\text{LastAction}} +
-H_{\text{Workbench-envelope}} \le H_{\text{body}}
-\]
-
-**Для B:**
-
-Ширина каждой из двух/трёх колонок должна вместить соответствующую hand capacity.
-
-\[
-H_{\text{header}} + H_{\text{table-strip}} +
-H_{\text{grid}} + H_{\text{horizontal-workbench}} +
-G_{\text{regions}} \le H
-\]
-
-Высота grid row определяется самой высокой рукой в этом ряду, включая own anchor.
-
-### 9.4 Workbench requirements
-
-Резервируется **максимум**, а не сумма обычных task layouts:
-
-| Task | Что обязано помещаться без скрытого основного действия |
-|---|---|
-| Card actions | Target identity, Play, Discard |
-| Clue | Target, все предусмотренные color/rank choices, selected candidate, Give |
-| Note read | Target, читаемая часть note, Edit; длинный текст может иметь внутренний scroll |
-| Rewind/replay | Temporal position, Previous/Next, timeline и Live либо shared-follow action |
-| Hypothetical | Явный mode и текущая обычная task; редкие morph/settings controls — в inspector/menu |
-
-Для B color/rank choices могут идти рядом в одной широкой полосе. Для A они обычно располагаются несколькими рядами. Это измеряется на реальном наборе clue choices.
-
-### 9.5 Числовой пример выбора
-
-**Расчётный fixture, не аппаратный результат:** usable window 860 × 388 dp; 6 игроков; capacity 4; touch slot 48 dp; gap 4 dp; суммарные горизонтальные hand paddings 16 dp.
-
-Минимальная ширина такой руки:
-
-\[
-4 \times 48 + 3 \times 4 + 16 = 220\text{ dp}
-\]
-
-Допустим, измеренные hand rows при выбранном renderer size составляют 80 dp для opponents и 88 dp для own hand.
-
-В A при двух колонках нужны три opponent rows:
-
-\[
-3 \times 80 + 2 \times 8 + 8 + 88 = 352\text{ dp}
-\]
-
-При body height 324 dp **A не проходит**, хотя по ширине руки помещаются.
-
-В B три колонки дают два ряда:
-
-\[
-80 + 88 + 8 = 176\text{ dp}
-\]
-
-При header 48, table strip 64, Workbench 64 и межобластных отступах 16:
-
-\[
-48 + 64 + 176 + 64 + 16 = 368\text{ dp}
-\]
-
-**B проходит геометрию этого fixture.** Остаются проверки реальной читабельности и tool content.
-
-При трёх игроках в том же окне A может пройти с одной колонкой opponents и получает предпочтение за более прямую связь Ledger → side Workbench.
-
-### 9.6 Финальная политика выбора
-
-**A предпочтительна, если проходит все width/height/readability/touch/tool требования. B выбирается, когда A не проходит, а B проходит.**
-
-Orientation только направляет окно в short-wide evaluation. Она не выбирает композицию самостоятельно.
-
-Layout не переключается из-за нового хода, раскрытия Clue, изменения note, scrubbing или уменьшения руки. Пересчёт разрешён при изменении window/insets/font scale, authoritative player/capacity envelope или другого реального геометрического ограничения.
-
-Текущий allocator содержит числовые floors и отдельный own-hand budget; их нельзя считать универсально доказанными readability limits. Новая оболочка не вправе понизить их просто для прохождения arithmetic fit. 
-
-Если ни A, ни B не проходят на целевом обычном устройстве, это **layout blocker**, а не повод автоматически объявить tiny-card/summary режим нормальным 6P.
+Rotation preserves mounted GameScreen/C17GameScreen and C17DenseWorkspace ownership, Note Editor/draft, recoverable tasks, feedback and room/runtime. Navigation never implicitly changes attendance. Inspection does not create a live gameplay send path. Networking, rules and command lifetime remain unchanged.
 
 ---
 
@@ -946,7 +813,7 @@ Primary action — Review. Seed, Share, tags и Other Scores находятся 
 │ F Result / Shared-follow / Hypothetical marker │
 ├────────────────────────────────────────────────┤
 │ F Same C17 Ledger + resources                  │
-│   Portrait or landscape A/B by fit             │
+│   Portrait or landscape grid by fit             │
 ├────────────────────────────────────────────────┤
 │ F T12 [Previous] ──timeline── [Next]             │
 │ F [Follow leader] OR [Live], when meaningful   │
@@ -1156,7 +1023,7 @@ Sign out никогда не маскируется под обычный Back �
 | Класс | Начальное правило | Browsing | Room |
 |---|---|---|---|
 | Compact | Не short-wide; ширина <600 dp | Bottom navigation, одна колонка | Portrait density allocator |
-| Short-wide | Ширина > высоты; высота <480 dp либо <600 dp при aspect ratio ≥1,2 | Rail и compact header | A/B по полному fit |
+| Short-wide | Ширина > высоты; высота <480 dp либо <600 dp при aspect ratio ≥1,2 | Rail и compact header | Live grid/right column по §9 fit |
 | Medium | Оставшиеся окна 600–839 dp | Rail при достаточном fit; не обязательные две колонки | Composition по реальной геометрии |
 | Large | Обычно ≥840 dp шириной и ≥600 dp высотой | Rail, optional list/detail | Расширенный workspace, без global navigation |
 
@@ -1225,7 +1092,7 @@ Short-wide editor получает full-height task surface, когда sheet б
 | Table row / history row / user row | Revise | Разные сущности, согласованная плотность и action hierarchy |
 | Create form | Extract as task | Один canonical flow, subtask/picker ownership |
 | Pregame roster/footer | Replace composition | Role/start first, details вторичны |
-| C17 layout allocator | Revise | Portrait + A/B; capacity/font/tool envelope |
+| C17 layout allocator | Revise | Portrait + Live landscape grid; capacity/font envelope |
 | Workbench shell | Revise | Geometry не зависит от активного tool |
 | Chat presentation | Revise | Visibility-aware read, правильный recipient, pinned composer |
 | User context actions | Split | Компактные actions и отдельные Profile/Conversation |
@@ -1256,7 +1123,7 @@ Destructive actions отделены от primary tasks. Reduced motion сохр
 | Разделение More и contextual Menu | P | Не меняет commands |
 | Отдельный Create | P + R | Existing create/preferences/seed semantics |
 | Pregame density/Start/role UI | P + R | Existing eligibility и proposals |
-| Portrait/A/B layout | P | Не меняет card identity, rules или visibility |
+| Portrait/landscape grid layout | P | Не меняет card identity, rules или visibility |
 | Safe task suspension/resume | P | RAM, без сохранения gameplay intentions |
 | Chat read по visibility | P + R | Existing read capability, корректный moment вызова |
 | Session Messages/Conversation | P + R | Existing PM events/send; новая связная presentation |
@@ -1286,7 +1153,7 @@ Destructive actions отделены от primary tasks. Reduced motion сохр
 | Return из собственного Rewind явно ведёт в Live | Нельзя выдавать старый temporal state за актуальную игру | Необозначенный resume Rewind | Явный existing temporal action |
 | Create как task | Inline form вытесняла discovery | Постоянная Create-колонка | Canonical task flow |
 | Leave убран из Pregame footer | Редкая attendance-команда конкурировала со Start | Start и Leave рядом постоянно | Menu placement |
-| A/B выбираются по fit | Orientation недостаточно | `wide` / stretched portrait | Layout policy |
+| Live landscape grid uses explicit fit floors | Orientation недостаточно | A/B fallback / stretched portrait | Layout policy |
 | Tool envelope не зависит от текущего tool | Composer не должен двигать руки | Пересчитывать Ledger на каждый tool | Geometry invariant |
 | Messages только внутри People | Session PM не равен полноценному Inbox | Top-level Messages с durable appearance | Честная capability boundary |
 | Visibility владеет chat read | Mounted скрытый Chat может очищать unread | Read on mount | Local effect ownership |
@@ -1327,7 +1194,7 @@ Destructive actions отделены от primary tasks. Reduced motion сохр
 | Return C | Title не сжимается до нечитаемой колонки; при нехватке ширины происходит stacking |
 | YOUR TURN | Отличается от спокойного Live и review не только цветом |
 | Short-wide | Home, Create, Pregame и Live имеют предусмотренные композиции, а не stretched portrait |
-| A/B | Каждый выбранный layout проходит численные width/height/touch/tool assertions |
+| Live landscape grid | Explicit width/height/card-floor assertions; unsupported geometry is a blocker |
 | Geometry stability | Card/hand rectangles не меняются при Card/Clue/Note/Rewind tool switch внутри одного envelope |
 | 2–6P | На целевой normal-phone matrix сохранены реальные card faces и пригодные действия; shell не ухудшает dense baseline |
 | Capacity | Проверяется максимальная поддержанная hand capacity, а не только неполная late-game hand |
@@ -1361,7 +1228,7 @@ Destructive actions отделены от primary tasks. Reduced motion сохр
 | **6. Safe task/visibility ownership** | Draft suspension, chat read, hidden-screen effects, input interruption | Высокий | Скрытые поверхности не читают chat и не сохраняют unsafe arming |
 | **7. Browse + Return C** | Room-aware header, explicit Browse, revised Back, return guards | Высокий | Один runtime; one-action Return; ноль implicit attendance sends |
 | **8a. Live portrait shell** | Header, compact HUD, Workbench envelope | Высокий | 2–6P baseline не ухудшен; tools не двигают Ledger |
-| **8b. Landscape A/B** | Обе композиции, fit selection, font/capacity fixtures | Высокий | Выбор по измерению; ordinary target windows проходят без tiny-card excuse |
+| **8b. Live landscape shell** | One topology, deterministic grid, elastic divider, font/capacity fixtures | Высокий | Explicit 68dp/294dp floors; physical validation pending |
 | **9. Chat и contextual menus** | Bounded overlays/tasks, correct context, Settings-from-room | Средний | IME, Return, unread, menu nesting и attendance confirmations |
 | **10. History/Review** | List-first hierarchy, import task, temporal/shared surfaces | Средний | Replay guards, source eligibility, origin restoration и isolation |
 | **11. People/Session Messages/Profile** | Directory, session conversation list, shared user surfaces | Средний | Честная retention boundary, account isolation, send uncertainty |
