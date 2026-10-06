@@ -7,6 +7,7 @@ import {
   isBrowsingSettings,
   navigateBrowsing,
   openMoreSurface,
+  openBrowsingProfile,
   openBrowsingSettings,
 } from './browsingNavigationState';
 
@@ -66,4 +67,14 @@ describe('browsing presentation state', () => {
 test('Live Home intent resets any previous browsing destination to Home root', () => {
   const settings = openBrowsingSettings(createBrowsingPresentation('more'));
   expect(navigateBrowsing(settings, 'home')).toEqual(createBrowsingPresentation('home'));
+});
+
+
+test.each(['people', 'more'] as const)('Profile opened from %s returns to its browsing origin', (origin) => {
+  const root = createBrowsingPresentation(origin);
+  const profile = openBrowsingProfile(root, 'Ada');
+  expect(profile.destination).toBe(origin);
+  expect(currentBrowsingSurface(profile)).toEqual({ kind: 'profile', origin, username: 'Ada' });
+  expect(backBrowsing(profile)).toEqual(root);
+  expect(navigateBrowsing(profile, 'home')).toEqual(createBrowsingPresentation('home'));
 });

@@ -100,7 +100,7 @@ test('uses explicit export feedback tone instead of inferring it from message te
 
 
 test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
-  const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
+  const header = app.slice(app.indexOf('focusedRoomPresentation = ('), app.indexOf('{liveConnectionProblem'));
   expect(header).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
   expect(header).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
   expect(header).toContain('liveClientState.metadata.options.variantName');

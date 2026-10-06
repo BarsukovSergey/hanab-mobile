@@ -1,107 +1,68 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { lobbyRuntime } from '../../runtime/application';
 import { useAppSelector } from '../../store/hooks';
 import { tableSelectors, userSelectors } from '../../store/store';
-import {
-  ActionButton,
-  EmptyState,
-  Panel,
-  Pill,
-  SectionHeading,
-  useHanabTheme,
-} from '../designSystem';
-import { getPeopleRows } from '../peoplePresentation';
-import { UserContextActions } from '../UserContextActions';
+import { ActionButton, EmptyState, Field, Panel, Pill, SectionHeading, useHanabTheme, useResponsiveLayout } from '../designSystem';
+import { getPeopleRows, getPeopleSections } from '../peoplePresentation';
 
-export function PeopleScreen({ onBack, roomOccupied, showEmbeddedBack = true }: {
+export function PeopleScreen({ onBack, onProfile, roomOccupied, showEmbeddedBack = true }: {
   onBack: () => void;
+  onProfile: (username: string) => void;
   roomOccupied: boolean;
   showEmbeddedBack?: boolean;
 }) {
   const { theme } = useHanabTheme();
+  const { availableWidth, availableHeight } = useResponsiveLayout();
+  const wideRows = availableWidth > availableHeight;
   const users = useAppSelector(userSelectors.selectAll);
   const tables = useAppSelector(tableSelectors.selectAll);
   const authenticatedUser = useAppSelector((state) => state.session.authenticatedUser);
   const friends = useAppSelector((state) => state.session.friends);
-  const [composerUserID, setComposerUserID] = useState<number | null>(null);
-  const rows = useMemo(
-    () => getPeopleRows(users, friends, authenticatedUser, tables),
-    [authenticatedUser, friends, tables, users],
-  );
+  const [search, setSearch] = useState('');
+  const rows = useMemo(() => getPeopleRows(users, friends, authenticatedUser, tables),
+    [authenticatedUser, friends, tables, users]);
+  const sections = getPeopleSections(rows, search);
 
-  return (
-    <View style={styles.root}>
-      <Panel style={styles.hero}>
-        <SectionHeading
-          title="People"
-          detail={`${rows.length} ${rows.length === 1 ? 'person' : 'people'} online`}
-        />
-        {showEmbeddedBack && <ActionButton compact title="Back to Lobby" onPress={onBack} />}
-      </Panel>
-
-      <Panel>
-        {rows.length === 0 && <EmptyState>No users online.</EmptyState>}
-        {roomOccupied && rows.some((row) => row.tableAction !== null) &&
-          <Text style={{ color: theme.colors.textMuted }}>Return to the current room before spectating another table.</Text>}
-        {rows.map((row) => {
-          const tableAction = row.tableAction;
-          return (
-            <View key={row.user.userID} style={[
-              styles.userRow,
-              { borderColor: row.isFriend ? theme.colors.accent : theme.colors.border },
-              row.isFriend && styles.friendUserRow,
-            ]}>
-              <View style={styles.userHeader}>
-                <View style={styles.userCopy}>
-                  <Text style={[styles.username, { color: row.isFriend ? theme.colors.accent : theme.colors.text }]}>{row.user.name}</Text>
-                  <Text style={[styles.location, { color: theme.colors.textMuted }]}>{row.location}</Text>
-                </View>
-                <View style={styles.indicators}>
-                  {row.isOwnUser && <Pill>You</Pill>}
-                  {row.isFriend && <Pill>Friend</Pill>}
-                  {row.user.inactive && <Pill>Inactive</Pill>}
-                  {row.user.hyphenated && <Pill>H-group</Pill>}
-                </View>
-              </View>
-
-              {row.canUseContextActions && (
-                <UserContextActions
-                  username={row.user.name}
-                  isFriend={row.isFriend}
-                  open={composerUserID === row.user.userID}
-                  onOpenChange={(open) => setComposerUserID(open ? row.user.userID : null)}
-                >
-                  {tableAction !== null && (
-                    <ActionButton
-                      compact
-                      title={tableAction.label}
-                      disabled={roomOccupied}
-                      onPress={() => {
-                        if (roomOccupied) return;
-                        lobbyRuntime.spectate(tableAction.tableID);
-                      }}
-                    />
-                  )}
-                </UserContextActions>
-              )}
-            </View>
-          );
-        })}
-      </Panel>
+  return <View style={styles.root}>
+    <View style={[styles.toolbar, wideRows && styles.wideToolbar]}>
+      <SectionHeading title="People" detail={`${rows.length} online`} />
+      <Field accessibilityLabel="Search known usernames" autoCapitalize="none" autoCorrect={false}
+        placeholder="Search usernames" value={search} onChangeText={setSearch} style={styles.search} />
+      {showEmbeddedBack && <ActionButton compact title="Back to Lobby" onPress={onBack} />}
     </View>
-  );
+    {roomOccupied && rows.some((row) => row.tableAction !== null) &&
+      <Text style={{ color: theme.colors.textMuted }}>Return to the current room before spectating another table.</Text>}
+    {sections.every((section) => section.rows.length === 0) &&
+      <EmptyState>{rows.length === 0 ? 'No users online.' : 'No matching usernames.'}</EmptyState>}
+    {sections.filter((section) => section.rows.length > 0).map((section) => <Panel key={section.title}>
+      <SectionHeading title={section.title} />
+      {section.rows.map((row) => <View key={row.user.userID}
+        style={[styles.userRow, wideRows && styles.wideRow, { borderColor: theme.colors.border }]}>
+        <View style={[styles.userCopy, wideRows && styles.wideCopy]}>
+          <Text style={[styles.username, { color: row.isFriend ? theme.colors.accent : theme.colors.text }]}>{row.user.name}</Text>
+          <Text style={{ color: theme.colors.textMuted }}>{row.location}</Text>
+        </View>
+        <View style={styles.actions}>
+          {row.isOwnUser && <Pill>You</Pill>}
+          {row.user.inactive && <Pill>Inactive</Pill>}
+          <ActionButton compact title="Profile" accessibilityLabel={`Profile for ${row.user.name}`}
+            onPress={() => onProfile(row.user.name)} />
+        </View>
+      </View>)}
+    </Panel>)}
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 16 },
-  hero: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  userRow: { borderTopWidth: 1, gap: 10, paddingTop: 12 },
-  friendUserRow: { borderLeftWidth: 3, paddingLeft: 8 },
-  userHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
+  root: { gap: 12 },
+  toolbar: { gap: 8 },
+  wideToolbar: { flexDirection: 'row', alignItems: 'center' },
+  search: { flexGrow: 1, minWidth: 140 },
+  userRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingVertical: 6, gap: 8 },
+  wideRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   userCopy: { flex: 1, gap: 2, minWidth: 0 },
-  username: { fontSize: 16, fontWeight: '800' },
-  location: { fontSize: 13, lineHeight: 18 },
-  indicators: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end' },
+  wideCopy: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  username: { fontSize: 15, fontWeight: '700' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
 });

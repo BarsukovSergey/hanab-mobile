@@ -84,7 +84,7 @@ test('Live identity in both orientations is always the current variant with sing
   expect(identity).not.toContain('username');
   expect(identity).not.toContain('tableID');
   expect(identity).not.toContain('width <= height');
-  const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
+  const header = app.slice(app.indexOf('focusedRoomPresentation = ('), app.indexOf('{liveConnectionProblem'));
   expect(header).not.toContain('username');
   expect(header).not.toContain('title="Browse"');
   expect(header).not.toContain('title="More"');

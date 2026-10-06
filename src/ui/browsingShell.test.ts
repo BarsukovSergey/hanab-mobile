@@ -106,7 +106,7 @@ test('stable no-room waits for authoritative recovery and sign-out clears room o
 test('hardware Back assigns browsing ownership before room attendance', () => {
   const app = read('App.tsx').replace(/\r\n/g, '\n');
   const hardwareBack = app.slice(app.indexOf("BackHandler.addEventListener('hardwareBackPress'"), app.indexOf('return () => subscription.remove();', app.indexOf("BackHandler.addEventListener('hardwareBackPress'")));
-  const liveMenu = app.slice(app.indexOf("{roomChild === 'menu' ? <>"), app.indexOf("</> : roomChild === 'menu-participants'"));
+  const liveMenu = app.slice(app.indexOf("roomChild === 'menu' ? <>"), app.indexOf("</> : roomChild === 'menu-participants'"));
   expect(hardwareBack.indexOf("if (presentationFocus === 'browsing')")).toBeLessThan(hardwareBack.indexOf("if (roomState.room.kind === 'pregame')"));
   expect(hardwareBack).toContain("getFocusedRoomBackDecision(roomState.room)");
   expect(hardwareBack).not.toContain('lobbyRuntime.unattendLiveGame');
@@ -125,7 +125,7 @@ test('More routes to current task owners and reads the repository version', () =
   expect(lobby).toContain('{showLiveGameLink && <Panel style={styles.linkPanel}>');
   expect(more).toContain("from '../../../package.json'");
   expect(more).toContain('Signed in as');
-  expect(more).not.toContain('My Profile');
+  expect(more).toContain('My Profile');
   expect(more).not.toContain('lobbyRuntime');
 });
 

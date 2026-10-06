@@ -44,13 +44,21 @@ export function getPeopleRows(
       tableAction,
     };
   }).sort((left, right) => {
-    if (left.isOwnUser !== right.isOwnUser) return left.isOwnUser ? -1 : 1;
     if (left.isFriend !== right.isFriend) return left.isFriend ? -1 : 1;
     const nameOrder = left.user.name.localeCompare(right.user.name, undefined, {
       sensitivity: 'base',
     });
     return nameOrder !== 0 ? nameOrder : left.user.userID - right.user.userID;
   });
+}
+
+export function getPeopleSections(rows: readonly PeopleUserRow[], search: string) {
+  const query = search.trim().toLowerCase();
+  const matching = rows.filter((row) => row.user.name.toLowerCase().includes(query));
+  return [
+    { title: 'Friends', rows: matching.filter((row) => row.isFriend) },
+    { title: 'Online', rows: matching.filter((row) => !row.isFriend) },
+  ];
 }
 
 function getPeopleTableAction(table: LobbyTable): PeopleTableAction | null {
