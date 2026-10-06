@@ -4130,6 +4130,38 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().history.hasMore).toBe(false);
   });
 
+  test('gameHistory delegates history state before also feeding game bootstrap', async () => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    const history = [historicalGame(77)];
+    const receiveHistory = jest.spyOn(runtime['historyRuntime'], 'receiveEvent');
+    const bootstrapHistory = jest.spyOn(runtime['gameBootstrap'], 'receiveGameHistory');
+    socket.emitMessage(`gameHistory ${JSON.stringify(history)}`);
+    expect(receiveHistory).toHaveBeenCalledWith(1, { command: 'gameHistory', data: history });
+    expect(store.getState().history.items).toEqual(history);
+    expect(bootstrapHistory).toHaveBeenCalledWith(1, history);
+    expect(receiveHistory.mock.invocationCallOrder[0]!).toBeLessThan(bootstrapHistory.mock.invocationCallOrder[0]!);
+  });
+
+  test.each(['warning', 'error'] as const)('%s delegates cleanup of every current history request', async (command) => {
+    const { socket, store, runtime } = await makeReadyRuntime();
+    store.dispatch(sessionActions.welcomeReceived({
+      epoch: 1, welcome: { userID: 1, username: 'Ada', totalGames: 30, playingAtTables: [] },
+    }));
+    const history = Array.from({ length: 10 }, (_, i) => ({ ...historicalGame(20 - i), numGamesOnThisSeed: 3 }));
+    socket.emitMessage(`gameHistory ${JSON.stringify(history)}`);
+    socket.emitMessage(`gameHistoryFriends ${JSON.stringify(history)}`);
+    expect(runtime.loadMoreHistory()).toBe(true);
+    expect(runtime.loadMoreFriendsHistory()).toBe(true);
+    expect(runtime.loadOtherScores(20, false)).toBe(true);
+    expect(runtime.watchHistoricalGame(20)).toBe(true);
+    socket.emitMessage(`${command} ${JSON.stringify({ [command]: 'Request rejected' })}`);
+    expect(store.getState().history).toMatchObject({
+      pendingRequest: null, friendPendingRequest: null, pendingOtherScores: null,
+      pendingReplayCreate: null, error: 'Request rejected',
+    });
+    expect(store.getState().lobby.notice).toEqual({ kind: command, message: 'Request rejected' });
+  });
+
   test('friends history receives separately and paginates with the exact frame', async () => {
     const { socket, store, runtime } = await makeReadyRuntime();
     const bootstrapHistory = jest.spyOn(runtime['gameBootstrap'], 'receiveGameHistory');
