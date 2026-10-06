@@ -23,7 +23,7 @@ export function ProfileScreen({ username, roomOccupied, room = 'lobby' }: {
     <SectionHeading title={profile.username} detail={profile.presence} />
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
       {profile.isOwnUser && <Pill>You</Pill>}
-      <Pill>{profile.isFriend ? 'Friend' : 'Not a friend'}</Pill>
+      {!profile.isOwnUser && <Pill>{profile.isFriend ? 'Friend' : 'Not a friend'}</Pill>}
     </View>
     {profile.location !== null && <Text style={{ color: theme.colors.textMuted }}>{profile.location}</Text>}
     {!profile.isOwnUser && <UserContextActions key={profile.username} username={profile.username}

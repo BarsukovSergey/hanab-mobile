@@ -6,6 +6,13 @@ const read = (file: string) => readFileSync(resolve(__dirname, file), 'utf8').re
 const app = read('../../../App.tsx');
 const profile = read('ProfileScreen.tsx');
 
+test('own Profile keeps You and reserves friend-state labels for other users', () => {
+  const markers = profile.slice(profile.indexOf('<View style='), profile.indexOf('</View>'));
+  expect(markers).toContain('{profile.isOwnUser && <Pill>You</Pill>}');
+  expect(markers).toContain("{!profile.isOwnUser && <Pill>{profile.isFriend ? 'Friend' : 'Not a friend'}</Pill>}");
+  expect(markers.match(/<Pill>/g)).toHaveLength(2);
+});
+
 test('browsing origins share Profile with App-owned Back and existing global navigation', () => {
   expect(app).toContain('onProfile={(name) => setBrowsing((state) => openBrowsingProfile(state, name))}');
   expect(app).toContain('if (name !== undefined) setBrowsing((state) => openBrowsingProfile(state, name))');
