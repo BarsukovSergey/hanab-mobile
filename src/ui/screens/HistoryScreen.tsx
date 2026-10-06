@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
-import { parseReplayInput, type ReplayInputResult } from '../../game/client/replayInput';
+import type { ReplayInputResult } from '../../game/client/replayInput';
 import { replayInputActions, type ReplayInputActions } from '../../platform/replayInputActions';
+import { parseHistoryReplayInput } from '../historyReplayInput';
 import { copyHistorySeed } from '../historySeedCopy';
 import { extractCanonicalHistorySeedSuffix } from '../specificSeedName';
 import type { MobileTableOptions } from '../../protocol/lobbyProtocol';
@@ -36,6 +37,7 @@ export function HistoryScreen({
   onWatchJSONReplay,
   onWatchReplayInput,
   onPlaySeed,
+  onPresentationChange,
   clipboardActions = replayInputActions,
 }: {
   roomOccupied: boolean;
@@ -46,17 +48,26 @@ export function HistoryScreen({
   onWatchJSONReplay: (gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared') => void;
   onWatchReplayInput: (request: Exclude<ReplayInputResult, { kind: 'invalid' }>) => void;
   onPlaySeed: (prefill: { seedSuffix: string; maxPlayers: number; createOptions: MobileTableOptions; numPlayers: number }) => void;
+  onPresentationChange?: () => void;
   clipboardActions?: ReplayInputActions;
 }) {
   const { theme } = useHanabTheme();
-  const { wide } = useResponsiveLayout();
+  const { windowClass } = useResponsiveLayout();
+  const wideRows = windowClass !== 'compact';
   const history = useAppSelector((state) => state.history);
   const session = useAppSelector((state) => state.session);
   const [selection, setSelection] = useState<{ epoch: number; mode: 'mine' | 'friends' | 'tagged' }>({
     epoch: session.connectionEpoch, mode: 'mine',
   });
   const [tagInput, setTagInput] = useState('');
+  const [openReplayTask, setOpenReplayTask] = useState(false);
+  const [advancedReplay, setAdvancedReplay] = useState(false);
+  const [detailsID, setDetailsID] = useState<number | null>(null);
+  const [replayLinkText, setReplayLinkText] = useState('');
   const [replayJSONText, setReplayJSONText] = useState('');
+  const replayInputText = advancedReplay ? replayJSONText : replayLinkText;
+  const setReplayInputText = advancedReplay ? setReplayJSONText : setReplayLinkText;
+  const replayUsesLink = /^[a-z][a-z\d+.-]*:\/\//i.test(replayInputText.trim());
   const [replayVisibility, setReplayVisibility] = useState<'solo' | 'shared'>('solo');
   const [replayJSONError, setReplayJSONError] = useState<string | null>(null);
   const [seedCopyFeedback, setSeedCopyFeedback] = useState<{ itemID: number; message: string } | null>(null);
@@ -64,6 +75,7 @@ export function HistoryScreen({
   const invalidateSeedCopy = useCallback(() => {
     seedCopyGeneration.current += 1;
     setSeedCopyFeedback(null);
+    setDetailsID(null);
   }, []);
   useEffect(() => {
     if (
@@ -74,6 +86,8 @@ export function HistoryScreen({
       setSelection({ epoch: session.connectionEpoch, mode: 'mine' });
     }
   }, [invalidateSeedCopy, selection, session.connectionEpoch, session.friends.length]);
+  useEffect(() => { invalidateSeedCopy(); }, [invalidateSeedCopy, session.connectionEpoch]);
+  useEffect(() => { onPresentationChange?.(); }, [onPresentationChange, openReplayTask, detailsID]);
   const mode = selection.epoch === session.connectionEpoch ? selection.mode : 'mine';
   const showingFriends = mode === 'friends' && session.friends.length > 0;
   const showingTagged = mode === 'tagged';
@@ -89,6 +103,13 @@ export function HistoryScreen({
   const comparing = history.pendingOtherScores !== null || history.otherScores !== null;
   const handleBack = () => {
     invalidateSeedCopy();
+    if (openReplayTask) {
+      setOpenReplayTask(false);
+      setAdvancedReplay(false);
+      setReplayJSONError(null);
+      return;
+    }
+    if (detailsID !== null) { setDetailsID(null); return; }
     if (comparing) lobbyRuntime.dismissOtherScores();
     onBack();
   };
@@ -100,17 +121,56 @@ export function HistoryScreen({
     setSelection({ epoch: session.connectionEpoch, mode: friends && session.friends.length > 0 ? 'friends' : 'mine' });
     lobbyRuntime.dismissOtherScores();
   };
+  if (openReplayTask) return (
+    <View style={styles.root}>
+      {showEmbeddedBack && <ActionButton compact title="Back to history" tone="secondary" onPress={handleBack} />}
+      {roomOccupied && <Notice>You're already in a room. Return to the current room before opening another replay.</Notice>}
+      <Panel style={styles.importPanel}>
+        <SectionHeading title="Open replay" detail="Enter a hanab.live replay link or database ID. Links keep their Solo / Shared mode." />
+        {!advancedReplay && <Field value={replayLinkText} onChangeText={setReplayLinkText}
+          placeholder="Replay link or database ID" autoCapitalize="none" autoCorrect={false} />}
+        <ActionButton compact title={advancedReplay ? 'Hide Advanced' : 'Advanced'} tone="secondary"
+          onPress={() => { setAdvancedReplay((value) => !value); setReplayJSONError(null); }} />
+        {advancedReplay && <TextInput multiline value={replayJSONText} onChangeText={setReplayJSONText}
+          accessibilityLabel="Raw replay JSON" placeholder="Raw replay JSON" autoCapitalize="none" autoCorrect={false}
+          style={[styles.jsonInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />}
+        <View style={styles.search}>
+          <ActionButton compact title="Paste from clipboard" tone="secondary" onPress={() => {
+            void clipboardActions.readClipboard().then((text) => {
+              if (text.trim() === '') setReplayJSONError('Clipboard is empty.');
+              else { setReplayInputText(text); setReplayJSONError(null); }
+            }).catch(() => setReplayJSONError('Could not read the clipboard.'));
+          }} />
+          {!replayUsesLink && <><ActionButton compact title="Solo" tone={replayVisibility === 'solo' ? 'primary' : 'secondary'}
+            onPress={() => setReplayVisibility('solo')} />
+          <ActionButton compact title="Shared" tone={replayVisibility === 'shared' ? 'primary' : 'secondary'}
+            onPress={() => setReplayVisibility('shared')} /></>}
+          <ActionButton compact title="Open" disabled={roomOccupied || replayPending || replayInputText.trim() === ''}
+            onPress={() => {
+              if (roomOccupied) return;
+              const parsed = parseHistoryReplayInput(replayInputText, replayVisibility, advancedReplay);
+              if (parsed.kind === 'invalid') { setReplayJSONError(parsed.reason); return; }
+              setReplayJSONError(null);
+              if (parsed.kind === 'id') onWatchReplayInput(parsed);
+              else onWatchJSONReplay(parsed.gameJSON, parsed.visibility);
+            }} />
+        </View>
+        {replayJSONError !== null && <Notice tone="error">{replayJSONError}</Notice>}
+      </Panel>
+      {history.error !== null && <Notice tone="error">{history.error}</Notice>}
+    </View>
+  );
   return (
     <View style={styles.root}>
-      <Panel style={styles.header}>
+      {(showEmbeddedBack || comparing || detailsID !== null) && <Panel style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>REPLAYS</Text>
-          <SectionHeading title={comparing ? 'Other Scores' : 'Game history'} detail={comparing
+          <SectionHeading title={comparing ? 'Other Scores' : detailsID !== null ? 'Game details' : 'Game history'} detail={comparing
             ? 'Games played on this seed.'
-            : 'Open a finished game using the same authoritative replay path.'} />
+            : 'Review finished games.'} />
         </View>
         {showEmbeddedBack && <ActionButton compact title="Back to lobby" onPress={handleBack} />}
-      </Panel>
+      </Panel>}
       {roomOccupied && <Notice>You're already in a room. History stays available for browsing, but return to the current room before opening another replay or starting this seed.</Notice>}
 
       {comparing && (
@@ -122,58 +182,32 @@ export function HistoryScreen({
         </Panel>
       )}
 
-      {!comparing && (
+      {!comparing && detailsID === null && <ActionButton title="Open replay"
+        onPress={() => { invalidateSeedCopy(); setOpenReplayTask(true); }} />}
+      {showEmbeddedBack && detailsID !== null && <ActionButton compact title="Back to history" tone="secondary" onPress={handleBack} />}
+
+      {!comparing && detailsID === null && (
         <View style={styles.switcher}>
           <ActionButton compact title="My history" tone={mode === 'mine' ? 'primary' : 'secondary'}
             onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'mine' }); invalidateSeedCopy(); }} />
-          {session.friends.length > 0 && <ActionButton compact title="Friends history" tone={showingFriends ? 'primary' : 'secondary'}
+          {session.friends.length > 0 && <ActionButton compact title="Friends" tone={showingFriends ? 'primary' : 'secondary'}
             onPress={() => {
               setSelection({ epoch: session.connectionEpoch, mode: 'friends' });
               invalidateSeedCopy();
               lobbyRuntime.ensureFriendsHistory();
             }} />}
-          <ActionButton compact title="Tagged games" tone={showingTagged ? 'primary' : 'secondary'}
+          <ActionButton compact title="Tagged" tone={showingTagged ? 'primary' : 'secondary'}
             onPress={() => { setSelection({ epoch: session.connectionEpoch, mode: 'tagged' }); invalidateSeedCopy(); lobbyRuntime.ensureTaggedGames(); }} />
         </View>
       )}
 
-      {!comparing && showingTagged && <Panel style={styles.search}>
+      {!comparing && detailsID === null && showingTagged && <Panel style={styles.search}>
         <Field autoCapitalize="none" autoCorrect={false} onChangeText={setTagInput} placeholder="Exact tag" value={tagInput} />
         <ActionButton compact title="Search" disabled={history.tagSearchPending || tagInput.trim() === ''}
           onPress={() => { invalidateSeedCopy(); lobbyRuntime.searchTag(tagInput); }} />
         <ActionButton compact title="Clear search" tone="secondary" disabled={!history.tagSearchActive}
           onPress={() => { invalidateSeedCopy(); lobbyRuntime.clearTagSearch(); }} />
       </Panel>}
-
-      {!comparing && <Panel style={styles.importPanel}>
-        <SectionHeading title="Open replay" detail="Paste replay JSON or a hanab.live replay link." />
-        <TextInput multiline value={replayJSONText} onChangeText={setReplayJSONText}
-          placeholder="Replay JSON or https://hanab.live/replay/…" autoCapitalize="none" autoCorrect={false}
-          style={[styles.jsonInput, { color: theme.colors.text, borderColor: theme.colors.border }]} />
-        <View style={styles.search}>
-          <ActionButton compact title="Paste from clipboard" tone="secondary" onPress={() => {
-            void clipboardActions.readClipboard().then((text) => {
-              if (text.trim() === '') setReplayJSONError('Clipboard is empty.');
-              else { setReplayJSONText(text); setReplayJSONError(null); }
-            }).catch(() => setReplayJSONError('Could not read the clipboard.'));
-          }} />
-          <ActionButton compact title="Solo" tone={replayVisibility === 'solo' ? 'primary' : 'secondary'}
-            onPress={() => setReplayVisibility('solo')} />
-          <ActionButton compact title="Shared" tone={replayVisibility === 'shared' ? 'primary' : 'secondary'}
-            onPress={() => setReplayVisibility('shared')} />
-          <ActionButton compact title="Open replay" disabled={roomOccupied || replayPending || replayJSONText.trim() === ''}
-            onPress={() => {
-              if (roomOccupied) return;
-              const parsed = parseReplayInput(replayJSONText, replayVisibility);
-              if (parsed.kind === 'invalid') { setReplayJSONError(parsed.reason); return; }
-              setReplayJSONError(null);
-              if (parsed.kind === 'id') onWatchReplayInput(parsed);
-              else onWatchJSONReplay(parsed.gameJSON, parsed.visibility);
-            }} />
-        </View>
-        {replayJSONError !== null && <Notice tone="error">{replayJSONError}</Notice>}
-      </Panel>}
-
       {!comparing && showingTagged && history.taggedPending && !history.tagSearchActive && <Notice>Loading tagged games…</Notice>}
       {!comparing && showingTagged && !history.taggedLoaded && !history.taggedPending
         && !history.tagSearchActive && history.taggedError === null
@@ -196,8 +230,10 @@ export function HistoryScreen({
         && history.taggedItems.length === 0
         && <Panel><EmptyState>No tagged games found.</EmptyState></Panel>}
 
-      <View style={[styles.grid, wide && styles.gridWide]}>
+      <View style={styles.grid}>
         {(comparing ? history.otherScores?.games ?? [] : items).map((item) => {
+          if (detailsID !== null && detailsID !== item.id) return null;
+          const showingDetails = detailsID === item.id;
           const supported = areTableOptionsSupported(item.options);
           const seedSuffix = supported
             ? extractCanonicalHistorySeedSuffix(item.seed, item.options.numPlayers, item.options.variantID)
@@ -209,84 +245,92 @@ export function HistoryScreen({
             ? item.datetimeFinished
             : finished.toLocaleString();
           return (
-            <Panel key={item.id} style={[styles.gameCard, wide && styles.gameCardWide]}>
-              <View style={styles.gameHeader}>
+            <Panel key={item.id} style={styles.gameCard}>
+              <View style={[styles.rowSummary, wideRows && styles.rowSummaryWide]}>
                 <View style={styles.gameCopy}>
-                  <Text style={[styles.gameTitle, { color: theme.colors.text }]}>Game #{item.id}</Text>
-                  <Text style={[styles.variant, { color: theme.colors.textMuted }]}>{item.options.variantName}</Text>
+                  <View style={styles.gameHeader}>
+                    <View style={styles.gameCopy}>
+                      <Text style={[styles.gameTitle, { color: theme.colors.text }]}>Game #{item.id}</Text>
+                      <Text style={[styles.variant, { color: theme.colors.textMuted }]}>{item.options.variantName} · {item.options.numPlayers}P</Text>
+                    </View>
+                    <Pill active={supported}>Score {item.score}{maxScore !== null ? ` / ${maxScore}` : ''}</Pill>
+                  </View>
+                  {comparing && item.playerNames.includes(session.authenticatedUser?.username ?? '')
+                    && <Pill active>Your game</Pill>}
+                  <Text style={[styles.players, { color: theme.colors.text }]}>{item.playerNames.join(', ')}</Text>
+                  <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{finishedLabel}</Text>
                 </View>
-                <Pill active={supported}>Score {item.score}{maxScore !== null ? ` / ${maxScore}` : ''}</Pill>
+                <ActionButton
+                  disabled={roomOccupied || !supported || replayPending}
+                  title={replayPending ? 'Opening replay…' : 'Review'}
+                  tone={supported ? 'primary' : 'secondary'}
+                  onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'solo'); }}
+                />
               </View>
-              {comparing && item.playerNames.includes(session.authenticatedUser?.username ?? '')
-                && <Pill active>Your game</Pill>}
-              <Text style={[styles.players, { color: theme.colors.text }]}>{item.playerNames.join(', ')}</Text>
-              <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{finishedLabel}</Text>
-              <View style={styles.seedMetadata}>
-                <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
-                  {item.seed !== '' ? `Seed ${item.seed}` : 'Seed unavailable'} · {item.numTurns} turns
-                </Text>
-                {item.seed !== '' && <ActionButton compact title="Copy seed" tone="secondary" onPress={() => {
-                  const requestID = ++seedCopyGeneration.current;
-                  setSeedCopyFeedback(null);
-                  void copyHistorySeed(item.seed, clipboardActions).then((copied) => {
-                    if (requestID !== seedCopyGeneration.current) return;
-                    setSeedCopyFeedback({
-                      itemID: item.id,
-                      message: copied ? 'Seed copied.' : 'Could not copy seed.',
+              {!showingDetails && <ActionButton compact title="Details / actions >" tone="secondary"
+                onPress={() => { invalidateSeedCopy(); setDetailsID(item.id); }} />}
+              {showingDetails && <>
+                <View style={styles.seedMetadata}>
+                  <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
+                    {item.seed !== '' ? `Seed ${item.seed}` : 'Seed unavailable'} · {item.numTurns} turns
+                  </Text>
+                  {item.seed !== '' && <ActionButton compact title="Copy seed" tone="secondary" onPress={() => {
+                    const requestID = ++seedCopyGeneration.current;
+                    setSeedCopyFeedback(null);
+                    void copyHistorySeed(item.seed, clipboardActions).then((copied) => {
+                      if (requestID !== seedCopyGeneration.current) return;
+                      setSeedCopyFeedback({
+                        itemID: item.id,
+                        message: copied ? 'Seed copied.' : 'Could not copy seed.',
+                      });
                     });
-                  });
-                }} />}
-                {supported && seedSuffix !== null && <ActionButton compact title="Play this seed" tone="secondary" disabled={roomOccupied} onPress={() => {
-                  if (roomOccupied) return;
-                  onPlaySeed({
-                    seedSuffix,
-                    maxPlayers: item.options.numPlayers,
-                    numPlayers: item.options.numPlayers,
-                    createOptions: {
-                      variantName: item.options.variantName,
-                      timed: item.options.timed,
-                      timeBase: item.options.timeBase,
-                      timePerTurn: item.options.timePerTurn,
-                      cardCycle: item.options.cardCycle,
-                      emptyClues: item.options.emptyClues,
-                      oneExtraCard: item.options.oneExtraCard,
-                      oneLessCard: item.options.oneLessCard,
-                      allOrNothing: item.options.allOrNothing,
-                    },
-                  });
-                }} />}
-              </View>
-              {seedCopyFeedback?.itemID === item.id
-                && <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{seedCopyFeedback.message}</Text>}
-              <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{END_CONDITIONS[item.endCondition]}</Text>
-              {item.tags !== '' && <Text style={[styles.tags, { color: theme.colors.textMuted }]}>{item.tags}</Text>}
-              {!supported && <Notice tone="error">This game uses unsupported options.</Notice>}
-              <ActionButton
-                disabled={roomOccupied || !supported || replayPending}
-                title={replayPending ? 'Opening replay…' : 'Watch replay'}
-                tone={supported ? 'primary' : 'secondary'}
-                onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'solo'); }}
-              />
-              <ActionButton
-                compact
-                disabled={roomOccupied || !supported || replayPending}
-                title="Share replay"
-                tone="secondary"
-                onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'shared'); }}
-              />
-              {!comparing && !showingTagged && <ActionButton
-                compact
-                disabled={otherCount === 0 || history.pendingOtherScores !== null}
-                title={`Other scores · ${otherCount}`}
-                tone="secondary"
-                onPress={() => { invalidateSeedCopy(); lobbyRuntime.loadOtherScores(item.id, showingFriends); }}
-              />}
+                  }} />}
+                  {supported && seedSuffix !== null && <ActionButton compact title="Play this seed" tone="secondary" disabled={roomOccupied} onPress={() => {
+                    if (roomOccupied) return;
+                    onPlaySeed({
+                      seedSuffix,
+                      maxPlayers: item.options.numPlayers,
+                      numPlayers: item.options.numPlayers,
+                      createOptions: {
+                        variantName: item.options.variantName,
+                        timed: item.options.timed,
+                        timeBase: item.options.timeBase,
+                        timePerTurn: item.options.timePerTurn,
+                        cardCycle: item.options.cardCycle,
+                        emptyClues: item.options.emptyClues,
+                        oneExtraCard: item.options.oneExtraCard,
+                        oneLessCard: item.options.oneLessCard,
+                        allOrNothing: item.options.allOrNothing,
+                      },
+                    });
+                  }} />}
+                </View>
+                {seedCopyFeedback?.itemID === item.id
+                  && <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{seedCopyFeedback.message}</Text>}
+                <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{END_CONDITIONS[item.endCondition]}</Text>
+                {item.tags !== '' && <Text style={[styles.tags, { color: theme.colors.textMuted }]}>{item.tags}</Text>}
+                {!supported && <Notice tone="error">This game uses unsupported options.</Notice>}
+                <ActionButton
+                  compact
+                  disabled={roomOccupied || !supported || replayPending}
+                  title="Share replay"
+                  tone="secondary"
+                  onPress={() => { if (roomOccupied) return; onWatchReplay(item.id, 'shared'); }}
+                />
+                {!comparing && !showingTagged && <ActionButton
+                  compact
+                  disabled={otherCount === 0 || history.pendingOtherScores !== null}
+                  title={`Other scores · ${otherCount}`}
+                  tone="secondary"
+                  onPress={() => { invalidateSeedCopy(); lobbyRuntime.loadOtherScores(item.id, showingFriends); }}
+                />}
+              </>}
             </Panel>
           );
         })}
       </View>
 
-      {!comparing && hasMore && (
+      {!comparing && detailsID === null && hasMore && (
         <ActionButton
           disabled={pendingRequest !== null}
           title={pendingRequest === null ? 'Load more' : 'Loading more…'}
@@ -309,9 +353,9 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, gap: 3 },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   grid: { gap: 12 },
-  gridWide: { flexDirection: 'row', flexWrap: 'wrap' },
   gameCard: { gap: 10 },
-  gameCardWide: { flexBasis: '48%', flexGrow: 1, minWidth: 320 },
+  rowSummary: { gap: 8 },
+  rowSummaryWide: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   gameHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   gameCopy: { flex: 1, gap: 2 },
   gameTitle: { fontSize: 18, fontWeight: '900' },
