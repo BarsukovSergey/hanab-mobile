@@ -35,7 +35,7 @@ test('browsing hides embedded Back while room Settings keeps its own Back', () =
   expect(app).toContain('<PeopleScreen onBack={() => navigate(\'home\')} roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}');
   expect(app).toContain('showEmbeddedBack={false}\n      onBack={() => setBrowsing');
   expect(app).toContain('backRef={settingsBackRef} showEmbeddedBack={false}');
-  const roomSettings = app.slice(app.indexOf("liveSheet === 'settings'"), app.indexOf("liveSheet === 'tag'"));
+  const roomSettings = app.slice(app.indexOf("{roomChild === 'settings' && <ScrollView"), app.indexOf("{roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings'"));
   expect(roomSettings).toContain('<SettingsScreen');
   expect(roomSettings).not.toContain('showEmbeddedBack={false}');
 });

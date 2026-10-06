@@ -8,7 +8,7 @@ describe('gameplay presentation visibility', () => {
   test('the gameplay wrapper passes visibility to both implementations', () => {
     const wrapper = read('GameScreen.tsx');
     expect(wrapper).toContain('presentationVisible = true');
-    expect(wrapper).toContain('<C17GameScreen presentationVisible={presentationVisible} />');
+    expect(wrapper).toContain('<C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} />');
     expect(wrapper).toContain('<LegacyGameScreen presentationVisible={presentationVisible} />');
   });
 

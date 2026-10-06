@@ -1,11 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Alert,
   AppState,
+  Keyboard,
   BackHandler,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -66,7 +67,7 @@ import { UserContextActions } from './src/ui/UserContextActions';
 import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
-type LiveSheet = 'menu' | 'chat' | 'settings' | 'tag' | 'replay-export' | null;
+type RoomChild = null | 'chat' | 'menu' | 'menu-participants' | 'menu-perspective' | 'menu-tools' | 'settings' | 'tag' | 'replay-export';
 
 export default function App() {
   return (
@@ -109,7 +110,7 @@ function AppContent() {
     setCreateTaskOpen(false);
     setSpecificSeedCreatePrefill(null);
   }, []);
-  const [liveSheet, setLiveSheet] = useState<LiveSheet>(null);
+  const [roomChild, setRoomChild] = useState<RoomChild>(null);
   const settingsBackRef = useRef<(() => void) | null>(null);
   const historyBackRef = useRef<(() => void) | null>(null);
   const pregameBackRef = useRef<(() => void) | null>(null);
@@ -150,6 +151,7 @@ function AppContent() {
     setPresentationFocus('browsing');
   };
   const homeFromLive = () => {
+    Keyboard.dismiss();
     setBrowsing((state) => navigateBrowsing(state, 'home'));
     setPresentationFocus('browsing');
   };
@@ -232,12 +234,29 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (roomState.room.kind !== 'live_game') setLiveSheet(null);
-  }, [roomState.room.kind]);
+    setRoomChild(null);
+  }, [roomState.room.kind, roomState.room.kind === 'live_game' ? roomState.room.tableID : null]);
 
   useEffect(() => {
-    if (presentationFocus !== 'room') setLiveSheet(null);
+    if (presentationFocus !== 'room') setRoomChild(null);
   }, [presentationFocus]);
+
+  const keyboardOpen = useRef(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => { keyboardOpen.current = true; });
+    const hide = Keyboard.addListener('keyboardDidHide', () => { keyboardOpen.current = false; });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  const closeRoomChild = () => { Keyboard.dismiss(); setRoomChild(null); };
+  const backRoomChild = () => {
+    if (roomChild === 'chat') {
+      if (keyboardOpen.current || Keyboard.isVisible()) Keyboard.dismiss();
+      else setRoomChild(null);
+    } else if (roomChild === 'settings') settingsBackRef.current?.();
+    else if (roomChild === 'tag' || roomChild === 'replay-export') setRoomChild('menu-tools');
+    else if (roomChild !== 'menu') setRoomChild('menu');
+    else closeRoomChild();
+  };
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -257,12 +276,8 @@ function AppContent() {
         }
         return false;
       }
-      if (liveSheet === 'settings') {
-        settingsBackRef.current?.();
-        return true;
-      }
-      if (liveSheet !== null) {
-        setLiveSheet(null);
+      if (roomChild !== null) {
+        backRoomChild();
         return true;
       }
       if (roomState.room.kind === 'pregame') {
@@ -278,7 +293,7 @@ function AppContent() {
     });
     return () => subscription.remove();
   }, [
-    browsing, createTaskOpen, hydrated, liveSheet, presentationFocus, probe,
+    browsing, createTaskOpen, hydrated, roomChild, presentationFocus, probe,
     roomState.room, session.phase,
   ]);
 
@@ -351,7 +366,7 @@ function AppContent() {
         previousRoomKind: 'none',
         preserveNextRoomEntry: false,
       };
-      setLiveSheet(null);
+      setRoomChild(null);
       setUsername('');
       setPassword('');
       setShowManualLogin(recentAccounts.length === 0);
@@ -423,12 +438,146 @@ function AppContent() {
       replayActive: roomState.room.clientState.replay.active,
       sharedReplay: roomState.room.sharedReplay,
     });
+    const portraitChatOpen = roomChild === 'chat' && width <= height;
     const gameRootScrollable = !c17Workspace;
+    const renderRoomChildren = (landscapeRightWidth: number | null) => {
+      const landscape = landscapeRightWidth !== null;
+      const childVisible = roomPresentationVisible && roomChild !== null;
+      return <View pointerEvents={childVisible ? 'auto' : 'none'}
+        accessibilityElementsHidden={!childVisible}
+        importantForAccessibility={childVisible ? 'auto' : 'no-hide-descendants'}
+        style={[styles.roomChildHost, { width: roomChild === 'settings' ? '100%' : landscapeRightWidth ?? '100%' }, !childVisible && { display: 'none' }]}>
+        <View style={[styles.chatTask, { backgroundColor: theme.colors.surface }, roomChild !== 'chat' && { display: 'none' }]}>
+          {landscape && <View style={styles.childHeader}>
+            <SectionHeading title="Table chat" />
+            <ActionButton compact title="Return to game" onPress={closeRoomChild} />
+          </View>}
+          <ChatPanel key={liveTableID} room={'table' + liveTableID} title="Table chat"
+            fill readActive={roomPresentationVisible && roomChild === 'chat'}
+            sendEnabled={roomPresentationVisible && roomChild === 'chat'} />
+        </View>
+        {roomChild === 'settings' && <ScrollView
+          style={[styles.roomSettingsTask, { backgroundColor: theme.colors.background }]}
+          contentContainerStyle={styles.roomSettingsContent} keyboardShouldPersistTaps="handled">
+          <SettingsScreen onBack={() => setRoomChild('menu')} onSignOut={() => void signOut()} backRef={settingsBackRef} />
+        </ScrollView>}
+        {roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings' && <Pressable onPress={closeRoomChild}
+          style={[styles.roomMenuBackdrop, !landscape && { backgroundColor: theme.colors.overlay }]}>
+          <Pressable onPress={(event) => event.stopPropagation()}
+            style={[styles.roomMenu, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong },
+              !landscape && styles.roomMenuPortrait,
+              landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }]}>
+            <View style={styles.childHeader}>
+              <SectionHeading title={roomChild === 'menu' ? 'Game menu' : roomChild === 'menu-participants' ? 'Participants / spectators' : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
+              <ActionButton compact title="Close" tone="ghost" onPress={closeRoomChild} />
+            </View>
+            {roomChild !== 'menu' && <ActionButton compact title="Back" onPress={backRoomChild} />}
+            <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions} keyboardShouldPersistTaps="handled">
+              {roomChild === 'menu' ? <>
+                <ActionButton title="Participants / spectators >" onPress={() => setRoomChild('menu-participants')} />
+                {perspectiveEligible && <ActionButton title="Perspective >" onPress={() => setRoomChild('menu-perspective')} />}
+                {pauseEligible && <ActionButton title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />}
+                <ActionButton title="Tags / replay tools >" onPress={() => setRoomChild('menu-tools')} />
+                <TerminationControls />
+                <ActionButton title="Settings >" onPress={() => setRoomChild('settings')} />
+                <ActionButton disabled={roomState.pendingUnattendTableID !== null}
+                  title={roomState.room.kind === 'live_game' && roomState.room.role === 'player' ? 'Unattend' : 'Stop watching'}
+                  onPress={() => {
+                    const label = roomState.room.kind === 'live_game' && roomState.room.role === 'player' ? 'Unattend' : 'Stop watching';
+                    Alert.alert(label, 'Leave this table?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: label, style: 'destructive', onPress: () => {
+                        closeRoomChild();
+                        lobbyRuntime.unattendLiveGame(liveTableID);
+                      } },
+                    ]);
+                  }} />
+              </> : roomChild === 'menu-participants' ? <>
+                    <SectionHeading title={`Players (${liveClientState.metadata.playerNames.length})`} />
+                    {liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))}
+                    <SectionHeading
+                      title={`Spectators (${liveClientState.spectators.length})`}
+                    />
+                    {liveClientState.spectators.length === 0
+                      ? <Text style={{ color: theme.colors.textMuted }}>No spectators</Text>
+                      : liveClientState.spectators.map((spectator, index) => renderLiveUser(spectator.name, `spectator-${index}-${spectator.name}`))}
+              </> : roomChild === 'menu-perspective' ? <>
+                      <SectionHeading
+                        title="Perspective"
+                        detail={currentPerspective === -1
+                          ? 'All hands'
+                          : `Viewing as ${liveClientState.metadata.playerNames[currentPerspective]}`}
+                      />
+                      <View style={styles.perspectiveChoices}>
+                        {[-1, ...liveClientState.metadata.playerNames.map((_, index) => index)].map((index) => (
+                          <ActionButton
+                            key={index}
+                            compact
+                            disabled={index === currentPerspective}
+                            tone={index === currentPerspective ? 'primary' : 'secondary'}
+                            title={index === -1 ? 'All hands' : liveClientState.metadata.playerNames[index] ?? ''}
+                            onPress={() => {
+                              if (lobbyRuntime.setSpectatorPerspective(index)) setRoomChild(null);
+                            }}
+                          />
+                        ))}
+                      </View>
+              </> : roomChild === 'menu-tools' ? <>
+                <ActionButton title="Add tag" onPress={() => { setTagDraft(''); setRoomChild('tag'); }} />
+                <ActionButton title="Show tags" onPress={() => chatRuntime.submit('/tags')} />
+                {liveClientState.finished && <ActionButton title="Export replay" onPress={() => { setExportFeedback(null); setRoomChild('replay-export'); }} />}
+              </> : roomChild === 'replay-export'
+                      ? <>
+                        <SectionHeading title="Export replay" detail="Copy or share this finished replay." />
+                        {exportFeedback !== null && <Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>}
+                        <ActionButton title="Copy link" onPress={() => {
+                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
+                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
+                          void replayExportActions.copy(result.url).then(() => setExportFeedback({ message: 'Replay link copied.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not copy replay link.', tone: 'error' }));
+                        }} />
+                        <ActionButton title="Share link" onPress={() => {
+                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
+                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
+                          void replayExportActions.share(result.url).then(() => setExportFeedback({ message: 'Share sheet opened.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not share replay link.', tone: 'error' }));
+                        }} />
+                        <ActionButton title="Copy JSON" onPress={() => {
+                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
+                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
+                          void replayExportActions.copy(result.json).then(() => setExportFeedback({ message: 'Replay JSON copied.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not copy replay JSON.', tone: 'error' }));
+                        }} />
+                      </>
+                    : roomChild === 'tag'
+                      ? <>
+                        <SectionHeading title="Add tag" detail="Tags are attached to this game." />
+                        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setTagDraft}
+                          onSubmitEditing={() => {
+                            if (tagDraft.trim() !== '' && chatRuntime.submit(`/tag ${tagDraft.trim()}`)) {
+                              setTagDraft('');
+                              setRoomChild(null);
+                            }
+                          }}
+                          placeholder="Tag" returnKeyType="send" value={tagDraft} />
+                        <ActionButton
+                          disabled={tagDraft.trim() === ''}
+                          title="Add tag"
+                          tone="primary"
+                          onPress={() => {
+                            if (chatRuntime.submit(`/tag ${tagDraft.trim()}`)) {
+                              setTagDraft('');
+                              setRoomChild(null);
+                            }
+                          }}
+                        />
+                      </>
+                    : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>}
+      </View>;
+    };
     focusedRoomPresentation = (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.flex, { backgroundColor: theme.colors.background }]}
-      >
+      // Keep Live allocation stable through adjustResize; Chat consumes IME locally.
+      <View style={{ height, backgroundColor: theme.colors.background }}>
         <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
         <View style={[
           styles.gameBar,
@@ -436,16 +585,22 @@ function AppContent() {
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
           <View style={[styles.headerActions, styles.flex, landscapePhone && styles.headerActionsLandscape]}>
+            {portraitChatOpen ? <>
+              <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
+              <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
+            </> : <>
             <ActionButton compact title="Home" tone="secondary" style={styles.liveHeaderAction} onPress={homeFromLive} />
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{liveClientState.metadata.options.variantName}</Text>
             <ActionButton
               compact
+              disabled={roomChild !== null}
               title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
               tone="secondary"
               style={styles.liveHeaderAction}
-              onPress={() => setLiveSheet('chat')}
+              onPress={() => setRoomChild('chat')}
             />
-            <ActionButton compact title="Menu" tone="secondary" style={styles.liveHeaderAction} onPress={() => setLiveSheet('menu')} />
+            <ActionButton compact disabled={roomChild !== null} title="Menu" tone="secondary" style={styles.liveHeaderAction} onPress={() => setRoomChild('menu')} />
+            </>}
           </View>
         </View>
         {liveConnectionProblem && (
@@ -473,136 +628,14 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
-            <GameScreen presentationVisible={roomPresentationVisible} />
+            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} />
           </View>
         </ScrollView>
         </SafeAreaView>
-        <Modal animationType="fade" onRequestClose={() => {
-          if (liveSheet === 'settings') settingsBackRef.current?.();
-          else setLiveSheet(null);
-        }} statusBarTranslucent transparent visible={roomPresentationVisible && liveSheet !== null}>
-          <Pressable onPress={() => {
-            if (liveSheet === 'settings') settingsBackRef.current?.();
-            else setLiveSheet(null);
-          }} style={styles.sheetBackdrop}>
-            <Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
-              {liveSheet === 'menu'
-                ? <>
-                  <SectionHeading title="Game menu" detail="Secondary controls stay off the gameplay surface." />
-                  <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions}>
-                    <ActionButton title="Add tag" onPress={() => {
-                      setTagDraft('');
-                      setLiveSheet('tag');
-                    }} />
-                    <ActionButton title="Show tags" onPress={() => chatRuntime.submit('/tags')} />
-                    {liveClientState.finished && <ActionButton title="Export replay" onPress={() => {
-                      setExportFeedback(null);
-                      setLiveSheet('replay-export');
-                    }} />}
-                    <SectionHeading title={`Players (${liveClientState.metadata.playerNames.length})`} />
-                    {liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))}
-                    <SectionHeading
-                      title={`Spectators (${liveClientState.spectators.length})`}
-                    />
-                    {liveClientState.spectators.length === 0
-                      ? <Text style={{ color: theme.colors.textMuted }}>No spectators</Text>
-                      : liveClientState.spectators.map((spectator, index) => renderLiveUser(spectator.name, `spectator-${index}-${spectator.name}`))}
-                    {perspectiveEligible && <>
-                      <SectionHeading
-                        title="Perspective"
-                        detail={currentPerspective === -1
-                          ? 'All hands'
-                          : `Viewing as ${liveClientState.metadata.playerNames[currentPerspective]}`}
-                      />
-                      <View style={styles.perspectiveChoices}>
-                        {[-1, ...liveClientState.metadata.playerNames.map((_, index) => index)].map((index) => (
-                          <ActionButton
-                            key={index}
-                            compact
-                            disabled={index === currentPerspective}
-                            tone={index === currentPerspective ? 'primary' : 'secondary'}
-                            title={index === -1 ? 'All hands' : liveClientState.metadata.playerNames[index] ?? ''}
-                            onPress={() => {
-                              if (lobbyRuntime.setSpectatorPerspective(index)) setLiveSheet(null);
-                            }}
-                          />
-                        ))}
-                      </View>
-                    </>}
-                    <ActionButton
-                      disabled={roomState.pendingUnattendTableID !== null}
-                      title={roomState.pendingUnattendTableID === null ? 'Lobby' : 'Leaving...'}
-                      onPress={() => {
-                        setLiveSheet(null);
-                        lobbyRuntime.unattendLiveGame(liveTableID);
-                      }}
-                    />
-                    {pauseEligible && <ActionButton title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />}
-                    <TerminationControls />
-                    <ActionButton title="Settings" onPress={() => setLiveSheet('settings')} />
-                  </ScrollView>
-                  <ActionButton title="Close" tone="ghost" onPress={() => setLiveSheet(null)} />
-                </>
-                : liveSheet === 'chat'
-                  ? <>
-                    <ChatPanel room={`table${liveTableID}`} title="Table chat" readActive={roomPresentationVisible && liveSheet === 'chat'} />
-                    <ActionButton title="Back" onPress={() => setLiveSheet(null)} />
-                  </>
-                  : liveSheet === 'settings'
-                    ? <SettingsScreen onBack={() => setLiveSheet('menu')} onSignOut={() => void signOut()}
-                        backRef={settingsBackRef} />
-                    : liveSheet === 'replay-export'
-                      ? <>
-                        <SectionHeading title="Export replay" detail="Copy or share this finished replay." />
-                        {exportFeedback !== null && <Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>}
-                        <ActionButton title="Copy link" onPress={() => {
-                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
-                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
-                          void replayExportActions.copy(result.url).then(() => setExportFeedback({ message: 'Replay link copied.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not copy replay link.', tone: 'error' }));
-                        }} />
-                        <ActionButton title="Share link" onPress={() => {
-                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
-                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
-                          void replayExportActions.share(result.url).then(() => setExportFeedback({ message: 'Share sheet opened.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not share replay link.', tone: 'error' }));
-                        }} />
-                        <ActionButton title="Copy JSON" onPress={() => {
-                          const result = createReplayExport(liveClientState, HANAB_HTTP_BASE_URL);
-                          if (!result.ok) { setExportFeedback({ message: result.error, tone: 'error' }); return; }
-                          void replayExportActions.copy(result.json).then(() => setExportFeedback({ message: 'Replay JSON copied.', tone: 'success' })).catch(() => setExportFeedback({ message: 'Could not copy replay JSON.', tone: 'error' }));
-                        }} />
-                        <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
-                      </>
-                    : liveSheet === 'tag'
-                      ? <>
-                        <SectionHeading title="Add tag" detail="Tags are attached to this game." />
-                        <Field autoCapitalize="none" autoCorrect={false} onChangeText={setTagDraft}
-                          onSubmitEditing={() => {
-                            if (tagDraft.trim() !== '' && chatRuntime.submit(`/tag ${tagDraft.trim()}`)) {
-                              setTagDraft('');
-                              setLiveSheet(null);
-                            }
-                          }}
-                          placeholder="Tag" returnKeyType="send" value={tagDraft} />
-                        <ActionButton
-                          disabled={tagDraft.trim() === ''}
-                          title="Add tag"
-                          tone="primary"
-                          onPress={() => {
-                            if (chatRuntime.submit(`/tag ${tagDraft.trim()}`)) {
-                              setTagDraft('');
-                              setLiveSheet(null);
-                            }
-                          }}
-                        />
-                        <ActionButton title="Back" onPress={() => setLiveSheet('menu')} />
-                      </>
-                    : null}
-            </Pressable>
-          </Pressable>
-        </Modal>
+
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
         </SafeAreaView>
-      </KeyboardAvoidingView>
+      </View>
     );
   }
 
@@ -804,6 +837,14 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
+  roomChildHost: { position: 'absolute', top: 0, bottom: 0, right: 0 },
+  chatTask: { flex: 1, minHeight: 0 },
+  roomSettingsTask: { flex: 1 },
+  roomSettingsContent: { alignSelf: 'center', maxWidth: 720, padding: 12, width: '100%' },
+  roomMenuPortrait: { alignSelf: 'stretch', margin: 12, width: 'auto' },
+  childHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4, padding: 4 },
+  roomMenuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, justifyContent: 'flex-end', alignItems: 'flex-end' },
+  roomMenu: { width: '100%', height: '82%', maxHeight: '82%', borderRadius: 12, borderWidth: 1, padding: 8, minHeight: 160 },
   flex: { flex: 1 },
   browsingBody: { flex: 1, flexDirection: 'row' },
   browsingMain: { flex: 1, minWidth: 0 },
@@ -828,7 +869,7 @@ const styles = StyleSheet.create({
   liveHeaderAction: { justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },
   menuActions: { gap: 7 },
   liveUserRow: { alignItems: 'flex-start', gap: 4, paddingVertical: 2 },
-  menuScroll: { flexGrow: 0, flexShrink: 1 },
+  menuScroll: { flex: 1, minHeight: 0 },
   perspectiveChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   loginCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
   accountChoice: { alignItems: 'center', flexDirection: 'row', gap: 8 },
@@ -837,6 +878,4 @@ const styles = StyleSheet.create({
   loginEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   loginTitle: { fontSize: 30, fontWeight: '900', letterSpacing: -0.6 },
   loginDetail: { fontSize: 14, lineHeight: 20 },
-  sheetBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.58)', flex: 1, justifyContent: 'center', padding: 14 },
-  sheet: { borderRadius: 16, borderWidth: 1, gap: 10, maxHeight: '90%', maxWidth: 720, padding: 10, width: '100%' },
 });

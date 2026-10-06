@@ -3,52 +3,80 @@ import { resolve } from 'node:path';
 import { expect, test } from '@jest/globals';
 
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
-const liveSheet = app.slice(app.indexOf('<Modal animationType="fade"'), app.indexOf('</Modal>', app.indexOf('<Modal animationType="fade"')));
+const roomChild = app.slice(app.indexOf('const renderRoomChildren'), app.indexOf('    focusedRoomPresentation = ('));
+const menu = roomChild.slice(roomChild.indexOf("{roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings'"));
 
-test('keeps chat out of More and closes Chat directly to the game', () => {
-  expect(liveSheet).not.toContain('<ActionButton title="Table chat"');
-  const chatBranch = liveSheet.match(/: liveSheet === 'chat'([\s\S]*?)(?=: liveSheet === 'settings')/)?.[1];
-  expect(chatBranch).toContain('<ActionButton title="Back" onPress={() => setLiveSheet(null)} />');
-  expect(chatBranch).not.toContain("setLiveSheet('menu')");
+test('keeps one table Chat mounted outside conditional Menu with a direct Return', () => {
+  expect(roomChild.match(/<ChatPanel/g)).toHaveLength(1);
+  expect(roomChild).toContain('key={liveTableID}');
+  expect(roomChild).toContain('title="Return to game" onPress={closeRoomChild}');
+  expect(roomChild).toContain("roomChild !== 'chat' && { display: 'none' }");
+  expect(roomChild).not.toContain('<ActionButton title="Table chat"');
+  expect(app).not.toContain('type LiveSheet');
 });
 
-test('submits Show tags as a normal chat command', () => {
-  expect(liveSheet).toContain('<ActionButton title="Show tags" onPress={() => chatRuntime.submit(\'/tags\')} />');
+test('groups tools and preserves normal Show tags submission', () => {
+  expect(roomChild).toContain("roomChild === 'menu-tools'");
+  expect(roomChild).toContain("chatRuntime.submit('/tags')");
+  expect(app).toContain("roomChild === 'tag' || roomChild === 'replay-export'");
+  expect(app).toContain("setRoomChild('menu-tools')");
 });
 
-test('keeps Settings in More and removes Sign out', () => {
-  expect(liveSheet).toContain('<ActionButton title="Settings" onPress={() => setLiveSheet(\'settings\')} />');
-  const menuBranch = liveSheet.slice(liveSheet.indexOf("liveSheet === 'menu'"), liveSheet.indexOf(": liveSheet === 'chat'"));
-  expect(menuBranch).not.toContain('<ActionButton title="Sign out"');
+test('Settings returns to Menu and retains nested Back ownership', () => {
+  expect(roomChild).toContain('title="Settings >"');
+  expect(roomChild).toContain("<SettingsScreen onBack={() => setRoomChild('menu')}");
+  expect(app).toContain("else if (roomChild === 'settings') settingsBackRef.current?.();");
+  expect(roomChild).not.toContain('<ActionButton title="Sign out"');
 });
 
-test('uses local Settings Back on modal dismissal and stops dismissal inside the sheet', () => {
-  expect(liveSheet).toContain("if (liveSheet === 'settings') settingsBackRef.current?.();");
-  expect(liveSheet).toContain('else setLiveSheet(null);');
-  expect(liveSheet).toContain('style={styles.sheetBackdrop}>');
-  expect(liveSheet).toContain('<Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet,');
+test('Menu has a fixed header and Close above the bounded inner scroll', () => {
+  expect(menu.indexOf('title="Close"')).toBeLessThan(menu.indexOf('<ScrollView'));
+  expect(menu.indexOf('title="Back"')).toBeLessThan(menu.indexOf('<ScrollView'));
+  expect(roomChild).toContain('onPress={(event) => event.stopPropagation()}');
+  expect(app).toContain('menuScroll: { flex: 1, minHeight: 0 }');
+  expect(roomChild).toContain('Math.min(288, Math.max(220, landscapeRightWidth - 32))');
 });
 
-test('bounds the More scroll viewport to the sheet so dynamic content remains reachable', () => {
-  expect(liveSheet).toContain('<ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions}>');
-  expect(app).toContain("menuScroll: { flexGrow: 0, flexShrink: 1 }");
-  expect(app).toContain("sheet: { borderRadius: 16, borderWidth: 1, gap: 10, maxHeight: '90%'");
+test('only destructive attendance confirmation sends unattend', () => {
+  expect(roomChild).toContain("Alert.alert(label, 'Leave this table?'");
+  expect(roomChild).toContain("{ text: 'Cancel', style: 'cancel' }");
+  expect(roomChild).toMatch(/style: 'destructive', onPress: \(\) => \{\s*closeRoomChild\(\);\s*lobbyRuntime.unattendLiveGame\(liveTableID\)/);
+  expect(app.match(/lobbyRuntime.unattendLiveGame/g)).toHaveLength(1);
+  expect(roomChild).toContain("'Unattend' : 'Stop watching'");
+});
+
+test('Chat hardware Back dismisses only keyboard first', () => {
+  const back = app.slice(app.indexOf('const backRoomChild'), app.indexOf('  useEffect(() => {', app.indexOf('const backRoomChild')));
+  expect(back).toContain("if (roomChild === 'chat')");
+  expect(back).toContain('if (keyboardOpen.current || Keyboard.isVisible()) Keyboard.dismiss();');
+  expect(back).toContain('else setRoomChild(null);');
+  expect(back).not.toContain('unattend');
+});
+
+test('C17 child host uses the allocated right column without changing allocator inputs', () => {
+  const c17 = readFileSync(resolve(__dirname, 'game/C17GameScreen.tsx'), 'utf8');
+  expect(c17).toContain('roomChildren?.(portraitV2 ? null : landscapeLayout.fits ? landscapeLayout.rightWidth : 0)');
+  expect(c17).not.toContain('useWindowDimensions');
+  const allocator = c17.slice(c17.indexOf('const landscapeLayout ='), c17.indexOf('const layout: C17DenseLayout'));
+  expect(allocator).not.toMatch(/roomChildren|roomChild|ime/);
+  expect(app).toContain("roomState.room.kind === 'live_game' ? roomState.room.tableID : null");
 });
 
 test('keeps live-game header actions outlined, matched, and tall enough to tap', () => {
   const headerStart = app.indexOf('<View style={[styles.headerActions');
   const headerEnd = app.indexOf('</View>', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
-  const buttons = headerActions.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
+  const normalHeader = headerActions.slice(headerActions.indexOf('</> : <>'));
+  const buttons = normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
   expect(browse).toContain('title="Home"');
   expect(browse).toContain('onPress={homeFromLive}');
   expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
-  expect(chat).toContain("onPress={() => setLiveSheet('chat')}");
+  expect(chat).toContain("onPress={() => setRoomChild('chat')}");
   expect(more).toContain('title="Menu"');
-  expect(more).toContain("onPress={() => setLiveSheet('menu')}");
+  expect(more).toContain("onPress={() => setRoomChild('menu')}");
   for (const button of buttons) {
     expect(button).toContain('compact');
     expect(button).toContain('tone="secondary"');
@@ -59,25 +87,75 @@ test('keeps live-game header actions outlined, matched, and tall enough to tap',
 
 test('uses explicit export feedback tone instead of inferring it from message text', () => {
   expect(app).toContain("message: string;\n    tone: 'success' | 'error';");
-  expect(liveSheet).toContain('<Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>');
-  expect(liveSheet).not.toMatch(/exportFeedback\.startsWith\(/);
-  expect(liveSheet).toContain("message: result.error, tone: 'error'");
-  expect(liveSheet).toContain("message: 'Replay link copied.', tone: 'success'");
-  expect(liveSheet).toContain("message: 'Share sheet opened.', tone: 'success'");
-  expect(liveSheet).toContain("message: 'Replay JSON copied.', tone: 'success'");
-  expect(liveSheet).toContain("message: 'Could not copy replay link.', tone: 'error'");
-  expect(liveSheet).toContain("message: 'Could not share replay link.', tone: 'error'");
-  expect(liveSheet).toContain("message: 'Could not copy replay JSON.', tone: 'error'");
+  expect(roomChild).toContain('<Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>');
+  expect(roomChild).not.toMatch(/exportFeedback\.startsWith\(/);
+  expect(roomChild).toContain("message: result.error, tone: 'error'");
+  expect(roomChild).toContain("message: 'Replay link copied.', tone: 'success'");
+  expect(roomChild).toContain("message: 'Share sheet opened.', tone: 'success'");
+  expect(roomChild).toContain("message: 'Replay JSON copied.', tone: 'success'");
+  expect(roomChild).toContain("message: 'Could not copy replay link.', tone: 'error'");
+  expect(roomChild).toContain("message: 'Could not share replay link.', tone: 'error'");
+  expect(roomChild).toContain("message: 'Could not copy replay JSON.', tone: 'error'");
 });
 
 
-test('Live header shares Home variant Chat Menu in both orientations', () => {
+test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
   const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
   expect(header).toContain('title="Home"');
   expect(header).toContain('onPress={homeFromLive}');
   expect(header).toContain('liveClientState.metadata.options.variantName');
   expect(header).toContain('title="Menu"');
-  expect(header).toContain("onPress={() => setLiveSheet('chat')}");
+  expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).not.toMatch(/Browse|More|username|YOUR TURN|LIVE T/);
   expect(header).not.toContain('width <= height');
+});
+
+test('portrait Chat replaces contents of the same Live header and has no second task header', () => {
+  expect(app).toContain("const portraitChatOpen = roomChild === 'chat' && width <= height;");
+  const header = app.slice(app.indexOf('styles.gameBar,'), app.indexOf('{liveConnectionProblem'));
+  expect(header.match(/styles.gameBar,/g)).toHaveLength(1);
+  const chatHeader = header.slice(header.indexOf('{portraitChatOpen ? <>'), header.indexOf('</> : <>'));
+  expect(chatHeader).toContain('>Table chat</Text>');
+  expect(chatHeader).toContain('title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild}');
+  expect(chatHeader).not.toMatch(/title="Home"|title="Menu"|variantName/);
+  const task = roomChild.slice(roomChild.indexOf('<View style={[styles.chatTask'), roomChild.indexOf("{roomChild === 'settings'"));
+  expect(task).toMatch(/\{landscape && <View style=\{styles.childHeader\}>[\s\S]*?title="Table chat"[\s\S]*?title="Return to game"[\s\S]*?<\/View>\}/);
+  expect(task.match(/styles.childHeader/g)).toHaveLength(1);
+  expect(task.match(/<ChatPanel/g)).toHaveLength(1);
+  expect(task).toContain('fill readActive={roomPresentationVisible && roomChild === \'chat\'}');
+});
+
+test('portrait Menu is bottom anchored with 12 outer margin and an 82 percent cap', () => {
+  expect(menu).toContain('!landscape && styles.roomMenuPortrait');
+  expect(app).toMatch(/roomMenuBackdrop: \{[^}]*justifyContent: 'flex-end'/);
+  expect(app).toContain("roomMenuPortrait: { alignSelf: 'stretch', margin: 12, width: 'auto' }");
+  expect(app).toMatch(/roomMenu: \{[^}]*maxHeight: '82%'/);
+  expect(menu).toContain("landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }");
+  expect(roomChild).toContain("pointerEvents={childVisible ? 'auto' : 'none'}");
+});
+
+test('canonical Settings is a room task outside the Menu panel and its scrolling body', () => {
+  const settingsTask = roomChild.slice(roomChild.indexOf("{roomChild === 'settings' && <ScrollView"), roomChild.indexOf("{roomChild !== null"));
+  expect(settingsTask).toContain('styles.roomSettingsTask');
+  expect(settingsTask).toContain("<SettingsScreen onBack={() => setRoomChild('menu')}");
+  expect(settingsTask).toContain('backRef={settingsBackRef}');
+  expect(settingsTask).not.toMatch(/SectionHeading|ActionButton|styles.roomMenu|styles.menuScroll/);
+  expect(menu).not.toContain('<SettingsScreen');
+  expect(menu).not.toContain("roomChild === 'settings' ? 'Settings'");
+  expect(roomChild).toContain("width: roomChild === 'settings' ? '100%' : landscapeRightWidth ?? '100%'");
+  const settings = readFileSync(resolve(__dirname, 'screens/SettingsScreen.tsx'), 'utf8');
+  const back = settings.slice(settings.indexOf('const handleBack ='), settings.indexOf('if (backRef)'));
+  expect(back).toMatch(/else if \(category !== null\) \{\s*setCategory\(null\);\s*\} else \{\s*onBack\(\);/);
+  expect(settings).toContain('backRef.current = handleBack');
+  expect(app).toContain("else if (roomChild === 'settings') settingsBackRef.current?.();");
+});
+
+test('section 10 documents exact right-column Chat replacement without a full-window fallback', () => {
+  const doc = readFileSync(resolve(__dirname, '../../docs/MOBILE_APP_DESIGN_V2.md'), 'utf8');
+  const section = doc.slice(doc.indexOf('## 10.'), doc.indexOf('## 11.'));
+  expect(section).toContain('Landscape Chat replaces exactly the existing Slice 8b right column');
+  expect(section).toContain('landscapeLayout.rightWidth');
+  expect(section).toContain('There is no full-window Chat fallback.');
+  expect(section).toContain('The left hand grid, divider, and card geometry do not reflow');
+  expect(section).not.toMatch(/full-window task/);
 });

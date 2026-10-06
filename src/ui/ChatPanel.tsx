@@ -7,19 +7,27 @@ import { chatActions } from '../store/chatSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { transformChatInput } from './chatInput';
 import { chatMessageMetadata } from './chatPresentation';
-import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme } from './designSystem';
+import { ActionButton, EmptyState, Field, Panel, SectionHeading, useHanabTheme, useResponsiveLayout } from './designSystem';
 
 type Props = {
   room: string;
   title: string;
   readActive?: boolean;
   sendEnabled?: boolean;
+  fill?: boolean;
 };
 
 const EMPTY_MESSAGES: readonly never[] = [];
 
-export function ChatPanel({ room, title, readActive = true, sendEnabled = true }: Props) {
+export function ChatPanel({ room, title, readActive = true, sendEnabled = true, fill = false }: Props) {
   const dispatch = useAppDispatch();
+  const { imeOcclusion, systemInsets } = useResponsiveLayout();
+  const [atEnd, setAtEnd] = useState(true);
+  const [newMessages, setNewMessages] = useState(false);
+  const followEnd = useRef(true);
+  const viewportHeight = useRef(0);
+  const contentHeight = useRef(0);
+  const historyOffset = useRef(0);
   const { theme } = useHanabTheme();
   const historyRef = useRef<ScrollView>(null);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
@@ -51,24 +59,59 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true }
   }, []);
 
   useEffect(() => {
-    if (!readActive || !appActive || !ready) return;
+    if (!readActive || !appActive || !ready || !atEnd) return;
     historyRef.current?.scrollToEnd({ animated: false });
-  }, [appActive, messages.length, readActive, ready, room]);
+  }, [appActive, atEnd, messages, readActive, ready, room]);
 
   useEffect(() => {
-    if (!readActive || !appActive || !ready) return;
+    if (!readActive || !appActive || !ready || followEnd.current) return;
+    historyRef.current?.scrollTo({ y: historyOffset.current, animated: false });
+  }, [appActive, readActive, ready]);
+
+  const latestMessage = messages[messages.length - 1];
+  const previousLatestMessage = useRef(latestMessage);
+  useEffect(() => {
+    if (latestMessage !== previousLatestMessage.current && latestMessage !== undefined && !followEnd.current) {
+      setNewMessages(true);
+    }
+    previousLatestMessage.current = latestMessage;
+  }, [latestMessage]);
+
+  useEffect(() => {
+    if (!readActive || !appActive || !ready || !atEnd) return;
     dispatch(chatActions.roomRead({ room }));
     if (/^table[1-9]\d*$/.test(room)) lobbyRuntime.markChatRead(room);
-  }, [appActive, dispatch, messages.length, readActive, ready, room]);
+  }, [appActive, atEnd, dispatch, messages, readActive, ready, room]);
 
   return (
-    <Panel>
-      <SectionHeading title={title} detail={ready ? 'Connected' : 'Chat reconnecting…'} />
+    <Panel style={fill ? [styles.fill, { paddingBottom: Math.max(0, imeOcclusion - systemInsets.bottom) }] : undefined}>
+      {!fill && <SectionHeading title={title} detail={ready ? 'Connected' : 'Chat reconnecting\u2026'} />}
       <ScrollView
         contentContainerStyle={styles.historyContent}
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        onLayout={(event) => {
+          viewportHeight.current = event.nativeEvent.layout.height;
+          if (readActive && appActive && ready && !followEnd.current) {
+            historyRef.current?.scrollTo({ y: historyOffset.current, animated: false });
+          }
+        }}
+        onContentSizeChange={(_, nextHeight) => {
+          contentHeight.current = nextHeight;
+          if (!readActive || !appActive || !ready) return;
+          if (followEnd.current) historyRef.current?.scrollToEnd({ animated: false });
+        }}
+        onScroll={({ nativeEvent }) => {
+          if (!readActive || !appActive || !ready) return;
+          historyOffset.current = nativeEvent.contentOffset.y;
+          const end = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 24;
+          followEnd.current = end;
+          setAtEnd(end);
+          if (end) setNewMessages(false);
+        }}
         nestedScrollEnabled
         ref={historyRef}
-        style={[styles.history, { backgroundColor: theme.colors.surfaceMuted }]}
+        style={[styles.history, fill && styles.fillHistory, { backgroundColor: theme.colors.surfaceMuted }]}
       >
         {messages.length === 0 && <EmptyState>No messages yet.</EmptyState>}
         {messages.map((message, index) => {
@@ -108,6 +151,12 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true }
           );
         })}
       </ScrollView>
+      {newMessages && !atEnd && <ActionButton compact title={'New \u2193'} onPress={() => {
+        if (!readActive || !appActive || !ready) return;
+        followEnd.current = true;
+        historyRef.current?.scrollToEnd({ animated: false });
+        if (contentHeight.current <= viewportHeight.current) { setAtEnd(true); setNewMessages(false); }
+      }} />}
       <Field
         editable={ready && sendEnabled}
         maxLength={300}
@@ -118,7 +167,7 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true }
         }))}
         onSubmitEditing={send}
         placeholder={ready ? 'Message' : 'Chat reconnecting…'}
-        style={styles.input}
+        style={[styles.input, fill && { minHeight: 40, maxHeight: 80 }]}
         returnKeyType="send"
         submitBehavior="submit"
         value={draft}
@@ -132,6 +181,8 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true }
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1, minHeight: 0, borderWidth: 0, borderRadius: 0, padding: 4, gap: 4 },
+  fillHistory: { flex: 1, minHeight: 0, maxHeight: undefined },
   history: { borderRadius: 10, maxHeight: 260, paddingHorizontal: 10 },
   historyContent: { gap: 7, paddingVertical: 10 },
   messageRow: { gap: 6 },

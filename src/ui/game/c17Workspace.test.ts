@@ -75,7 +75,7 @@ test('Live keeps a stable ScrollView root across rotation with eligible scrollin
   expect(appSource).toContain('const gameRootScrollable = !c17Workspace;');
   const liveRoot = appSource.match(/<SafeAreaView edges=\{\['bottom'\]\}[^>]*>\s*(<ScrollView[\s\S]*?<\/ScrollView>)\s*<\/SafeAreaView>/)?.[1] ?? '';
   expect(liveRoot).toContain('scrollEnabled={gameRootScrollable}');
-  expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible} />');
+  expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} />');
   expect(liveRoot).not.toMatch(/\bkey=/);
   expect(appSource).not.toContain('const GameRoot');
   expect(appSource).not.toContain('<GameRoot');

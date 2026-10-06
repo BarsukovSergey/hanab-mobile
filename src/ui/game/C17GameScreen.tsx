@@ -1,3 +1,4 @@
+import type { RoomChildren } from './GameScreen';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AppState,
@@ -7,7 +8,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
 
@@ -33,7 +33,7 @@ import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtim
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
-import { ActionButton, Notice, useHanabTheme } from '../designSystem';
+import { ActionButton, Notice, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { getC17LandscapeLayout, C17_LANDSCAPE_REGION_GAP, C17_LANDSCAPE_COLUMN_GAP, C17_LANDSCAPE_ROW_GAP } from './c17LandscapeLayout';
 import { C17RewindScrubber } from './C17RewindScrubber';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
@@ -89,9 +89,9 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen({ presentationVisible = true }: { presentationVisible?: boolean }) {
+export function C17GameScreen({ presentationVisible = true, roomChildren }: { presentationVisible?: boolean; roomChildren?: RoomChildren }) {
   const { theme } = useHanabTheme();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useResponsiveLayout();
   const orientation = width > height ? 'landscape' : 'portrait';
   const orientationRef = useRef(orientation);
   const dispatch = useAppDispatch();
@@ -568,6 +568,7 @@ export function C17GameScreen({ presentationVisible = true }: { presentationVisi
       canEnterClue={enabled || hypotheticalEnabled}
       recentActions={recentActions}
       presentationVisible={presentationVisible}
+      roomChildren={roomChildren}
       result={result}
       reviewActive={!hypotheticalActive && (isFinishedReplay || replay.active || isSharedReplay)}
       finishedReplay={isFinishedReplay}
@@ -700,6 +701,7 @@ function C17DenseWorkspace({
   pendingReplaySuggestion,
   recentActions,
   presentationVisible,
+  roomChildren,
   result,
   reviewActive,
   finishedReplay,
@@ -798,6 +800,7 @@ function C17DenseWorkspace({
   pendingReplaySuggestion: { userName: string; segment: number } | null;
   recentActions: readonly C17TemporalEntry[];
   presentationVisible: boolean;
+  roomChildren?: RoomChildren;
   result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
   finishedReplay: boolean;
@@ -820,7 +823,7 @@ function C17DenseWorkspace({
     realLifeMode,
     showResourceCues: hypothetical === null,
   });
-  const { width: viewportWidth, height: viewportHeight, fontScale } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight, fontScale } = useResponsiveLayout();
   const portraitV2 = viewportWidth <= viewportHeight;
   const ownHandPosition = useAppSelector((state) => state.presentationPreferences.ownHandPosition);
   const [workbenchFeedback, setWorkbenchFeedback] = useState<{
@@ -1452,6 +1455,9 @@ function C17DenseWorkspace({
     </View> : <View style={[styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }, !portraitV2 && { marginTop: 'auto' }]} />
   );
   return <View style={styles.workspace}>
+    <View style={styles.workspace} pointerEvents={presentationVisible ? 'auto' : 'none'}
+      accessibilityElementsHidden={!presentationVisible}
+      importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'}>
     {portraitV2 ? <>
       <View style={styles.ledgerChrome}>{metricStrip}{tableResources}{lastActionPanel}</View>
     <View onLayout={portraitV2 ? captureAmbientBody : undefined} style={styles.workspaceBody}>
@@ -1494,6 +1500,8 @@ function C17DenseWorkspace({
       </>}
     </View>}
 
+    </View>
+    {roomChildren?.(portraitV2 ? null : landscapeLayout.fits ? landscapeLayout.rightWidth : 0)}
     <Modal animationType="fade" onRequestClose={() => setRecentOpen(false)} statusBarTranslucent transparent visible={presentationVisible && recentOpen}>
       <View style={[styles.recentBackdrop, { backgroundColor: theme.colors.overlay }]}>
         <View style={[styles.recentPopup, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
