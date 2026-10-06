@@ -62,7 +62,6 @@ import {
   encodeTableSetLeaderFrame,
   encodeTableUpdateFrame,
   encodeTableUnattendFrame,
-  type LobbyTable,
   type ChatMessage,
   type CardPresentationSettingName,
   type MobileTableOptions,
@@ -82,6 +81,14 @@ import { historyActions } from '../store/historySlice';
 import type { AppStore } from '../store/store';
 import { findKnownBotUser, freeBotSlots, isBotAtTable, knownBots, normalizedBotName } from '../config/knownBots';
 import { isEditableLiveNoteOrder } from './notePolicy';
+import {
+  isJoinEligible,
+  isPregameSpectateEligible,
+  isQuickRematchEligible,
+  isRestartToPregameEligible,
+  isReattendEligible,
+  isSpectateEligible,
+} from './lobbyEligibility';
 
 const SOCKET_OPEN = 1;
 const SOCKET_CLOSING = 2;
@@ -2211,63 +2218,4 @@ export class LobbyRuntime {
       socket.close(1000, 'Connection disposed');
     }
   }
-}
-
-export function isSpectateEligible(table: LobbyTable): boolean {
-  return areTableOptionsSupported(table.options)
-    && table.running
-    && (table.sharedReplay || !table.joined);
-}
-
-export function isPregameSpectateEligible(table: LobbyTable): boolean {
-  return areTableOptionsSupported(table.options)
-    && !table.running
-    && !table.sharedReplay
-    && !table.joined;
-}
-
-export function isJoinEligible(table: LobbyTable): boolean {
-  return !table.running
-    && !table.sharedReplay
-    && !table.joined
-    && areTableOptionsSupported(table.options)
-    && table.numPlayers < table.maxPlayers;
-}
-
-export function isReattendEligible(table: LobbyTable): boolean {
-  return table.running
-    && table.joined
-    && !table.sharedReplay
-    && areTableOptionsSupported(table.options);
-}
-
-export function isQuickRematchEligible(
-  clientState: Extract<
-    ReturnType<AppStore['getState']>['room']['room'],
-    { kind: 'live_game' }
-  >['clientState'],
-  pendingRestartTableID: number | null,
-): boolean {
-  const shared = clientState.replay.shared;
-  if (
-    shared === null
-    || !shared.amLeader
-    || pendingRestartTableID !== null
-    || !clientState.metadata.playerNames.includes(clientState.metadata.ourUsername)
-    || clientState.spectators.length < 2
-  ) return false;
-  const activeNames = new Set(clientState.spectators.map((spectator) => spectator.name));
-  return clientState.metadata.playerNames.every((name) => activeNames.has(name));
-}
-
-export function isRestartToPregameEligible(
-  clientState: Parameters<typeof isQuickRematchEligible>[0],
-  pendingRestartTableID: number | null,
-): boolean {
-  const shared = clientState.replay.shared;
-  return shared !== null
-    && shared.amLeader
-    && pendingRestartTableID === null
-    && clientState.metadata.playerNames.includes(clientState.metadata.ourUsername)
-    && clientState.spectators.length >= 2;
 }
