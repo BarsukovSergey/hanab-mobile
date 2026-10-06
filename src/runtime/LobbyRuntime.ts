@@ -36,14 +36,8 @@ import {
   encodeChatFrame,
   encodeChatReadFrame,
   encodeInactiveFrame,
-  encodeHistoryGetFrame,
-  encodeHistoryFriendsGetFrame,
-  encodeHistoryGetSeedFrame,
-  encodeJSONReplayCreateFrame,
-  historyGetSeedCommandSchema,
   type GameplayPresentationSettingName,
   encodeGetNameFrame,
-  encodeReplayCreateFrame,
   encodeClientFrame,
   encodeReplayActionFrame,
   encodeReplayHypoActionFrame,
@@ -79,6 +73,7 @@ import { sessionActions } from '../store/sessionSlice';
 import { terminationActions } from '../store/terminationSlice';
 import { historyActions } from '../store/historySlice';
 import type { AppStore } from '../store/store';
+import { HistoryRuntime } from './HistoryRuntime';
 import { findKnownBotUser, freeBotSlots, isBotAtTable, knownBots, normalizedBotName } from '../config/knownBots';
 import { isEditableLiveNoteOrder } from './notePolicy';
 import {
@@ -145,6 +140,7 @@ export class LobbyRuntime {
   private appActive = true;
   private maintainConnection = false;
   private readonly gameBootstrap: GameBootstrapCoordinator;
+  private readonly historyRuntime: HistoryRuntime;
 
   constructor(
     private readonly networkSession: NetworkSession,
@@ -158,6 +154,14 @@ export class LobbyRuntime {
     private readonly nowMs: () => number = Date.now,
   ) {
     this.connectionEpoch = store.getState().session.connectionEpoch;
+    this.historyRuntime = new HistoryRuntime(
+      store,
+      {
+        fetchTaggedGames: (username) => networkSession.fetchTaggedGames(username),
+        searchTag: (tag) => networkSession.searchTag(tag),
+      },
+      (frame) => this.sendEncoded(frame),
+    );
     this.gameBootstrap = new GameBootstrapCoordinator(
       store,
       (frame) => this.sendEncoded(frame),
@@ -344,180 +348,47 @@ export class LobbyRuntime {
   }
 
   loadMoreHistory(): boolean {
-    const state = this.store.getState();
-    const history = state.history;
-    if (
-      state.session.phase !== 'ready'
-      || history.connectionEpoch !== state.session.connectionEpoch
-      || !history.initialPageReceived
-      || !history.hasMore
-      || history.pendingRequest !== null
-    ) return false;
-    const request = {
-      connectionEpoch: state.session.connectionEpoch,
-      offset: history.items.length,
-      amount: 10 as const,
-    };
-    if (!this.sendEncoded(encodeHistoryGetFrame(request.offset, request.amount))) return false;
-    this.store.dispatch(historyActions.pageRequested(request));
-    return this.store.getState().history.pendingRequest?.offset === request.offset;
+    return this.historyRuntime.loadMoreHistory();
   }
 
   ensureFriendsHistory(): boolean {
-    const state = this.store.getState();
-    const history = state.history;
-    if (
-      state.session.phase !== 'ready'
-      || history.connectionEpoch !== state.session.connectionEpoch
-      || state.session.friends.length === 0
-      || history.friendInitialPageReceived
-      || history.friendPendingRequest !== null
-    ) return false;
-    if (!this.sendEncoded(encodeHistoryFriendsGetFrame(0))) return false;
-    this.store.dispatch(historyActions.friendPageRequested({
-      connectionEpoch: state.session.connectionEpoch, offset: 0, amount: 10,
-    }));
-    return this.store.getState().history.friendPendingRequest?.offset === 0;
+    return this.historyRuntime.ensureFriendsHistory();
   }
 
   ensureTaggedGames(): boolean {
-    const state = this.store.getState();
-    const username = state.session.authenticatedUser?.username;
-    const history = state.history;
-    if (state.session.phase !== 'ready' || username === undefined
-      || history.connectionEpoch !== state.session.connectionEpoch
-      || history.taggedLoaded || history.taggedPending) return false;
-    const epoch = state.session.connectionEpoch;
-    this.store.dispatch(historyActions.taggedRequested({ connectionEpoch: epoch }));
-    void this.networkSession.fetchTaggedGames(username).then((items) => {
-      if (this.store.getState().session.connectionEpoch !== epoch) return;
-      this.store.dispatch(historyActions.taggedReceived({ connectionEpoch: epoch, history: items }));
-    }).catch((error: unknown) => {
-      if (this.store.getState().session.connectionEpoch !== epoch) return;
-      this.store.dispatch(historyActions.tagFailed({ connectionEpoch: epoch, request: 'tagged', message: safeStatus(error, 'Unable to load tagged games.') }));
-    });
-    return true;
+    return this.historyRuntime.ensureTaggedGames();
   }
 
   searchTag(tag: string): boolean {
-    const state = this.store.getState();
-    if (tag.trim() === '' || state.session.phase !== 'ready'
-      || state.history.connectionEpoch !== state.session.connectionEpoch
-      || state.history.tagSearchPending) return false;
-    const epoch = state.session.connectionEpoch;
-    this.store.dispatch(historyActions.tagSearchRequested({ connectionEpoch: epoch, tag }));
-    const requestId = this.store.getState().history.tagSearchRequestId;
-    if (requestId === null) return false;
-    void this.networkSession.searchTag(tag).then((items) => {
-      if (this.store.getState().session.connectionEpoch !== epoch) return;
-      this.store.dispatch(historyActions.tagSearchReceived({ connectionEpoch: epoch, requestId, tag, history: items }));
-    }).catch((error: unknown) => {
-      if (this.store.getState().session.connectionEpoch !== epoch) return;
-      this.store.dispatch(historyActions.tagFailed({ connectionEpoch: epoch, request: 'search', requestId, tag, message: safeStatus(error, 'Unable to search this tag.') }));
-    });
-    return true;
+    return this.historyRuntime.searchTag(tag);
   }
 
-  clearTagSearch(): void { this.store.dispatch(historyActions.tagSearchCleared()); }
+  clearTagSearch(): void {
+    this.historyRuntime.clearTagSearch();
+  }
 
   loadMoreFriendsHistory(): boolean {
-    const state = this.store.getState();
-    const history = state.history;
-    if (
-      state.session.phase !== 'ready'
-      || history.connectionEpoch !== state.session.connectionEpoch
-      || !history.friendInitialPageReceived
-      || !history.friendHasMore
-      || history.friendPendingRequest !== null
-    ) return false;
-    const offset = history.friendItems.length;
-    if (!this.sendEncoded(encodeHistoryFriendsGetFrame(offset))) return false;
-    this.store.dispatch(historyActions.friendPageRequested({
-      connectionEpoch: state.session.connectionEpoch, offset, amount: 10,
-    }));
-    return this.store.getState().history.friendPendingRequest?.offset === offset;
+    return this.historyRuntime.loadMoreFriendsHistory();
   }
 
   loadOtherScores(databaseID: number, friends: boolean): boolean {
-    const state = this.store.getState();
-    const history = state.history;
-    const source = (friends ? history.friendItems : history.items)
-      .find((item) => item.id === databaseID);
-    if (state.session.phase !== 'ready'
-      || history.connectionEpoch !== state.session.connectionEpoch
-      || !Number.isInteger(databaseID) || databaseID <= 0
-      || source === undefined || source.numGamesOnThisSeed <= 1
-      || !historyGetSeedCommandSchema.safeParse({ seed: source.seed, friends }).success
-      || history.pendingOtherScores !== null) return false;
-    if (!this.sendEncoded(encodeHistoryGetSeedFrame(source.seed, friends))) return false;
-    this.store.dispatch(historyActions.otherScoresRequested({
-      connectionEpoch: state.session.connectionEpoch,
-      sourceDatabaseID: databaseID,
-      seed: source.seed,
-      friends,
-    }));
-    return this.store.getState().history.pendingOtherScores?.sourceDatabaseID === databaseID;
+    return this.historyRuntime.loadOtherScores(databaseID, friends);
   }
 
   dismissOtherScores(): void {
-    this.store.dispatch(historyActions.otherScoresDismissed());
+    this.historyRuntime.dismissOtherScores();
   }
 
   watchHistoricalGame(databaseID: number, visibility: 'solo' | 'shared' = 'solo'): boolean {
-    const state = this.store.getState();
-    const item = [...state.history.items, ...state.history.friendItems, ...state.history.taggedItems,
-      ...(state.history.tagSearchItems ?? []), ...(state.history.otherScores?.games ?? [])]
-      .find((candidate) => candidate.id === databaseID);
-    if (
-      state.session.phase !== 'ready'
-      || state.history.connectionEpoch !== state.session.connectionEpoch
-      || !Number.isInteger(databaseID)
-      || databaseID <= 0
-      || item === undefined
-      || !areTableOptionsSupported(item.options)
-      || !this.canRequestReplay(state)
-    ) return false;
-    if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
-    this.store.dispatch(historyActions.replayCreateRequested({
-      connectionEpoch: state.session.connectionEpoch,
-      source: 'id', visibility,
-      databaseID,
-    }));
-    return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
+    return this.historyRuntime.watchHistoricalGame(databaseID, visibility);
   }
 
   watchReplayByID(databaseID: number, visibility: 'solo' | 'shared'): boolean {
-    const state = this.store.getState();
-    if (!Number.isInteger(databaseID) || databaseID <= 0 || !this.canRequestReplay(state)) return false;
-    if (!this.sendEncoded(encodeReplayCreateFrame(databaseID, visibility))) return false;
-    this.store.dispatch(historyActions.externalReplayCreateRequested({
-      connectionEpoch: state.session.connectionEpoch, source: 'id', databaseID, visibility,
-    }));
-    return this.store.getState().history.pendingReplayCreate?.databaseID === databaseID;
+    return this.historyRuntime.watchReplayByID(databaseID, visibility);
   }
 
   watchJSONReplay(gameJSON: Record<string, unknown>, visibility: 'solo' | 'shared'): boolean {
-    const state = this.store.getState();
-    if (!this.canRequestReplay(state)) return false;
-    if (!this.sendEncoded(encodeJSONReplayCreateFrame(gameJSON, visibility))) return false;
-    this.store.dispatch(historyActions.replayCreateRequested({
-      connectionEpoch: state.session.connectionEpoch, source: 'json', visibility,
-    }));
-    return this.store.getState().history.pendingReplayCreate?.source === 'json';
-  }
-
-  private canRequestReplay(state: ReturnType<LobbyRuntime['store']['getState']>): boolean {
-    const room = state.room;
-    return state.session.phase === 'ready'
-      && state.history.connectionEpoch === state.session.connectionEpoch
-      && room.room.kind === 'none'
-      && room.pendingRecovery === null && room.pendingSpectateTableID === null
-      && room.pendingJoin === null && room.pendingCreate === null
-      && room.pendingLeaveTableID === null && room.pendingUnattendTableID === null
-      && room.pendingStart === null && room.pendingUpdate === null
-      && room.pendingLeaderName === null && room.pendingRestartTableID === null
-      && room.rematchTransition === null && room.pendingGameplayAction === null
-      && state.history.pendingReplayCreate === null;
+    return this.historyRuntime.watchJSONReplay(gameJSON, visibility);
   }
 
   spectate(tableID: number): boolean {
@@ -1634,23 +1505,14 @@ export class LobbyRuntime {
         this.gameBootstrap.receiveClock(epoch, event.data, this.nowMs());
         break;
       case 'gameHistory':
-        this.store.dispatch(historyActions.pageReceived({
-          connectionEpoch: epoch,
-          history: event.data,
-        }));
+        this.historyRuntime.receiveEvent(epoch, event);
         this.gameBootstrap.receiveGameHistory(epoch, event.data);
         break;
       case 'gameHistoryFriends':
-        this.store.dispatch(historyActions.friendPageReceived({
-          connectionEpoch: epoch,
-          history: event.data,
-        }));
+        this.historyRuntime.receiveEvent(epoch, event);
         break;
       case 'gameHistoryOtherScores':
-        this.store.dispatch(historyActions.otherScoresReceived({
-          connectionEpoch: epoch,
-          result: event.data,
-        }));
+        this.historyRuntime.receiveEvent(epoch, event);
         break;
       case 'cardIdentities':
         this.gameBootstrap.receiveCardIdentities(epoch, event.data);
@@ -1866,7 +1728,7 @@ export class LobbyRuntime {
         if (this.store.getState().room.pendingCreate !== null) this.pendingBotCreate = null;
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
-        this.clearCurrentHistoryPending(epoch, event.data.warning);
+        this.historyRuntime.clearCurrentPending(epoch, event.data.warning);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
           notice: { kind: 'warning', message: event.data.warning.slice(0, MAX_STATUS_LENGTH) },
@@ -1876,7 +1738,7 @@ export class LobbyRuntime {
         if (this.store.getState().room.pendingCreate !== null) this.pendingBotCreate = null;
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.clearCurrentGameplayPending(epoch);
-        this.clearCurrentHistoryPending(epoch, event.data.error);
+        this.historyRuntime.clearCurrentPending(epoch, event.data.error);
         this.store.dispatch(lobbyActions.noticeReceived({
           epoch,
           notice: { kind: 'error', message: event.data.error.slice(0, MAX_STATUS_LENGTH) },
@@ -1896,20 +1758,6 @@ export class LobbyRuntime {
       error: event.code === 1000 ? null : `WebSocket closed (${event.code})`,
     }));
     this.scheduleRetry();
-  }
-
-  private clearCurrentHistoryPending(epoch: number, message: string): void {
-    const history = this.store.getState().history;
-    if (
-      history.connectionEpoch === epoch
-      && (history.pendingRequest !== null
-        || history.friendPendingRequest !== null
-        || history.pendingReplayCreate !== null
-        || history.pendingOtherScores !== null)
-    ) this.store.dispatch(historyActions.operationFailed({
-      connectionEpoch: epoch,
-      message: message.slice(0, MAX_STATUS_LENGTH),
-    }));
   }
 
   private failCurrent(owned: OwnedConnection, error: string): void {
