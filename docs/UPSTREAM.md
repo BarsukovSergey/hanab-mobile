@@ -74,10 +74,10 @@ Hypothetical deterministic planning is adapted from the merged U2 extraction:
 - Source: `packages/game/src/hypotheticalPlanning.ts`
 - Mobile adaptation: `src/game/client/hypotheticalPlanning.ts`
 
-This is a scoped pure-planning adoption. It does not advance the baseline game/protocol pin,
-nor the hypothetical replay state/reducer/protocol pin at
-`8be709c48145ad56a1891307663ed3bec2cd4175`. Mobile validation, eligibility,
-card visibility policy, and runtime transport/READY/ownership safety remain outside the planner.
+This is a scoped pure-planning adoption. It does not advance the baseline game/protocol pin or
+the hypothetical replay/protocol pin above. The hypothetical state-transition core is pinned
+separately. Mobile validation, eligibility, card visibility policy, and runtime
+transport/READY/ownership safety remain outside the planner.
 Later bottom-deck planning changes such as #3157 are not part of this adoption;
 mobile still does not support Bottom-Deck Blind Plays or `deckPlays`.
 
