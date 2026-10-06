@@ -10,6 +10,7 @@ test('global navigation belongs to authenticated browsing and uses responsive ge
   const navPolicy = app.slice(app.indexOf('const showBrowsingNavigation ='), app.indexOf('const railNavigation ='));
   expect(navPolicy).toContain("presentationFocus === 'browsing'");
   expect(navPolicy).toContain('!passwordTaskOpen && !createTaskOpen');
+  expect(navPolicy).toContain('&& !replayImportTaskOpen');
   expect(navPolicy).not.toContain("roomState.room.kind === 'none'");
   expect(navPolicy).not.toContain('roomState.rematchTransition');
   expect(app).toContain("windowClass !== 'compact'");
@@ -26,6 +27,18 @@ test('global navigation belongs to authenticated browsing and uses responsive ge
   expect(nav).toContain('measureNavigation(\'bottom\', labelWidth, labelHeight, availableWidth)');
   expect(nav).toContain('measureNavigation(\'rail\', labelWidth, labelHeight)');
   expect(nav).not.toContain('64, 20');
+});
+
+test('History root and details keep global navigation while its import task hides bottom navigation and rail', () => {
+  const app = read('App.tsx');
+  const navPolicy = app.slice(app.indexOf('const showBrowsingNavigation ='), app.indexOf('const railNavigation ='));
+  expect(app).toContain('const [replayImportTaskOpen, setReplayImportTaskOpen] = useState(false)');
+  expect(app).toContain('onOpenReplayTaskChange={setReplayImportTaskOpen}');
+  expect(navPolicy).toContain('&& !replayImportTaskOpen');
+  expect(navPolicy).not.toMatch(/detailsID|browsing\.destination|onPresentationChange/);
+  expect(app).toContain("const railNavigation = showBrowsingNavigation && windowClass !== 'compact'");
+  expect(app).toContain('{railNavigation &&');
+  expect(app).toContain('{showBrowsingNavigation && !railNavigation && <BrowsingNavigation');
 });
 
 test('focused rooms stay mounted in an App-owned layer while browsing has focus', () => {

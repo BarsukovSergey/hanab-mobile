@@ -29,6 +29,22 @@ describe('App browsing ownership', () => {
     expect(hardware).toContain('backFromBrowsing();');
     expect(app).toContain('? backFromBrowsing : undefined;');
   });
+  test('History tasks reuse App scroll ownership and existing replay/Create entry paths', () => {
+    const history = app.slice(app.indexOf('content = <HistoryScreen'), app.indexOf('} else if (createTaskOpen)'));
+    expect(history).toContain('onPresentationChange={resetHistoryScroll}');
+    const scroll = app.slice(app.indexOf('const resetHistoryScroll ='), app.indexOf('const navigate ='));
+    expect(scroll).toContain('Keyboard.dismiss()');
+    expect(scroll).toContain('scrollTo({ y: 0, animated: false })');
+    expect(scroll).not.toContain('lobbyRuntime');
+    expect(history).toContain('lobbyRuntime.watchHistoricalGame(databaseID, visibility)');
+    expect(history).toContain('lobbyRuntime.watchReplayByID(request.databaseID, request.visibility)');
+    expect(history).toContain('lobbyRuntime.watchJSONReplay(request.gameJSON, request.visibility)');
+    const seed = history.slice(history.indexOf('onPlaySeed='), history.indexOf('onWatchReplay='));
+    expect(seed).toContain('setSpecificSeedCreatePrefill(prefill)');
+    expect(seed).toContain("navigate('home')");
+    expect(seed).toContain('setCreateTaskOpen(true)');
+    expect(seed).not.toMatch(/lobbyRuntime|createTable|unattend|leave/);
+  });
   test('Browse and Return only alter focus except own Rewind exits through local review selection', () => {
     const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const exitOwnRewind ='));
     const returning = app.slice(app.indexOf('const returnToRoom ='), app.indexOf('useLayoutEffect(', app.indexOf('const returnToRoom =')));

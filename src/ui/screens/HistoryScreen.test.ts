@@ -5,6 +5,94 @@ import { describe, expect, test } from '@jest/globals';
 const screen = readFileSync(resolve(__dirname, 'HistoryScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('History screen source contract', () => {
+  test('only Open Replay reports import-task ownership to App and clears it on Back or unmount', () => {
+    const report = screen.slice(screen.indexOf('  useLayoutEffect(() => {'), screen.indexOf('  const mode ='));
+    expect(screen).toContain('onOpenReplayTaskChange?: (active: boolean) => void');
+    expect(report).toContain('onOpenReplayTaskChange?.(openReplayTask)');
+    expect(report).toContain('return () => onOpenReplayTaskChange?.(false)');
+    expect(report).toContain('[onOpenReplayTaskChange, openReplayTask]');
+    expect(report).not.toMatch(/detailsID|advancedReplay|comparing|mode/);
+    expect(screen).toContain('const [openReplayTask, setOpenReplayTask] = useState(false)');
+    const back = screen.slice(screen.indexOf('const handleBack ='), screen.indexOf('if (backRef) backRef.current'));
+    expect(back).toContain('setOpenReplayTask(false)');
+    const detailsEntry = screen.slice(screen.indexOf('title="Details / actions >"'), screen.indexOf('{showingDetails && <>'));
+    expect(detailsEntry).toContain('setDetailsID(item.id)');
+    expect(detailsEntry).not.toMatch(/setOpenReplayTask|onOpenReplayTaskChange/);
+  });
+  test('History root orders Open Replay, sources, exact tag and compact rows', () => {
+    const root = screen.slice(screen.indexOf('\n  return ('));
+    const open = root.indexOf('<ActionButton title="Open replay"');
+    const sources = root.indexOf('style={styles.switcher}');
+    const tag = root.indexOf('placeholder="Exact tag"');
+    const rows = root.indexOf('<View style={styles.grid}>');
+    expect(open).toBeGreaterThan(0);
+    expect(open).toBeLessThan(sources);
+    expect(sources).toBeLessThan(tag);
+    expect(tag).toBeLessThan(rows);
+    expect(root).toContain('!comparing && detailsID === null && showingTagged && <Panel');
+    expect(root).not.toContain('<TextInput');
+    expect(root).not.toContain('parseHistoryReplayInput');
+    expect(root).not.toContain('styles.importPanel');
+    expect(screen).toContain("const wideRows = windowClass !== 'compact'");
+    expect(root).toContain('wideRows && styles.rowSummaryWide');
+    expect(root).toContain("rowSummaryWide: { flexDirection: 'row', alignItems: 'center', gap: 12 }");
+    expect(root).not.toMatch(/gridWide|gameCardWide|flexBasis|splitPane/);
+  });
+
+  test('Review is primary and eligible secondary actions live only in selected local details', () => {
+    const row = screen.slice(screen.indexOf('<Panel key={item.id}'), screen.indexOf('\n      {!comparing && detailsID === null && hasMore'));
+    const summary = row.slice(0, row.indexOf('{showingDetails && <>'));
+    const details = row.slice(row.indexOf('{showingDetails && <>'));
+    expect(screen).toContain('const [detailsID, setDetailsID] = useState<number | null>(null)');
+    expect(screen).toContain('if (detailsID !== null && detailsID !== item.id) return null');
+    expect(summary).toContain("'Review'");
+    expect(summary).toContain("tone={supported ? 'primary' : 'secondary'}");
+    expect(summary).toContain("onWatchReplay(item.id, 'solo')");
+    expect(summary).toContain('title="Details / actions >" tone="secondary"');
+    expect(summary).toContain('setDetailsID(item.id)');
+    for (const action of ['Copy seed', 'Play this seed', 'Share replay', 'Other scores']) {
+      expect(summary).not.toContain(action);
+      expect(details).toContain(action);
+    }
+    expect(details).toContain('END_CONDITIONS[item.endCondition]');
+    expect(summary).toContain('item.playerNames.join');
+    expect(summary).toContain('{finishedLabel}');
+    expect(summary).toContain('{item.options.variantName}');
+    expect(summary).toContain('{item.options.numPlayers}P');
+    expect(summary).toContain('{item.score}');
+  });
+
+  test('Open Replay is a separate task with link/ID first and raw JSON behind Advanced', () => {
+    const task = screen.slice(screen.indexOf('if (openReplayTask) return ('), screen.indexOf('\n  return ('));
+    expect(screen).toContain('const [openReplayTask, setOpenReplayTask] = useState(false)');
+    expect(screen).toContain('const [advancedReplay, setAdvancedReplay] = useState(false)');
+    expect(task).toContain('!advancedReplay && <Field value={replayLinkText}');
+    expect(task).toContain('placeholder="Replay link or database ID"');
+    expect(task).toContain("title={advancedReplay ? 'Hide Advanced' : 'Advanced'}");
+    expect(task).toContain('advancedReplay && <TextInput multiline value={replayJSONText}');
+    expect(task).toContain('placeholder="Raw replay JSON"');
+    expect(screen).toContain('advancedReplay ? replayJSONText : replayLinkText');
+    expect(task).toContain('!replayUsesLink && <>');
+    expect(task).toContain('title="Solo"');
+    expect(task).toContain('title="Shared"');
+    expect(task).toContain('title="Open"');
+    expect(task).toContain('history.error !== null && <Notice tone="error">{history.error}');
+    expect(task).not.toContain('items.map');
+  });
+
+  test('App-owned Back closes tasks/details before root navigation without opening anything', () => {
+    const back = screen.slice(screen.indexOf('const handleBack ='), screen.indexOf('if (backRef) backRef.current'));
+    const taskBack = back.slice(back.indexOf('if (openReplayTask)'), back.indexOf('if (detailsID !== null)'));
+    expect(taskBack).toContain('setOpenReplayTask(false)');
+    expect(taskBack).toContain('setAdvancedReplay(false)');
+    expect(taskBack).toContain('return;');
+    expect(back).toContain('if (detailsID !== null) { setDetailsID(null); return; }');
+    expect(back).not.toMatch(/onWatch|watchReplay|watchJSON|onPlaySeed|createTable|unattend|leave/);
+    expect(back.indexOf('if (detailsID !== null)')).toBeLessThan(back.indexOf('onBack()'));
+    expect(screen).toContain('onPresentationChange?.();');
+    expect(screen).toContain('[onPresentationChange, openReplayTask, detailsID]');
+  });
+
   test('both embedded and App-owned Back run local History cleanup before navigation', () => {
     const handler = screen.slice(screen.indexOf('const handleBack ='), screen.indexOf('const returnFromComparison ='));
     expect(handler).toContain('invalidateSeedCopy();');
@@ -19,13 +107,13 @@ describe('History screen source contract', () => {
     expect(screen).toContain('>{item.tags}</Text>');
     expect(screen).not.toMatch(/item\.tags\.split/);
   });
-  test('offers unified replay input and rejects invalid input locally', () => {
+  test('Open Replay preserves clipboard support and rejects invalid input locally', () => {
     expect(screen).toContain('title="Open replay"');
-    expect(screen).toContain('parseReplayInput(replayJSONText, replayVisibility)');
+    expect(screen).toContain('parseHistoryReplayInput(replayInputText, replayVisibility, advancedReplay)');
     expect(screen).toContain('title="Paste from clipboard"');
     expect(screen).toContain('title="Open replay"');
     expect(screen).toContain('onWatchJSONReplay(parsed.gameJSON, parsed.visibility)');
-    expect(screen).toContain("else { setReplayJSONText(text); setReplayJSONError(null); }");
+    expect(screen).toContain("else { setReplayInputText(text); setReplayJSONError(null); }");
     expect(screen).toContain("setReplayJSONError('Clipboard is empty.')");
     expect(screen).toContain("setReplayJSONError('Could not read the clipboard.')");
   });
@@ -92,10 +180,10 @@ describe('History screen source contract', () => {
     expect(screen).toContain('title="Back to lobby" onPress={handleBack}');
   });
 
-  test('offers Friends history only for authoritative friends and uses its independent pages', () => {
+  test('offers Friends only for authoritative friends and uses its independent pages', () => {
     expect(screen).toContain('session.friends.length > 0');
     expect(screen).toContain('title="My history"');
-    expect(screen).toContain('title="Friends history"');
+    expect(screen).toContain('title="Friends"');
     expect(screen).toContain('lobbyRuntime.ensureFriendsHistory()');
     expect(screen).toContain('history.friendItems');
     expect(screen).toContain('history.friendPendingRequest');
@@ -110,7 +198,7 @@ describe('History screen source contract', () => {
   });
 
   test('offers tagged games and exact tag search without other scores', () => {
-    expect(screen).toContain('title="Tagged games"');
+    expect(screen).toContain('title="Tagged"');
     expect(screen).toContain('lobbyRuntime.ensureTaggedGames()');
     expect(screen).toContain('placeholder="Exact tag"');
     expect(screen).toContain('title="Search"');
@@ -151,12 +239,12 @@ describe('History screen source contract', () => {
   test('blocks replay and seed actions while leaving history browsing available', () => {
     expect(screen).toContain('roomOccupied: boolean;');
     expect(screen).toContain("You're already in a room. History stays available for browsing, but return to the current room before opening another replay or starting this seed.");
-    expect(screen).toMatch(/title="Open replay" disabled=\{roomOccupied \|\| replayPending \|\| replayJSONText\.trim\(\) === ''\}[\s\S]*?onPress=\{\(\) => \{\s*if \(roomOccupied\) return;\s*const parsed/);
+    expect(screen).toMatch(/title="Open" disabled=\{roomOccupied \|\| replayPending \|\| replayInputText\.trim\(\) === ''\}[\s\S]*?onPress=\{\(\) => \{\s*if \(roomOccupied\) return;\s*const parsed/);
     expect(screen).toMatch(/title="Play this seed"[^>]*disabled=\{roomOccupied\} onPress=\{\(\) => \{\s*if \(roomOccupied\) return;\s*onPlaySeed/);
     expect(screen.match(/disabled=\{roomOccupied \|\| !supported \|\| replayPending\}/g)).toHaveLength(2);
     expect(screen).toContain("if (roomOccupied) return; onWatchReplay(item.id, 'solo');");
     expect(screen).toContain("if (roomOccupied) return; onWatchReplay(item.id, 'shared');");
-    for (const action of ['My history', 'Friends history', 'Tagged games', 'Search', 'Clear search', 'Copy seed', 'Other scores', 'Load more']) {
+    for (const action of ['My history', 'Friends', 'Tagged', 'Search', 'Clear search', 'Copy seed', 'Other scores', 'Load more']) {
       expect(screen).toContain(action);
     }
     expect(screen).toContain('title="Clear search" tone="secondary" disabled={!history.tagSearchActive}');
