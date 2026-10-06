@@ -167,3 +167,93 @@ describe('hypothetical clue touches', () => {
     expect(reviewingPreview?.touchedOrders).toEqual([]);
   });
 });
+
+describe('mobile clue visibility compatibility at the U2 boundary', () => {
+  const emptyNote: CardNote = { ...note, possibilities: [] };
+  test.each([
+    { morph: { suitIndex: 0, rank: null }, rankVisible: false, expected: [] },
+    { morph: { suitIndex: null, rank: 1 }, rankVisible: true, expected: [1] },
+  ])('empty possibilities preserve mobile visibility: %j', ({ morph, rankVisible, expected }) => {
+    const state = {
+      ...game,
+      deck: [game.deck[0], { ...game.deck[1], possibleCardsFromClues: [], possibleCards: [] }],
+    };
+    const context = {
+      cardIdentities, morphedIdentities: [undefined, morph] as unknown as readonly CardIdentity[],
+      notes: [emptyNote, emptyNote], playing: true,
+    };
+    const preview = getCluePreview(state as never, 'No Variant', 1, 'rank', 1, context);
+    const actions = getHypotheticalActions(
+      { type: 'rankClue', target: 1, value: 1 }, state as never, metadata as never,
+      cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    );
+    expect(preview?.touchedOrders).toEqual(expected);
+    expect(actions?.[0]).toMatchObject({ list: preview?.touchedOrders });
+    expect(context.morphedIdentities[1]?.rank !== null).toBe(rankVisible);
+  });
+
+  test('reviewing unknown recorded identity can touch its visible note-derived rank', () => {
+    const state = {
+      ...game,
+      deck: [game.deck[0], {
+        ...game.deck[1], possibleCardsFromClues: [[0, 1], [1, 1]], possibleCards: [[0, 1], [1, 1]],
+      }],
+    };
+    const context = {
+      cardIdentities: [cardIdentities[0]!, { suitIndex: null, rank: null }],
+      morphedIdentities: [] as readonly CardIdentity[], notes: [emptyNote, emptyNote], playing: false,
+    };
+    const preview = getCluePreview(state as never, 'No Variant', 1, 'rank', 1, context);
+    const actions = getHypotheticalActions(
+      { type: 'rankClue', target: 1, value: 1 }, state as never, metadata as never,
+      context.cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    );
+    expect(preview?.touchedOrders).toEqual([1]);
+    expect(actions?.[0]).toMatchObject({ list: preview?.touchedOrders });
+    expect(context.morphedIdentities).toEqual([]);
+  });
+
+  test.each([true, false])('ordinary visible cards agree for preview and planner, playing=%s', (playing) => {
+    const context = { cardIdentities, morphedIdentities: [] as readonly CardIdentity[], notes: [emptyNote, emptyNote], playing };
+    const state = {
+      ...game, deck: [game.deck[0], { ...game.deck[1], possibleCardsFromClues: [[0, 2], [1, 1]], possibleCards: [[0, 2], [1, 1]] }],
+    };
+    for (const type of ['color', 'rank'] as const) {
+      const value = type === 'color' ? 0 : 2;
+      const preview = getCluePreview(state as never, 'No Variant', 1, type, value, context);
+      const actions = getHypotheticalActions(
+        { type: type === 'color' ? 'colorClue' : 'rankClue', target: 1, value },
+        state as never, metadata as never, cardIdentities, context.morphedIdentities, context.notes, playing,
+      );
+      expect(preview?.touchedOrders).toEqual([1]);
+      expect(actions?.[0]).toMatchObject({ list: preview?.touchedOrders });
+    }
+  });
+
+  test('unavailable clue card input is skipped equally by preview and planning', () => {
+    const context = { cardIdentities, morphedIdentities: [] as readonly CardIdentity[], notes: [], playing: true };
+    const preview = getCluePreview(game as never, 'No Variant', 1, 'rank', 1, context);
+    const actions = getHypotheticalActions(
+      { type: 'rankClue', target: 1, value: 1 }, game as never, metadata as never,
+      cardIdentities, context.morphedIdentities, context.notes, context.playing,
+    );
+    expect(preview?.touchedOrders).toEqual([]);
+    expect(actions?.[0]).toMatchObject({ list: [] });
+    expect(game.hands).toEqual([[0], [1]]);
+  });
+});
+
+test('blank morph with empty clue possibilities never needs a visibility lookup', () => {
+  const state = {
+    ...game, deck: [game.deck[0], { ...game.deck[1], possibleCardsFromClues: [], possibleCards: [] }],
+  };
+  const context = {
+    cardIdentities, morphedIdentities: [undefined, { suitIndex: null, rank: null }] as unknown as readonly CardIdentity[],
+    notes: [note, note], playing: false,
+  };
+  expect(getCluePreview(state as never, 'No Variant', 1, 'rank', 1, context)?.touchedOrders).toEqual([]);
+  expect(getHypotheticalActions(
+    { type: 'rankClue', target: 1, value: 1 }, state as never, metadata as never,
+    cardIdentities, context.morphedIdentities, context.notes, context.playing,
+  )?.[0]).toMatchObject({ list: [] });
+});

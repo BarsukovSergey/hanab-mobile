@@ -5,13 +5,13 @@ import type { CardNote } from '../upstream/interfaces/CardNote';
 import type { GameMetadata } from '../upstream/interfaces/GameMetadata';
 import type { GameState } from '../upstream/interfaces/GameState';
 import type { MsgClue } from '../upstream/types/MsgClue';
-import { newColorClue, newRankClue } from '../upstream/types/Clue';
 import { colorIndex } from '../upstream/types/ColorIndex';
 import type { CardOrder } from '../upstream/types/CardOrder';
 import type { PlayerIndex } from '../upstream/types/PlayerIndex';
-import { getNextPlayableRanks } from '../upstream/rules/playStacks';
+import { getCardIdentityToShow } from './cardPresentation';
+import { planHypotheticalAction, type HypotheticalActionIntent } from './hypotheticalPlanning';
 import { getHypotheticalCardRepresentation } from './hypotheticalCardRepresentation';
-import { getHypotheticalTouchedOrders } from './hypotheticalClueTouch';
+import { getHypotheticalCluePlanningInput } from './hypotheticalClueTouch';
 import type { ActionIncludingHypothetical } from './types/actions';
 
 /** Platform-independent port of upstream sendHypotheticalAction's input. */
@@ -47,40 +47,27 @@ export function getHypotheticalActions(
       card, cardIdentity, note, morphedIdentities[order], playing,
     );
     if (identity.suitIndex === null || identity.rank === null) return null;
-    const { suitIndex, rank } = identity;
+    const { suitIndex } = identity;
     const suit = variant.suits[suitIndex];
     let actualType: 'play' | 'discard' = action.type;
     if (suit?.inverted) actualType = actualType === 'play' ? 'discard' : 'play';
-    let failed = false;
-    if (actualType === 'play') {
-      const direction = game.playStackDirections[suitIndex];
-      if (direction === undefined) return null;
-      const nextRanks = getNextPlayableRanks(
-        suitIndex,
-        game.playStacks[suitIndex] ?? [],
-        direction,
-        game.playStackStarts,
-        variant,
-        game.deck,
-      );
-      if (!nextRanks.includes(rank)) {
-        actualType = 'discard';
-        failed = true;
-      }
-    }
-    const actions: ActionIncludingHypothetical[] = [actualType === 'play'
-      ? { type: 'play', playerIndex: actor, order, suitIndex, rank }
-      : { type: 'discard', playerIndex: actor, order, suitIndex, rank, failed }];
-    if (failed) actions.push({
-      type: 'strike', num: game.strikes.length + 1, turn: game.turn.segment ?? 0, order,
+    if (actualType === 'play' && (
+      !Array.isArray(game.playStacks?.[suitIndex])
+      || game.playStackDirections?.[suitIndex] === undefined
+    )) return null;
+    const visible = getCardIdentityToShow({
+      cardIdentity: identity, state: card, note, empathy: false,
+      morphedIdentity: morphedIdentities[order], isStackBase: false, finished: false,
     });
-    if (game.deck.length < cardIdentities.length) {
-      const order = game.deck.length as CardOrder;
-      const drawn = cardIdentities[order];
-      actions.push({ type: 'draw', playerIndex: actor, order, suitIndex: drawn?.suitIndex ?? -1, rank: drawn?.rank ?? -1 });
+    // Malformed stack data must remain a rejected mobile input, not a planner assertion.
+    try {
+      return planHypotheticalAction({ type: action.type, order }, {
+        gameState: game, metadata, variant, cardIdentities, morphedIdentities, notes, playing,
+        cardViews: [{ state: card, isStackBase: false, visibleSuitIndex: visible.suitIndex, visibleRank: visible.rank }],
+      });
+    } catch {
+      return null;
     }
-    actions.push(nextTurn(game, metadata.options.numPlayers));
-    return actions;
   }
 
   const clueAction = action as Extract<HypotheticalClientAction, { readonly target: number }>;
@@ -91,29 +78,30 @@ export function getHypotheticalActions(
       if (!parsedColorIndex.success) return null;
       const color = variant.clueColors[parsedColorIndex.data];
       return color === undefined ? null : {
-        clue: newColorClue(color),
         message: { type: ClueType.Color, value: parsedColorIndex.data } satisfies MsgClue,
       };
     })()
     : (() => {
       const rank = variant.clueRanks.find((candidate) => candidate === clueAction.value);
       return rank === undefined ? null : {
-        clue: newRankClue(rank),
         message: { type: ClueType.Rank, value: rank } satisfies MsgClue,
       };
     })();
   if (clueAndMessage === null) return null;
-  const list = getHypotheticalTouchedOrders(game, variant, clueAction.target, clueAndMessage.clue, {
-    cardIdentities,
-    morphedIdentities,
-    notes,
-    playing,
+  const input = getHypotheticalCluePlanningInput(game, clueAction.target, clueAndMessage.message.type, {
+    cardIdentities, morphedIdentities, notes, playing,
   });
-  return [{ type: 'clue', clue: clueAndMessage.message, giver: actor, list, target: clueAction.target as PlayerIndex, ignoreNegative: false }, nextTurn(game, metadata.options.numPlayers)];
-}
-
-function nextTurn(game: GameState, numPlayers: number): ActionIncludingHypothetical {
-  const actor = game.turn.currentPlayerIndex;
-  // actor is non-null at each caller; preserve upstream's simple hypothetical next-player behavior.
-  return { type: 'turn', num: game.turn.turnNum + 1, currentPlayerIndex: ((actor! + 1) % numPlayers) as PlayerIndex };
+  const intent: HypotheticalActionIntent = clueAndMessage.message.type === ClueType.Color
+    ? { type: 'colorClue', target: clueAction.target as PlayerIndex, value: clueAndMessage.message.value }
+    : { type: 'rankClue', target: clueAction.target as PlayerIndex, value: clueAndMessage.message.value };
+  return planHypotheticalAction(intent, {
+    // Missing clue-card input was already omitted by the mobile touch adapter.
+    // This planning-only hand keeps that policy without mutating the ongoing game.
+    gameState: {
+      ...game,
+      hands: game.hands.map((hand, index) => index === clueAction.target ? input.orders : hand) as unknown as GameState['hands'],
+    },
+    metadata, variant, cardIdentities, notes, playing,
+    morphedIdentities: input.morphedIdentities, cardViews: input.cardViews,
+  });
 }
