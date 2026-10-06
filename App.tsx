@@ -97,6 +97,7 @@ function AppContent() {
   const [showManualLogin, setShowManualLogin] = useState(false);
   const [browsing, setBrowsing] = useState(() => createBrowsingPresentation());
   const [passwordTaskOpen, setPasswordTaskOpen] = useState(false);
+  const [replayImportTaskOpen, setReplayImportTaskOpen] = useState(false);
   const browsingScrollRef = useRef<ScrollView>(null);
   const resetHistoryScroll = useCallback(() => {
     Keyboard.dismiss();
@@ -736,6 +737,7 @@ function AppContent() {
     content = <HistoryScreen roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}
       backRef={historyBackRef} onBack={() => navigate('home')}
       onPresentationChange={resetHistoryScroll}
+      onOpenReplayTaskChange={setReplayImportTaskOpen}
       onPlaySeed={(prefill) => {
         setSpecificSeedCreatePrefill(prefill);
         navigate('home');
@@ -783,7 +785,7 @@ function AppContent() {
   const showBrowsingNavigation = presentationFocus === 'browsing'
     && probe === 'valid' && session.phase === 'ready' && hydrated
     && session.authenticatedUser !== null
-    && !passwordTaskOpen && !createTaskOpen;
+    && !passwordTaskOpen && !createTaskOpen && !replayImportTaskOpen;
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
   const browsingSurface = currentBrowsingSurface(browsing);
   const browsingTitle = browsingSurface.kind === 'root'

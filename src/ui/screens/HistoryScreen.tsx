@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { areTableOptionsSupported, getSupportedVariantMaxScore } from '../../game/client/supportedVariants';
@@ -38,6 +38,7 @@ export function HistoryScreen({
   onWatchReplayInput,
   onPlaySeed,
   onPresentationChange,
+  onOpenReplayTaskChange,
   clipboardActions = replayInputActions,
 }: {
   roomOccupied: boolean;
@@ -49,6 +50,7 @@ export function HistoryScreen({
   onWatchReplayInput: (request: Exclude<ReplayInputResult, { kind: 'invalid' }>) => void;
   onPlaySeed: (prefill: { seedSuffix: string; maxPlayers: number; createOptions: MobileTableOptions; numPlayers: number }) => void;
   onPresentationChange?: () => void;
+  onOpenReplayTaskChange?: (active: boolean) => void;
   clipboardActions?: ReplayInputActions;
 }) {
   const { theme } = useHanabTheme();
@@ -88,6 +90,10 @@ export function HistoryScreen({
   }, [invalidateSeedCopy, selection, session.connectionEpoch, session.friends.length]);
   useEffect(() => { invalidateSeedCopy(); }, [invalidateSeedCopy, session.connectionEpoch]);
   useEffect(() => { onPresentationChange?.(); }, [onPresentationChange, openReplayTask, detailsID]);
+  useLayoutEffect(() => {
+    onOpenReplayTaskChange?.(openReplayTask);
+    return () => onOpenReplayTaskChange?.(false);
+  }, [onOpenReplayTaskChange, openReplayTask]);
   const mode = selection.epoch === session.connectionEpoch ? selection.mode : 'mine';
   const showingFriends = mode === 'friends' && session.friends.length > 0;
   const showingTagged = mode === 'tagged';

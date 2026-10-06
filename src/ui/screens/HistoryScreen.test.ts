@@ -5,6 +5,20 @@ import { describe, expect, test } from '@jest/globals';
 const screen = readFileSync(resolve(__dirname, 'HistoryScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('History screen source contract', () => {
+  test('only Open Replay reports import-task ownership to App and clears it on Back or unmount', () => {
+    const report = screen.slice(screen.indexOf('  useLayoutEffect(() => {'), screen.indexOf('  const mode ='));
+    expect(screen).toContain('onOpenReplayTaskChange?: (active: boolean) => void');
+    expect(report).toContain('onOpenReplayTaskChange?.(openReplayTask)');
+    expect(report).toContain('return () => onOpenReplayTaskChange?.(false)');
+    expect(report).toContain('[onOpenReplayTaskChange, openReplayTask]');
+    expect(report).not.toMatch(/detailsID|advancedReplay|comparing|mode/);
+    expect(screen).toContain('const [openReplayTask, setOpenReplayTask] = useState(false)');
+    const back = screen.slice(screen.indexOf('const handleBack ='), screen.indexOf('if (backRef) backRef.current'));
+    expect(back).toContain('setOpenReplayTask(false)');
+    const detailsEntry = screen.slice(screen.indexOf('title="Details / actions >"'), screen.indexOf('{showingDetails && <>'));
+    expect(detailsEntry).toContain('setDetailsID(item.id)');
+    expect(detailsEntry).not.toMatch(/setOpenReplayTask|onOpenReplayTaskChange/);
+  });
   test('History root orders Open Replay, sources, exact tag and compact rows', () => {
     const root = screen.slice(screen.indexOf('\n  return ('));
     const open = root.indexOf('<ActionButton title="Open replay"');
