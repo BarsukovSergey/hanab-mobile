@@ -6,7 +6,6 @@ import type {
 import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
 import {
   areTableOptionsSupported,
-  isVariantNameSupported,
 } from '../game/client/supportedVariants';
 import {
   decodeServerFrame,
@@ -16,21 +15,13 @@ import {
   encodeChatReadFrame,
   encodeInactiveFrame,
   type GameplayPresentationSettingName,
-  encodeGetNameFrame,
   encodeClientFrame,
   encodeTableRestartFrame,
-  encodeTableCreateFrame,
   encodeTableReattendFrame,
   encodeTableSpectateFrame,
-  encodeTableStartFrame,
-  encodeTableSetLeaderFrame,
-  encodeTableUpdateFrame,
   encodeTableUnattendFrame,
-  type ChatMessage,
   type CardPresentationSettingName,
   type MobileTableOptions,
-  type CreateTableSetting,
-  encodeCreateTableSettingFrame,
   type ServerEvent,
 } from '../protocol/lobbyProtocol';
 import type { ActionIncludingHypothetical } from '../game/client/types/actions';
@@ -45,7 +36,7 @@ import { GameplayRuntime } from './GameplayRuntime';
 import { RoomAttendanceRuntime } from './RoomAttendanceRuntime';
 import { HistoryRuntime } from './HistoryRuntime';
 import { ReplayInteractionRuntime } from './ReplayInteractionRuntime';
-import { findKnownBotUser, freeBotSlots, isBotAtTable, knownBots, normalizedBotName } from '../config/knownBots';
+import { TableManagementRuntime } from './TableManagementRuntime';
 import {
   isQuickRematchEligible,
   isRestartToPregameEligible,
@@ -91,13 +82,6 @@ function safeStatus(value: unknown, fallback: string): string {
 }
 
 export class LobbyRuntime {
-  private pendingBotCreate: {
-    epoch: number;
-    name: string;
-    creatorUserID: number;
-    bots: string[];
-    password: string;
-  } | null = null;
   private current: OwnedConnection | null = null;
   private connectionEpoch: number;
   private connectPromise: Promise<void> | null = null;
@@ -108,6 +92,7 @@ export class LobbyRuntime {
   private readonly gameBootstrap: GameBootstrapCoordinator;
   private readonly gameplayRuntime: GameplayRuntime;
   private readonly roomAttendanceRuntime: RoomAttendanceRuntime;
+  private readonly tableManagementRuntime: TableManagementRuntime;
   private readonly historyRuntime: HistoryRuntime;
   private readonly replayInteractionRuntime: ReplayInteractionRuntime;
 
@@ -123,6 +108,12 @@ export class LobbyRuntime {
     private readonly nowMs: () => number = Date.now,
   ) {
     this.connectionEpoch = store.getState().session.connectionEpoch;
+    this.tableManagementRuntime = new TableManagementRuntime(
+      store,
+      (frame) => this.sendEncoded(frame),
+      (message) => this.send('chatPM', message),
+      (tableID) => this.isReadyCurrentRoom(tableID, 'pregame'),
+    );
     this.roomAttendanceRuntime = new RoomAttendanceRuntime(
       store,
       (frame) => this.sendEncoded(frame),
@@ -172,7 +163,7 @@ export class LobbyRuntime {
       return this.connectPromise ?? Promise.resolve();
     }
 
-    this.pendingBotCreate = null;
+    this.tableManagementRuntime.clearTransientState();
     const previous = this.current;
     const epoch = this.connectionEpoch + 1;
     this.connectionEpoch = epoch;
@@ -203,7 +194,7 @@ export class LobbyRuntime {
   }
 
   disconnect(): void {
-    this.pendingBotCreate = null;
+    this.tableManagementRuntime.clearTransientState();
     this.maintainConnection = false;
     this.retryAttempt = 0;
     this.cancelRetry();
@@ -403,234 +394,27 @@ export class LobbyRuntime {
     password = '',
     bots: readonly string[] = [],
   ): boolean {
-    const state = this.store.getState();
-    const creatorUserID = state.session.authenticatedUser?.userID;
-    const trimmedName = name.trim();
-    const effectiveName = trimmedName || state.session.randomTableName?.trim() || '';
-    const exposed = typeof options === 'string' ? {
-      variantName: options,
-      timed: false,
-      timeBase: 0,
-      timePerTurn: 0,
-      cardCycle: false,
-      emptyClues: false,
-      oneExtraCard: false,
-      oneLessCard: false,
-      allOrNothing: false,
-    } : options;
-    if (
-      creatorUserID === undefined
-      || effectiveName.length < 1
-      || effectiveName.length > 45
-      || !Number.isInteger(maxPlayers)
-      || maxPlayers < 2
-      || maxPlayers > 6
-      || !isVariantNameSupported(exposed.variantName)
-      || (exposed.oneExtraCard && exposed.oneLessCard)
-      || state.room.room.kind !== 'none'
-      || state.room.pendingRecovery !== null
-      || state.room.pendingSpectateTableID !== null
-      || state.room.pendingJoin !== null
-      || state.room.pendingCreate !== null
-      || state.history.pendingReplayCreate !== null
-      || bots.length > maxPlayers - 1
-      || new Set(bots.map(normalizedBotName)).size !== bots.length
-      || bots.some((name) => !knownBots.some((bot) => normalizedBotName(bot.username) === normalizedBotName(name)
-        && (password.length === 0 || bot.passwordJoin)))
-    ) return false;
-
-    let frame: string;
-    try {
-      frame = encodeTableCreateFrame(effectiveName, maxPlayers, exposed, password);
-    } catch {
-      return false;
-    }
-    if (!this.sendEncoded(frame)) return false;
-
-    this.saveCreateTablePreferences(maxPlayers, exposed);
-
-    this.store.dispatch(roomActions.createRequested({
-      epoch: state.session.connectionEpoch,
-      name: effectiveName,
-      creatorUserID,
-    }));
-    this.pendingBotCreate = bots.length === 0 ? null : {
-      epoch: state.session.connectionEpoch, name: effectiveName, creatorUserID,
-      bots: [...bots], password,
-    };
-    this.sendEncoded(encodeGetNameFrame());
-    return true;
+    return this.tableManagementRuntime.createTable(name, maxPlayers, options, password, bots);
   }
 
   saveCreateTablePreferences(maxPlayers: number, options: MobileTableOptions): boolean {
-    const initial = this.store.getState();
-    if (initial.session.phase !== 'ready') return false;
-    const desired: CreateTableSetting[] = [
-      { name: 'createTableVariant', value: options.variantName },
-      { name: 'createTableTimed', value: options.timed },
-      ...(options.timed ? [
-        { name: 'createTableTimeBaseMinutes' as const, value: options.timeBase / 60 },
-        { name: 'createTableTimePerTurnSeconds' as const, value: options.timePerTurn },
-      ] : []),
-      { name: 'createTableCardCycle', value: options.cardCycle },
-      { name: 'createTableEmptyClues', value: options.emptyClues },
-      { name: 'createTableOneExtraCard', value: options.oneExtraCard },
-      { name: 'createTableOneLessCard', value: options.oneLessCard },
-      { name: 'createTableAllOrNothing', value: options.allOrNothing },
-      { name: 'createTableMaxPlayers', value: maxPlayers },
-    ];
-    for (const setting of desired) {
-      const state = this.store.getState();
-      if (state.session.phase !== 'ready') return false;
-      const keyMap = {
-        createTableVariant: 'variant', createTableTimed: 'timed',
-        createTableTimeBaseMinutes: 'timeBaseMinutes', createTableTimePerTurnSeconds: 'timePerTurnSeconds',
-        createTableCardCycle: 'cardCycle', createTableEmptyClues: 'emptyClues',
-        createTableOneExtraCard: 'oneExtraCard', createTableOneLessCard: 'oneLessCard',
-        createTableAllOrNothing: 'allOrNothing', createTableMaxPlayers: 'maxPlayers',
-      } as const;
-      const current = state.session.createTablePreferences[keyMap[setting.name]];
-      if (current === setting.value) continue;
-      let frame: string;
-      try {
-        frame = encodeCreateTableSettingFrame(setting);
-      } catch {
-        return false;
-      }
-      if (!this.sendEncoded(frame)) return false;
-      this.store.dispatch(sessionActions.createTablePreferenceUpdated(setting));
-    }
-    return true;
+    return this.tableManagementRuntime.saveCreateTablePreferences(maxPlayers, options);
   }
 
   inviteBots(tableID: number, names: readonly string[], password = ''): number {
-    let sent = 0;
-    for (const name of names) {
-      const state = this.store.getState();
-      const room = state.room.room;
-      if (room.kind !== 'pregame' || room.tableID !== tableID || state.session.phase !== 'ready') break;
-      const free = freeBotSlots(room.data.maxPlayers, room.data.players.length);
-      if (sent >= free) break;
-      const bot = knownBots.find((entry) => normalizedBotName(entry.username) === normalizedBotName(name));
-      if (bot === undefined || isBotAtTable(name, room.data.players)
-        || (room.data.passwordProtected && (!bot.passwordJoin || password.length === 0))
-        || !state.lobby.userListReceived) continue;
-      const user = findKnownBotUser(name, Object.values(state.lobby.users.entities).filter(
-        (entry): entry is NonNullable<typeof entry> => entry !== undefined,
-      ));
-      if (user?.status !== 0) continue;
-      const msg = room.data.passwordProtected ? `/join ${password}` : '/join';
-      if (this.send('chatPM', { msg, recipient: user.name, room: `table${tableID}` })) sent += 1;
-    }
-    return sent;
-  }
-
-  private finishPendingBotCreate(epoch: number): void {
-    const pending = this.pendingBotCreate;
-    if (pending === null || pending.epoch !== epoch) return;
-    const state = this.store.getState();
-    const room = state.room.room;
-    if (room.kind === 'pregame' && room.role === 'player'
-      && room.data.name === pending.name && room.data.owner === pending.creatorUserID
-      && room.data.players.some((player) => player.you)) {
-      this.pendingBotCreate = null;
-      this.inviteBots(room.tableID, pending.bots, pending.password);
-    } else if (state.room.pendingCreate === null) {
-      this.pendingBotCreate = null;
-    }
-  }
-
-  private isBotJoinEcho(message: ChatMessage): boolean {
-    const username = this.store.getState().session.authenticatedUser?.username;
-    return username !== undefined
-      && normalizedBotName(message.who) === normalizedBotName(username)
-      && /^\/join(?:\s|$)/.test(message.msg)
-      && knownBots.some((bot) => normalizedBotName(bot.username) === normalizedBotName(message.recipient));
+    return this.tableManagementRuntime.inviteBots(tableID, names, password);
   }
 
   startGame(): boolean {
-    const state = this.store.getState();
-    const room = state.room.room;
-    const ownerUserID = state.session.authenticatedUser?.userID;
-    if (
-      ownerUserID === undefined
-      || room.kind !== 'pregame'
-      || room.data.owner !== ownerUserID
-      || room.data.players.length < 2
-      || state.room.pendingRoleSwitch !== null
-      || state.room.pendingStart !== null
-      || state.room.pendingLeaveTableID !== null
-    ) return false;
-
-    const intendedPlayers = room.data.players.map((player) => player.name);
-    let frame: string;
-    try {
-      frame = encodeTableStartFrame(room.tableID, intendedPlayers);
-    } catch {
-      return false;
-    }
-    if (!this.sendEncoded(frame)) return false;
-
-    this.store.dispatch(roomActions.startRequested({
-      epoch: state.session.connectionEpoch,
-      tableID: room.tableID,
-      ownerUserID,
-      intendedPlayers,
-    }));
-    return true;
+    return this.tableManagementRuntime.startGame();
   }
 
   updateTable(name: string, maxPlayers: number, changes: MobileTableOptions): boolean {
-    const state = this.store.getState();
-    const room = state.room.room;
-    const ownerUserID = state.session.authenticatedUser?.userID;
-    if (
-      ownerUserID === undefined
-      || room.kind !== 'pregame'
-      || state.room.pendingRoleSwitch !== null
-    ) return false;
-    const isOwner = room.data.owner === ownerUserID;
-    if (isOwner && state.room.pendingUpdate !== null) return false;
-    let frame: string;
-    try {
-      frame = encodeTableUpdateFrame(
-        room.tableID, name, maxPlayers, room.data.options, changes,
-      );
-    } catch {
-      return false;
-    }
-    if (!this.sendEncoded(frame)) return false;
-    if (!isOwner) return true;
-    this.store.dispatch(roomActions.updateRequested({
-      epoch: state.session.connectionEpoch, tableID: room.tableID, ownerUserID,
-      name: name.trim(), maxPlayers, changes,
-    }));
-    return this.store.getState().room.pendingUpdate?.tableID === room.tableID;
+    return this.tableManagementRuntime.updateTable(name, maxPlayers, changes);
   }
 
   setTableLeader(name: string): boolean {
-    const state = this.store.getState();
-    const room = state.room.room;
-    const requesterUserID = state.session.authenticatedUser?.userID;
-    const target = room.kind === 'pregame'
-      ? room.data.players.find((player) => player.name === name)
-      : undefined;
-    if (
-      requesterUserID === undefined
-      || room.kind !== 'pregame'
-      || room.role !== 'player'
-      || state.room.pendingRoleSwitch !== null
-      || target === undefined
-      || room.data.players[0]?.name === name
-      || (room.data.owner !== requesterUserID && !target.you)
-      || state.room.pendingLeaderName !== null
-      || !this.isReadyCurrentRoom(room.tableID, 'pregame')
-    ) return false;
-    if (!this.sendEncoded(encodeTableSetLeaderFrame(room.tableID, name))) return false;
-    this.store.dispatch(roomActions.leaderRequested({
-      epoch: state.session.connectionEpoch, tableID: room.tableID, requesterUserID, name,
-    }));
-    return this.store.getState().room.pendingLeaderName === name;
+    return this.tableManagementRuntime.setTableLeader(name);
   }
 
   leave(tableID: number): boolean {
@@ -937,11 +721,11 @@ export class LobbyRuntime {
       case 'game':
         if (this.rejectUnsupportedRoom(epoch, event.data.tableID, event.data.options)) break;
         this.store.dispatch(roomActions.gameReceived({ epoch, game: event.data }));
-        this.finishPendingBotCreate(epoch);
+        this.tableManagementRuntime.finishPendingBotCreate(epoch);
         break;
       case 'joined':
         this.store.dispatch(roomActions.joinedReceived({ epoch, joined: event.data }));
-        this.finishPendingBotCreate(epoch);
+        this.tableManagementRuntime.finishPendingBotCreate(epoch);
         break;
       case 'left':
         this.store.dispatch(roomActions.leftReceived({ epoch, left: event.data }));
@@ -1097,7 +881,7 @@ export class LobbyRuntime {
         }
         break;
       case 'chat':
-        if (this.isBotJoinEcho(event.data)) break;
+        if (this.tableManagementRuntime.isBotJoinEcho(event.data)) break;
         this.store.dispatch(chatActions.messageReceived({
           epoch,
           defaultRoom: this.currentChatRoom(),
@@ -1111,7 +895,7 @@ export class LobbyRuntime {
           this.store.dispatch(chatActions.historyReceived({
             epoch,
             defaultRoom: historyRoom,
-            messages: event.data.list.filter((message) => !this.isBotJoinEcho(message)),
+            messages: event.data.list.filter((message) => !this.tableManagementRuntime.isBotJoinEcho(message)),
             ...(/^table[1-9]\d*$/.test(historyRoom)
               ? { authoritativeTableUnread: { room: historyRoom, unread: event.data.unread } }
               : {}),
@@ -1125,7 +909,7 @@ export class LobbyRuntime {
         }));
         break;
       case 'warning':
-        if (this.store.getState().room.pendingCreate !== null) this.pendingBotCreate = null;
+        this.tableManagementRuntime.clearRejectedCreate();
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.gameplayRuntime.clearCurrentPending(epoch);
         this.historyRuntime.clearCurrentPending(epoch, event.data.warning);
@@ -1135,7 +919,7 @@ export class LobbyRuntime {
         }));
         break;
       case 'error':
-        if (this.store.getState().room.pendingCreate !== null) this.pendingBotCreate = null;
+        this.tableManagementRuntime.clearRejectedCreate();
         this.store.dispatch(roomActions.commandPendingCleared({ epoch }));
         this.gameplayRuntime.clearCurrentPending(epoch);
         this.historyRuntime.clearCurrentPending(epoch, event.data.error);
@@ -1150,7 +934,7 @@ export class LobbyRuntime {
   private onClose(owned: OwnedConnection, event: WebSocketCloseEvent): void {
     if (!this.isCurrent(owned)) return;
     this.current = null;
-    this.pendingBotCreate = null;
+    this.tableManagementRuntime.clearTransientState();
     this.gameBootstrap.invalidate();
     this.dispose(owned, false);
     this.store.dispatch(sessionActions.connectionClosed({
@@ -1163,7 +947,7 @@ export class LobbyRuntime {
   private failCurrent(owned: OwnedConnection, error: string): void {
     if (!this.isCurrent(owned)) return;
     this.current = null;
-    this.pendingBotCreate = null;
+    this.tableManagementRuntime.clearTransientState();
     this.gameBootstrap.invalidate();
     this.dispose(owned, true);
     this.store.dispatch(sessionActions.connectionFailed({
@@ -1301,7 +1085,7 @@ export class LobbyRuntime {
   }
 
   private resetConfirmedMissingSession(): void {
-    this.pendingBotCreate = null;
+    this.tableManagementRuntime.clearTransientState();
     this.maintainConnection = false;
     this.retryAttempt = 0;
     this.cancelRetry();

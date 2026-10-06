@@ -26,6 +26,7 @@ import {
   isRestartToPregameEligible,
 } from './lobbyEligibility';
 import { LobbyRuntime } from './LobbyRuntime';
+import { TableManagementRuntime } from './TableManagementRuntime';
 import { TerminationRuntime } from './terminationRuntime';
 import { SHRUG_TEXT, transformChatInput } from '../ui/chatInput';
 
@@ -84,6 +85,9 @@ class FakeSocket implements NetworkSocket {
     for (const listener of [...this.listeners.close]) {
       listener({ code } as WebSocketCloseEvent);
     }
+  }
+  emitError(): void {
+    for (const listener of [...this.listeners.error]) listener();
   }
   snapshotCloseListeners(): Array<(event: WebSocketCloseEvent) => void> {
     return [...this.listeners.close];
@@ -222,8 +226,6 @@ describe('bot invites', () => {
   const botUser = (userID: number, name: string, status = 0) =>
     `user ${JSON.stringify({ userID, name, status, hyphenated: false, inactive: false })}`;
   const invites = (sent: readonly string[]) => sent.filter((frame) => frame.startsWith('chatPM '));
-  const pendingPassword = (runtime: LobbyRuntime) =>
-    (runtime as unknown as { pendingBotCreate: { password: string } | null }).pendingBotCreate?.password;
 
   test.each(['game-first', 'joined-first'])('create waits for both events and invites once: %s', async (order) => {
     const { socket, store, runtime } = await makeReadyRuntime();
@@ -271,7 +273,6 @@ describe('bot invites', () => {
     expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(true);
     socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
     runtime.disconnect();
-    expect(pendingPassword(runtime)).toBeUndefined();
     const next = new FakeSocket();
     session.sockets.push(Promise.resolve(next));
     await runtime.connect();
@@ -298,7 +299,6 @@ describe('bot invites', () => {
     socket.emitMessage('userList []');
     socket.emitMessage(botUser(7, 'JaBoT1'));
     expect(runtime.createTable('Mobile table', 5, 'No Variant', 'private-secret', ['jabot1'])).toBe(true);
-    expect(pendingPassword(runtime)).toBe('private-secret');
     expect(JSON.stringify(store.getState())).not.toContain('private-secret');
     const game = createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true);
     const joined = 'joined {"tableID":321}';
@@ -308,7 +308,6 @@ describe('bot invites', () => {
     expect(invites(socket.sent)).toEqual([
       'chatPM {"msg":"/join private-secret","recipient":"JaBoT1","room":"table321"}',
     ]);
-    expect(pendingPassword(runtime)).toBeUndefined();
     expect(JSON.stringify(store.getState())).not.toContain('private-secret');
     const echo = {
       msg: '/join private-secret', who: 'Ada', recipient: 'JaBoT1',
@@ -370,23 +369,70 @@ describe('bot invites', () => {
     ]);
   });
 
-  test('failed create, disconnect, and sign-out discard pending create passwords', async () => {
-    const failed = await makeReadyRuntime();
-    expect(failed.runtime.createTable('Mobile table', 5, 'No Variant', 'first-secret', ['jabot1'])).toBe(true);
-    failed.socket.emitMessage('warning {"warning":"Create failed"}');
-    expect(pendingPassword(failed.runtime)).toBeUndefined();
-
-    const disconnected = await makeReadyRuntime();
-    expect(disconnected.runtime.createTable('Mobile table', 5, 'No Variant', 'second-secret', ['jabot1'])).toBe(true);
-    disconnected.runtime.disconnect();
-    expect(pendingPassword(disconnected.runtime)).toBeUndefined();
-
-    const signedOut = await makeReadyRuntime();
-    expect(signedOut.runtime.createTable('Mobile table', 5, 'No Variant', 'third-secret', ['jabot1'])).toBe(true);
-    signedOut.session.sessionCheckResult = { kind: 'missing' };
-    await expect(signedOut.runtime.signOut()).resolves.toEqual({ kind: 'signedOut' });
-    expect(pendingPassword(signedOut.runtime)).toBeUndefined();
+  test.each(['warning', 'error'] as const)('%s notifies secret cleanup before clearing pendingCreate', async (command) => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    socket.emitMessage('userList []');
+    socket.emitMessage(botUser(7, 'jabot1'));
+    expect(runtime.createTable('Mobile table', 5, 'No Variant', 'synthetic-secret', ['jabot1'])).toBe(true);
+    const original = TableManagementRuntime.prototype.clearRejectedCreate;
+    const cleanup = jest.spyOn(TableManagementRuntime.prototype, 'clearRejectedCreate')
+      .mockImplementation(function (this: TableManagementRuntime) {
+        expect(store.getState().room.pendingCreate?.name).toBe('Mobile table');
+        original.call(this);
+      });
+    try {
+      socket.emitMessage(`${command} ${JSON.stringify({ [command]: 'Create rejected' })}`);
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(store.getState().room.pendingCreate).toBeNull();
+      socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
+      socket.emitMessage('joined {"tableID":321}');
+      expect(invites(socket.sent)).toHaveLength(0);
+      expect(JSON.stringify(store.getState())).not.toContain('synthetic-secret');
+    } finally {
+      cleanup.mockRestore();
+    }
   });
+
+  test.each(['disconnect', 'close', 'failure', 'new-attempt', 'session-reset', 'sign-out'] as const)(
+    '%s notifies transient cleanup and never replays create/bot commands on reconnect', async (boundary) => {
+      const { runtime, session, socket, store } = await makeReadyRuntime();
+      socket.emitMessage('userList []');
+      socket.emitMessage(botUser(7, 'jabot1'));
+      expect(runtime.createTable('Mobile table', 5, 'No Variant', 'synthetic-secret', ['jabot1'])).toBe(true);
+      socket.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
+      const next = new FakeSocket();
+      session.sockets.push(Promise.resolve(next));
+      const cleanup = jest.spyOn(TableManagementRuntime.prototype, 'clearTransientState');
+      try {
+        if (boundary === 'disconnect') runtime.disconnect();
+        else if (boundary === 'close') socket.emitClose();
+        else if (boundary === 'failure') socket.emitError();
+        else if (boundary === 'new-attempt') {
+          runtime.disconnect();
+          cleanup.mockClear();
+          await runtime.connect();
+        } else {
+          session.sessionCheckResult = { kind: 'missing' };
+          if (boundary === 'sign-out') await expect(runtime.signOut()).resolves.toEqual({ kind: 'signedOut' });
+          else await expect(runtime.checkSession()).resolves.toEqual({ kind: 'missing' });
+        }
+        expect(cleanup).toHaveBeenCalledTimes(boundary === 'sign-out' ? 2 : 1);
+        session.sessionCheckResult = { kind: 'valid' };
+        await runtime.connect();
+        next.emitOpen();
+        next.emitMessage(welcomeFrame);
+        next.emitMessage('userList []');
+        next.emitMessage(botUser(7, 'jabot1'));
+        next.emitMessage('joined {"tableID":321}');
+        next.emitMessage(createdPregameFrame(['Ada'], 321, 'Mobile table', tableOptions, 5, true));
+        expect(next.sent).toEqual([]);
+        expect(store.getState().room.pendingCreate).toBeNull();
+        expect(JSON.stringify(store.getState())).not.toContain('synthetic-secret');
+      } finally {
+        cleanup.mockRestore();
+      }
+    },
+  );
 });
 
 describe('Create preference persistence', () => {
