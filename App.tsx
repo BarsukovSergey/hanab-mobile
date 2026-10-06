@@ -59,6 +59,7 @@ import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { BrowsingAppBar } from './src/ui/BrowsingAppBar';
 import { getFocusedRoomBackDecision, getRoomReturnPresentation, isOwnOngoingRewind } from './src/ui/roomReturnPresentation';
 import { getReviewWorkspacePresentation } from './src/ui/reviewWorkspacePresentation';
+import { getRoomChildBackDecision, getRoomChildTitle, isRoomProfileChild, type RoomChild } from './src/ui/roomChildPresentation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { CreateTableScreen, type SpecificSeedCreatePrefill } from './src/ui/screens/CreateTableScreen';
 import { MoreScreen } from './src/ui/screens/MoreScreen';
@@ -69,7 +70,6 @@ import { ProfileScreen } from './src/ui/screens/ProfileScreen';
 import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
-type RoomChild = null | 'chat' | 'menu' | 'menu-participants' | 'menu-perspective' | 'menu-tools' | 'settings' | 'tag' | 'replay-export' | { kind: 'profile'; username: string; origin: 'menu-participants' };
 
 export default function App() {
   return (
@@ -256,15 +256,15 @@ function AppContent() {
   }, []);
   const closeRoomChild = () => { Keyboard.dismiss(); setRoomChild(null); };
   const backRoomChild = () => {
-    if (typeof roomChild === 'object' && roomChild !== null) {
+    const decision = getRoomChildBackDecision(roomChild);
+    if (decision.kind === 'profile-origin') {
       Keyboard.dismiss();
-      setRoomChild(roomChild.origin);
-    } else if (roomChild === 'chat') {
+      setRoomChild(decision.origin);
+    } else if (decision.kind === 'chat') {
       if (keyboardOpen.current || Keyboard.isVisible()) Keyboard.dismiss();
       else setRoomChild(null);
-    } else if (roomChild === 'settings') settingsBackRef.current?.();
-    else if (roomChild === 'tag' || roomChild === 'replay-export') setRoomChild('menu-tools');
-    else if (roomChild !== 'menu') setRoomChild('menu');
+    } else if (decision.kind === 'settings') settingsBackRef.current?.();
+    else if (decision.kind === 'open-child') setRoomChild(decision.child);
     else closeRoomChild();
   };
 
@@ -475,12 +475,12 @@ function AppContent() {
               !landscape && styles.roomMenuPortrait,
               landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }]}>
             <View style={styles.childHeader}>
-              <SectionHeading title={roomChild === 'menu' ? workspacePresentation.menuTitle : roomChild === 'menu-participants' ? 'Participants / spectators' : typeof roomChild === 'object' && roomChild !== null ? roomChild.username : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
+              <SectionHeading title={getRoomChildTitle(roomChild, workspacePresentation.menuTitle)} />
               <ActionButton compact title="Close" tone="ghost" onPress={closeRoomChild} />
             </View>
             {roomChild !== 'menu' && <ActionButton compact title="Back" onPress={backRoomChild} />}
             <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions} keyboardShouldPersistTaps="handled">
-              {typeof roomChild === 'object' && roomChild !== null ?
+              {isRoomProfileChild(roomChild) ?
                 <ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`} />
               : roomChild === 'menu' ? <>
                 <ActionButton title="Participants / spectators >" onPress={() => setRoomChild('menu-participants')} />

@@ -61,7 +61,7 @@ test('focused Review reuses mounted C17 and room children, with local Browse and
   expect(header).toContain('workspacePresentation.status');
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).toContain('accessibilityLabel={workspacePresentation.menuAccessibilityLabel}');
-  expect(app).toContain("roomChild === 'menu' ? workspacePresentation.menuTitle");
+  expect(app).toContain('getRoomChildTitle(roomChild, workspacePresentation.menuTitle)');
   const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const homeFromLive ='));
   expect(browse).toContain("setPresentationFocus('browsing')");
   expect(browse).not.toMatch(/lobbyRuntime|dispatch|setRoomChild|setBrowsing/);
