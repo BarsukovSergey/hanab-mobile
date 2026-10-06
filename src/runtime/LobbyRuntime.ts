@@ -1,6 +1,5 @@
 import type {
   NetworkSession,
-  NetworkSocket,
   SessionCheckResult,
 } from '../network/types';
 import { GameBootstrapCoordinator } from '../game/bootstrap/GameBootstrapCoordinator';
@@ -32,6 +31,12 @@ import { sessionActions } from '../store/sessionSlice';
 import { terminationActions } from '../store/terminationSlice';
 import { historyActions } from '../store/historySlice';
 import type { AppStore } from '../store/store';
+import {
+  ConnectionRuntime,
+  DEFAULT_WELCOME_TIMEOUT_MS,
+  DEFAULT_RETRY_DELAYS_MS,
+  type RuntimeTimers,
+} from './ConnectionRuntime';
 import { GameplayRuntime } from './GameplayRuntime';
 import { RoomAttendanceRuntime } from './RoomAttendanceRuntime';
 import { HistoryRuntime } from './HistoryRuntime';
@@ -42,10 +47,8 @@ import {
   isRestartToPregameEligible,
 } from './lobbyEligibility';
 
-const SOCKET_OPEN = 1;
-const SOCKET_CLOSING = 2;
-const DEFAULT_WELCOME_TIMEOUT_MS = 10_000;
-const DEFAULT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000] as const;
+export type { RuntimeTimers } from './ConnectionRuntime';
+
 const MAX_STATUS_LENGTH = 240;
 const USER_STATUS_LOBBY = 0;
 const USER_STATUS_PLAYER_MIN = 1;
@@ -53,28 +56,9 @@ const USER_STATUS_PLAYER_MAX = 2;
 const USER_STATUS_SPECTATOR = 3;
 const UNSUPPORTED_TABLE_WARNING = 'This table uses options that Hanab Mobile does not support.';
 
-export type RuntimeTimers = {
-  setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
-  clearTimeout(timer: ReturnType<typeof setTimeout>): void;
-};
-
 export type SignOutResult =
   | { kind: 'signedOut' }
   | { kind: 'failed'; message: string; sessionValid: boolean };
-
-type SocketListeners = {
-  open: () => void;
-  message: (event: WebSocketMessageEvent) => void;
-  error: () => void;
-  close: (event: WebSocketCloseEvent) => void;
-};
-
-type OwnedConnection = {
-  epoch: number;
-  socket: NetworkSocket | null;
-  timer: ReturnType<typeof setTimeout> | null;
-  listeners: SocketListeners | null;
-};
 
 function safeStatus(value: unknown, fallback: string): string {
   const message = value instanceof Error ? value.message : fallback;
@@ -82,13 +66,7 @@ function safeStatus(value: unknown, fallback: string): string {
 }
 
 export class LobbyRuntime {
-  private current: OwnedConnection | null = null;
-  private connectionEpoch: number;
-  private connectPromise: Promise<void> | null = null;
-  private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private retryAttempt = 0;
-  private appActive = true;
-  private maintainConnection = false;
+  private readonly connectionRuntime: ConnectionRuntime;
   private readonly gameBootstrap: GameBootstrapCoordinator;
   private readonly gameplayRuntime: GameplayRuntime;
   private readonly roomAttendanceRuntime: RoomAttendanceRuntime;
@@ -99,15 +77,14 @@ export class LobbyRuntime {
   constructor(
     private readonly networkSession: NetworkSession,
     private readonly store: AppStore,
-    private readonly timers: RuntimeTimers = {
+    timers: RuntimeTimers = {
       setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
       clearTimeout: (timer) => clearTimeout(timer),
     },
-    private readonly welcomeTimeoutMs = DEFAULT_WELCOME_TIMEOUT_MS,
-    private readonly retryDelaysMs: readonly number[] = DEFAULT_RETRY_DELAYS_MS,
+    welcomeTimeoutMs = DEFAULT_WELCOME_TIMEOUT_MS,
+    retryDelaysMs: readonly number[] = DEFAULT_RETRY_DELAYS_MS,
     private readonly nowMs: () => number = Date.now,
   ) {
-    this.connectionEpoch = store.getState().session.connectionEpoch;
     this.tableManagementRuntime = new TableManagementRuntime(
       store,
       (frame) => this.sendEncoded(frame),
@@ -143,68 +120,38 @@ export class LobbyRuntime {
       (frame) => this.sendEncoded(frame),
       timers,
     );
+    this.connectionRuntime = new ConnectionRuntime(
+      networkSession,
+      {
+        getPhase: () => store.getState().session.phase,
+        onStarted: (epoch) => {
+          this.tableManagementRuntime.clearTransientState();
+          this.gameBootstrap.invalidateConnection(epoch);
+          store.dispatch(sessionActions.connectionStarted({ epoch }));
+        },
+        onOpened: (epoch) => store.dispatch(sessionActions.socketOpened({ epoch })),
+        onInvalidated: () => {
+          this.tableManagementRuntime.clearTransientState();
+          this.gameBootstrap.invalidate();
+        },
+        onClosed: (epoch, error) => store.dispatch(sessionActions.connectionClosed({ epoch, error })),
+        onFailed: (epoch, error) => store.dispatch(sessionActions.connectionFailed({ epoch, error })),
+        onFrame: (epoch, rawFrame) => this.onMessage(epoch, rawFrame),
+        onAppActiveChanged: (active) => { this.sendEncoded(encodeInactiveFrame(!active)); },
+      },
+      store.getState().session.connectionEpoch,
+      timers,
+      welcomeTimeoutMs,
+      retryDelaysMs,
+    );
   }
 
   connect(): Promise<void> {
-    this.maintainConnection = true;
-    if (!this.appActive) return Promise.resolve();
-    this.cancelRetry();
-    return this.startConnectionAttempt();
-  }
-
-  private startConnectionAttempt(): Promise<void> {
-    const phase = this.store.getState().session.phase;
-    if (
-      this.current !== null
-      && (phase === 'connecting'
-        || phase === 'openAwaitingWelcome'
-        || phase === 'ready')
-    ) {
-      return this.connectPromise ?? Promise.resolve();
-    }
-
-    this.tableManagementRuntime.clearTransientState();
-    const previous = this.current;
-    const epoch = this.connectionEpoch + 1;
-    this.connectionEpoch = epoch;
-
-    // Establish new ownership before disposal because close() may synchronously callback.
-    const owned: OwnedConnection = {
-      epoch,
-      socket: null,
-      timer: null,
-      listeners: null,
-    };
-    this.current = owned;
-    this.gameBootstrap.invalidateConnection(epoch);
-    this.store.dispatch(sessionActions.connectionStarted({ epoch }));
-    if (previous !== null) this.dispose(previous, true);
-
-    owned.timer = this.timers.setTimeout(() => {
-      if (!this.isCurrent(owned)) return;
-      this.failCurrent(owned, 'Timed out waiting for a valid welcome');
-    }, this.welcomeTimeoutMs);
-
-    const opening = this.open(owned);
-    this.connectPromise = opening;
-    void opening.finally(() => {
-      if (this.connectPromise === opening) this.connectPromise = null;
-    });
-    return opening;
+    return this.connectionRuntime.connect();
   }
 
   disconnect(): void {
-    this.tableManagementRuntime.clearTransientState();
-    this.maintainConnection = false;
-    this.retryAttempt = 0;
-    this.cancelRetry();
-    const owned = this.current;
-    this.current = null;
-    this.gameBootstrap.invalidate();
-    if (owned !== null) this.dispose(owned, true);
-    this.store.dispatch(
-      sessionActions.connectionClosed({ epoch: this.connectionEpoch, error: null }),
-    );
+    this.connectionRuntime.disconnect();
   }
 
   async checkSession(): Promise<SessionCheckResult> {
@@ -245,21 +192,7 @@ export class LobbyRuntime {
   }
 
   setAppActive(active: boolean): void {
-    if (this.appActive === active) return;
-    this.appActive = active;
-    try {
-      this.sendEncoded(encodeInactiveFrame(!active));
-    } catch {
-      // Presence is advisory and is never queued or retried.
-    }
-    if (!active) {
-      this.cancelRetry();
-      return;
-    }
-    if (this.maintainConnection) {
-      this.cancelRetry();
-      void this.startConnectionAttempt();
-    }
+    this.connectionRuntime.setAppActive(active);
   }
 
   /** Internal no-queue send gate for later typed client commands. */
@@ -553,48 +486,11 @@ export class LobbyRuntime {
     return this.gameplayRuntime.editNote(cardOrder, text);
   }
 
-  private async open(owned: OwnedConnection): Promise<void> {
-    let socket: NetworkSocket;
-    try {
-      socket = await this.networkSession.openSocket();
-    } catch (error) {
-      if (this.isCurrent(owned)) {
-        this.failCurrent(owned, safeStatus(error, 'WebSocket creation failed'));
-      }
-      return;
-    }
-
-    if (!this.isCurrent(owned)) {
-      socket.close(1000, 'Stale connection');
-      return;
-    }
-
-    owned.socket = socket;
-    const listeners: SocketListeners = {
-      open: () => this.onOpen(owned),
-      message: (event) => this.onMessage(owned, event),
-      error: () => this.failCurrent(owned, 'WebSocket error'),
-      close: (event) => this.onClose(owned, event),
-    };
-    owned.listeners = listeners;
-    socket.addEventListener('open', listeners.open);
-    socket.addEventListener('message', listeners.message);
-    socket.addEventListener('error', listeners.error);
-    socket.addEventListener('close', listeners.close);
-    if (socket.readyState === SOCKET_OPEN) this.onOpen(owned);
-  }
-
-  private onOpen(owned: OwnedConnection): void {
-    if (!this.isCurrent(owned)) return;
-    this.store.dispatch(sessionActions.socketOpened({ epoch: owned.epoch }));
-  }
-
-  private onMessage(owned: OwnedConnection, event: WebSocketMessageEvent): void {
-    if (!this.isCurrent(owned) || typeof event.data !== 'string') return;
-    const decoded = decodeServerFrame(event.data);
+  private onMessage(epoch: number, rawFrame: string): void {
+    const decoded = decodeServerFrame(rawFrame);
 
     if (decoded.kind === 'unknown') {
-      this.recordInboundDiagnostic(owned.epoch, {
+      this.recordInboundDiagnostic(epoch, {
         command: decoded.command,
         classification: 'unknown',
       });
@@ -603,14 +499,14 @@ export class LobbyRuntime {
     if (decoded.kind === 'malformed') {
       const command = decoded.command ?? 'frame';
       if (command === 'gameAction') {
-        this.store.dispatch(sessionActions.gameActionFrameSeen({ epoch: owned.epoch }));
+        this.store.dispatch(sessionActions.gameActionFrameSeen({ epoch }));
       }
-      this.recordInboundDiagnostic(owned.epoch, {
+      this.recordInboundDiagnostic(epoch, {
         command,
         classification: 'malformed',
       });
       this.store.dispatch(sessionActions.protocolIssue({
-        epoch: owned.epoch,
+        epoch,
         issue: `${command}: ${decoded.issue}`,
       }));
       return;
@@ -618,10 +514,10 @@ export class LobbyRuntime {
 
     if (decoded.event.command === 'gameAction') {
       const result = this.gameBootstrap.receiveIncrementalDetailed(
-        owned.epoch,
+        epoch,
         decoded.event.data,
       );
-      this.recordInboundDiagnostic(owned.epoch, {
+      this.recordInboundDiagnostic(epoch, {
         command: decoded.event.command,
         classification: 'known',
         gameAction: {
@@ -632,7 +528,7 @@ export class LobbyRuntime {
         },
       });
       this.store.dispatch(sessionActions.gameActionDiagnosticRecorded({
-        epoch: owned.epoch,
+        epoch,
         diagnostic: {
           tableID: decoded.event.data.tableID,
           actionType: decoded.event.data.action.type,
@@ -643,23 +539,18 @@ export class LobbyRuntime {
       return;
     }
 
-    this.recordInboundDiagnostic(owned.epoch, {
+    this.recordInboundDiagnostic(epoch, {
       command: decoded.event.command,
       classification: 'known',
     });
 
-    this.applyEvent(owned, decoded.event);
+    this.applyEvent(epoch, decoded.event);
   }
 
-  private applyEvent(owned: OwnedConnection, event: ServerEvent): void {
-    const epoch = owned.epoch;
+  private applyEvent(epoch: number, event: ServerEvent): void {
     switch (event.command) {
       case 'welcome':
-        if (owned.timer !== null) {
-          this.timers.clearTimeout(owned.timer);
-          owned.timer = null;
-        }
-        this.retryAttempt = 0;
+        if (!this.connectionRuntime.confirmWelcome(epoch)) return;
         this.store.dispatch(sessionActions.welcomeReceived({ epoch, welcome: event.data }));
         this.resumeAuthoritativeRoom(epoch, event.data);
         break;
@@ -931,32 +822,6 @@ export class LobbyRuntime {
     }
   }
 
-  private onClose(owned: OwnedConnection, event: WebSocketCloseEvent): void {
-    if (!this.isCurrent(owned)) return;
-    this.current = null;
-    this.tableManagementRuntime.clearTransientState();
-    this.gameBootstrap.invalidate();
-    this.dispose(owned, false);
-    this.store.dispatch(sessionActions.connectionClosed({
-      epoch: owned.epoch,
-      error: event.code === 1000 ? null : `WebSocket closed (${event.code})`,
-    }));
-    this.scheduleRetry();
-  }
-
-  private failCurrent(owned: OwnedConnection, error: string): void {
-    if (!this.isCurrent(owned)) return;
-    this.current = null;
-    this.tableManagementRuntime.clearTransientState();
-    this.gameBootstrap.invalidate();
-    this.dispose(owned, true);
-    this.store.dispatch(sessionActions.connectionFailed({
-      epoch: owned.epoch,
-      error,
-    }));
-    this.scheduleRetry();
-  }
-
   private resumeAuthoritativeRoom(
     epoch: number,
     welcome: Extract<ServerEvent, { command: 'welcome' }>['data'],
@@ -999,47 +864,10 @@ export class LobbyRuntime {
 
   private isReadyCurrentRoom(tableID: number, kind: 'pregame' | 'live_game' = 'live_game'): boolean {
     const state = this.store.getState();
-    const owned = this.current;
-    return owned !== null
-      && owned.epoch === this.connectionEpoch
-      && owned.epoch === state.session.connectionEpoch
-      && owned.socket !== null
-      && owned.socket.readyState === SOCKET_OPEN
-      && state.session.phase === 'ready'
-      && state.room.connectionEpoch === owned.epoch
+    return this.connectionRuntime.isReady(state.session.connectionEpoch)
+      && state.room.connectionEpoch === state.session.connectionEpoch
       && state.room.room.kind === kind
       && state.room.room.tableID === tableID;
-  }
-
-  private scheduleRetry(): void {
-    if (
-      !this.maintainConnection
-      || !this.appActive
-      || this.retryTimer !== null
-      || this.retryDelaysMs.length === 0
-    ) return;
-    const delayIndex = Math.min(this.retryAttempt, this.retryDelaysMs.length - 1);
-    const delayMs = this.retryDelaysMs[delayIndex];
-    if (delayMs === undefined) return;
-    this.retryAttempt += 1;
-    let timer!: ReturnType<typeof setTimeout>;
-    timer = this.timers.setTimeout(() => {
-      if (this.retryTimer !== timer) return;
-      this.retryTimer = null;
-      if (!this.maintainConnection || !this.appActive) return;
-      void this.startConnectionAttempt();
-    }, delayMs);
-    this.retryTimer = timer;
-  }
-
-  private cancelRetry(): void {
-    if (this.retryTimer === null) return;
-    this.timers.clearTimeout(this.retryTimer);
-    this.retryTimer = null;
-  }
-
-  private isCurrent(owned: OwnedConnection): boolean {
-    return this.current === owned && owned.epoch === this.connectionEpoch;
   }
 
   private currentChatRoom(): string {
@@ -1085,14 +913,7 @@ export class LobbyRuntime {
   }
 
   private resetConfirmedMissingSession(): void {
-    this.tableManagementRuntime.clearTransientState();
-    this.maintainConnection = false;
-    this.retryAttempt = 0;
-    this.cancelRetry();
-    const owned = this.current;
-    this.current = null;
-    this.gameBootstrap.invalidate();
-    if (owned !== null) this.dispose(owned, true);
+    this.connectionRuntime.reset();
     this.store.dispatch(sessionActions.signedOut());
   }
 
@@ -1109,40 +930,6 @@ export class LobbyRuntime {
   }
 
   private sendEncoded(frame: string): boolean {
-    const owned = this.current;
-    if (
-      owned === null
-      || owned.epoch !== this.connectionEpoch
-      || owned.socket === null
-      || owned.socket.readyState !== SOCKET_OPEN
-      || this.store.getState().session.phase !== 'ready'
-    ) {
-      return false;
-    }
-
-    try {
-      owned.socket.send(frame);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private dispose(owned: OwnedConnection, closeSocket: boolean): void {
-    if (owned.timer !== null) {
-      this.timers.clearTimeout(owned.timer);
-      owned.timer = null;
-    }
-    const { socket, listeners } = owned;
-    if (socket !== null && listeners !== null) {
-      socket.removeEventListener('open', listeners.open);
-      socket.removeEventListener('message', listeners.message);
-      socket.removeEventListener('error', listeners.error);
-      socket.removeEventListener('close', listeners.close);
-      owned.listeners = null;
-    }
-    if (closeSocket && socket !== null && socket.readyState < SOCKET_CLOSING) {
-      socket.close(1000, 'Connection disposed');
-    }
+    return this.connectionRuntime.send(frame);
   }
 }

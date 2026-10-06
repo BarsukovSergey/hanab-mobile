@@ -1507,6 +1507,34 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().chat.messagesByRoom).toEqual({});
   });
 
+  test('confirmed missing disposes without an extra closed event and reconnect epoch survives signedOut', async () => {
+    const { session, socket, store, runtime } = await makeReadyRuntime();
+    const staleMessages = socket.snapshotMessageListeners();
+    const staleCloses = socket.snapshotCloseListeners();
+    const dispatch = jest.spyOn(store, 'dispatch');
+    session.sessionCheckResult = { kind: 'missing' };
+
+    await expect(runtime.checkSession()).resolves.toEqual({ kind: 'missing' });
+
+    expect(dispatch.mock.calls.map(([action]) => action.type)).toEqual([sessionActions.signedOut.type]);
+    dispatch.mockRestore();
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'Connection disposed' }]);
+    expect(store.getState().session).toMatchObject({ connectionEpoch: 0, phase: 'idle' });
+    jest.advanceTimersByTime(60_000);
+    expect(session.openCalls).toBe(1);
+
+    const second = new FakeSocket();
+    session.sockets.push(Promise.resolve(second));
+    await runtime.connect();
+    for (const listener of staleMessages) listener({ data: welcomeFrame } as WebSocketMessageEvent);
+    for (const listener of staleCloses) listener({ code: 1006 } as WebSocketCloseEvent);
+    expect(store.getState().session).toMatchObject({ connectionEpoch: 2, phase: 'connecting' });
+    second.emitOpen();
+    second.emitMessage(welcomeFrame);
+    expect(store.getState().session).toMatchObject({ connectionEpoch: 2, phase: 'ready' });
+    expect(second.sent).toEqual([]);
+  });
+
   test('unsupported pregame recovery unattends, clears recovery, and warns', async () => {
     const session = new FakeSession();
     const socket = new FakeSocket();
@@ -2362,6 +2390,36 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().session.phase).toBe('ready');
     expect(socket.sent).toEqual([]);
     expect(store.getState().room.room).toEqual({ kind: 'none' });
+  });
+
+  test('malformed welcome retains the watchdog; valid welcome acknowledges transport before Redux and recovery', async () => {
+    const session = new FakeSession();
+    const socket = new FakeSocket();
+    session.sockets.push(Promise.resolve(socket));
+    const store = createAppStore();
+    const runtime = new LobbyRuntime(session, store, undefined, 500);
+    await runtime.connect();
+    socket.emitOpen();
+    socket.emitMessage('welcome {"userID":1}');
+    expect(store.getState().session.phase).toBe('openAwaitingWelcome');
+    expect(store.getState().session.lastProtocolIssue).toContain('welcome:');
+    expect(runtime.send('futureCommand')).toBe(false);
+    expect(jest.getTimerCount()).toBe(1);
+    jest.advanceTimersByTime(499);
+
+    const observed: boolean[] = [];
+    const unsubscribe = store.subscribe(() => {
+      if (store.getState().session.phase !== 'ready' || observed.length > 0) return;
+      expect(jest.getTimerCount()).toBe(0);
+      observed.push(runtime.send('futureCommand'));
+    });
+    socket.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}');
+    unsubscribe();
+    expect(observed).toEqual([true]);
+    expect(socket.sent).toEqual(['futureCommand', 'tableReattend {"tableID":123}']);
+    expect(store.getState().room.pendingRecovery).toMatchObject({ tableID: 123, role: 'player' });
+    jest.advanceTimersByTime(1);
+    expect(store.getState().session.phase).toBe('ready');
   });
 
   test('player welcome reattends and matching tableStart enters shared bootstrap', async () => {
