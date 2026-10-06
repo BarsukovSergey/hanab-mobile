@@ -297,6 +297,31 @@ describe('C7 authoritative gameplay runtime', () => {
     );
   });
 
+  test('failed gameplay sends through the facade clear pending without changing GameState', async () => {
+    const { runtime, socket, store } = await makeLive();
+    const before = store.getState().room.room;
+    const sentBefore = [...socket.sent];
+    socket.failSend = true;
+    expect(runtime.play(0)).toBe(false);
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+    expect(store.getState().room.room).toBe(before);
+    expect(socket.sent).toEqual(sentBefore);
+    socket.failSend = false;
+    expect(runtime.play(0)).toBe(true);
+    expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+  });
+
+  test.each(['warning', 'error'] as const)('%s delegates current gameplay pending cleanup', async (command) => {
+    const { runtime, socket, store } = await makeLive();
+    const before = store.getState().room.room;
+    expect(runtime.play(0)).toBe(true);
+    socket.emitMessage(`${command} ${JSON.stringify({ [command]: 'Action rejected' })}`);
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+    expect(store.getState().room.room).toBe(before);
+    expect(store.getState().lobby.notice).toEqual({ kind: command, message: 'Action rejected' });
+    expect(runtime.play(1)).toBe(true);
+  });
+
   test('review mode cannot emit gameplay and returning live restores command eligibility', async () => {
     const { runtime, socket, store } = await makeLive();
     const room = store.getState().room.room;
