@@ -4,6 +4,7 @@ import { lobbySlice, tablesAdapter, usersAdapter } from './lobbySlice';
 import { chatSlice } from './chatSlice';
 import { roomSlice } from './roomSlice';
 import { sessionSlice } from './sessionSlice';
+import { sessionMessagesSlice } from './sessionMessagesSlice';
 import { terminationSlice } from './terminationSlice';
 import { historySlice } from './historySlice';
 import { presentationPreferencesSlice } from './presentationPreferencesSlice';
@@ -15,6 +16,7 @@ export function createAppStore() {
       lobby: lobbySlice.reducer,
       room: roomSlice.reducer,
       chat: chatSlice.reducer,
+      sessionMessages: sessionMessagesSlice.reducer,
       termination: terminationSlice.reducer,
       history: historySlice.reducer,
       presentationPreferences: presentationPreferencesSlice.reducer,
