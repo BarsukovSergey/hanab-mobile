@@ -3,13 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
   workflow_dispatch:
 
 permissions:
@@ -21,12 +15,46 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 2
+          fetch-depth: 0
+
+      - name: Determine validation scope
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BASE_SHA...HEAD" -- . ':(exclude)docs/**' ':(exclude)**/*.md'; then
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v7
+        if: steps.scope.outputs.full == 'true'
         with:
           node-version: 24
           cache: npm
+
       - run: npm ci
+        if: steps.scope.outputs.full == 'true'
+
       - run: npm run typecheck
+        if: steps.scope.outputs.full == 'true'
+
       - run: npm test
-      - run: git diff --check HEAD^..HEAD
+        if: steps.scope.outputs.full == 'true'
+
+      - name: Check whitespace
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff --check "$BASE_SHA...HEAD"
+          else
+            git diff --check HEAD^..HEAD
+          fi
