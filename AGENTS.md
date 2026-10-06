@@ -76,6 +76,8 @@ For new code, prefer behavioral/helper-level tests when practical. Do not rewrit
 
 ## Validation
 
+During implementation, use `npm run test:affected` for fast feedback on branch and worktree changes, including source-contract tests. Use `npm run test:affected -- --list` to inspect the selection or `--base <ref>` to override the comparison base. This helper does not replace full validation.
+
 The canonical normal validation entry point is:
 
 ```text
