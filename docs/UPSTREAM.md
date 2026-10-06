@@ -20,19 +20,14 @@ Runtime diagnostics should eventually expose the relevant pinned SHA alongside p
 
 ## Card presentation selector pin
 
-Card presentation semantics are adapted from the later upstream selector extraction:
+Card presentation semantics are adapted from the merged U1 upstream selector extraction:
 
 - Repository: `Hanabi-Live/hanabi-live`
-- Commit: `7a9c601b66f5966f7e33564855e25f82e68a94ed`
-- Commit message: `refactor: extract card presentation selectors (#3115)`
-- Source: `packages/client/src/game/ui/cardPresentation.ts`
+- Commit: `7ca5992783d8dec1e57c6c19077dc690e13aaf25`
+- Source: `packages/game/src/cardPresentation.ts`
 - Mobile adaptation: `src/game/client/cardPresentation.ts`
 
-The mobile adaptation is intended to preserve the upstream selector behavior while rewriting imports to use the vendored game core.
-
-`7a9c601...` is nine commits ahead of the baseline pin and that range includes unrelated client/server changes in addition to the card-presentation extraction. Therefore adopting the selector does **not** by itself mean the entire mobile game/protocol baseline has moved to `7a9c601...`.
-
-The finished-game `note.unclued` presentation behavior deliberately includes the scoped follow-up from `f92dbefaad90894612eff8369e376843ae6b3621` (PR #3116, `Deactivate note.unclued when game is finished`). This is a selector-only semantic follow-up; it does not advance the baseline game/protocol pin or the whole vendored upstream baseline.
+The mobile adaptation preserves the upstream selector behavior while rewriting imports to use the vendored game core. This scoped selector pin does not advance the baseline game/protocol pin above.
 
 The semantic contract and mobile parity notes for this selector live in `docs/CARD_PRESENTATION_PARITY.md`.
 

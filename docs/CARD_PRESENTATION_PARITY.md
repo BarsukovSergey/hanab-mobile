@@ -4,12 +4,11 @@ This document records the card-presentation semantics that Hanab Mobile intentio
 
 ## Upstream source
 
-The presentation selectors are adapted from:
+The presentation selectors are adapted from the merged U1 extraction:
 
 - Repository: `Hanabi-Live/hanabi-live`
-- Commit: `7a9c601b66f5966f7e33564855e25f82e68a94ed`
-- Commit message: `refactor: extract card presentation selectors (#3115)`
-- Source: `packages/client/src/game/ui/cardPresentation.ts`
+- Commit: `7ca5992783d8dec1e57c6c19077dc690e13aaf25`
+- Source: `packages/game/src/cardPresentation.ts`
 
 Mobile copy:
 
@@ -101,8 +100,8 @@ Do not compute these independently in `GameCard` or other UI components; consume
 
 ### Note overrides
 
-- `note.unclued` suppresses the clue border only while the game is not finished.
-- `note.clued` can force the clue border even when normal positive-clue state would not.
+- `note.unclued` suppresses a genuine clue border only while the game is not finished.
+- `note.clued` can force the clue border when normal positive-clue state would not, but only while the game is unfinished.
 - If both convention-note flags are present, the precedence above still applies.
 
 ### Finished games
@@ -112,7 +111,7 @@ When `finished` is true:
 - finesse border is hidden;
 - discard-permission border is hidden;
 - chop-moved border is hidden;
-- clue border is not suppressed merely because the game ended.
+- only a genuine positive-clue state retains a clue border; a `note.clued`-only override does not.
 
 This is intentional upstream behavior.
 
