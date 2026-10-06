@@ -32,6 +32,17 @@ For shell/navigation/landscape decisions introduced by Mobile App Design v2, v2 
 - Prefer small implementation slices from issue #143 over broad rewrites.
 - When touching a large hotspot, extract a bounded helper/policy only when it is required by the task; do not combine behavior changes with opportunistic decomposition.
 
+## Agent delivery defaults
+
+Unless the task explicitly says otherwise:
+
+- Keep work bounded to the requested task/slice and use the authority hierarchy above; stale docs do not expand scope.
+- Do not update unrelated roadmap/release/status documents or opportunistically refactor unrelated hotspots.
+- Use `npm run test:affected` during iteration where useful, then run the canonical final validation required by the task.
+- When delivery asks for a PR, push the branch and open or update the requested PR. Do not merge your own PR.
+- Run Android APK/release workflows only when the task explicitly requires physical-device or release work.
+- Report which validation ran and what was intentionally deferred.
+
 ## Connection and gameplay safety
 
 - One authentication lifetime uses one logical `NetworkSession`.
