@@ -50,6 +50,23 @@ Hypothetical replay state, reducer semantics, and replay-action protocol are ada
 
 The mobile boundary retains only platform-independent state/reducer/protocol/runtime behavior; browser UI remains out of scope.
 
+## Hypothetical action planning pin
+
+Hypothetical deterministic planning is adapted from the merged U2 extraction:
+
+- Repository: `Hanabi-Live/hanabi-live`
+- Commit: `0c8c1cd039044c00d4d4c00ba773b8143ef25fd2`
+- PR: #3156
+- Source: `packages/game/src/hypotheticalPlanning.ts`
+- Mobile adaptation: `src/game/client/hypotheticalPlanning.ts`
+
+This is a scoped pure-planning adoption. It does not advance the baseline game/protocol pin,
+nor the hypothetical replay state/reducer/protocol pin at
+`8be709c48145ad56a1891307663ed3bec2cd4175`. Mobile validation, eligibility,
+card visibility policy, and runtime transport/READY/ownership safety remain outside the planner.
+Later bottom-deck planning changes such as #3157 are not part of this adoption;
+mobile still does not support Bottom-Deck Blind Plays or `deckPlays`.
+
 ## Pinning rule
 
 When behavior needs to move forward:
