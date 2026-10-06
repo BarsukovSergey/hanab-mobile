@@ -25,6 +25,7 @@ import { lobbyActions } from './src/store/lobbySlice';
 import { roomActions } from './src/store/roomSlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
+import { Conversation } from './src/ui/Conversation';
 import { ChatPanel } from './src/ui/ChatPanel';
 import {
   ActionButton,
@@ -49,6 +50,8 @@ import {
   navigateBrowsing,
   openMoreSurface,
   openBrowsingProfile,
+  openBrowsingConversation,
+  selectPeopleMode,
   openBrowsingSettings,
   type BrowsingDestination,
 } from './src/ui/browsingNavigationState';
@@ -59,7 +62,7 @@ import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { BrowsingAppBar } from './src/ui/BrowsingAppBar';
 import { getFocusedRoomBackDecision, getRoomReturnPresentation, isOwnOngoingRewind } from './src/ui/roomReturnPresentation';
 import { getReviewWorkspacePresentation } from './src/ui/reviewWorkspacePresentation';
-import { getRoomChildBackDecision, getRoomChildTitle, isRoomProfileChild, type RoomChild } from './src/ui/roomChildPresentation';
+import { getRoomChildBackDecision, getRoomChildTitle, isRoomProfileChild, isRoomConversationChild, type RoomChild } from './src/ui/roomChildPresentation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { CreateTableScreen, type SpecificSeedCreatePrefill } from './src/ui/screens/CreateTableScreen';
 import { MoreScreen } from './src/ui/screens/MoreScreen';
@@ -86,7 +89,7 @@ export default function App() {
 function AppContent() {
   const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
-  const { contentMaxWidth, width, height, windowClass } = useResponsiveLayout();
+  const { contentMaxWidth, width, height, windowClass, imeOcclusion } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
@@ -176,6 +179,10 @@ function AppContent() {
     setPresentationFocus('room');
   };
   const backFromBrowsing = () => {
+    if (currentBrowsingSurface(browsing).kind === 'conversation' && (keyboardOpen.current || Keyboard.isVisible())) {
+      Keyboard.dismiss();
+      return;
+    }
     if (browsing.destination === 'history' && currentBrowsingSurface(browsing).kind === 'root'
       && historyBackRef.current !== null) {
       historyBackRef.current();
@@ -242,7 +249,7 @@ function AppContent() {
 
   useEffect(() => {
     setRoomChild(null);
-  }, [roomState.room.kind, roomState.room.kind === 'live_game' ? roomState.room.tableID : null]);
+  }, [roomState.room.kind, roomState.room.kind !== 'none' ? roomState.room.tableID : null]);
 
   useEffect(() => {
     if (presentationFocus !== 'room') setRoomChild(null);
@@ -257,7 +264,10 @@ function AppContent() {
   const closeRoomChild = () => { Keyboard.dismiss(); setRoomChild(null); };
   const backRoomChild = () => {
     const decision = getRoomChildBackDecision(roomChild);
-    if (decision.kind === 'profile-origin') {
+    if (decision.kind === 'conversation-origin') {
+      if (keyboardOpen.current || Keyboard.isVisible()) Keyboard.dismiss();
+      else setRoomChild(decision.origin);
+    } else if (decision.kind === 'profile-origin') {
       Keyboard.dismiss();
       setRoomChild(decision.origin);
     } else if (decision.kind === 'chat') {
@@ -468,7 +478,14 @@ function AppContent() {
           contentContainerStyle={styles.roomSettingsContent} keyboardShouldPersistTaps="handled">
           <SettingsScreen onBack={() => setRoomChild('menu')} onSignOut={() => void signOut()} backRef={settingsBackRef} />
         </ScrollView>}
-        {roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings' && <Pressable onPress={closeRoomChild}
+        {isRoomConversationChild(roomChild) && <View style={[styles.chatTask, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.childHeader}>
+            <SectionHeading title={roomChild.username} />
+            <ActionButton compact title="Back" onPress={backRoomChild} />
+          </View>
+          <Conversation key={roomChild.username} username={roomChild.username} room={`table${liveTableID}`} visible={childVisible} />
+        </View>}
+        {roomChild !== null && !isRoomConversationChild(roomChild) && roomChild !== 'chat' && roomChild !== 'settings' && <Pressable onPress={closeRoomChild}
           style={[styles.roomMenuBackdrop, !landscape && { backgroundColor: theme.colors.overlay }]}>
           <Pressable onPress={(event) => event.stopPropagation()}
             style={[styles.roomMenu, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong },
@@ -481,7 +498,8 @@ function AppContent() {
             {roomChild !== 'menu' && <ActionButton compact title="Back" onPress={backRoomChild} />}
             <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions} keyboardShouldPersistTaps="handled">
               {isRoomProfileChild(roomChild) ?
-                <ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`} />
+                <ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`}
+                  onMessage={() => { if (isRoomProfileChild(roomChild)) setRoomChild({ kind: 'conversation', username: roomChild.username, origin: roomChild }); }} />
               : roomChild === 'menu' ? <>
                 <ActionButton title="Participants / spectators >" onPress={() => setRoomChild('menu-participants')} />
                 {perspectiveEligible && <ActionButton title="Perspective >" onPress={() => setRoomChild('menu-perspective')} />}
@@ -670,7 +688,16 @@ function AppContent() {
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.flex}>
         <View style={styles.focusedRoomShell}>
           {serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
-          {pregameReady ? <PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}
+          {pregameReady ? <View style={[styles.flex, isRoomConversationChild(roomChild) && { display: 'none' }]}>
+            <PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom}
+              onMessage={(name) => setRoomChild({ kind: 'conversation', username: name, origin: null })}
+              presentationVisible={roomPresentationVisible && !isRoomConversationChild(roomChild)} />
+          </View> : pregameConnectionStatus}
+          {pregameReady && isRoomConversationChild(roomChild) && <View style={styles.flex}>
+            <View style={styles.childHeader}><SectionHeading title={roomChild.username} />
+              <ActionButton compact title="Back" onPress={backRoomChild} /></View>
+            <Conversation key={roomChild.username} username={roomChild.username} room={`table${roomState.room.tableID}`} visible={roomPresentationVisible} />
+          </View>}
         </View>
         {lobbyNotice !== null && <View pointerEvents="box-none" style={styles.lobbyNoticeOverlay}>
           <View style={[styles.lobbyNoticeContainer, { maxWidth: contentMaxWidth }]}>
@@ -764,10 +791,15 @@ function AppContent() {
   } else if (isBrowsingSettings(browsing)) {
     content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()}
       onPasswordTaskChange={setPasswordTaskOpen} backRef={settingsBackRef} showEmbeddedBack={false} />;
+  } else if (browsingSurface.kind === 'conversation') {
+    content = <Conversation key={browsingSurface.username} username={browsingSurface.username} visible={presentationFocus === 'browsing'} />;
   } else if (browsingSurface.kind === 'profile') {
-    content = <ProfileScreen username={browsingSurface.username} roomOccupied={browsingRoomOccupied} />;
+    content = <ProfileScreen username={browsingSurface.username} roomOccupied={browsingRoomOccupied}
+      onMessage={() => setBrowsing((state) => openBrowsingConversation(state, browsingSurface.username))} />;
   } else if (browsing.destination === 'people') {
     content = <PeopleScreen onBack={() => navigate('home')} roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}
+      mode={browsing.peopleMode} onMode={(mode) => setBrowsing((state) => selectPeopleMode(state, mode))}
+      onConversation={(name) => setBrowsing((state) => openBrowsingConversation(state, name))}
       onProfile={(name) => setBrowsing((state) => openBrowsingProfile(state, name))} />;
   } else if (browsing.destination === 'more') {
     const surface = currentBrowsingSurface(browsing);
@@ -798,11 +830,12 @@ function AppContent() {
   const showBrowsingNavigation = presentationFocus === 'browsing'
     && probe === 'valid' && session.phase === 'ready' && hydrated
     && session.authenticatedUser !== null
-    && !passwordTaskOpen && !createTaskOpen && !replayImportTaskOpen;
+    && !passwordTaskOpen && !createTaskOpen && !replayImportTaskOpen
+    && !(browsingSurface.kind === 'conversation' && imeOcclusion > 0);
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
   const browsingTitle = browsingSurface.kind === 'root'
     ? { home: 'Home', history: 'History', people: 'People', more: 'More' }[browsingSurface.destination]
-    : browsingSurface.kind === 'profile' ? browsingSurface.username
+    : (browsingSurface.kind === 'profile' || browsingSurface.kind === 'conversation') ? browsingSurface.username
     : { settings: 'Settings', tools: 'Tools', about: 'About' }[browsingSurface.kind];
   const browsingAuthenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
   const showBrowsingAppBar =
@@ -824,10 +857,10 @@ function AppContent() {
       <View style={styles.browsingMain}>
       {showBrowsingAppBar && <BrowsingAppBar title={browsingTitle} username={session.authenticatedUser?.username ?? null}
         onBack={appBarBack} returnPresentation={returnPresentation} onReturn={returnToRoom} />}
-      <ScrollView ref={browsingScrollRef} style={styles.flex} contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+      {browsingSurface.kind === 'conversation' && browsingAuthenticated && !createTaskOpen ? <View style={styles.flex}>{content}</View> : <ScrollView ref={browsingScrollRef} style={styles.flex} contentContainerStyle={[styles.container, { maxWidth: contentMaxWidth }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {probe === 'valid' && serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
         {content}
-      </ScrollView>
+      </ScrollView>}
       </View>
       </View>
       {showBrowsingNavigation && !railNavigation && <BrowsingNavigation destination={browsing.destination} onNavigate={navigate} />}

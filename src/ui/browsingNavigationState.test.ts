@@ -8,6 +8,8 @@ import {
   navigateBrowsing,
   openMoreSurface,
   openBrowsingProfile,
+  openBrowsingConversation,
+  selectPeopleMode,
   openBrowsingSettings,
 } from './browsingNavigationState';
 
@@ -77,4 +79,21 @@ test.each(['people', 'more'] as const)('Profile opened from %s returns to its br
   expect(currentBrowsingSurface(profile)).toEqual({ kind: 'profile', origin, username: 'Ada' });
   expect(backBrowsing(profile)).toEqual(root);
   expect(navigateBrowsing(profile, 'home')).toEqual(createBrowsingPresentation('home'));
+});
+
+
+test('Messages Conversation Back restores the App-owned Messages selection', () => {
+  const messages = selectPeopleMode(createBrowsingPresentation('people'), 'messages');
+  const conversation = openBrowsingConversation(messages, 'Alice');
+  expect(currentBrowsingSurface(conversation)).toEqual({ kind: 'conversation', username: 'Alice', origin: 'people' });
+  expect(backBrowsing(conversation)).toEqual(messages);
+  expect(openBrowsingConversation(conversation, 'Alice')).toBe(conversation);
+});
+
+test('People Profile Message Back restores Profile then People', () => {
+  const people = createBrowsingPresentation('people');
+  const profile = openBrowsingProfile(people, 'Bob');
+  const conversation = openBrowsingConversation(profile, 'Bob');
+  expect(backBrowsing(conversation)).toEqual(profile);
+  expect(backBrowsing(backBrowsing(conversation))).toEqual(people);
 });

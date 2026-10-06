@@ -5,7 +5,7 @@ import { getRoomChildBackDecision } from './roomChildPresentation';
 
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const roomChild = app.slice(app.indexOf('const renderRoomChildren'), app.indexOf('    focusedRoomPresentation = ('));
-const menu = roomChild.slice(roomChild.indexOf("{roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings'"));
+const menu = roomChild.slice(roomChild.indexOf("{roomChild !== null && !isRoomConversationChild(roomChild) && roomChild !== 'chat' && roomChild !== 'settings'"));
 
 test('keeps one table Chat mounted outside conditional Menu with a direct Return', () => {
   expect(roomChild.match(/<ChatPanel/g)).toHaveLength(1);
@@ -60,7 +60,7 @@ test('C17 child host uses the allocated right column without changing allocator 
   expect(c17).not.toContain('useWindowDimensions');
   const allocator = c17.slice(c17.indexOf('const landscapeLayout ='), c17.indexOf('const layout: C17DenseLayout'));
   expect(allocator).not.toMatch(/roomChildren|roomChild|ime/);
-  expect(app).toContain("roomState.room.kind === 'live_game' ? roomState.room.tableID : null");
+  expect(app).toContain("roomState.room.kind !== 'none' ? roomState.room.tableID : null");
 });
 
 test('keeps live-game header actions outlined, matched, and tall enough to tap', () => {
@@ -137,7 +137,7 @@ test('portrait Menu is bottom anchored with 12 outer margin and an 82 percent ca
 });
 
 test('canonical Settings is a room task outside the Menu panel and its scrolling body', () => {
-  const settingsTask = roomChild.slice(roomChild.indexOf("{roomChild === 'settings' && <ScrollView"), roomChild.indexOf("{roomChild !== null"));
+  const settingsTask = roomChild.slice(roomChild.indexOf("{roomChild === 'settings' && <ScrollView"), roomChild.indexOf("{isRoomConversationChild(roomChild)"));
   expect(settingsTask).toContain('styles.roomSettingsTask');
   expect(settingsTask).toContain("<SettingsScreen onBack={() => setRoomChild('menu')}");
   expect(settingsTask).toContain('backRef={settingsBackRef}');

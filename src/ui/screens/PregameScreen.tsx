@@ -19,9 +19,10 @@ import { isPregameLandscape } from '../navigationPolicy';
 const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6] as const;
 type PregameSurface = 'root' | 'table-settings' | 'spectators' | 'team-tools' | 'table-menu';
 
-export function PregameScreen({ backRef, onBrowse, presentationVisible = true }: {
+export function PregameScreen({ backRef, onBrowse, onMessage, presentationVisible = true }: {
   backRef?: { current: (() => void) | null };
   onBrowse: () => void;
+  onMessage: (username: string) => void;
   presentationVisible?: boolean;
 }) {
   const { theme } = useHanabTheme();
@@ -133,7 +134,7 @@ export function PregameScreen({ backRef, onBrowse, presentationVisible = true }:
           {!player.you && <UserContextActions
             username={player.name}
             isFriend={session.friends.some((friend) => friend.toLowerCase() === player.name.toLowerCase())}
-            room={`table${room.tableID}`}>
+            room={`table${room.tableID}`} onMessage={() => onMessage(player.name)}>
             {isOwner && <ActionButton compact disabled={roomTransitionPending} title="Kick" tone="danger"
               onPress={() => Alert.alert(`Kick ${player.name}?`,
                 'They will be removed from this pregame and cannot rejoin this table.',

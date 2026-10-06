@@ -29,13 +29,13 @@ test('room-owned Profile retains participant origin, focus and attendance', () =
   const back = app.slice(app.indexOf('const backRoomChild ='), app.indexOf("BackHandler.addEventListener"));
   expect(back).toContain('setRoomChild(decision.origin)');
   expect(back).not.toMatch(/lobbyRuntime|setFriend|sendPrivateMessage|dispatch/);
-  expect(app).toContain('<ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`} />');
+  expect(app).toContain('<ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`}');
   const globalNav = app.slice(app.indexOf('const showBrowsingNavigation'), app.indexOf('const railNavigation'));
   expect(globalNav).toContain("presentationFocus === 'browsing'");
   expect(profile).not.toMatch(/BrowsingNavigation|setPresentationFocus|unattend|leaveRoom/);
 });
 
-test('Profile uses current selectors and the unchanged context actions for Friend and Dialog', () => {
+test('Profile uses current selectors and the context actions for Friend and Message', () => {
   expect(profile).toContain('useAppSelector(userSelectors.selectAll)');
   expect(profile).toContain('useAppSelector(tableSelectors.selectAll)');
   expect(profile).toContain('state.session.friends');
@@ -44,7 +44,7 @@ test('Profile uses current selectors and the unchanged context actions for Frien
   expect(profile).toContain('!profile.isOwnUser');
   const actions = read('../UserContextActions.tsx');
   expect(actions).toContain('chatRuntime.setFriend(username, !isFriend, room)');
-  expect(actions).toContain('sessionPrivateMessages(messagesByRoom, authenticatedUsername, username)');
-  expect(actions).toContain('chatRuntime.sendPrivateMessage(username, message, room)');
+  expect(actions).toContain('title="Message" onPress={onMessage}');
+  expect(actions).not.toMatch(/sessionPrivateMessages|sendPrivateMessage/);
   expect(profile).not.toMatch(/statistics|gameHistory|messagesByRoom|Delivered|typing/);
 });

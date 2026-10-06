@@ -19,5 +19,15 @@ test('local known-user search and compact rows use a single column with wide-row
   expect(screen).toContain('const wideRows = availableWidth > availableHeight');
   expect(screen).toContain('wideRows && styles.wideRow');
   expect(screen).toContain('wideRows && styles.wideToolbar');
-  expect(screen).not.toMatch(/numColumns|columnWrapperStyle|Messages|sessionPrivateMessages/);
+  expect(screen).not.toMatch(/numColumns|columnWrapperStyle|sessionPrivateMessages/);
+});
+
+
+test('Messages uses session-owned observed rows without consuming unread in the list', () => {
+  expect(screen).toContain('sessionConversationRows(messages, authenticatedUser?.username)');
+  expect(screen).toContain('Messages seen by this client');
+  expect(screen).toContain('No conversations seen yet');
+  expect(screen).toContain('row.unread');
+  expect(screen).toContain('row.hasReconnectGap');
+  expect(screen).not.toMatch(/conversationRead|messagesByRoom/);
 });

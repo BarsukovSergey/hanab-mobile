@@ -22,12 +22,13 @@ describe('focused Pregame surface', () => {
     const end = app.indexOf('\n  let content: ReactNode;', start);
     const host = app.slice(start, end);
     expect(host).toContain("<SafeAreaView edges={['top', 'right', 'bottom', 'left']}");
-    expect(host).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom} presentationVisible={roomPresentationVisible} />');
+    expect(host).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom}');
     expect(host).not.toContain('<ScrollView');
+    expect(host).toContain('presentationVisible={roomPresentationVisible && !isRoomConversationChild(roomChild)}');
     expect(host).not.toContain('<BrowsingNavigation');
     expect(host).not.toContain('styles.appHeader');
     expect(host).toContain('const pregameReady = session.phase === \'ready\' && hydrated;');
-    expect(host).toContain('{pregameReady ? <PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom} presentationVisible={roomPresentationVisible} /> : pregameConnectionStatus}');
+    expect(host).toContain('</View> : pregameConnectionStatus}');
     expect(host).toContain('Session unavailable');
     expect(host).toContain('Connection lost');
     expect(host).toContain('Connecting to lobby');
