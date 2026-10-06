@@ -40,11 +40,11 @@ test('C17 shared replay renders its leader once and groups priority controls com
   );
 
   expect((sharedWorkbench.match(/Leader: \{sharedReplay\.leader\}/g) ?? []).length).toBe(1);
-  const primaryControls = screen.slice(screen.indexOf('const replayPrimaryControls ='), screen.indexOf('const WorkbenchViewport ='));
+  const primaryControls = screen.slice(screen.indexOf('const followLeaderControl ='), screen.indexOf('const WorkbenchViewport ='));
   expect(sharedWorkbench).toContain('{portraitV2 && replayPrimaryControls}');
   expect(screen).toContain('styles.actionButtons]}>{replayPrimaryControls}');
-  expect(primaryControls).toContain('title="Back" onLongPress={onReviewStart} onPress={onReviewBack}');
-  expect(primaryControls).toContain('title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward}');
+  expect(primaryControls).toContain('title="Previous" onLongPress={onReviewStart} onPress={onReviewBack}');
+  expect(primaryControls).toContain('title="Next" onLongPress={onReviewEnd} onPress={onReviewForward}');
   expect(primaryControls).toContain('title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()}');
   expect(sharedWorkbench).toContain('title="Take leadership" onPress={() => lobbyRuntime.setSharedReplayLeader(sharedReplayOwnName)}');
   expect(sharedWorkbench).toContain('title={`Pass to ${name}`}');

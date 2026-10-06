@@ -57,6 +57,7 @@ import { HistoryScreen } from './src/ui/screens/HistoryScreen';
 import { BrowsingNavigation } from './src/ui/BrowsingNavigation';
 import { BrowsingAppBar } from './src/ui/BrowsingAppBar';
 import { getFocusedRoomBackDecision, getRoomReturnPresentation, isOwnOngoingRewind } from './src/ui/roomReturnPresentation';
+import { getReviewWorkspacePresentation } from './src/ui/reviewWorkspacePresentation';
 import { LobbyScreen } from './src/ui/screens/LobbyScreen';
 import { CreateTableScreen, type SpecificSeedCreatePrefill } from './src/ui/screens/CreateTableScreen';
 import { MoreScreen } from './src/ui/screens/MoreScreen';
@@ -414,6 +415,7 @@ function AppContent() {
       );
     };
     const liveClientState = roomState.room.clientState;
+    const workspacePresentation = getReviewWorkspacePresentation(roomState.room);
     const perspectiveEligible = roomState.room.role === 'spectator'
       && !roomState.room.sharedReplay
       && liveClientState.replay.shared === null
@@ -473,7 +475,7 @@ function AppContent() {
               !landscape && styles.roomMenuPortrait,
               landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }]}>
             <View style={styles.childHeader}>
-              <SectionHeading title={roomChild === 'menu' ? 'Game menu' : roomChild === 'menu-participants' ? 'Participants / spectators' : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
+              <SectionHeading title={roomChild === 'menu' ? workspacePresentation.menuTitle : roomChild === 'menu-participants' ? 'Participants / spectators' : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
               <ActionButton compact title="Close" tone="ghost" onPress={closeRoomChild} />
             </View>
             {roomChild !== 'menu' && <ActionButton compact title="Back" onPress={backRoomChild} />}
@@ -594,8 +596,8 @@ function AppContent() {
               <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
               <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
             </> : <>
-            <ActionButton compact title="Home" tone="secondary" style={styles.liveHeaderAction} onPress={homeFromLive} />
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{liveClientState.metadata.options.variantName}</Text>
+            <ActionButton compact title={workspacePresentation.review ? 'Browse' : 'Home'} tone="secondary" style={styles.liveHeaderAction} onPress={workspacePresentation.review ? browseFromRoom : homeFromLive} />
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
             <ActionButton
               compact
               disabled={roomChild !== null}
@@ -604,10 +606,11 @@ function AppContent() {
               style={styles.liveHeaderAction}
               onPress={() => setRoomChild('chat')}
             />
-            <ActionButton compact disabled={roomChild !== null} title="Menu" tone="secondary" style={styles.liveHeaderAction} onPress={() => setRoomChild('menu')} />
+            <ActionButton compact disabled={roomChild !== null} title="Menu" accessibilityLabel={workspacePresentation.menuAccessibilityLabel} tone="secondary" style={styles.liveHeaderAction} onPress={() => setRoomChild('menu')} />
             </>}
           </View>
         </View>
+        {!portraitChatOpen && workspacePresentation.status !== '' && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
         {liveConnectionProblem && (
           <View style={styles.liveConnectionNotice}>
             <Notice tone="error">{session.error ?? 'Connection lost. Game actions are disabled until the realtime session reconnects.'}</Notice>
