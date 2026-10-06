@@ -141,6 +141,22 @@ describe('card knowledge view model', () => {
     expect(getCardKnowledgeViewModel(variant.name, positivelyClued, note, true).borderColor).toBe('orange');
   });
 
+  test('allows a clued note to force a border only while the game is unfinished', () => {
+    const note: CardNote = { ...emptyNote, clued: true };
+    const card = freshCard(19);
+
+    expect(getCardKnowledgeViewModel(variant.name, card, note, false).borderColor).toBe('orange');
+    expect(getCardKnowledgeViewModel(variant.name, card, note, true).borderColor).toBeNull();
+  });
+
+  test('retains a genuine positive clue border after the game finishes despite note.unclued', () => {
+    const positivelyClued = applyClue(freshCard(20), newRankClue(2), true);
+    const note: CardNote = { ...emptyNote, unclued: true, clued: true };
+
+    expect(getCardKnowledgeViewModel(variant.name, positivelyClued, note, false).borderColor).toBeNull();
+    expect(getCardKnowledgeViewModel(variant.name, positivelyClued, note, true).borderColor).toBe('orange');
+  });
+
   test('does not promote a single best-knowledge possibility into card identity', () => {
     const card = freshCard(15);
     const deduced: CardState = {
