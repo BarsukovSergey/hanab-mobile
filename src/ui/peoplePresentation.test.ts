@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 
 import type { LobbyTable, LobbyUser } from '../protocol/lobbyProtocol';
-import { getPeopleRows } from './peoplePresentation';
+import { getPeopleRows, getPeopleSections } from './peoplePresentation';
 
 const user = (userID: number, name: string, changes: Partial<LobbyUser> = {}): LobbyUser => ({
   userID,
@@ -35,7 +35,7 @@ const table = (id: number, changes: Partial<LobbyTable> = {}): LobbyTable => ({
 });
 
 describe('People presentation', () => {
-  test('sorts own user first, then friends, then others alphabetically with user ID tie breaks', () => {
+  test('sorts friends first, then remaining online users alphabetically with user ID tie breaks', () => {
     const rows = getPeopleRows(
       [user(8, 'zoe'), user(7, 'bob'), user(3, 'Amy'), user(4, 'cy'), user(5, 'Ada'), user(6, 'ada')],
       ['CY', 'Bob'],
@@ -44,9 +44,9 @@ describe('People presentation', () => {
     );
 
     expect(rows.map((row) => [row.user.name, row.isFriend])).toEqual([
-      ['Amy', false], ['bob', true], ['cy', true], ['Ada', false], ['ada', false], ['zoe', false],
+      ['bob', true], ['cy', true], ['Ada', false], ['ada', false], ['Amy', false], ['zoe', false],
     ]);
-    expect(rows.slice(3).map(({ user: item }) => item.userID)).toEqual([5, 6, 8]);
+    expect(rows.slice(2, 4).map(({ user: item }) => item.userID)).toEqual([5, 6]);
   });
 
   test('presents authoritative flags and known or unknown table context', () => {
@@ -106,4 +106,13 @@ describe('People presentation', () => {
       Unsupported: null,
     });
   });
+});
+
+
+test('search partitions only known users, never synthesizing offline friends', () => {
+  const rows = getPeopleRows([user(1, 'Ada'), user(2, 'Bob'), user(3, 'Carol')], ['Bob', 'Offline'], null, []);
+  expect(getPeopleSections(rows, '').map((section) => [section.title, section.rows.map((row) => row.user.name)]))
+    .toEqual([['Friends', ['Bob']], ['Online', ['Ada', 'Carol']]]);
+  expect(getPeopleSections(rows, '  BO ').flatMap((section) => section.rows).map((row) => row.user.name)).toEqual(['Bob']);
+  expect(getPeopleSections(rows, 'Offline').flatMap((section) => section.rows)).toEqual([]);
 });

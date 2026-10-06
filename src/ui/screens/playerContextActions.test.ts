@@ -4,18 +4,18 @@ import { describe, expect, test } from '@jest/globals';
 
 const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf8').replace(/\r\n/g, '\n');
 const people = read('PeopleScreen.tsx');
+const profile = read('ProfileScreen.tsx');
 const pregame = read('PregameScreen.tsx');
 const shared = read('../UserContextActions.tsx');
 const app = read('../../../App.tsx');
 
 describe('player context actions', () => {
-  test('People uses the shared actions while keeping Spectate in People', () => {
-    expect(people).toContain('const [composerUserID, setComposerUserID] = useState<number | null>(null)');
-    expect(people).toContain('open={composerUserID === row.user.userID}');
-    expect(people).toContain('onOpenChange={(open) => setComposerUserID(open ? row.user.userID : null)}');
-    expect(people).toContain('lobbyRuntime.spectate(tableAction.tableID)');
-    expect(people).not.toContain('chatRuntime.sendPrivateMessage');
-    expect(people).not.toContain('chatRuntime.setFriend');
+  test('People opens the shared Profile, which owns existing actions and Spectate', () => {
+    expect(people).toContain('onPress={() => onProfile(row.user.name)}');
+    expect(profile).toContain('<UserContextActions');
+    expect(profile).toContain('lobbyRuntime.spectate(tableAction.tableID)');
+    expect(profile).not.toContain('chatRuntime.sendPrivateMessage');
+    expect(profile).not.toContain('chatRuntime.setFriend');
   });
 
   test('Pregame exposes actions only for other players using authoritative friends and table context', () => {
@@ -25,14 +25,12 @@ describe('player context actions', () => {
     expect(pregame).toContain('room={`table${room.tableID}`}');
   });
 
-  test('Game menu exposes table actions for players and spectators except the authenticated user', () => {
-    expect(app).toContain("import { UserContextActions } from './src/ui/UserContextActions'");
+  test('Game participants open Profile in the room menu chain', () => {
+    expect(app).toContain("import { ProfileScreen } from './src/ui/screens/ProfileScreen'");
     expect(app).toContain('liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))');
     expect(app).toContain('liveClientState.spectators.map((spectator, index) => renderLiveUser(spectator.name, `spectator-${index}-${spectator.name}`))');
-    expect(app).toContain('<UserContextActions username={name} isFriend={isFriend} room={`table${liveTableID}`} />');
-    expect(app).toContain('name.toLocaleLowerCase() === authenticatedUsername.toLocaleLowerCase()');
-    expect(app).toContain('!isAuthenticatedUser && (');
-    expect(app).toContain('session.friends.some((friend) => friend.toLocaleLowerCase() === name.toLocaleLowerCase())');
+    expect(app).toContain("kind: 'profile', username: name, origin: 'menu-participants'");
+    expect(app).toContain('room={`table${liveTableID}`}');
   });
 
   test('shared Dialog shows session messages and sends in context while keeping friends unchanged', () => {
@@ -60,7 +58,7 @@ describe('player context actions', () => {
     expect(shared).toContain("transcript: { alignSelf: 'stretch', borderRadius: 8, borderWidth: 1, maxHeight: 240, padding: 8, width: '100%' }");
     expect(shared).toContain("messageField: { alignSelf: 'stretch', width: '100%' }");
     expect(shared).toContain('style={styles.messageField}');
-    expect(people).toContain('<UserContextActions');
+    expect(profile).toContain('<UserContextActions');
     expect(people).toContain('styles.userRow');
     expect(pregame).toContain('styles.playerRow');
     expect(pregame).toContain('<UserContextActions');

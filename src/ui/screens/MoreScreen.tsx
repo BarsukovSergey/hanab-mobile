@@ -5,10 +5,11 @@ import { ActionButton, Panel, SectionHeading, useHanabTheme } from '../designSys
 
 type MoreSurface = 'root' | 'tools' | 'about';
 
-export function MoreScreen({ surface, username, onBack, onSettings, onTools, onAbout, onHomeTools, onHistoryTools, showEmbeddedBack = true }: {
+export function MoreScreen({ surface, username, onBack, onProfile, onSettings, onTools, onAbout, onHomeTools, onHistoryTools, showEmbeddedBack = true }: {
   surface: MoreSurface;
   username: string;
   onBack: () => void;
+  onProfile: () => void;
   showEmbeddedBack?: boolean;
   onSettings: () => void;
   onTools: () => void;
@@ -35,6 +36,7 @@ export function MoreScreen({ surface, username, onBack, onSettings, onTools, onA
   return <View style={styles.screen}>
     <Panel>
       <SectionHeading title="More" detail={'Signed in as ' + username} />
+      <ActionButton title="My Profile" onPress={onProfile} />
       <ActionButton title="Settings" onPress={onSettings} />
       <ActionButton title="Tools" onPress={onTools} />
       <ActionButton title="About / version" onPress={onAbout} />

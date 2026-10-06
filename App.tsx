@@ -48,6 +48,7 @@ import {
   isBrowsingSettings,
   navigateBrowsing,
   openMoreSurface,
+  openBrowsingProfile,
   openBrowsingSettings,
   type BrowsingDestination,
 } from './src/ui/browsingNavigationState';
@@ -64,11 +65,11 @@ import { MoreScreen } from './src/ui/screens/MoreScreen';
 import { PeopleScreen } from './src/ui/screens/PeopleScreen';
 import { PregameScreen } from './src/ui/screens/PregameScreen';
 import { SettingsScreen } from './src/ui/screens/SettingsScreen';
-import { UserContextActions } from './src/ui/UserContextActions';
+import { ProfileScreen } from './src/ui/screens/ProfileScreen';
 import { getServerStatusNoticeMessage } from './src/ui/serverStatusNotice';
 
 type ProbeStatus = 'checking' | 'valid' | 'missing' | 'indeterminate';
-type RoomChild = null | 'chat' | 'menu' | 'menu-participants' | 'menu-perspective' | 'menu-tools' | 'settings' | 'tag' | 'replay-export';
+type RoomChild = null | 'chat' | 'menu' | 'menu-participants' | 'menu-perspective' | 'menu-tools' | 'settings' | 'tag' | 'replay-export' | { kind: 'profile'; username: string; origin: 'menu-participants' };
 
 export default function App() {
   return (
@@ -255,7 +256,10 @@ function AppContent() {
   }, []);
   const closeRoomChild = () => { Keyboard.dismiss(); setRoomChild(null); };
   const backRoomChild = () => {
-    if (roomChild === 'chat') {
+    if (typeof roomChild === 'object' && roomChild !== null) {
+      Keyboard.dismiss();
+      setRoomChild(roomChild.origin);
+    } else if (roomChild === 'chat') {
       if (keyboardOpen.current || Keyboard.isVisible()) Keyboard.dismiss();
       else setRoomChild(null);
     } else if (roomChild === 'settings') settingsBackRef.current?.();
@@ -400,17 +404,13 @@ function AppContent() {
     && presentationFocus === 'room';
   if (probe === 'valid' && roomState.room.kind === 'live_game') {
     const liveTableID = roomState.room.tableID;
-    const authenticatedUsername = session.authenticatedUser?.username;
     const renderLiveUser = (name: string, key: string) => {
-      const isAuthenticatedUser = authenticatedUsername !== undefined
-        && name.toLocaleLowerCase() === authenticatedUsername.toLocaleLowerCase();
-      const isFriend = session.friends.some((friend) => friend.toLocaleLowerCase() === name.toLocaleLowerCase());
       return (
         <View key={key} style={styles.liveUserRow}>
           <Text style={{ color: theme.colors.text }}>{name}</Text>
-          {!isAuthenticatedUser && (
-            <UserContextActions username={name} isFriend={isFriend} room={`table${liveTableID}`} />
-          )}
+          <ActionButton compact title="Profile" onPress={() => setRoomChild({
+            kind: 'profile', username: name, origin: 'menu-participants',
+          })} />
         </View>
       );
     };
@@ -475,12 +475,14 @@ function AppContent() {
               !landscape && styles.roomMenuPortrait,
               landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }]}>
             <View style={styles.childHeader}>
-              <SectionHeading title={roomChild === 'menu' ? workspacePresentation.menuTitle : roomChild === 'menu-participants' ? 'Participants / spectators' : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
+              <SectionHeading title={roomChild === 'menu' ? workspacePresentation.menuTitle : roomChild === 'menu-participants' ? 'Participants / spectators' : typeof roomChild === 'object' && roomChild !== null ? roomChild.username : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
               <ActionButton compact title="Close" tone="ghost" onPress={closeRoomChild} />
             </View>
             {roomChild !== 'menu' && <ActionButton compact title="Back" onPress={backRoomChild} />}
             <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuActions} keyboardShouldPersistTaps="handled">
-              {roomChild === 'menu' ? <>
+              {typeof roomChild === 'object' && roomChild !== null ?
+                <ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`} />
+              : roomChild === 'menu' ? <>
                 <ActionButton title="Participants / spectators >" onPress={() => setRoomChild('menu-participants')} />
                 {perspectiveEligible && <ActionButton title="Perspective >" onPress={() => setRoomChild('menu-perspective')} />}
                 {pauseEligible && <ActionButton title={pauseLabel} onPress={() => lobbyRuntime.pauseGame()} />}
@@ -681,6 +683,7 @@ function AppContent() {
     </KeyboardAvoidingView>;
   }
 
+  const browsingSurface = currentBrowsingSurface(browsing);
   let content: ReactNode;
   if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.pendingRecovery !== null) {
     content = <Panel><SectionHeading title="Reconnecting…" detail="Recovering the current room." /></Panel>;
@@ -761,14 +764,21 @@ function AppContent() {
   } else if (isBrowsingSettings(browsing)) {
     content = <SettingsScreen onBack={() => setBrowsing((state) => backBrowsing(state))} onSignOut={() => void signOut()}
       onPasswordTaskChange={setPasswordTaskOpen} backRef={settingsBackRef} showEmbeddedBack={false} />;
+  } else if (browsingSurface.kind === 'profile') {
+    content = <ProfileScreen username={browsingSurface.username} roomOccupied={browsingRoomOccupied} />;
   } else if (browsing.destination === 'people') {
-    content = <PeopleScreen onBack={() => navigate('home')} roomOccupied={browsingRoomOccupied} showEmbeddedBack={false} />;
+    content = <PeopleScreen onBack={() => navigate('home')} roomOccupied={browsingRoomOccupied} showEmbeddedBack={false}
+      onProfile={(name) => setBrowsing((state) => openBrowsingProfile(state, name))} />;
   } else if (browsing.destination === 'more') {
     const surface = currentBrowsingSurface(browsing);
     content = <MoreScreen surface={surface.kind === 'tools' || surface.kind === 'about' ? surface.kind : 'root'}
       username={session.authenticatedUser?.username ?? ''}
       showEmbeddedBack={false}
       onBack={() => setBrowsing((state) => backBrowsing(state))}
+      onProfile={() => {
+        const name = session.authenticatedUser?.username;
+        if (name !== undefined) setBrowsing((state) => openBrowsingProfile(state, name));
+      }}
       onSettings={() => setBrowsing((state) => openBrowsingSettings(state))}
       onTools={() => setBrowsing((state) => openMoreSurface(state, 'tools'))}
       onAbout={() => setBrowsing((state) => openMoreSurface(state, 'about'))}
@@ -790,9 +800,9 @@ function AppContent() {
     && session.authenticatedUser !== null
     && !passwordTaskOpen && !createTaskOpen && !replayImportTaskOpen;
   const railNavigation = showBrowsingNavigation && windowClass !== 'compact';
-  const browsingSurface = currentBrowsingSurface(browsing);
   const browsingTitle = browsingSurface.kind === 'root'
     ? { home: 'Home', history: 'History', people: 'People', more: 'More' }[browsingSurface.destination]
+    : browsingSurface.kind === 'profile' ? browsingSurface.username
     : { settings: 'Settings', tools: 'Tools', about: 'About' }[browsingSurface.kind];
   const browsingAuthenticated = probe === 'valid' && session.phase === 'ready' && hydrated;
   const showBrowsingAppBar =
