@@ -1,13 +1,19 @@
 /** Room-owned presentation state; attendance and lifecycle remain App-owned. */
 export type RoomChild = null | 'chat' | 'menu' | 'menu-participants' | 'menu-perspective'
   | 'menu-tools' | 'settings' | 'tag' | 'replay-export'
+  | { kind: 'conversation'; username: string; origin: null | { kind: 'profile'; username: string; origin: 'menu-participants' } }
   | { kind: 'profile'; username: string; origin: 'menu-participants' };
 
 export function isRoomProfileChild(child: RoomChild): child is Extract<RoomChild, { kind: 'profile' }> {
   return typeof child === 'object' && child !== null && child.kind === 'profile';
 }
 
+export function isRoomConversationChild(child: RoomChild): child is Extract<RoomChild, { kind: 'conversation' }> {
+  return typeof child === 'object' && child !== null && child.kind === 'conversation';
+}
+
 export type RoomChildBackDecision =
+  | { kind: 'conversation-origin'; origin: Extract<RoomChild, { kind: 'conversation' }>['origin'] }
   | { kind: 'profile-origin'; origin: 'menu-participants' }
   | { kind: 'open-child'; child: 'menu' | 'menu-tools' }
   | { kind: 'chat' }
@@ -16,6 +22,7 @@ export type RoomChildBackDecision =
 
 /** Classifies Back only; App executes keyboard, Settings and state effects. */
 export function getRoomChildBackDecision(child: RoomChild): RoomChildBackDecision {
+  if (isRoomConversationChild(child)) return { kind: 'conversation-origin', origin: child.origin };
   if (isRoomProfileChild(child)) return { kind: 'profile-origin', origin: child.origin };
   switch (child) {
     case 'chat': return { kind: 'chat' };
@@ -32,7 +39,7 @@ export function getRoomChildBackDecision(child: RoomChild): RoomChildBackDecisio
 
 /** Chat and Settings own their chrome; this title is for the contextual panel. */
 export function getRoomChildTitle(child: Exclude<RoomChild, null | 'chat' | 'settings'>, menuTitle: string): string {
-  if (isRoomProfileChild(child)) return child.username;
+  if (isRoomProfileChild(child) || isRoomConversationChild(child)) return child.username;
   switch (child) {
     case 'menu': return menuTitle;
     case 'menu-participants': return 'Participants / spectators';

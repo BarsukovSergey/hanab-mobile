@@ -33,35 +33,12 @@ describe('player context actions', () => {
     expect(app).toContain('room={`table${liveTableID}`}');
   });
 
-  test('shared Dialog shows session messages and sends in context while keeping friends unchanged', () => {
-    expect(shared).toContain('open?: boolean');
-    expect(shared).toContain('onOpenChange?: (open: boolean) => void');
-    expect(shared).toContain('maxLength={300}');
-    expect(shared).toContain('title="Dialog"');
-    expect(shared).toContain('sessionPrivateMessages(messagesByRoom, authenticatedUsername, username)');
-    expect(shared).toContain('chatRuntime.sendPrivateMessage(username, message, room)');
+  test('Message delegates to navigation and Friend remains in the existing runtime', () => {
+    expect(shared).toContain('onMessage: () => void');
+    expect(shared).toContain('title="Message" onPress={onMessage}');
     expect(shared).toContain('chatRuntime.setFriend(username, !isFriend, room)');
-    expect(shared).toContain('if (chatRuntime.sendPrivateMessage(username, message, room)) setMessage(\'\')');
-    expect(shared).not.toContain('setIsFriend');
-  });
-
-  test('composer is a full-width sibling below compact actions in both screens', () => {
-    const actionsIndex = shared.indexOf('<View style={styles.actions}>');
-    const composerIndex = shared.indexOf('{composing && (');
-    expect(actionsIndex).toBeGreaterThanOrEqual(0);
-    expect(composerIndex).toBeGreaterThan(actionsIndex);
-    expect(shared.slice(actionsIndex, composerIndex)).toContain('<ActionButton compact title="Dialog"');
-    expect(shared.slice(composerIndex)).toContain('<View style={styles.composer}>');
-    expect(shared.slice(composerIndex)).toContain('<ScrollView style={[styles.transcript');
-    expect(shared).toContain("root: { alignSelf: 'stretch', gap: 8, width: '100%' }");
-    expect(shared).toContain("composer: { alignSelf: 'stretch', gap: 8, width: '100%' }");
-    expect(shared).toContain("transcript: { alignSelf: 'stretch', borderRadius: 8, borderWidth: 1, maxHeight: 240, padding: 8, width: '100%' }");
-    expect(shared).toContain("messageField: { alignSelf: 'stretch', width: '100%' }");
-    expect(shared).toContain('style={styles.messageField}');
-    expect(profile).toContain('<UserContextActions');
-    expect(people).toContain('styles.userRow');
-    expect(pregame).toContain('styles.playerRow');
-    expect(pregame).toContain('<UserContextActions');
-    expect(pregame).not.toContain('flexDirection: \'row\', gap: 12, justifyContent: \'space-between\', paddingTop: 9');
+    expect(shared).not.toMatch(/Dialog|sendPrivateMessage|messagesByRoom|ScrollView|draft|useState/);
+    expect(profile).toContain('onMessage={onMessage}');
+    expect(pregame).toContain('onMessage={() => onMessage(player.name)}');
   });
 });

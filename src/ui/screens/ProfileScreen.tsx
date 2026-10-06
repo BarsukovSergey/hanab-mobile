@@ -7,8 +7,9 @@ import { ActionButton, Panel, Pill, SectionHeading, useHanabTheme } from '../des
 import { getProfilePresentation } from '../profilePresentation';
 import { UserContextActions } from '../UserContextActions';
 
-export function ProfileScreen({ username, roomOccupied, room = 'lobby' }: {
+export function ProfileScreen({ username, roomOccupied, room = 'lobby', onMessage }: {
   username: string;
+  onMessage: () => void;
   roomOccupied: boolean;
   room?: string;
 }) {
@@ -27,7 +28,7 @@ export function ProfileScreen({ username, roomOccupied, room = 'lobby' }: {
     </View>
     {profile.location !== null && <Text style={{ color: theme.colors.textMuted }}>{profile.location}</Text>}
     {!profile.isOwnUser && <UserContextActions key={profile.username} username={profile.username}
-      isFriend={profile.isFriend} room={room}>
+      isFriend={profile.isFriend} room={room} onMessage={onMessage}>
       {tableAction !== null && <ActionButton compact title={tableAction.label} disabled={roomOccupied}
         onPress={() => {
           if (roomOccupied) return;

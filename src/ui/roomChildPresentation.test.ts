@@ -63,3 +63,13 @@ test('App consumes pure room policy and retains child rendering and imperative B
   expect(back).toContain('const closeRoomChild = () => { Keyboard.dismiss(); setRoomChild(null); };');
   expect(policy).not.toMatch(/import |Keyboard|Ref|setRoomChild|lobbyRuntime|chatRuntime|<View/);
 });
+
+
+test('room Conversation Back restores its exact Profile or mounted Pregame origin', () => {
+  const profile = { kind: 'profile' as const, username: 'Bob', origin: 'menu-participants' as const };
+  expect(getRoomChildBackDecision({ kind: 'conversation', username: 'Bob', origin: profile }))
+    .toEqual({ kind: 'conversation-origin', origin: profile });
+  expect(getRoomChildBackDecision(profile)).toEqual({ kind: 'profile-origin', origin: 'menu-participants' });
+  expect(getRoomChildBackDecision({ kind: 'conversation', username: 'Bob', origin: null }))
+    .toEqual({ kind: 'conversation-origin', origin: null });
+});
