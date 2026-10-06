@@ -3107,6 +3107,49 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().room.pendingRoleSwitch).toBeNull();
   });
 
+  test('player-to-spectator first-send failure cancels the intent without sending spectate', async () => {
+    const { runtime, socket, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    const room = store.getState().room.room;
+    socket.failSend = true;
+
+    expect(runtime.switchToSpectator()).toBe(false);
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+    expect(store.getState().room.room).toBe(room);
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}']);
+    socket.failSend = false;
+    expect(runtime.switchToSpectator()).toBe(true);
+    expect(socket.sent.slice(1)).toEqual([
+      'tableLeave {"tableID":123}',
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":-1}',
+    ]);
+  });
+
+  test('partial player-to-spectator switch clears on reconnect without replaying either command', async () => {
+    const { runtime, socket, session, store } = await makeReadyRuntime();
+    addJoinableTable(store);
+    expect(runtime.join(123)).toBe(true);
+    socket.emitMessage(pregameFrame());
+    socket.emitMessage('joined {"tableID":123}');
+    socket.failOnSendNumber = 3;
+    expect(runtime.switchToSpectator()).toBe(false);
+    expect(store.getState().room.pendingRoleSwitch).toMatchObject({ leaveSent: true, spectateSent: false });
+    expect(runtime.switchToSpectator()).toBe(false);
+
+    const nextSocket = new FakeSocket();
+    session.sockets.push(Promise.resolve(nextSocket));
+    runtime.disconnect();
+    await runtime.connect();
+    nextSocket.emitOpen();
+    nextSocket.emitMessage(welcomeFrame);
+    expect(store.getState().room.pendingRoleSwitch).toBeNull();
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}', 'tableLeave {"tableID":123}']);
+    expect(nextSocket.sent).toEqual([]);
+  });
+
   test('player-to-spectator retains the leave transition when local spectate send fails and authoritative left exits pregame', async () => {
     const { runtime, socket, store } = await makeReadyRuntime();
     addJoinableTable(store);
