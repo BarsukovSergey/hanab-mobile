@@ -100,7 +100,7 @@ test('Review keeps adjacent/edge navigation, timeline, current turn and direct f
 });
 
 test('follower movement retains the local runtime path; only the shared leader broadcasts', () => {
-  const runtime = read('src/runtime/LobbyRuntime.ts');
+  const runtime = read('src/runtime/ReplayInteractionRuntime.ts');
   const navigate = runtime.slice(runtime.indexOf('  navigateReplaySegment('), runtime.indexOf('  followReplayLeader('));
   const local = navigate.slice(navigate.indexOf('if (shared === null || !shared.amLeader)'), navigate.indexOf('if (!this.isReadyCurrentRoom'));
   expect(local).toContain('this.store.dispatch(roomActions.reviewSegmentSelected(');
