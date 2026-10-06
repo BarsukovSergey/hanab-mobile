@@ -21,7 +21,7 @@ export type HypotheticalClientAction =
 
 /**
  * Expands one deliberate hypothetical UI action into the authoritative replay-action sequence.
- * It deliberately does not dispatch or send: LobbyRuntime owns that boundary.
+ * It deliberately does not dispatch or send: ReplayInteractionRuntime owns that boundary.
  */
 export function getHypotheticalActions(
   action: HypotheticalClientAction,

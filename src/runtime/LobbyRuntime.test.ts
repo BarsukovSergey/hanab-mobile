@@ -1779,6 +1779,26 @@ describe('deterministic lobby runtime', () => {
     expect(socket.sent).toHaveLength(sent);
   });
 
+  test.each(['not JSON', JSON.stringify({ type: 'invalid' })])(
+    'malformed hypothetical snapshot retains facade diagnostics and ignores stale callbacks: %s',
+    async (actionJSON) => {
+      const { runtime, socket, store } = await makeSharedReplayRuntime();
+      const before = store.getState().room.room;
+      const frame = `hypothetical ${JSON.stringify({ showDrawnCards: false, actions: [actionJSON] })}`;
+      socket.emitMessage(frame);
+      expect(store.getState().room.room).toBe(before);
+      expect(store.getState().session.inboundDiagnostics.slice(-2)).toEqual([
+        { command: 'hypothetical', classification: 'known' },
+        { command: 'hypothetical', classification: 'malformed' },
+      ]);
+      const staleListeners = socket.snapshotMessageListeners();
+      runtime.disconnect();
+      const afterDisconnect = store.getState();
+      for (const listener of staleListeners) listener({ data: frame } as WebSocketMessageEvent);
+      expect(store.getState()).toBe(afterDisconnect);
+    },
+  );
+
   test('hypothetical runtime rejects discard at maximum clue tokens', async () => {
     const { runtime, socket, store } = await makeSharedReplayRuntime();
     expect(runtime.navigateReplaySegment(0)).toBe(true);
