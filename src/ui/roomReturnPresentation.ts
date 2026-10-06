@@ -1,5 +1,6 @@
 import type { RoomState } from '../store/roomSlice';
 import { getHumanTurnNumber } from './game/c17Temporal';
+import { getReviewWorkspacePresentation } from './reviewWorkspacePresentation';
 
 export type RoomReturnPresentation = {
   status: string;
@@ -8,9 +9,7 @@ export type RoomReturnPresentation = {
 };
 
 export function isOwnOngoingRewind(room: RoomState): boolean {
-  return room.kind === 'live_game' && !room.clientState.finished
-    && room.clientState.replay.active && room.clientState.replay.shared === null
-    && room.clientState.replay.hypothetical === null;
+  return room.kind === 'live_game' && getReviewWorkspacePresentation(room).ownRewind;
 }
 
 export function getRoomReturnPresentation(room: RoomState, recovering: boolean): RoomReturnPresentation | null {
@@ -40,6 +39,9 @@ export function getRoomReturnPresentation(room: RoomState, recovering: boolean):
     status: `Finished · ${clientState.ongoingGame.score}`,
     action: 'Review game', behavior: 'focus-room',
   };
+  if (getReviewWorkspacePresentation(room).review) return {
+    status: getReviewWorkspacePresentation(room).identity, action: 'Return to review', behavior: 'focus-room',
+  };
   const ourTurn = room.role === 'player' && clientState.playing
     && clientState.ongoingGame.turn.currentPlayerIndex === clientState.metadata.ourPlayerIndex;
   return {
@@ -54,6 +56,6 @@ export function getFocusedRoomBackDecision(room: RoomState): FocusedRoomBackDeci
   if (room.kind !== 'live_game') return 'consume';
   if (room.clientState.replay.hypothetical !== null) return 'browse-origin';
   if (isOwnOngoingRewind(room)) return 'return-live';
-  if (room.clientState.finished || room.sharedReplay || room.clientState.replay.shared !== null) return 'browse-origin';
+  if (getReviewWorkspacePresentation(room).review) return 'browse-origin';
   return 'consume';
 }

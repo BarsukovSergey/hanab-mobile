@@ -78,6 +78,7 @@ test('Live identity in both orientations is always the current variant with sing
   const start = app.indexOf('<Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex');
   const identity = app.slice(start, app.indexOf('</Text>', start));
   expect(identity).toContain('liveClientState.metadata.options.variantName');
+  expect(identity).toContain('workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity');
   expect(identity).toContain('numberOfLines={1}');
   expect(identity).toContain('ellipsizeMode="tail"');
   expect(identity).not.toContain('username');

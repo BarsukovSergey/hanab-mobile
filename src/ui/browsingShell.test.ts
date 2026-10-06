@@ -76,7 +76,7 @@ test('App reconciles focus before paint and hidden focus only closes the live sh
   const hiddenEffect = app.slice(app.indexOf("if (presentationFocus !== 'room') setRoomChild(null);"));
   expect(hiddenEffect.slice(0, hiddenEffect.indexOf('}, [presentationFocus]);')))
     .toBe("if (presentationFocus !== 'room') setRoomChild(null);\n  ");
-  expect(app).toContain('title="Home"');
+  expect(app).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
   expect(app).toContain('returnPresentation={returnPresentation} onReturn={returnToRoom}');
 });
 

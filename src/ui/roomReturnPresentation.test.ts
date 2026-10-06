@@ -9,12 +9,12 @@ const bootstrap = { kind: 'awaiting_game_bootstrap', tableID: 1 } as RoomState;
 const live = (changes: {
   finished?: boolean; active?: boolean; shared?: object | null; hypothetical?: object | null;
   sharedReplay?: boolean; role?: 'player' | 'spectator'; currentPlayerIndex?: number;
-  turnNum?: number; score?: number;
+  turnNum?: number; score?: number; databaseID?: number | null;
 } = {}): RoomState => ({
   kind: 'live_game', tableID: 1, role: changes.role ?? 'player', sharedReplay: changes.sharedReplay ?? false,
   clientState: {
     finished: changes.finished ?? false, playing: true,
-    replay: { active: changes.active ?? false, shared: changes.shared ?? null, hypothetical: changes.hypothetical ?? null },
+    replay: { active: changes.active ?? false, databaseID: changes.databaseID ?? null, shared: changes.shared ?? null, hypothetical: changes.hypothetical ?? null },
     metadata: { ourPlayerIndex: 0 },
     ongoingGame: { score: changes.score ?? 23, turn: { currentPlayerIndex: changes.currentPlayerIndex ?? 1, turnNum: changes.turnNum ?? 0 } },
   },

@@ -1297,10 +1297,12 @@ function C17DenseWorkspace({
             </View>
           </View> : hypotheticalController ? <Text style={[styles.workbenchText, { color: theme.colors.textMuted }]}>{editHypotheticalCards ? 'Choose any visible hand card to edit its identity.' : 'Select a card from the hypothetical actor hand or a player to plan a clue.'}</Text> : null
   );
+  const followLeaderControl = sharedReplay !== null && !sharedReplay.amLeader && !sharedReplay.useSharedSegments
+    ? <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} /> : null;
   const replayPrimaryControls = <>
-    <ActionButton compact disabled={!canReviewBack} title="Back" onLongPress={onReviewStart} onPress={onReviewBack} />
-    <ActionButton compact disabled={!canReviewForward} title="Forward" onLongPress={onReviewEnd} onPress={onReviewForward} />
-    {sharedReplay !== null && !sharedReplay.amLeader && !sharedReplay.useSharedSegments && <ActionButton compact title="Follow leader" tone="primary" onPress={() => lobbyRuntime.followReplayLeader()} />}
+    <ActionButton compact disabled={!canReviewBack} title="Previous" onLongPress={onReviewStart} onPress={onReviewBack} />
+    <ActionButton compact disabled={!canReviewForward} title="Next" onLongPress={onReviewEnd} onPress={onReviewForward} />
+    {followLeaderControl}
   </>;
   const WorkbenchViewport = !portraitV2 && selectedTarget !== null && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null ? View : ScrollView;
   const workbench = (
@@ -1315,8 +1317,8 @@ function C17DenseWorkspace({
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canReviewBack} title={portraitV2 ? "← Back" : "Back"} onLongPress={onReviewStart} onPress={onReviewBack} />
-              <ActionButton compact disabled={!canReviewForward} title={portraitV2 ? "Forward →" : "Forward"} onLongPress={onReviewEnd} onPress={onReviewForward} />
+              <ActionButton compact disabled={!canReviewBack} title="Previous" onLongPress={onReviewStart} onPress={onReviewBack} />
+              <ActionButton compact disabled={!canReviewForward} title="Next" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
             <ActionButton compact title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"} tone="primary" onPress={onReturnLive} />
           </View>
@@ -1340,6 +1342,7 @@ function C17DenseWorkspace({
           <ActionButton compact title="Close" onPress={() => setWorkbenchFeedback(null)} />
         </View> : hypothetical !== null ? <>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>HYPOTHETICAL · ACTOR {hypotheticalActor === null ? '—' : metadata.playerNames[hypotheticalActor] ?? `P${hypotheticalActor + 1}`}</Text>
+          {followLeaderControl}
           {hypotheticalController ? <View style={styles.actionButtons}>
             <ActionButton compact disabled={hypotheticalOperationPending || hypothetical.states.length <= 1} title="Back" onPress={onBackHypothetical} />
             <ActionButton compact disabled={hypotheticalOperationPending} title={editHypotheticalCards ? 'Done editing' : 'Edit cards'} onPress={() => takeWorkbenchTask(onToggleEditHypotheticalCards)} />
@@ -1366,8 +1369,8 @@ function C17DenseWorkspace({
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <View style={styles.rowBetween}>
             <View style={styles.actionButtons}>
-              <ActionButton compact disabled={!canReviewBack} title={portraitV2 ? "← Back" : "Back"} onLongPress={onReviewStart} onPress={onReviewBack} />
-              <ActionButton compact disabled={!canReviewForward} title={portraitV2 ? "Forward →" : "Forward"} onLongPress={onReviewEnd} onPress={onReviewForward} />
+              <ActionButton compact disabled={!canReviewBack} title="Previous" onLongPress={onReviewStart} onPress={onReviewBack} />
+              <ActionButton compact disabled={!canReviewForward} title="Next" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
             <ActionButton compact title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"} tone="primary" onPress={onReturnLive} />
           </View>
@@ -1395,6 +1398,7 @@ function C17DenseWorkspace({
             </View>}
             {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={() => takeWorkbenchTask(onStartHypothetical)} />}
           </> : <>
+            <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>T{selectedTurn} · {sharedReplay.amLeader ? 'Shared leader view' : sharedReplay.useSharedSegments ? 'Following leader' : 'Local view · Detached from leader'}</Text>
             <Text numberOfLines={1} style={[styles.workbenchText, { color: theme.colors.textMuted }]}>Leader: {sharedReplay.leader}</Text>
             {pendingReplaySuggestion !== null && <View style={styles.actionButtons}>
               <Text style={[styles.workbenchText, { color: theme.colors.text }]}>

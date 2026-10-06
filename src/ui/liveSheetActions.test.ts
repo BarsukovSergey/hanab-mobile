@@ -64,15 +64,15 @@ test('C17 child host uses the allocated right column without changing allocator 
 
 test('keeps live-game header actions outlined, matched, and tall enough to tap', () => {
   const headerStart = app.indexOf('<View style={[styles.headerActions');
-  const headerEnd = app.indexOf('</View>', headerStart);
+  const headerEnd = app.indexOf('{liveConnectionProblem', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
   const normalHeader = headerActions.slice(headerActions.indexOf('</> : <>'));
   const buttons = normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
-  expect(browse).toContain('title="Home"');
-  expect(browse).toContain('onPress={homeFromLive}');
+  expect(browse).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
+  expect(browse).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
   expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
   expect(chat).toContain("onPress={() => setRoomChild('chat')}");
   expect(more).toContain('title="Menu"');
@@ -101,12 +101,13 @@ test('uses explicit export feedback tone instead of inferring it from message te
 
 test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
   const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
-  expect(header).toContain('title="Home"');
-  expect(header).toContain('onPress={homeFromLive}');
+  expect(header).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
+  expect(header).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
   expect(header).toContain('liveClientState.metadata.options.variantName');
   expect(header).toContain('title="Menu"');
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
-  expect(header).not.toMatch(/Browse|More|username|YOUR TURN|LIVE T/);
+  expect(header).not.toMatch(/More|username|YOUR TURN|LIVE T/);
+  expect(header).toContain('workspacePresentation.identity');
   expect(header).not.toContain('width <= height');
 });
 
