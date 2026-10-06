@@ -2,7 +2,7 @@ import type { LobbyTable, LobbyUser } from '../protocol/lobbyProtocol';
 import {
   isPregameSpectateEligible,
   isSpectateEligible,
-} from '../runtime/LobbyRuntime';
+} from '../runtime/lobbyEligibility';
 
 export type PeopleTableAction = {
   label: 'Spectate' | 'Spectate pregame';

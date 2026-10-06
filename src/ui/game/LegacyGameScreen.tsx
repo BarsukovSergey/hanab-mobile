@@ -16,7 +16,7 @@ import {
   type LiveClock,
 } from '../../game/selectors/gameplay';
 import { getLastCluePresentation } from '../../game/selectors/lastClue';
-import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/LobbyRuntime';
+import { isQuickRematchEligible, isRestartToPregameEligible } from '../../runtime/lobbyEligibility';
 import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';

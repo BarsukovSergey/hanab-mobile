@@ -5,7 +5,7 @@ import {
   isPregameSpectateEligible,
   isReattendEligible,
   isSpectateEligible,
-} from '../runtime/LobbyRuntime';
+} from '../runtime/lobbyEligibility';
 
 export type LobbySections = {
   yourRunningGames: LobbyTable[];

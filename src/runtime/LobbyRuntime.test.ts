@@ -21,14 +21,11 @@ import { sessionActions } from '../store/sessionSlice';
 import { createAppStore, userSelectors } from '../store/store';
 import { ChatRuntime, getVariantFromArgs } from './ChatRuntime';
 import {
-  isJoinEligible,
   isPregameSpectateEligible,
   isQuickRematchEligible,
   isRestartToPregameEligible,
-  isReattendEligible,
-  isSpectateEligible,
-  LobbyRuntime,
-} from './LobbyRuntime';
+} from './lobbyEligibility';
+import { LobbyRuntime } from './LobbyRuntime';
 import { TerminationRuntime } from './terminationRuntime';
 import { SHRUG_TEXT, transformChatInput } from '../ui/chatInput';
 
@@ -1462,47 +1459,6 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().lobby.tables.ids).toEqual([]);
     expect(store.getState().room.room).toEqual({ kind: 'none' });
     expect(store.getState().chat.messagesByRoom).toEqual({});
-  });
-
-  test('running shared replays remain spectate eligible even when joined', () => {
-    expect(isSpectateEligible(runningTable)).toBe(true);
-    expect(isSpectateEligible({ ...runningTable, running: false })).toBe(false);
-    expect(isSpectateEligible({ ...runningTable, sharedReplay: true })).toBe(true);
-    expect(isSpectateEligible({
-      ...runningTable, sharedReplay: true, joined: true,
-    })).toBe(true);
-    expect(isSpectateEligible({ ...runningTable, joined: true })).toBe(false);
-  });
-
-  test('only supported open non-replay non-joined tables with a seat are join eligible', () => {
-    expect(isJoinEligible(joinableTable)).toBe(true);
-    expect(isJoinEligible({ ...joinableTable, running: true })).toBe(false);
-    expect(isJoinEligible({ ...joinableTable, sharedReplay: true })).toBe(false);
-    expect(isJoinEligible({ ...joinableTable, joined: true })).toBe(false);
-    expect(isJoinEligible({ ...joinableTable, passwordProtected: true })).toBe(true);
-    expect(isJoinEligible({ ...joinableTable, numPlayers: 5 })).toBe(false);
-    expect(isJoinEligible({
-      ...joinableTable,
-      options: { ...tableOptions, timed: true, timeBase: 120, timePerTurn: 20 },
-    })).toBe(true);
-    for (const unsupported of ['speedrun', 'deckPlays', 'detrimentalCharacters'] as const) {
-      expect(isJoinEligible({
-        ...joinableTable,
-        options: { ...tableOptions, [unsupported]: true },
-      })).toBe(false);
-    }
-  });
-
-  test('only own running non-replay tables are reattend eligible', () => {
-    const ownRunningTable = { ...runningTable, joined: true };
-    expect(isReattendEligible(ownRunningTable)).toBe(true);
-    expect(isReattendEligible({ ...ownRunningTable, running: false })).toBe(false);
-    expect(isReattendEligible({ ...ownRunningTable, joined: false })).toBe(false);
-    expect(isReattendEligible({ ...ownRunningTable, sharedReplay: true })).toBe(false);
-    expect(isReattendEligible({
-      ...ownRunningTable,
-      options: { ...tableOptions, timed: true, timeBase: 120, timePerTurn: 20 },
-    })).toBe(true);
   });
 
   test('unsupported pregame recovery unattends, clears recovery, and warns', async () => {
