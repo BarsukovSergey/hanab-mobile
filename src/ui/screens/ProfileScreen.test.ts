@@ -27,7 +27,7 @@ test('room-owned Profile retains participant origin, focus and attendance', () =
   expect(opening).toContain("kind: 'profile', username: name, origin: 'menu-participants'");
   expect(opening).not.toMatch(/setPresentationFocus|setBrowsing|lobbyRuntime|dispatch/);
   const back = app.slice(app.indexOf('const backRoomChild ='), app.indexOf("BackHandler.addEventListener"));
-  expect(back).toContain('setRoomChild(roomChild.origin)');
+  expect(back).toContain('setRoomChild(decision.origin)');
   expect(back).not.toMatch(/lobbyRuntime|setFriend|sendPrivateMessage|dispatch/);
   expect(app).toContain('<ProfileScreen username={roomChild.username} roomOccupied={browsingRoomOccupied} room={`table${liveTableID}`} />');
   const globalNav = app.slice(app.indexOf('const showBrowsingNavigation'), app.indexOf('const railNavigation'));

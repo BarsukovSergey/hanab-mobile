@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@jest/globals';
+import { getRoomChildBackDecision } from './roomChildPresentation';
 
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const roomChild = app.slice(app.indexOf('const renderRoomChildren'), app.indexOf('    focusedRoomPresentation = ('));
@@ -18,14 +19,14 @@ test('keeps one table Chat mounted outside conditional Menu with a direct Return
 test('groups tools and preserves normal Show tags submission', () => {
   expect(roomChild).toContain("roomChild === 'menu-tools'");
   expect(roomChild).toContain("chatRuntime.submit('/tags')");
-  expect(app).toContain("roomChild === 'tag' || roomChild === 'replay-export'");
-  expect(app).toContain("setRoomChild('menu-tools')");
+  expect(getRoomChildBackDecision('tag')).toEqual({ kind: 'open-child', child: 'menu-tools' });
+  expect(getRoomChildBackDecision('replay-export')).toEqual({ kind: 'open-child', child: 'menu-tools' });
 });
 
 test('Settings returns to Menu and retains nested Back ownership', () => {
   expect(roomChild).toContain('title="Settings >"');
   expect(roomChild).toContain("<SettingsScreen onBack={() => setRoomChild('menu')}");
-  expect(app).toContain("else if (roomChild === 'settings') settingsBackRef.current?.();");
+  expect(app).toContain("else if (decision.kind === 'settings') settingsBackRef.current?.();");
   expect(roomChild).not.toContain('<ActionButton title="Sign out"');
 });
 
@@ -47,7 +48,7 @@ test('only destructive attendance confirmation sends unattend', () => {
 
 test('Chat hardware Back dismisses only keyboard first', () => {
   const back = app.slice(app.indexOf('const backRoomChild'), app.indexOf('  useEffect(() => {', app.indexOf('const backRoomChild')));
-  expect(back).toContain("if (roomChild === 'chat')");
+  expect(back).toContain("if (decision.kind === 'chat')");
   expect(back).toContain('if (keyboardOpen.current || Keyboard.isVisible()) Keyboard.dismiss();');
   expect(back).toContain('else setRoomChild(null);');
   expect(back).not.toContain('unattend');
@@ -148,7 +149,7 @@ test('canonical Settings is a room task outside the Menu panel and its scrolling
   const back = settings.slice(settings.indexOf('const handleBack ='), settings.indexOf('if (backRef)'));
   expect(back).toMatch(/else if \(category !== null\) \{\s*setCategory\(null\);\s*\} else \{\s*onBack\(\);/);
   expect(settings).toContain('backRef.current = handleBack');
-  expect(app).toContain("else if (roomChild === 'settings') settingsBackRef.current?.();");
+  expect(app).toContain("else if (decision.kind === 'settings') settingsBackRef.current?.();");
 });
 
 test('section 10 documents exact right-column Chat replacement without a full-window fallback', () => {
