@@ -4,6 +4,7 @@ import { expect, test } from '@jest/globals';
 
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const roomChild = app.slice(app.indexOf('const renderRoomChildren'), app.indexOf('    focusedRoomPresentation = ('));
+const menu = roomChild.slice(roomChild.indexOf("{roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings'"));
 
 test('keeps one table Chat mounted outside conditional Menu with a direct Return', () => {
   expect(roomChild.match(/<ChatPanel/g)).toHaveLength(1);
@@ -29,7 +30,8 @@ test('Settings returns to Menu and retains nested Back ownership', () => {
 });
 
 test('Menu has a fixed header and Close above the bounded inner scroll', () => {
-  expect(roomChild.indexOf('title="Close"')).toBeLessThan(roomChild.indexOf('<ScrollView'));
+  expect(menu.indexOf('title="Close"')).toBeLessThan(menu.indexOf('<ScrollView'));
+  expect(menu.indexOf('title="Back"')).toBeLessThan(menu.indexOf('<ScrollView'));
   expect(roomChild).toContain('onPress={(event) => event.stopPropagation()}');
   expect(app).toContain('menuScroll: { flex: 1, minHeight: 0 }');
   expect(roomChild).toContain('Math.min(288, Math.max(220, landscapeRightWidth - 32))');
@@ -64,7 +66,8 @@ test('keeps live-game header actions outlined, matched, and tall enough to tap',
   const headerStart = app.indexOf('<View style={[styles.headerActions');
   const headerEnd = app.indexOf('</View>', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
-  const buttons = headerActions.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
+  const normalHeader = headerActions.slice(headerActions.indexOf('</> : <>'));
+  const buttons = normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
@@ -96,7 +99,7 @@ test('uses explicit export feedback tone instead of inferring it from message te
 });
 
 
-test('Live header shares Home variant Chat Menu in both orientations', () => {
+test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
   const header = app.slice(app.indexOf('const gameRootScrollable'), app.indexOf('{liveConnectionProblem'));
   expect(header).toContain('title="Home"');
   expect(header).toContain('onPress={homeFromLive}');
@@ -105,4 +108,54 @@ test('Live header shares Home variant Chat Menu in both orientations', () => {
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).not.toMatch(/Browse|More|username|YOUR TURN|LIVE T/);
   expect(header).not.toContain('width <= height');
+});
+
+test('portrait Chat replaces contents of the same Live header and has no second task header', () => {
+  expect(app).toContain("const portraitChatOpen = roomChild === 'chat' && width <= height;");
+  const header = app.slice(app.indexOf('styles.gameBar,'), app.indexOf('{liveConnectionProblem'));
+  expect(header.match(/styles.gameBar,/g)).toHaveLength(1);
+  const chatHeader = header.slice(header.indexOf('{portraitChatOpen ? <>'), header.indexOf('</> : <>'));
+  expect(chatHeader).toContain('>Table chat</Text>');
+  expect(chatHeader).toContain('title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild}');
+  expect(chatHeader).not.toMatch(/title="Home"|title="Menu"|variantName/);
+  const task = roomChild.slice(roomChild.indexOf('<View style={[styles.chatTask'), roomChild.indexOf("{roomChild === 'settings'"));
+  expect(task).toMatch(/\{landscape && <View style=\{styles.childHeader\}>[\s\S]*?title="Table chat"[\s\S]*?title="Return to game"[\s\S]*?<\/View>\}/);
+  expect(task.match(/styles.childHeader/g)).toHaveLength(1);
+  expect(task.match(/<ChatPanel/g)).toHaveLength(1);
+  expect(task).toContain('fill readActive={roomPresentationVisible && roomChild === \'chat\'}');
+});
+
+test('portrait Menu is bottom anchored with 12 outer margin and an 82 percent cap', () => {
+  expect(menu).toContain('!landscape && styles.roomMenuPortrait');
+  expect(app).toMatch(/roomMenuBackdrop: \{[^}]*justifyContent: 'flex-end'/);
+  expect(app).toContain("roomMenuPortrait: { alignSelf: 'stretch', margin: 12, width: 'auto' }");
+  expect(app).toMatch(/roomMenu: \{[^}]*maxHeight: '82%'/);
+  expect(menu).toContain("landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }");
+  expect(roomChild).toContain("pointerEvents={childVisible ? 'auto' : 'none'}");
+});
+
+test('canonical Settings is a room task outside the Menu panel and its scrolling body', () => {
+  const settingsTask = roomChild.slice(roomChild.indexOf("{roomChild === 'settings' && <ScrollView"), roomChild.indexOf("{roomChild !== null"));
+  expect(settingsTask).toContain('styles.roomSettingsTask');
+  expect(settingsTask).toContain("<SettingsScreen onBack={() => setRoomChild('menu')}");
+  expect(settingsTask).toContain('backRef={settingsBackRef}');
+  expect(settingsTask).not.toMatch(/SectionHeading|ActionButton|styles.roomMenu|styles.menuScroll/);
+  expect(menu).not.toContain('<SettingsScreen');
+  expect(menu).not.toContain("roomChild === 'settings' ? 'Settings'");
+  expect(roomChild).toContain("width: roomChild === 'settings' ? '100%' : landscapeRightWidth ?? '100%'");
+  const settings = readFileSync(resolve(__dirname, 'screens/SettingsScreen.tsx'), 'utf8');
+  const back = settings.slice(settings.indexOf('const handleBack ='), settings.indexOf('if (backRef)'));
+  expect(back).toMatch(/else if \(category !== null\) \{\s*setCategory\(null\);\s*\} else \{\s*onBack\(\);/);
+  expect(settings).toContain('backRef.current = handleBack');
+  expect(app).toContain("else if (roomChild === 'settings') settingsBackRef.current?.();");
+});
+
+test('section 10 documents exact right-column Chat replacement without a full-window fallback', () => {
+  const doc = readFileSync(resolve(__dirname, '../../docs/MOBILE_APP_DESIGN_V2.md'), 'utf8');
+  const section = doc.slice(doc.indexOf('## 10.'), doc.indexOf('## 11.'));
+  expect(section).toContain('Landscape Chat replaces exactly the existing Slice 8b right column');
+  expect(section).toContain('landscapeLayout.rightWidth');
+  expect(section).toContain('There is no full-window Chat fallback.');
+  expect(section).toContain('The left hand grid, divider, and card geometry do not reflow');
+  expect(section).not.toMatch(/full-window task/);
 });

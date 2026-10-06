@@ -438,6 +438,7 @@ function AppContent() {
       replayActive: roomState.room.clientState.replay.active,
       sharedReplay: roomState.room.sharedReplay,
     });
+    const portraitChatOpen = roomChild === 'chat' && width <= height;
     const gameRootScrollable = !c17Workspace;
     const renderRoomChildren = (landscapeRightWidth: number | null) => {
       const landscape = landscapeRightWidth !== null;
@@ -445,23 +446,29 @@ function AppContent() {
       return <View pointerEvents={childVisible ? 'auto' : 'none'}
         accessibilityElementsHidden={!childVisible}
         importantForAccessibility={childVisible ? 'auto' : 'no-hide-descendants'}
-        style={[styles.roomChildHost, { width: landscapeRightWidth ?? '100%' }, !childVisible && { display: 'none' }]}>
+        style={[styles.roomChildHost, { width: roomChild === 'settings' ? '100%' : landscapeRightWidth ?? '100%' }, !childVisible && { display: 'none' }]}>
         <View style={[styles.chatTask, { backgroundColor: theme.colors.surface }, roomChild !== 'chat' && { display: 'none' }]}>
-          <View style={styles.childHeader}>
+          {landscape && <View style={styles.childHeader}>
             <SectionHeading title="Table chat" />
             <ActionButton compact title="Return to game" onPress={closeRoomChild} />
-          </View>
+          </View>}
           <ChatPanel key={liveTableID} room={'table' + liveTableID} title="Table chat"
             fill readActive={roomPresentationVisible && roomChild === 'chat'}
             sendEnabled={roomPresentationVisible && roomChild === 'chat'} />
         </View>
-        {roomChild !== null && roomChild !== 'chat' && <Pressable onPress={closeRoomChild}
+        {roomChild === 'settings' && <ScrollView
+          style={[styles.roomSettingsTask, { backgroundColor: theme.colors.background }]}
+          contentContainerStyle={styles.roomSettingsContent} keyboardShouldPersistTaps="handled">
+          <SettingsScreen onBack={() => setRoomChild('menu')} onSignOut={() => void signOut()} backRef={settingsBackRef} />
+        </ScrollView>}
+        {roomChild !== null && roomChild !== 'chat' && roomChild !== 'settings' && <Pressable onPress={closeRoomChild}
           style={[styles.roomMenuBackdrop, !landscape && { backgroundColor: theme.colors.overlay }]}>
           <Pressable onPress={(event) => event.stopPropagation()}
             style={[styles.roomMenu, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong },
+              !landscape && styles.roomMenuPortrait,
               landscape && { width: Math.min(288, Math.max(220, landscapeRightWidth - 32)), height: '100%', maxHeight: '100%' }]}>
             <View style={styles.childHeader}>
-              <SectionHeading title={roomChild === 'menu' ? 'Game menu' : roomChild === 'menu-participants' ? 'Participants / spectators' : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'settings' ? 'Settings' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
+              <SectionHeading title={roomChild === 'menu' ? 'Game menu' : roomChild === 'menu-participants' ? 'Participants / spectators' : roomChild === 'menu-perspective' ? 'Perspective' : roomChild === 'menu-tools' ? 'Tags / replay tools' : roomChild === 'tag' ? 'Add tag' : 'Export replay'} />
               <ActionButton compact title="Close" tone="ghost" onPress={closeRoomChild} />
             </View>
             {roomChild !== 'menu' && <ActionButton compact title="Back" onPress={backRoomChild} />}
@@ -519,9 +526,7 @@ function AppContent() {
                 <ActionButton title="Add tag" onPress={() => { setTagDraft(''); setRoomChild('tag'); }} />
                 <ActionButton title="Show tags" onPress={() => chatRuntime.submit('/tags')} />
                 {liveClientState.finished && <ActionButton title="Export replay" onPress={() => { setExportFeedback(null); setRoomChild('replay-export'); }} />}
-              </> : roomChild === 'settings'
-                ? <SettingsScreen onBack={() => setRoomChild('menu')} onSignOut={() => void signOut()} backRef={settingsBackRef} />
-                    : roomChild === 'replay-export'
+              </> : roomChild === 'replay-export'
                       ? <>
                         <SectionHeading title="Export replay" detail="Copy or share this finished replay." />
                         {exportFeedback !== null && <Notice tone={exportFeedback.tone}>{exportFeedback.message}</Notice>}
@@ -580,6 +585,10 @@ function AppContent() {
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}>
           <View style={[styles.headerActions, styles.flex, landscapePhone && styles.headerActionsLandscape]}>
+            {portraitChatOpen ? <>
+              <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
+              <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
+            </> : <>
             <ActionButton compact title="Home" tone="secondary" style={styles.liveHeaderAction} onPress={homeFromLive} />
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{liveClientState.metadata.options.variantName}</Text>
             <ActionButton
@@ -591,6 +600,7 @@ function AppContent() {
               onPress={() => setRoomChild('chat')}
             />
             <ActionButton compact disabled={roomChild !== null} title="Menu" tone="secondary" style={styles.liveHeaderAction} onPress={() => setRoomChild('menu')} />
+            </>}
           </View>
         </View>
         {liveConnectionProblem && (
@@ -829,9 +839,12 @@ function AppContent() {
 const styles = StyleSheet.create({
   roomChildHost: { position: 'absolute', top: 0, bottom: 0, right: 0 },
   chatTask: { flex: 1, minHeight: 0 },
+  roomSettingsTask: { flex: 1 },
+  roomSettingsContent: { alignSelf: 'center', maxWidth: 720, padding: 12, width: '100%' },
+  roomMenuPortrait: { alignSelf: 'stretch', margin: 12, width: 'auto' },
   childHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4, padding: 4 },
   roomMenuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, justifyContent: 'flex-end', alignItems: 'flex-end' },
-  roomMenu: { width: '100%', height: '85%', maxHeight: '90%', borderRadius: 12, borderWidth: 1, padding: 8, minHeight: 160 },
+  roomMenu: { width: '100%', height: '82%', maxHeight: '82%', borderRadius: 12, borderWidth: 1, padding: 8, minHeight: 160 },
   flex: { flex: 1 },
   browsingBody: { flex: 1, flexDirection: 'row' },
   browsingMain: { flex: 1, minWidth: 0 },

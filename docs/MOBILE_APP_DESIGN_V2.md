@@ -718,7 +718,7 @@ LANDSCAPE
 └──────────────────────────────────────┴──────────────────────────┘
 ```
 
-Landscape Chat занимает боковую overlay, если её собственные width/height requirements проходят. Иначе — full-window task. **Он не сжимает Ledger**, чтобы «влезть рядом».
+Landscape Chat replaces exactly the existing Slice 8b right column, using `landscapeLayout.rightWidth`. There is no full-window Chat fallback. The left hand grid, divider, and card geometry do not reflow; Chat does not change the landscape allocator inputs.
 
 При IME доступная область отдаётся Chat task; сохранение полного игрового поля над клавиатурой не является обязательным.
 
