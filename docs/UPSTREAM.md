@@ -40,15 +40,29 @@ Friends history is adapted from `Hanabi-Live/hanabi-live` commit
 and `packages/client/src/lobby/types/GameHistory.ts`. This scoped protocol fact does
 not advance the baseline game/protocol pin above.
 
-## Hypothetical replay core pin
+## Hypothetical replay / protocol pin
 
-Hypothetical replay state, reducer semantics, and replay-action protocol are adapted from:
+Replay/shared-replay orchestration and replay-action protocol behavior are adapted from:
 
 - Repository: `Hanabi-Live/hanabi-live`
 - Commit: `8be709c48145ad56a1891307663ed3bec2cd4175`
-- Sources: `HypotheticalState.ts`, `replayReducer.ts`, `hypothetical.ts`, `ReplayActionType.ts`, and `server/src/command_replay_action.go`
+- Sources: `replayReducer.ts`, `hypothetical.ts`, `ReplayActionType.ts`, and `server/src/command_replay_action.go`
 
-The mobile boundary retains only platform-independent state/reducer/protocol/runtime behavior; browser UI remains out of scope.
+The platform-independent hypothetical state-transition core has since advanced to the separate U3a pin below. Mobile replay ownership, shared-replay coordination, protocol validation, and runtime safety remain outside that extracted core.
+
+## Hypothetical state-transition pin
+
+Platform-independent hypothetical state transitions are adapted from the merged U3a extraction:
+
+- Repository: `Hanabi-Live/hanabi-live`
+- Commit: `0103ce7d2a72cb1922e46324ef2e484720bea737`
+- PR: #3158
+- Source: `packages/game/src/hypotheticalState.ts`
+- Mobile adaptation: `src/game/client/hypotheticalState.ts`
+
+The mobile adaptation preserves the upstream initialization, action application, Back, draw-visibility, starting-player clue, reducer flags, and segment-snapshot semantics while retaining mobile-only branch-history fields (`actions` and `stateActionLengths`) used by reveal-toggle legality and replay export. Mobile also keeps its existing hypothetical strike contract that permits strike numbers above three; live-game strike validation is unchanged.
+
+This scoped state-transition pin does not advance the baseline game/protocol pin or the hypothetical planning pin. Bottom-Deck Blind Play follow-ups such as #3159 remain excluded because mobile does not support `deckPlays`.
 
 ## Hypothetical action planning pin
 
@@ -60,10 +74,10 @@ Hypothetical deterministic planning is adapted from the merged U2 extraction:
 - Source: `packages/game/src/hypotheticalPlanning.ts`
 - Mobile adaptation: `src/game/client/hypotheticalPlanning.ts`
 
-This is a scoped pure-planning adoption. It does not advance the baseline game/protocol pin,
-nor the hypothetical replay state/reducer/protocol pin at
-`8be709c48145ad56a1891307663ed3bec2cd4175`. Mobile validation, eligibility,
-card visibility policy, and runtime transport/READY/ownership safety remain outside the planner.
+This is a scoped pure-planning adoption. It does not advance the baseline game/protocol pin or
+the hypothetical replay/protocol pin above. The hypothetical state-transition core is pinned
+separately. Mobile validation, eligibility, card visibility policy, and runtime
+transport/READY/ownership safety remain outside the planner.
 Later bottom-deck planning changes such as #3157 are not part of this adoption;
 mobile still does not support Bottom-Deck Blind Plays or `deckPlays`.
 

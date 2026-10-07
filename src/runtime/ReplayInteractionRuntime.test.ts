@@ -305,6 +305,24 @@ describe('inbound replay events', () => {
     expect(solo.diagnostic).not.toHaveBeenCalled();
   });
 
+  test('hypothetical snapshots and action echoes retain strikes above three', () => {
+    const { runtime, replay, diagnostic, send } = makeRuntime();
+    const strike = { type: 'strike', num: 4, order: 5, turn: 1 };
+    runtime.receiveEvent(1, {
+      command: 'hypothetical', data: { actions: [JSON.stringify(strike)], showDrawnCards: false },
+    });
+    expect(replay().hypothetical?.actions).toEqual([strike]);
+    expect(replay().hypothetical?.ongoing.strikes).toHaveLength(1);
+    const nextStrike = { ...strike, num: 5 };
+    runtime.receiveEvent(1, { command: 'hypoAction', data: hypoActionSchema.parse(nextStrike) });
+    expect(replay().hypothetical?.actions).toEqual([strike, nextStrike]);
+    expect(replay().hypothetical?.ongoing.strikes).toHaveLength(2);
+    expect(replay().hypothetical?.stateActionLengths).toEqual([0]);
+    expect(diagnostic).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(gameActionListSchema.safeParse({ tableID: 123, list: [strike] }).success).toBe(false);
+  });
+
   test.each([{ epoch: 0, tableID: 123 }, { epoch: 1, tableID: 999 }])('reducers reject stale or wrong-room events: %j', ({ epoch, tableID }) => {
     const { runtime, store, room, start } = makeRuntime();
     const before = room();
