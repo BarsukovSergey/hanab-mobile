@@ -5,11 +5,12 @@ This directory mixes current product/technical authority with historical impleme
 ## Start here
 
 - `../README.md` — project overview, local development, current Android beta scope and release-candidate state.
-- `../TESTING.md` — tester-facing script and bug-report format; use the beta.3 physical-smoke document for the current hotfix acceptance pass.
-- `BETA_3_PHYSICAL_SMOKE.md` — current beta.3/hotfix physical acceptance record and exact hotfix APK identity.
-- `BETA_3_RELEASE_NOTES.md` — beta.3 release notes; `BETA_2_RELEASE_NOTES.md` remains the frozen previous-release reference.
-- `ANDROID_BETA_RELEASE.md` — internal APK build/release process and historical candidate identities; use `BETA_3_PHYSICAL_SMOKE.md` for the current hotfix artifact/acceptance state.
-- `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — maintainer triage rules during the beta.1 tester window plus the version/upgrade checklist used to prepare beta.2.
+- `../TESTING.md` — beta.4 tester-facing script and bug-report format.
+- `BETA_4_PHYSICAL_SMOKE.md` — short maintainer gate plus broader Slice 12 tester coverage plan.
+- `BETA_4_RELEASE_NOTES.md` — beta.4 candidate/release identity and tester-facing highlights.
+- `BETA_3_PHYSICAL_SMOKE.md` / `BETA_3_RELEASE_NOTES.md` — frozen previous tester-release evidence.
+- `ANDROID_BETA_RELEASE.md` — current internal APK build/release process.
+- `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — current candidate freeze, physical gate, and tester-distribution policy.
 
 ## Authority precedence
 

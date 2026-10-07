@@ -3,7 +3,7 @@
     "name": "Hanab Mobile",
     "slug": "hanab-mobile",
     "scheme": "hanab-mobile",
-    "version": "1.0.0-beta.3",
+    "version": "1.0.0-beta.4",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 4
+      "versionCode": 5
     }
   }
 }
