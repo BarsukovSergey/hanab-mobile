@@ -2,7 +2,7 @@
 
 Mobile Hanabi client focused on serious live play on phones.
 
-The current Android tester line is **1.0.0-beta.3**. Hotfix 1 is published as `v1.0.0-beta.3-hotfix.1` from runtime candidate `36717a2284490c8179e35b882dca0bde15a14a75`; focused physical re-smoke is still required before marking beta.3 PASS.
+The currently published Android tester artifact is **v1.0.0-beta.3-hotfix.1**. The next tester line is **1.0.0-beta.4** / Android `versionCode` 5; its release-prep candidate is not yet built or published.
 
 C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
 
@@ -12,11 +12,11 @@ If someone sent you an Android build/APK, you do **not** need to build the proje
 
 Please test the app as a player, not as someone trying to guess how the UI was implemented. If an action is hard to discover or a screen is confusing without instructions, report that as a UX problem.
 
-Beta.3 hotfix identity and current validation state are tracked in [`docs/BETA_3_PHYSICAL_SMOKE.md`](./docs/BETA_3_PHYSICAL_SMOKE.md). The previous beta.2 identity remains frozen in [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
+Beta.4 release identity and the short maintainer gate are tracked in [`docs/BETA_4_RELEASE_NOTES.md`](./docs/BETA_4_RELEASE_NOTES.md) and [`docs/BETA_4_PHYSICAL_SMOKE.md`](./docs/BETA_4_PHYSICAL_SMOKE.md). The published beta.3 hotfix remains frozen in [`docs/BETA_3_PHYSICAL_SMOKE.md`](./docs/BETA_3_PHYSICAL_SMOKE.md).
 
 ## Current test focus
 
-The Android beta remains centered on reliable serious play and review flows:
+Beta.4 is the first tester line carrying the implemented Mobile App Design v2 shell. Testing remains centered on reliable serious play/review plus physical hardening of the new navigation and responsive surfaces:
 
 - card selection and explicit Play/Discard actions;
 - notes, clue planning, knowledge/empathy and discard inspection;
@@ -27,7 +27,7 @@ The Android beta remains centered on reliable serious play and review flows:
 - focused 4P–6P real-card layout regression on supported phone layouts;
 - social/history additions shipped after beta.1.
 
-The post-beta mobile shell/IA redesign is now specified in [`docs/MOBILE_APP_DESIGN_V2.md`](./docs/MOBILE_APP_DESIGN_V2.md) and is the next major implementation milestone; it is intentionally separate from the frozen beta.3 tester baseline.
+Mobile App Design v2 is implemented through the current product slices; Slice 12 physical hardening / accessibility / performance is the active validation milestone. Beta.4 tester feedback is intended to broaden that device evidence before Slice 13 cleanup.
 
 See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug-report format.
 
@@ -69,7 +69,7 @@ Build the standalone internal beta APK:
 npm run android:beta-apk
 ```
 
-The APK is written to `dist/Hanab-Mobile-1.0.0-beta.3.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
+The APK is written to `dist/Hanab-Mobile-1.0.0-beta.4.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
 
 Normal local validation:
 
@@ -83,7 +83,8 @@ git diff --check
 ## Project documentation
 
 - Testers: start with [`TESTING.md`](./TESTING.md).
-- Beta.2 release notes: [`docs/BETA_2_RELEASE_NOTES.md`](./docs/BETA_2_RELEASE_NOTES.md).
+- Beta.4 release notes: [`docs/BETA_4_RELEASE_NOTES.md`](./docs/BETA_4_RELEASE_NOTES.md).
+- Beta.4 maintainer smoke: [`docs/BETA_4_PHYSICAL_SMOKE.md`](./docs/BETA_4_PHYSICAL_SMOKE.md).
 - Android beta build/release guidance: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
 - Product roadmap: [`docs/PRODUCT_ROADMAP.md`](./docs/PRODUCT_ROADMAP.md).
 - Ratified mobile design v2: [`docs/MOBILE_APP_DESIGN_V2.md`](./docs/MOBILE_APP_DESIGN_V2.md).
