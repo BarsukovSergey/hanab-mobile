@@ -1,136 +1,162 @@
 # Hanab Mobile — Testing Guide
 
-This page is for people testing the current **Hanab Mobile 1.0.0-beta.3 Android line**.
+This page is for people testing the **Hanab Mobile 1.0.0-beta.4 Android line**.
 
-For the current hotfix artifact, exact APK identity and the focused re-smoke checklist live in `docs/BETA_3_PHYSICAL_SMOKE.md`; that document wins for build-specific acceptance details.
+Beta.4 is the first tester build based on the implemented Mobile App Design v2 shell. Test it like a
+normal player. **If an ordinary action or route is hard to discover without instructions, report that
+as a UX problem.**
 
-You do not need to understand the C17 design documents or the implementation. Test it like a normal player. **If you need instructions to discover an ordinary gameplay control, report that as a problem.**
+Exact candidate/APK identity and the maintainer release gate live in
+`docs/BETA_4_PHYSICAL_SMOKE.md`.
 
 ## Before you start
 
 Please note:
 
 - build/commit if it was provided to you;
-- phone model;
+- phone/tablet model;
 - Android version;
 - gesture navigation or three-button navigation;
 - light or dark theme;
-- normal or enlarged system font size.
+- system font scale if changed from normal.
 
-If you were given an APK/build directly, install that build. You do not need the source repository.
-
-For the focused beta.3 hotfix check, install hotfix 1 **over the already-installed initial beta.3 build** where possible. If separately repeating the beta.2 upgrade path, do not uninstall beta.2 first.
+If you were given an APK directly, install that build. You do not need the source repository.
 
 ## What to test
 
-### 1. Normal live play
+### 1. Browsing and focused rooms
+
+Browse Home, History, People, and More.
+
+Then create or join a Pregame and enter Live play.
+
+Check that:
+
+- focused Pregame/Live does not show the global bottom navigation;
+- Browse/Home does not silently leave or unattend the room;
+- Return takes you back to the attended room when offered;
+- Leave / Unattend / Stop watching are explicit actions;
+- Android Back does not accidentally change room attendance.
+
+If it becomes unclear whether you are browsing the app or focused inside a room, report that.
+
+### 2. Normal live play
 
 Play several turns normally.
 
 Try to answer without hunting through menus:
 
-- Whose turn is it?
-- How many clues, strikes and cards remain?
-- What just happened?
-- Can you select your own card and understand how to Play or Discard it?
-- Does anything important move, clip or disappear?
+- whose turn is it?
+- how many clues, strikes, and cards remain?
+- what just happened?
+- can you select your own card and understand how to Play or Discard it?
+- are Chat and the contextual game/table menu discoverable?
 
-Play/Discard should remain an explicit commit action; accidental gameplay sends are high-priority failures.
+Play/Discard/Clue must remain explicit sends. Accidental or duplicate gameplay commands are
+high-priority failures.
 
-### 2. Last Action and Recent actions
+### 3. Chat / Conversation / keyboard
 
-After several actions have happened:
+Use table Chat and, when convenient, a session Conversation.
 
-- inspect the most recent action;
-- find the recent-action list;
-- check whether the entries are understandable and obviously actionable;
-- select an older recent action.
+Check:
 
-Do not look for a specific button name. If the route is not discoverable, report that.
+- send/receive works;
+- unread behavior is sensible;
+- opening/closing Chat or Conversation does not alter attendance;
+- with the keyboard open, the first Android Back dismisses the IME rather than leaving the room;
+- landscape Chat/menu remains usable.
 
-### 3. Live rewind
+Session Messages are still session-local rather than durable account-wide history.
 
-Enter rewind while the game is still active.
+### 4. Live rewind and review
+
+Enter Rewind while a game is active.
 
 Try to:
 
-- move one action backward;
-- move one action forward;
-- move quickly across a larger part of the game;
-- jump to the beginning/end using the available controls;
-- inspect Last Action / Recent while still in rewind;
-- return to the current Live game.
+- move backward and forward;
+- inspect an older action;
+- return to Live;
+- let another live action arrive while reviewing if convenient.
 
-At every point, it should be obvious whether you are viewing history or Live.
+While reviewing, Play/Discard/Clue must not accidentally send. Returning to Live must show current
+authoritative state.
 
-While in rewind, Play/Discard/Clue must not accidentally send a gameplay action.
+Also sample a finished Review/shared replay when convenient.
 
-If another live action arrives while you are rewinding, you should not be kicked out of rewind. The UI should make the new live activity visible and returning to Live should show the current authoritative game.
+### 5. Hypothetical
 
-### 4. Look-away check
+From a representative replay/review:
 
-Look away from the phone for one action, then look back.
+- enter Hypothetical;
+- perform one action;
+- use Back;
+- morph/unmorph a card if convenient;
+- exit Hypothetical.
 
-Without asking another player, try to determine:
+Hypothetical actions must never become live gameplay sends.
 
-- who acted;
-- what they did;
-- which card/slot was involved when relevant;
-- important score/clue/strike/deck changes.
+### 6. Layout and accessibility
 
-If that takes too long or the information is unclear, report it even if you eventually figure it out.
+During Pregame, Live, Chat, and Review when possible:
 
-### 5. Layout / device behavior
+- rotate portrait -> landscape -> back;
+- try the other landscape orientation;
+- note clipping behind system UI;
+- check required controls remain comfortably tappable;
+- try enlarged system font if convenient;
+- report unreadable cards/text or controls that disappear.
 
-During normal play and rewind, briefly check:
+4P/6P and tablet coverage is especially useful because not every tester needs to test the same
+density.
 
-- rotate the phone and rotate back;
-- background the app and return;
-- light/dark theme if convenient;
-- Android system navigation does not cover required controls;
-- no hand requires horizontal scrolling;
-- required gameplay controls remain comfortably tappable.
+### 7. Background / reconnect
 
-The 2P/3P path remains the core smoke target. Beta.2 also includes substantial 4P–6P real-card layout work, so a larger table is useful regression coverage when convenient.
+During a live game:
 
-### 6. Beta.3 additions
+- begin an interaction but do not confirm it;
+- background and foreground the app;
+- allow reconnect/recovery if it occurs.
 
-If convenient, sample the current beta.3 surfaces:
+No old Play/Discard/Clue may fire automatically. Current authoritative state must win after recovery.
 
-- spectator mode and perspective switching;
-- colorblind/styled-number card settings;
-- Pregame player stats and spectator list;
-- Friends history and same-seed Other Scores;
-- shared replay creation from History and turn suggestions;
-- game tag display/Add flow;
-- live table chat unread indicator;
-- a session PM Dialog from People, Pregame, or live-game player/spectator context.
+### 8. Spectator
 
-These are regression targets, not a requirement to exhaust every feature in one session.
+If convenient:
 
-## Beta scope and known limitations
+- spectate a live game;
+- switch perspective;
+- return to the normal spectator view;
+- Browse and Return;
+- explicitly Stop watching.
 
-Beta.3 remains centered on reliable live gameplay/review while carrying the current 4P–6P real-card layout and the post-beta.2 product additions.
+Participant-only gameplay controls must not become available accidentally, and ordinary Back/Browse
+must not silently change attendance.
 
-The current 4P–6P path uses real cards as the primary UI with Compact Overview reserved as an emergency fallback. Report clipping, unreadable cards, excessive density, or an unexpected fallback.
+## Suggested coverage split
 
-Known non-blockers:
+You do not need to test everything. Different testers are more useful covering different combinations:
 
-- rapid replay scrubber movement can still show visible jank (issue #4);
-- compact shell/Pregame information-density polish remains future work (issue #58);
-- the major Mobile App Design v2 implementation is post-beta.3; session PM Dialogs are still not durable account-wide history.
-
-Still report crashes, broken navigation, accidental sends, lost state, clipped UI, unreadable cards, or anything that makes ordinary play confusing.
+- smaller phone / A55-class phone / tablet;
+- 2P / 3P / 4P / 6P;
+- portrait / either phone landscape orientation;
+- normal / enlarged fonts;
+- gesture / three-button navigation;
+- player / spectator;
+- Rewind / Review / Hypothetical;
+- notes / Chat / Conversation;
+- rotation / background / reconnect / IME.
 
 ## How to report a problem
 
 A useful report can be very short:
 
 ```text
-Build/commit:
+Version/build:
 Device + Android version:
 Navigation: gesture / three-button
-Theme + font size:
+Theme + font scale:
 
 What I wanted to do:
 What I did:
@@ -141,19 +167,19 @@ Can reproduce: always / sometimes / once
 Screenshot or screen recording: attached if useful
 ```
 
-For a UX/discoverability problem, also say **the first moment where you became unsure what to do next**.
-
-Do not write implementation guesses. “I wanted to see the previous action and could not tell where to tap” is more useful than “the history reducer is broken.”
+For a UX/discoverability problem, also say **the first moment where you became unsure what to do
+next**. Describe observed behavior rather than guessing at implementation.
 
 ## High-priority failures
 
 Call these out explicitly:
 
-- accidental Play/Discard/Clue send;
-- history/rewind changes the authoritative live game;
+- accidental or duplicate Play/Discard/Clue send;
+- history/rewind/hypothetical changes the authoritative live game;
+- reconnect/background/rotation causes an old armed action to fire;
 - returning to Live shows stale state;
 - wrong card identity/old slot in history;
+- Browse/Back silently changes attendance;
 - required controls hidden behind Android system UI;
 - app crash/freeze;
-- reconnect/background causes an old armed action to fire;
-- you cannot tell whether you are in Live or rewind.
+- you cannot tell whether you are browsing, focused in a room, Live, or reviewing history.
