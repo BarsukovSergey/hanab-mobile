@@ -633,7 +633,7 @@ function AppContent() {
             </>}
           </View>
         </View>
-        {!portraitChatOpen && workspacePresentation.status !== '' && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
+        {!portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '' && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
         {liveConnectionProblem && (
           <View style={styles.liveConnectionNotice}>
             <Notice tone="error">{session.error ?? 'Connection lost. Game actions are disabled until the realtime session reconnects.'}</Notice>
