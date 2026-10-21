@@ -9,10 +9,8 @@ function read(relativePath: string) {
 test('production gameplay screens keep live and replay hands free of horizontal ScrollView surfaces', () => {
   const wrapper = read('src/ui/game/GameScreen.tsx');
   const c17 = read('src/ui/game/C17GameScreen.tsx');
-  const legacy = read('src/ui/game/LegacyGameScreen.tsx');
-  const source = [wrapper, c17, legacy].join('\n');
+  const source = [wrapper, c17].join('\n');
 
   expect(source).not.toMatch(/<ScrollView\b[^>]*\bhorizontal(?:\s|=|>)/s);
-  expect(legacy).toContain('flexWrap: \'wrap\'');
-  expect(legacy).toContain('replayHand');
+  expect(wrapper).not.toContain('LegacyGameScreen');
 });

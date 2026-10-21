@@ -103,7 +103,6 @@ describe('lobby eligibility', () => {
     'src/ui/lobbySections.ts',
     'src/ui/peoplePresentation.ts',
     'src/ui/game/C17GameScreen.tsx',
-    'src/ui/game/LegacyGameScreen.tsx',
   ])('%s imports pure policy without the runtime controller', (path) => {
     const source = readFileSync(resolve(__dirname, '../..', path), 'utf8');
     expect(source).toMatch(/from ['"].*\/lobbyEligibility['"]/);

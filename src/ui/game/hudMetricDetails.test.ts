@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from '@jest/globals';
 
 const c17 = readFileSync('src/ui/game/C17GameScreen.tsx', 'utf8');
-const legacy = readFileSync('src/ui/game/LegacyGameScreen.tsx', 'utf8');
 const paceModal = readFileSync('src/ui/game/PaceDetailsModal.tsx', 'utf8');
 
 describe('Eff and Pace HUD details', () => {
-  it.each([['C17', c17], ['Legacy', legacy]])('%s keeps both metrics inspectable', (_name, screen) => {
+  it('C17 keeps both metrics inspectable', () => {
+    const screen = c17;
     expect(screen).toMatch(/label="Eff"[\s\S]*?onPress=\{\(\) => setEfficiencyDetailsOpen\(true\)\}/);
     expect(screen).toMatch(/label="Pace"[\s\S]*?onPress=\{\(\) => setPaceDetailsOpen\(true\)\}/);
     expect(screen).toContain('accessibilityHint="Opens read-only efficiency calculation details"');
@@ -26,13 +26,11 @@ describe('Eff and Pace HUD details', () => {
     expect(paceModal).toContain("if (risk === 'zero') return '#df1c2d'");
     expect(paceModal).toContain('return defaultColor');
     expect(c17).toContain('getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)');
-    expect(legacy).toContain('getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)');
   });
 
   it('colors Eff cyan only when the authoritative modifier flag applies', () => {
     const colorBehavior = "gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined";
     expect(c17).toContain(colorBehavior);
-    expect(legacy).toContain(colorBehavior);
   });
 
   it('provides read-only Pace meaning, formula, and accessible risk explanations', () => {
