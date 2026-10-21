@@ -1,5 +1,7 @@
 # Beta feedback triage and next tester release
 
+> **Historical beta.4 plan.** The current next tester candidate is `1.0.0-rc.1`; see [RC_1_RELEASE.md](./RC_1_RELEASE.md) for its release gate. Beta.4 was not physically accepted or published.
+
 Date: 2026-10-07
 
 Status: maintainer guidance for the published `1.0.0-beta.3-hotfix.1` tester artifact and the
