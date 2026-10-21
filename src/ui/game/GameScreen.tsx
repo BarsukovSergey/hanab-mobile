@@ -23,7 +23,7 @@ export function GameScreen({ presentationVisible = true, roomChildren }: { prese
     sharedReplay: liveRoom?.sharedReplay ?? false,
   });
 
-  if (!useC17 || clientState?.metadata.options.numPlayers !== clientState.metadata.playerNames.length) {
+  if (!useC17 || clientState === null || clientState.metadata.options.numPlayers !== clientState.metadata.playerNames.length) {
     return (
       <View style={{ flex: 1 }} pointerEvents="none" accessibilityElementsHidden={!presentationVisible} importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'}>
         <Text accessibilityRole="alert">Unable to display game: unsupported or inconsistent player data.</Text>
