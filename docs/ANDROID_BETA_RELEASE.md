@@ -1,6 +1,6 @@
 # Android Beta Release
 
-> **Current candidate (2026-10-21):** `1.0.0-rc.1` / Android `versionCode` 6. See [RC_1_RELEASE.md](./RC_1_RELEASE.md) for the current candidate, workflow and physical gate. The beta.4 plan below is retained as historical and was not physically accepted or distributed.
+> **Current candidate (2026-10-21):** `1.0.0-rc.2` / Android `versionCode` 7; APK `Hanab-Mobile-1.0.0-rc.2.apk`, workflow artifact `Hanab-Mobile-1.0.0-rc.2`. See [RC_2_RELEASE.md](./RC_2_RELEASE.md) for the current candidate and release blockers. After PR review, CI and physical PASS, publish the exact tested APK under `v1.0.0-rc.2` as a GitHub prerelease, not stable. RC.1 failed initial physical acceptance due to a startup crash; fixes are included in rc.2. The beta.4 plan below is retained as historical and was not physically accepted or distributed.
 
 > **Planned tester candidate:** `1.0.0-beta.4` / Android `versionCode` 5.
 > Beta.4 has not been built or published yet. Freeze the release-prep merge commit, build once from
