@@ -19,7 +19,7 @@ type ProposalMessage = Pick<ChatMessage, 'server' | 'msg'>;
 // It is deliberately parsed as data only; React Native never renders this markup.
 const PINNED_NEW_OPTIONS_MESSAGE = /^<span class="cp"><button class="new-options" data-new-options="([^\"]*)">click to apply the suggestion<\/button><\/span>$/;
 
-export function parseServerTableProposal(message: ProposalMessage): TableProposal | null {
+function parseServerNewOptions(message: ProposalMessage): Record<string, unknown> | null {
   if (!message.server) return null;
   const match = PINNED_NEW_OPTIONS_MESSAGE.exec(message.msg);
   const encodedOptions = match?.[1];
@@ -32,8 +32,21 @@ export function parseServerTableProposal(message: ProposalMessage): TableProposa
     return null;
   }
   if (candidate === null || typeof candidate !== 'object') return null;
+  return candidate as Record<string, unknown>;
+}
 
-  const { tableName, maxPlayers, ...options } = candidate as Record<string, unknown>;
+// Display-only: recognizing a name does not make the proposed options applicable.
+export function parseServerProposedVariantName(message: ProposalMessage): string | null {
+  const variantName = parseServerNewOptions(message)?.variantName;
+  return typeof variantName === 'string' && variantName.trim().length > 0
+    && variantName.length <= 256 ? variantName : null;
+}
+
+export function parseServerTableProposal(message: ProposalMessage): TableProposal | null {
+  const candidate = parseServerNewOptions(message);
+  if (candidate === null) return null;
+
+  const { tableName, maxPlayers, ...options } = candidate;
   const parsed = tableUpdateCommandSchema.safeParse({
     tableID: 0,
     name: tableName,
