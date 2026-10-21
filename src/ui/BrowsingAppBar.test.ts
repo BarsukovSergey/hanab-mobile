@@ -4,6 +4,20 @@ import { expect, test } from '@jest/globals';
 
 const read = (path: string) => readFileSync(resolve(__dirname, '../..', path), 'utf8').replace(/\r\n/g, '\n');
 
+test('app bar measurement updaters use a synchronously captured width', () => {
+  const bar = read('src/ui/BrowsingAppBar.tsx');
+  const handlers = [...bar.matchAll(/onLayout=\{\(event\) => \{([\s\S]*?)\}\}/g)].map((match) => match[1]!);
+  for (const setter of ['setStatusWidths', 'setActionWidths']) {
+    const handler = handlers.find((body) => body.includes(`${setter}(`));
+    expect(handler).toBeDefined();
+    expect(handler).toMatch(new RegExp(`const width = event\\.nativeEvent\\.layout\\.width;\\s+${setter}\\(`));
+    const updater = handler!.slice(handler!.indexOf(`${setter}(`));
+    expect(updater).not.toContain('event');
+    expect(updater).toContain('current[label] === width');
+    expect(updater).toContain('? current : { ...current, [label]: width }');
+  }
+});
+
 test('fixed app bar owns browsing Back and keeps one complete Return control', () => {
   const app = read('App.tsx');
   const bar = read('src/ui/BrowsingAppBar.tsx');
