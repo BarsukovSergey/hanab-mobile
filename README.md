@@ -2,7 +2,7 @@
 
 Mobile Hanabi client focused on serious live play on phones.
 
-The currently published Android tester artifact is **v1.0.0-beta.3-hotfix.1**. The next candidate is **1.0.0-rc.1** / Android `versionCode` 6; it must pass physical smoke before public distribution.
+The currently published Android tester artifact is **v1.0.0-beta.3-hotfix.1**. The next candidate is **1.0.0-rc.2** / Android `versionCode` 7; it must pass PR review, CI and physical acceptance before publication as GitHub prerelease `v1.0.0-rc.2` (not stable).
 
 C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
 
@@ -12,11 +12,11 @@ If someone sent you an Android build/APK, you do **not** need to build the proje
 
 Please test the app as a player, not as someone trying to guess how the UI was implemented. If an action is hard to discover or a screen is confusing without instructions, report that as a UX problem.
 
-RC.1 build identity and the short maintainer release gate are tracked in [`docs/RC_1_RELEASE.md`](./docs/RC_1_RELEASE.md). Beta.4 was never physically accepted or distributed. The published beta.3 hotfix remains frozen in [`docs/BETA_3_PHYSICAL_SMOKE.md`](./docs/BETA_3_PHYSICAL_SMOKE.md).
+RC.2 build identity and the short maintainer release gate are tracked in [`docs/RC_2_RELEASE.md`](./docs/RC_2_RELEASE.md). Beta.4 was never physically accepted or distributed. The published beta.3 hotfix remains frozen in [`docs/BETA_3_PHYSICAL_SMOKE.md`](./docs/BETA_3_PHYSICAL_SMOKE.md).
 
 ## Current test focus
 
-RC.1 is the first planned public tester line carrying the implemented Mobile App Design v2 shell. Testing remains centered on reliable serious play/review plus physical hardening of the new navigation and responsive surfaces:
+RC.2 carries the implemented Mobile App Design v2 shell. RC.1 failed its initial physical acceptance due to a startup crash; the fixes are included in rc.2 and require a fresh physical PASS. Testing remains centered on reliable serious play/review plus physical hardening of the new navigation and responsive surfaces:
 
 - card selection and explicit Play/Discard actions;
 - notes, clue planning, knowledge/empathy and discard inspection;
@@ -27,7 +27,7 @@ RC.1 is the first planned public tester line carrying the implemented Mobile App
 - focused 4P–6P real-card layout regression on supported phone layouts;
 - social/history additions shipped after beta.1.
 
-Mobile App Design v2 is implemented through the current product slices; Slice 12 physical hardening / accessibility / performance is the active validation milestone. RC.1 tester feedback is intended to broaden that device evidence before Slice 13 cleanup.
+Mobile App Design v2 is implemented through the current product slices; Slice 12 physical hardening / accessibility / performance is the active validation milestone. RC.2 tester feedback is intended to broaden that device evidence before Slice 13 cleanup.
 
 See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug-report format.
 
@@ -69,7 +69,7 @@ Build the standalone internal beta APK:
 npm run android:beta-apk
 ```
 
-The APK is written to `dist/Hanab-Mobile-1.0.0-rc.1.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
+The APK is written to `dist/Hanab-Mobile-1.0.0-rc.2.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
 
 Normal local validation:
 
@@ -83,7 +83,7 @@ git diff --check
 ## Project documentation
 
 - Testers: start with [`TESTING.md`](./TESTING.md).
-- RC.1 release gate: [`docs/RC_1_RELEASE.md`](./docs/RC_1_RELEASE.md).
+- RC.2 release gate: [`docs/RC_2_RELEASE.md`](./docs/RC_2_RELEASE.md).
 - Beta.4 maintainer smoke: [`docs/BETA_4_PHYSICAL_SMOKE.md`](./docs/BETA_4_PHYSICAL_SMOKE.md).
 - Android beta build/release guidance: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
 - Product roadmap: [`docs/PRODUCT_ROADMAP.md`](./docs/PRODUCT_ROADMAP.md).

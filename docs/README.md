@@ -5,10 +5,11 @@ This directory mixes current product/technical authority with historical impleme
 ## Start here
 
 - `../README.md` — project overview, local development, current Android beta scope and release-candidate state.
-- `RC_1_RELEASE.md` — current Android 1.0.0-rc.1 candidate identity, build and physical release gate; supersedes beta.4 as next tester candidate.
-- `../TESTING.md` — beta.4 tester-facing script and bug-report format.
-- `BETA_4_PHYSICAL_SMOKE.md` — short maintainer gate plus broader Slice 12 tester coverage plan.
-- `BETA_4_RELEASE_NOTES.md` — beta.4 candidate/release identity and tester-facing highlights.
+- [RC_2_RELEASE.md](./RC_2_RELEASE.md) — current Android 1.0.0-rc.2 candidate, versionCode 7, build identity and physical release gate; planned tag `v1.0.0-rc.2` is a prerelease, not stable.
+- `RC_1_RELEASE.md` — historical rc.1 candidate record; initial physical acceptance failed due to a startup crash, with fixes included in rc.2.
+- `../TESTING.md` — rc.2 tester-facing script and bug-report format.
+- `BETA_4_PHYSICAL_SMOKE.md` — historical beta.4 maintainer gate and broader Slice 12 tester coverage plan.
+- `BETA_4_RELEASE_NOTES.md` — historical beta.4 candidate identity and tester-facing highlights.
 - `BETA_3_PHYSICAL_SMOKE.md` / `BETA_3_RELEASE_NOTES.md` — frozen previous tester-release evidence.
 - `ANDROID_BETA_RELEASE.md` — current internal APK build/release process.
 - `BETA_FEEDBACK_AND_NEXT_RELEASE.md` — current candidate freeze, physical gate, and tester-distribution policy.

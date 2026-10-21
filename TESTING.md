@@ -1,13 +1,13 @@
 # Hanab Mobile — Testing Guide
 
-This page is for people testing the **Hanab Mobile 1.0.0-beta.4 Android line**.
+This page is for people testing the **Hanab Mobile 1.0.0-rc.2 Android candidate** (Android `versionCode` 7).
 
-Beta.4 is the first tester build based on the implemented Mobile App Design v2 shell. Test it like a
+RC.2 uses the implemented Mobile App Design v2 shell. Public prerelease publication requires PR review, CI and physical PASS. Test it like a
 normal player. **If an ordinary action or route is hard to discover without instructions, report that
 as a UX problem.**
 
 Exact candidate/APK identity and the maintainer release gate live in
-`docs/BETA_4_PHYSICAL_SMOKE.md`.
+[`docs/RC_2_RELEASE.md`](./docs/RC_2_RELEASE.md). Expected APK: `Hanab-Mobile-1.0.0-rc.2.apk`; planned GitHub tag: `v1.0.0-rc.2` (prerelease, not stable).
 
 ## Before you start
 
