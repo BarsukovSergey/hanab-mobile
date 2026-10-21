@@ -90,6 +90,35 @@ describe('chat state and plain-text conversion', () => {
     ]);
   });
 
+  test('removes deleted persisted lobby chat and blocks out-of-order restoration', () => {
+    const store = createAppStore();
+    store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'lobby',
+      message: { ...message('persisted'), chatID: 123 },
+    }));
+    expect(store.getState().chat.messagesByRoom.lobby).toHaveLength(1);
+
+    store.dispatch(chatActions.lobbyMessageDeleted({ epoch: 1, chatID: 123 }));
+    expect(store.getState().chat.messagesByRoom.lobby).toEqual([]);
+
+    store.dispatch(chatActions.messageReceived({
+      epoch: 1,
+      defaultRoom: 'lobby',
+      message: { ...message('late live'), chatID: 123 },
+    }));
+    store.dispatch(chatActions.historyReceived({
+      epoch: 1,
+      defaultRoom: 'lobby',
+      messages: [
+        { ...message('late history'), chatID: 123 },
+        { ...message('kept'), chatID: 124 },
+      ],
+    }));
+    expect(store.getState().chat.messagesByRoom.lobby?.map((entry) => entry.chatID)).toEqual([124]);
+  });
+
   test('actual Go public and server messages become renderable plain text', () => {
     const store = createAppStore();
     store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
@@ -273,7 +302,12 @@ describe('chat state and plain-text conversion', () => {
     store.dispatch(chatActions.draftChanged({ room: 'table123', draft: 'unsent' }));
     store.dispatch(sessionActions.signedOut());
     expect(store.getState().chat).toEqual({
-      connectionEpoch: 0, draftByRoom: {}, lastPM: null, messagesByRoom: {}, unreadByRoom: {},
+      connectionEpoch: 0,
+      draftByRoom: {},
+      lastPM: null,
+      messagesByRoom: {},
+      unreadByRoom: {},
+      deletedLobbyChatIDs: [],
     });
   });
 

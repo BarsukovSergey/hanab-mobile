@@ -18,9 +18,11 @@ export type ChatState = {
   lastPM: string | null;
   messagesByRoom: Record<string, ReadableChatMessage[]>;
   unreadByRoom: Record<string, number>;
+  deletedLobbyChatIDs: number[];
 };
 
 const MAX_MESSAGES_PER_ROOM = 1000;
+const MAX_REMEMBERED_LOBBY_DELETIONS = 10_000;
 
 const initialState: ChatState = {
   connectionEpoch: 0,
@@ -28,17 +30,24 @@ const initialState: ChatState = {
   lastPM: null,
   messagesByRoom: {},
   unreadByRoom: {},
+  deletedLobbyChatIDs: [],
 };
 
 function isSupportedRoom(room: string | undefined): room is string {
   return room === 'lobby' || (room !== undefined && /^table\d+$/.test(room));
 }
 
-function readable(message: ChatMessage, defaultRoom?: string): ReadableChatMessage | null {
+function readable(
+  message: ChatMessage,
+  defaultRoom?: string,
+  deletedLobbyChatIDs: readonly number[] = [],
+): ReadableChatMessage | null {
   const isPrivateMessage = message.recipient.length > 0
     && (message.room === '' || message.room === undefined);
   const room = isPrivateMessage ? defaultRoom : message.room;
   if (!isSupportedRoom(room)) return null;
+  if (room === 'lobby' && message.chatID !== undefined
+    && deletedLobbyChatIDs.includes(message.chatID)) return null;
   return {
     ...message,
     room,
@@ -84,6 +93,23 @@ export const chatSlice = createSlice({
     roomRead(state, action: PayloadAction<{ room: string }>) {
       delete state.unreadByRoom[action.payload.room];
     },
+    lobbyMessageDeleted(state, action: PayloadAction<{ epoch: number; chatID: number }>) {
+      if (state.connectionEpoch !== action.payload.epoch) return;
+      const { chatID } = action.payload;
+      if (!state.deletedLobbyChatIDs.includes(chatID)) {
+        state.deletedLobbyChatIDs.push(chatID);
+        if (state.deletedLobbyChatIDs.length > MAX_REMEMBERED_LOBBY_DELETIONS) {
+          state.deletedLobbyChatIDs.splice(
+            0,
+            state.deletedLobbyChatIDs.length - MAX_REMEMBERED_LOBBY_DELETIONS,
+          );
+        }
+      }
+      const lobbyMessages = state.messagesByRoom.lobby;
+      if (lobbyMessages !== undefined) {
+        state.messagesByRoom.lobby = lobbyMessages.filter((message) => message.chatID !== chatID);
+      }
+    },
     localMessageAdded(
       state,
       action: PayloadAction<{
@@ -121,7 +147,11 @@ export const chatSlice = createSlice({
       }>,
     ) {
       if (state.connectionEpoch !== action.payload.epoch) return;
-      const message = readable(action.payload.message, action.payload.defaultRoom);
+      const message = readable(
+        action.payload.message,
+        action.payload.defaultRoom,
+        state.deletedLobbyChatIDs,
+      );
       if (message === null) return;
       message.source = 'live';
       if (
@@ -156,7 +186,7 @@ export const chatSlice = createSlice({
       if (state.connectionEpoch !== action.payload.epoch) return;
       const grouped: Record<string, ReadableChatMessage[]> = {};
       for (const raw of action.payload.messages) {
-        const message = readable(raw, action.payload.defaultRoom);
+        const message = readable(raw, action.payload.defaultRoom, state.deletedLobbyChatIDs);
         if (message === null) continue;
         message.source = 'history';
         (grouped[message.room] ??= []).push(message);
@@ -184,6 +214,7 @@ export const chatSlice = createSlice({
       state.lastPM = null;
       state.messagesByRoom = {};
       state.unreadByRoom = {};
+      state.deletedLobbyChatIDs = [];
     });
     builder.addCase(sessionActions.signedOut, () => initialState);
   },

@@ -780,6 +780,12 @@ export class LobbyRuntime {
           message: event.data,
         }));
         break;
+      case 'chatDelete':
+        this.store.dispatch(chatActions.lobbyMessageDeleted({
+          epoch,
+          chatID: event.data.chatID,
+        }));
+        break;
       case 'chatList':
         {
           const historyRoom = this.currentHistoryRoom();

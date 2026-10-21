@@ -31,23 +31,53 @@ export const chatCommandSchema = z.object({
 
 export type ChatCommand = z.infer<typeof chatCommandSchema>;
 
-// Exact payload emitted by the pinned Go server. Go serializes who/recipient even when empty.
-export const chatMessageSchema = z.object({
+// Normalize both the current upstream chat payload and the immediately preceding
+// legacy payload into the stable shape consumed by the mobile reducers/UI.
+//
+// Upstream #3176 replaced `discord` / `server` with `source`, while #3160/#3162
+// added stable PM/lobby IDs. Keep a tolerant reader here so a mobile release can
+// survive a server rollout boundary without duplicating source semantics downstream.
+const currentChatMessageSchema = z.object({
+  msg: z.string().min(1),
+  who: z.string().min(1).optional(),
+  source: z.enum(['user', 'server', 'discord']),
+  datetime: z.string().min(1),
+  chatID: z.number().int().positive().optional(),
+  pmID: z.number().int().positive().optional(),
+  room: z.string().min(1).optional(),
+  recipient: z.string().min(1).optional(),
+});
+
+const legacyChatMessageSchema = z.object({
   msg: z.string().min(1),
   who: z.string(),
   discord: z.boolean(),
   server: z.boolean(),
   datetime: z.string().min(1),
+  chatID: z.number().int().positive().optional(),
+  pmID: z.number().int().positive().optional(),
   room: z.string().optional(),
   recipient: z.string(),
-}).strict().superRefine((message, context) => {
-  if (message.room === '' && message.recipient.length === 0) {
-    context.addIssue({
-      code: 'custom',
-      path: ['recipient'],
-      message: 'blank-room chat must have a recipient',
-    });
+});
+
+export const chatMessageSchema = z.union([
+  currentChatMessageSchema,
+  legacyChatMessageSchema,
+]).transform((message) => {
+  if ('source' in message) {
+    return {
+      msg: message.msg,
+      who: message.who ?? '',
+      discord: message.source === 'discord',
+      server: message.source === 'server',
+      datetime: message.datetime,
+      chatID: message.chatID,
+      pmID: message.pmID,
+      room: message.room,
+      recipient: message.recipient ?? '',
+    };
   }
+  return message;
 }).readonly();
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
@@ -58,6 +88,13 @@ export const chatListSchema = z.object({
 }).strict().readonly();
 
 export type ChatList = z.infer<typeof chatListSchema>;
+
+export const chatDeleteSchema = z.object({
+  chatID: z.number().int().positive(),
+  room: z.literal('lobby'),
+}).strict().readonly();
+
+export type ChatDelete = z.infer<typeof chatDeleteSchema>;
 
 export const tableProgressSchema = z.object({
   tableID: idSchema,
@@ -512,6 +549,7 @@ export const welcomeSchema = z.object({
   disconSpectatingTable: idSchema.optional(),
   disconShadowingSeat: z.number().int().optional(),
   settings: cardPresentationSettingsSchema,
+  connectionMode: z.enum(['initial', 'reconnect']).optional(),
   shuttingDown: z.boolean().default(false),
   datetimeShutdownInit: z.string().optional(),
   maintenanceMode: z.boolean().default(false),
@@ -612,6 +650,7 @@ const schemas = {
   pregameSpectators: spectatorsSchema,
   boot: bootSchema,
   chat: chatMessageSchema,
+  chatDelete: chatDeleteSchema,
   chatList: chatListSchema,
   friends: z.object({ friends: z.array(z.string().min(1)) }).strict(),
   warning: z.object({ warning: z.string().min(1) }),
