@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { chatRuntime, lobbyRuntime } from '../runtime/application';
-import { parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
+import { parseServerProposedVariantName, parseServerTableProposal, tableProposalMatches } from '../protocol/tableProposal';
 import { chatActions } from '../store/chatSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { transformChatInput } from './chatInput';
@@ -47,9 +47,16 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true, 
 
   const send = () => {
     if (!canSend) return;
+    const succeeded = chatRuntime.submit(draft);
+    if (succeeded) {
+      followEnd.current = true;
+      setAtEnd(true);
+      setNewMessages(false);
+      historyRef.current?.scrollToEnd({ animated: false });
+    }
     dispatch(chatActions.draftSubmissionFinished({
       room,
-      succeeded: chatRuntime.submit(draft),
+      succeeded,
     }));
   };
 
@@ -120,6 +127,7 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true, 
             ? ''
             : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const metadata = chatMessageMetadata(message, authenticatedUsername);
+          const proposedVariantName = parseServerProposedVariantName({ server: message.server, msg: message.rawMsg });
           const proposal = parseServerTableProposal({ server: message.server, msg: message.rawMsg });
           const isOwnerInThisTable = pregameRoom !== null
             && room === `table${pregameRoom.tableID}`
@@ -133,7 +141,7 @@ export function ChatPanel({ room, title, readActive = true, sendEnabled = true, 
               <Text style={[styles.message, { color: theme.colors.text }]}>
                 <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
                   {time.length > 0 ? `${time} ` : ''}{metadata} </Text>
-                {message.msg}
+                {proposedVariantName !== null ? `Suggested variant: ${proposedVariantName}` : message.msg}
               </Text>
               {proposal !== null && isOwnerInThisTable && (
                 <ActionButton
