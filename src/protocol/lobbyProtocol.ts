@@ -89,6 +89,13 @@ export const chatListSchema = z.object({
 
 export type ChatList = z.infer<typeof chatListSchema>;
 
+export const chatDeleteSchema = z.object({
+  chatID: z.number().int().positive(),
+  room: z.literal('lobby'),
+}).strict().readonly();
+
+export type ChatDelete = z.infer<typeof chatDeleteSchema>;
+
 export const tableProgressSchema = z.object({
   tableID: idSchema,
   progress: z.number().int().nonnegative(),
@@ -643,6 +650,7 @@ const schemas = {
   pregameSpectators: spectatorsSchema,
   boot: bootSchema,
   chat: chatMessageSchema,
+  chatDelete: chatDeleteSchema,
   chatList: chatListSchema,
   friends: z.object({ friends: z.array(z.string().min(1)) }).strict(),
   warning: z.object({ warning: z.string().min(1) }),
