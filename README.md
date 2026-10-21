@@ -1,91 +1,83 @@
-# Hanab Mobile
+<p align="center">
+  <img src="assets/icon.png" alt="Hanab Mobile app icon" width="112" />
+</p>
 
-Mobile Hanabi client focused on serious live play on phones.
+<h1 align="center">Hanab Mobile</h1>
 
-The currently published Android tester artifact is **v1.0.0-beta.3-hotfix.1**. The next candidate is **1.0.0-rc.2** / Android `versionCode` 7; it must pass PR review, CI and physical acceptance before publication as GitHub prerelease `v1.0.0-rc.2` (not stable).
+<p align="center">
+  <strong>Play, spectate, and review Hanabi on Android.</strong><br />
+  An unofficial mobile client for <a href="https://hanab.live">hanab.live</a>, built for serious games on a small screen.
+</p>
 
-C17 is the gameplay UX baseline, built around a dense table view plus a decision workspace.
+<p align="center">
+  <a href="https://github.com/BarsukovSergey/hanab-mobile/releases"><strong>Download for Android</strong></a>
+  &nbsp;·&nbsp;
+  <a href="TESTING.md">Testing guide</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/BarsukovSergey/hanab-mobile/issues/new/choose">Report a problem</a>
+</p>
 
-## For testers
+<p align="center">
+  <a href="https://github.com/BarsukovSergey/hanab-mobile/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/BarsukovSergey/hanab-mobile/actions/workflows/ci.yml/badge.svg" /></a>
+  <img alt="Android APK" src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=white" />
+  <img alt="Prerelease" src="https://img.shields.io/badge/status-prerelease-orange" />
+</p>
 
-If someone sent you an Android build/APK, you do **not** need to build the project from source. Install the build you were given and follow [`TESTING.md`](./TESTING.md).
+## Made for playing, not just viewing
 
-Please test the app as a player, not as someone trying to guess how the UI was implemented. If an action is hard to discover or a screen is confusing without instructions, report that as a UX problem.
+- **Live Hanabi:** create or join supported 2–6-player games, with explicit Play, Discard, and Clue controls.
+- **Spectating:** watch a live table, switch player perspective, and stay out of the action.
+- **Review and analysis:** rewind live turns, inspect finished games, use shared replay, and explore Hypothetical lines.
+- **Useful game context:** real card faces, notes, knowledge and clue cues, resources, recent actions, and game history.
+- **Community:** table chat, friends and player profiles, and session-based private conversations.
+- **Phone-first layouts:** portrait and landscape views, with room-aware browsing and a quick way back to your table.
 
-RC.2 build identity and the short maintainer release gate are tracked in [`docs/RC_2_RELEASE.md`](./docs/RC_2_RELEASE.md). Beta.4 was never physically accepted or distributed. The published beta.3 hotfix remains frozen in [`docs/BETA_3_PHYSICAL_SMOKE.md`](./docs/BETA_3_PHYSICAL_SMOKE.md).
+Some specialized hanab.live variants and features are not supported yet. This is a testing release, so layout and performance feedback is especially welcome.
 
-## Current test focus
+## Install on Android
 
-RC.2 carries the implemented Mobile App Design v2 shell. RC.1 failed its initial physical acceptance due to a startup crash; the fixes are included in rc.2 and require a fresh physical PASS. Testing remains centered on reliable serious play/review plus physical hardening of the new navigation and responsive surfaces:
+1. Open the [GitHub Releases](https://github.com/BarsukovSergey/hanab-mobile/releases) page.
+2. Choose the newest **published** testing release and download its `Hanab-Mobile-*.apk` file from **Assets**.
+3. Open the APK on your Android device. You may need to allow installs from your browser or file manager.
+4. Sign in with your hanab.live account.
 
-- card selection and explicit Play/Discard actions;
-- notes, clue planning, knowledge/empathy and discard inspection;
-- Last Action / Recent and live rewind;
-- finished/shared replay and Hypothetical;
-- spectator and lifecycle behavior;
-- Android safe-area, rotation, keyboard and reconnect behavior;
-- focused 4P–6P real-card layout regression on supported phone layouts;
-- social/history additions shipped after beta.1.
+**Android only for now.** The app is distributed as a standalone prerelease APK, not through Google Play. You do not need to build the source to try it.
 
-Mobile App Design v2 is implemented through the current product slices; Slice 12 physical hardening / accessibility / performance is the active validation milestone. RC.2 tester feedback is intended to broaden that device evidence before Slice 13 cleanup.
+If you run into trouble, the [testing guide](TESTING.md) explains what to report. Please never post passwords, session cookies, private messages, or unredacted logs in a public issue.
 
-See [`TESTING.md`](./TESTING.md) for the short player-facing test script and bug-report format.
+## Feedback and contributions
 
-## Development setup
+Found a crash, a hard-to-tap control, an incorrect game state, or confusing navigation? [Open an issue](https://github.com/BarsukovSergey/hanab-mobile/issues/new/choose). Include the app version, Android version, device, steps to reproduce, and a screenshot when useful.
 
-Prerequisites:
+Want to contribute code or docs? See [CONTRIBUTING.md](CONTRIBUTING.md). You can also browse the [product roadmap](docs/PRODUCT_ROADMAP.md) and [documentation map](docs/README.md).
 
-- Node.js 24 (see `.nvmrc`, matching CI);
-- Android Studio / Android SDK for local Android builds;
-- an Android device or emulator.
+## Development
 
-Install dependencies:
+Hanab Mobile uses **React Native, Expo, and TypeScript**. The hanab.live server is authoritative for game state; the client does not implement a separate game server.
 
-```bash
+You'll need Node.js 24, the Android SDK, and a device or emulator.
+
+~~~bash
 npm ci
-```
-
-Start the Expo dev client:
-
-```bash
-npm start
-```
-
-Build/run Android locally:
-
-```bash
 npm run android
-```
+~~~
 
-Install a release variant on a connected Android device:
+For type checking and automated tests:
 
-```bash
-npm run android:release
-```
-
-Build the standalone internal beta APK:
-
-```bash
-npm run android:beta-apk
-```
-
-The APK is written to `dist/Hanab-Mobile-1.0.0-rc.2.apk`. This internal beta uses the generated Expo/React Native release signing setup and is **not** the Play Store signing pipeline.
-
-Normal local validation:
-
-```bash
+~~~bash
 npm run validate
-git diff --check
-```
+~~~
 
-`npm run validate` runs the strict TypeScript check and the Jest suite. CI runs the same checks explicitly. There is no lint script.
+To build a standalone release-variant APK locally (this regenerates the native Android project and may take a while):
 
-## Project documentation
+~~~bash
+npm run android:beta-apk
+~~~
 
-- Testers: start with [`TESTING.md`](./TESTING.md).
-- RC.2 release gate: [`docs/RC_2_RELEASE.md`](./docs/RC_2_RELEASE.md).
-- Beta.4 maintainer smoke: [`docs/BETA_4_PHYSICAL_SMOKE.md`](./docs/BETA_4_PHYSICAL_SMOKE.md).
-- Android beta build/release guidance: [`docs/ANDROID_BETA_RELEASE.md`](./docs/ANDROID_BETA_RELEASE.md).
-- Product roadmap: [`docs/PRODUCT_ROADMAP.md`](./docs/PRODUCT_ROADMAP.md).
-- Ratified mobile design v2: [`docs/MOBILE_APP_DESIGN_V2.md`](./docs/MOBILE_APP_DESIGN_V2.md).
-- Maintainers: [`docs/README.md`](./docs/README.md) is the documentation map and marks current authority versus historical snapshots.
+Release candidates and physical-device acceptance are tracked under [docs/](docs/README.md). GitHub Actions builds are separate from app-store signing and publishing.
+
+## Credits and upstream
+
+Hanab Mobile is an **unofficial community project**, not affiliated with or endorsed by hanab.live.
+
+The project adapts portions of [Hanabi-Live](https://github.com/Hanabi-Live/hanabi-live). Upstream revisions and provenance are recorded in [docs/UPSTREAM.md](docs/UPSTREAM.md); the vendored game core retains its [upstream GPL license](src/game/upstream/LICENSE).
