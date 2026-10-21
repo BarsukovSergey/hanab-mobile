@@ -4,6 +4,13 @@ import { expect, test } from '@jest/globals';
 
 const read = (path: string) => readFileSync(resolve(__dirname, '../..', path), 'utf8');
 
+test('C17 landscape omits the external workspace status while portrait and non-C17 retain it', () => {
+  const app = read('App.tsx');
+  const statusRows = app.split('\n').filter((line) => line.includes('{workspacePresentation.status}</Text>'));
+  expect(statusRows).toHaveLength(1);
+  expect(statusRows[0]).toContain("{!portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '' && <Text");
+});
+
 test('global navigation belongs to authenticated browsing and uses responsive geometry', () => {
   const app = read('App.tsx');
   const nav = read('src/ui/BrowsingNavigation.tsx');
