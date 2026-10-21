@@ -25,6 +25,7 @@ import { lobbyActions } from './src/store/lobbySlice';
 import { roomActions } from './src/store/roomSlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
+import { AppErrorBoundary } from './src/ui/AppErrorBoundary';
 import { Conversation } from './src/ui/Conversation';
 import { ChatPanel } from './src/ui/ChatPanel';
 import {
@@ -79,7 +80,9 @@ export default function App() {
     <SafeAreaProvider>
       <ResponsiveSurfaceProvider>
         <HanabThemeProvider>
-          <AppContent />
+          <AppErrorBoundary>
+            <AppContent />
+          </AppErrorBoundary>
         </HanabThemeProvider>
       </ResponsiveSurfaceProvider>
     </SafeAreaProvider>
