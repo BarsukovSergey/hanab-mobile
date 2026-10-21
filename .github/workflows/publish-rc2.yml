@@ -1,0 +1,78 @@
+name: Publish verified Android RC2 prerelease
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-rc2.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-hanab-mobile-rc2
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify frozen build and fetch its APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: '39658955748'
+          SOURCE_SHA: '2f1a70fd6b6fab91d069703c6643715b6cae7ed3'
+        run: |
+          set -euo pipefail
+          if gh release view v1.0.0-rc.2 --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::v1.0.0-rc.2 already exists; refusing to overwrite it."
+            exit 1
+          fi
+          test "$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .head_sha)" = "$SOURCE_SHA"
+          test "$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .conclusion)" = "success"
+          mkdir -p dist
+          gh run download "$RUN_ID" --repo "$REPO" --name Hanab-Mobile-1.0.0-rc.2 --dir dist
+          test -s dist/Hanab-Mobile-1.0.0-rc.2.apk
+          sha256sum dist/Hanab-Mobile-1.0.0-rc.2.apk | tee apk-sha256.txt
+
+      - name: Create release notes and publish exact tested APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SOURCE_SHA: '2f1a70fd6b6fab91d069703c6643715b6cae7ed3'
+        run: |
+          set -euo pipefail
+          HASH="$(cut -d ' ' -f 1 apk-sha256.txt)"
+          cat > release-notes.md <<'EOF'
+          Hanab Mobile is an unofficial, open-source Android client for [hanab.live](https://hanab.live), built for playing, spectating, and reviewing Hanabi on a phone.
+
+          ### Highlights
+          - Mobile-friendly live gameplay, table creation, and spectating for supported 2-6-player games.
+          - Portrait and landscape gameplay layouts, explicit Play / Discard / Clue actions.
+          - Game history, live Rewind, finished/shared Replay, and Hypothetical analysis.
+          - Card notes, knowledge and clue cues, chat, friends, and session conversations.
+          - Redesigned Home / History / People / More navigation and safe room Browse / Return.
+          - Startup crash fix and landscape Review space-allocation fix.
+
+          ### Installation
+          Download **Hanab-Mobile-1.0.0-rc.2.apk** from Assets below and open it on an Android device. This is a testing prerelease, not a Google Play or stable 1.0 release.
+
+          ### Feedback
+          Please report crashes, gameplay problems, confusing navigation, and layout issues via [GitHub Issues](https://github.com/BarsukovSergey/hanab-mobile/issues). Include your device/Android version and reproduction steps. Do not post credentials or private chat logs.
+
+          ### Build provenance
+          - Built APK workflow: [Android Release Candidate APK run #39658955748](https://github.com/BarsukovSergey/hanab-mobile/actions/runs/39658955748).
+          - **Corresponding build source:** [2f1a70fd6b6fab91d069703c6643715b6cae7ed3](https://github.com/BarsukovSergey/hanab-mobile/tree/2f1a70fd6b6fab91d069703c6643715b6cae7ed3).
+          - Source-build instructions: [README at the build commit](https://github.com/BarsukovSergey/hanab-mobile/blob/2f1a70fd6b6fab91d069703c6643715b6cae7ed3/README.md).
+          - GPLv3 and upstream credits: [current project repository](https://github.com/BarsukovSergey/hanab-mobile).
+          EOF
+          printf '\n**APK SHA-256:** `%s`\n' "$HASH" >> release-notes.md
+          gh release create v1.0.0-rc.2 dist/Hanab-Mobile-1.0.0-rc.2.apk \
+            --repo "$REPO" --target "$SOURCE_SHA" \
+            --title "Hanab Mobile 1.0.0-rc.2 - Android Release Candidate" \
+            --notes-file release-notes.md --prerelease --latest=false
+          gh release view v1.0.0-rc.2 --repo "$REPO" --json url,isPrerelease,assets
