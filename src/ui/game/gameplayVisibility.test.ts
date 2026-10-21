@@ -5,14 +5,16 @@ import { describe, expect, test } from '@jest/globals';
 const read = (name: string) => readFileSync(join(__dirname, name), 'utf8');
 
 describe('gameplay presentation visibility', () => {
-  test('the gameplay wrapper passes visibility to both implementations', () => {
+  test('the gameplay wrapper passes visibility to the C17 implementation and denies interaction on invalid metadata', () => {
     const wrapper = read('GameScreen.tsx');
     expect(wrapper).toContain('presentationVisible = true');
     expect(wrapper).toContain('<C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} />');
-    expect(wrapper).toContain('<LegacyGameScreen presentationVisible={presentationVisible} />');
+    expect(wrapper).not.toContain('LegacyGameScreen');
+    expect(wrapper).toContain('pointerEvents="none"');
+    expect(wrapper).toContain('unsupported or inconsistent player data');
   });
 
-  test.each(['C17GameScreen.tsx', 'LegacyGameScreen.tsx'])(
+  test.each(['C17GameScreen.tsx'])(
     '%s disarms hidden gameplay and keeps lifecycle interruption separate from runtime sends', (name) => {
       const source = read(name);
       const hide = source.match(/useEffect\(\(\) => \{\s*if \(presentationVisible\) return;[\s\S]*?\}, \[presentationVisible\]\);/)?.[0] ?? '';
