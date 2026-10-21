@@ -48,11 +48,17 @@ export function BrowsingAppBar({ title, username, onBack, returnPresentation, on
       <Text onLayout={(event) => setBackLabelWidth(event.nativeEvent.layout.width)} style={styles.backLabel}>Back</Text>
       <Text onLayout={(event) => setTitleWidth(event.nativeEvent.layout.width)} style={styles.title}>{title}</Text>
       {RETURN_STATUS_LABELS.map((label) => <Text key={label} style={styles.status}
-        onLayout={(event) => setStatusWidths((current) => current[label] === event.nativeEvent.layout.width
-          ? current : { ...current, [label]: event.nativeEvent.layout.width })}>{label}</Text>)}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          setStatusWidths((current) => current[label] === width
+            ? current : { ...current, [label]: width });
+        }}>{label}</Text>)}
       {RETURN_ACTION_LABELS.map((label) => <Text key={label} style={styles.action}
-        onLayout={(event) => setActionWidths((current) => current[label] === event.nativeEvent.layout.width
-          ? current : { ...current, [label]: event.nativeEvent.layout.width })}>{label}</Text>)}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          setActionWidths((current) => current[label] === width
+            ? current : { ...current, [label]: width });
+        }}>{label}</Text>)}
     </View>
     <View style={styles.mainRow}>
       {onBack && <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
