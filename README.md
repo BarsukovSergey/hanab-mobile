@@ -80,4 +80,8 @@ Release candidates and physical-device acceptance are tracked under [docs/](docs
 
 Hanab Mobile is an **unofficial community project**, not affiliated with or endorsed by hanab.live.
 
-The project adapts portions of [Hanabi-Live](https://github.com/Hanabi-Live/hanabi-live). Upstream revisions and provenance are recorded in [docs/UPSTREAM.md](docs/UPSTREAM.md); the vendored game core retains its [upstream GPL license](src/game/upstream/LICENSE).
+The project adapts portions of [Hanabi-Live](https://github.com/Hanabi-Live/hanabi-live). Upstream revisions and provenance are recorded in [docs/UPSTREAM.md](docs/UPSTREAM.md).
+
+## License and third-party credits
+
+Hanab Mobile is distributed under **[GNU GPLv3](LICENSE)** (`GPL-3.0-only`). The copyright of upstream code and artwork remains with its respective owners. See [third-party notices](THIRD_PARTY_NOTICES.md) for upstream attribution, bundled card/UI assets, and source-availability information for APK releases.
