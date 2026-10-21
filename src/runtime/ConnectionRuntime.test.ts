@@ -486,6 +486,64 @@ describe('ConnectionRuntime transport ownership', () => {
     expect(callbacks.onFrame.mock.calls).toEqual([[1, 'unparsed raw frame']]);
   });
 
+  test('inbound handler exception fails the owned connection instead of crashing or replaying', async () => {
+    const { runtime, sockets, callbacks, store, openSocket, welcome } = fixture();
+    const first = new FakeSocket();
+    const second = new FakeSocket();
+    sockets.push(Promise.resolve(first), Promise.resolve(second));
+    await runtime.connect();
+    first.emitOpen();
+    welcome();
+    expect(runtime.send('one committed gameplay command')).toBe(true);
+
+    const report = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      callbacks.onFrame.mockImplementationOnce(() => {
+        throw new TypeError('Do not leak the original private frame or error');
+      });
+      expect(() => first.emitMessage('gameAction {"sensitive":"private"}')).not.toThrow();
+      expect(report).toHaveBeenCalledWith('[Hanab] Inbound gameAction handler failed (TypeError)');
+      expect(callbacks.onFailed).toHaveBeenCalledWith(
+        1, 'Unable to process server event (gameAction)',
+      );
+      expect(callbacks.onInvalidated).toHaveBeenCalledTimes(1);
+      expect(store.getState().session.phase).toBe('failed');
+      expectNoListeners(first);
+      expect(first.closeCalls).toEqual([{ code: 1000, reason: 'Connection disposed' }]);
+      expect(runtime.send('uncertain old command')).toBe(false);
+      expect(first.sent).toEqual(['one committed gameplay command']);
+
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+      expect(openSocket).toHaveBeenCalledTimes(2);
+      second.emitOpen();
+      welcome();
+      expect(runtime.isReady(2)).toBe(true);
+      expect(second.sent).toEqual([]);
+    } finally {
+      report.mockRestore();
+    }
+  });
+
+  test('inbound failure diagnostics do not print arbitrary frame tokens', async () => {
+    const { runtime, sockets, callbacks } = fixture();
+    const socket = new FakeSocket();
+    sockets.push(Promise.resolve(socket));
+    await runtime.connect();
+
+    const report = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      callbacks.onFrame.mockImplementationOnce(() => { throw new Error('secret'); });
+      expect(() => socket.emitMessage('malformed! {"private":"secret"}')).not.toThrow();
+      expect(report).toHaveBeenCalledWith('[Hanab] Inbound unknown handler failed (Error)');
+      expect(callbacks.onFailed).toHaveBeenCalledWith(
+        1, 'Unable to process server event (unknown)',
+      );
+    } finally {
+      report.mockRestore();
+    }
+  });
+
   test('reset cancels retry without closed event; epoch stays monotonic across signedOut', async () => {
     const { runtime, sockets, store, callbacks, welcome } = fixture({ initialEpoch: 7 });
     const first = new FakeSocket();

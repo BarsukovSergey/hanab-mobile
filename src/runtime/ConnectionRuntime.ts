@@ -4,6 +4,15 @@ import type { ConnectionPhase } from '../store/sessionSlice';
 const SOCKET_OPEN = 1;
 const SOCKET_CLOSING = 2;
 const MAX_STATUS_LENGTH = 240;
+const MAX_DIAGNOSTIC_COMMAND_LENGTH = 32;
+
+/** Never include raw message bodies (which may contain PMs or other private data) in diagnostics. */
+function safeCommandName(rawFrame: string): string {
+  const separator = rawFrame.indexOf(' ');
+  if (separator < 1 || separator > MAX_DIAGNOSTIC_COMMAND_LENGTH) return 'unknown';
+  const command = rawFrame.slice(0, separator);
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(command) ? command : 'unknown';
+}
 export const DEFAULT_WELCOME_TIMEOUT_MS = 10_000;
 export const DEFAULT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000] as const;
 
@@ -195,7 +204,17 @@ export class ConnectionRuntime {
       open: () => this.onOpen(owned),
       message: (event) => {
         if (!this.isCurrent(owned) || typeof event.data !== 'string') return;
-        this.callbacks.onFrame(owned.epoch, event.data);
+        try {
+          this.callbacks.onFrame(owned.epoch, event.data);
+        } catch (error) {
+          // A domain handler may have partially applied the frame. Invalidate the
+          // entire connection and rebuild from server authority, never replay sends.
+          const command = safeCommandName(event.data);
+          const kind = error instanceof TypeError ? 'TypeError'
+            : error instanceof RangeError ? 'RangeError' : 'Error';
+          console.error(`[Hanab] Inbound ${command} handler failed (${kind})`);
+          this.failCurrent(owned, `Unable to process server event (${command})`);
+        }
       },
       error: () => this.failCurrent(owned, 'WebSocket error'),
       close: (event) => this.onClose(owned, event),
