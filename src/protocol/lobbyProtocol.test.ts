@@ -119,6 +119,15 @@ describe('lobby protocol decoder', () => {
     expect(encodeCreateTableSettingFrame({ name: 'createTableMaxPlayers', value: 5 })).toBe('setting {"name":"createTableMaxPlayers","setting":"5"}');
     expect(encodeCreateTableSettingFrame({ name: 'createTableTimeBaseMinutes', value: 1.5 })).toBe('setting {"name":"createTableTimeBaseMinutes","setting":"1.5"}');
   });
+  test('accepts the current upstream connection mode on welcome', () => {
+    expect(decodeServerFrame(
+      'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"connectionMode":"initial"}',
+    )).toMatchObject({
+      kind: 'event',
+      event: { command: 'welcome', data: { connectionMode: 'initial' } },
+    });
+  });
+
   test('retains authoritative welcome mute state and defaults it when absent', () => {
     expect(decodeServerFrame(
       'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"muted":true}',
@@ -204,53 +213,99 @@ describe('lobby protocol decoder', () => {
       'replayCreate {"source":"json","gameJSON":{"seed":"p2v0s1","actions":[]},"visibility":"shared"}',
     );
   });
-  test('validates exact pinned chat and chatList payloads', () => {
-    const chat = {
+  test('decodes current upstream chat payloads and normalizes source semantics', () => {
+    const currentChat = {
       msg: 'hello &amp; goodbye',
+      who: 'Ada',
+      source: 'user',
+      datetime: '2026-10-20T10:00:00Z',
+      chatID: 123,
+      room: 'lobby',
+    };
+    const normalizedChat = {
+      msg: currentChat.msg,
       who: 'Ada',
       discord: false,
       server: false,
-      datetime: '2026-09-01T10:00:00Z',
+      datetime: currentChat.datetime,
+      chatID: 123,
+      pmID: undefined,
       room: 'lobby',
       recipient: '',
     };
-    expect(decodeServerFrame(`chat ${JSON.stringify(chat)}`)).toEqual({
-      kind: 'event', event: { command: 'chat', data: chat },
+    expect(decodeServerFrame(`chat ${JSON.stringify(currentChat)}`)).toEqual({
+      kind: 'event', event: { command: 'chat', data: normalizedChat },
     });
-    expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 2 })}`))
+    expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [currentChat], unread: 2 })}`))
       .toEqual({
         kind: 'event',
-        event: { command: 'chatList', data: { list: [chat], unread: 2 } },
+        event: { command: 'chatList', data: { list: [normalizedChat], unread: 2 } },
       });
-    expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, extra: true })}`)).toMatchObject({
-      kind: 'malformed', command: 'chat', issue: 'invalid-payload',
+
+    const serverChat = {
+      msg: '<strong>[Server Notice]</strong> Ready &amp; waiting',
+      source: 'server',
+      datetime: '2026-10-20T10:00:01Z',
+      room: 'lobby',
+    };
+    expect(decodeServerFrame(`chat ${JSON.stringify(serverChat)}`)).toMatchObject({
+      kind: 'event',
+      event: { command: 'chat', data: { who: '', server: true, discord: false, recipient: '' } },
     });
-    expect(decodeServerFrame(`chatList ${JSON.stringify({ list: [chat], unread: 0, extra: 1 })}`))
-      .toMatchObject({ kind: 'malformed', command: 'chatList', issue: 'invalid-payload' });
+
+    const discordChat = {
+      msg: 'from Discord',
+      who: 'DiscordUser',
+      source: 'discord',
+      datetime: '2026-10-20T10:00:02Z',
+      chatID: 124,
+      room: 'lobby',
+    };
+    expect(decodeServerFrame(`chat ${JSON.stringify(discordChat)}`)).toMatchObject({
+      kind: 'event',
+      event: { command: 'chat', data: { discord: true, server: false, chatID: 124 } },
+    });
+
+    const privateMessage = {
+      msg: 'private',
+      who: 'Ada',
+      source: 'user',
+      datetime: '2026-10-20T10:00:03Z',
+      pmID: 77,
+      recipient: 'Bob',
+    };
+    expect(decodeServerFrame(`chat ${JSON.stringify(privateMessage)}`)).toMatchObject({
+      kind: 'event',
+      event: {
+        command: 'chat',
+        data: { who: 'Ada', recipient: 'Bob', room: undefined, pmID: 77, server: false },
+      },
+    });
+
+    expect(decodeServerFrame('chatDelete {"chatID":123,"room":"lobby"}')).toEqual({
+      kind: 'event',
+      event: { command: 'chatDelete', data: { chatID: 123, room: 'lobby' } },
+    });
+    expect(decodeServerFrame('chatDelete {"chatID":0,"room":"lobby"}'))
+      .toMatchObject({ kind: 'malformed', command: 'chatDelete' });
     expect(decodeServerFrame('chatList {"list":[],"unread":-1}')).toEqual({
       kind: 'malformed', command: 'chatList', issue: 'invalid-payload',
     });
+  });
 
-    const serverChat = {
-      ...chat,
-      msg: '<strong>[Server Notice]</strong> Ready &amp; waiting',
-      who: '',
-      server: true,
+  test('keeps the pre-3176 chat payload readable across a server rollout boundary', () => {
+    const legacyChat = {
+      msg: 'legacy',
+      who: 'Ada',
+      discord: false,
+      server: false,
+      datetime: '2026-10-14T10:00:00Z',
+      room: 'lobby',
+      recipient: '',
     };
-    expect(decodeServerFrame(`chat ${JSON.stringify(serverChat)}`)).toEqual({
-      kind: 'event', event: { command: 'chat', data: serverChat },
+    expect(decodeServerFrame(`chat ${JSON.stringify(legacyChat)}`)).toEqual({
+      kind: 'event', event: { command: 'chat', data: legacyChat },
     });
-    expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, recipient: undefined })}`))
-      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
-    expect(decodeServerFrame(`chat ${JSON.stringify({ ...chat, who: undefined })}`))
-      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
-
-    const privateMessage = { ...chat, room: '', recipient: 'Bob' };
-    expect(decodeServerFrame(`chat ${JSON.stringify(privateMessage)}`)).toEqual({
-      kind: 'event', event: { command: 'chat', data: privateMessage },
-    });
-    expect(decodeServerFrame(`chat ${JSON.stringify({ ...privateMessage, recipient: '' })}`))
-      .toMatchObject({ kind: 'malformed', command: 'chat', issue: 'invalid-payload' });
   });
 
   test('strictly decodes notes and presence and encodes inactivity', () => {
