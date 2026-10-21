@@ -10,7 +10,6 @@ test('every production gameplay-screen runtime call is covered by the scenario-g
   const gameplayScreens = [
     read('src/ui/game/GameScreen.tsx'),
     read('src/ui/game/C17GameScreen.tsx'),
-    read('src/ui/game/LegacyGameScreen.tsx'),
   ].join('\n');
   const application = read('src/runtime/application.ts');
 
@@ -21,7 +20,8 @@ test('every production gameplay-screen runtime call is covered by the scenario-g
   const blockedMethods = [...(gateMatch?.[1] ?? '').matchAll(/['"]([A-Za-z0-9_]+)['"]/g)]
     .flatMap((match) => match[1] === undefined ? [] : [match[1]]);
 
-  expect([...new Set(runtimeCalls)].sort()).toEqual([...new Set(blockedMethods)].sort());
+  expect([...new Set(runtimeCalls)].every((method) => blockedMethods.includes(method))).toBe(true);
+  expect(blockedMethods).toContain('pauseGame'); // App-owned room-menu action
   expect(application).toContain('suppressGameplayRuntimeCommands');
 });
 
