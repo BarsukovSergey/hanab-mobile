@@ -5,6 +5,7 @@ This directory mixes current product/technical authority with historical impleme
 ## Start here
 
 - `../README.md` — project overview, local development, current Android beta scope and release-candidate state.
+- `RC_1_RELEASE.md` — current Android 1.0.0-rc.1 candidate identity, build and physical release gate; supersedes beta.4 as next tester candidate.
 - `../TESTING.md` — beta.4 tester-facing script and bug-report format.
 - `BETA_4_PHYSICAL_SMOKE.md` — short maintainer gate plus broader Slice 12 tester coverage plan.
 - `BETA_4_RELEASE_NOTES.md` — beta.4 candidate/release identity and tester-facing highlights.
