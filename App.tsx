@@ -459,6 +459,8 @@ function AppContent() {
       sharedReplay: roomState.room.sharedReplay,
     });
     const portraitChatOpen = roomChild === 'chat' && width <= height;
+    const workspaceStatusVisible = !portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '';
+    const gameHeightConstrained = liveConnectionProblem || serverStatusMessage !== null || workspaceStatusVisible;
     const gameRootScrollable = !c17Workspace;
     const renderRoomChildren = (landscapeRightWidth: number | null) => {
       const landscape = landscapeRightWidth !== null;
@@ -633,7 +635,7 @@ function AppContent() {
             </>}
           </View>
         </View>
-        {!portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '' && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
+        {workspaceStatusVisible && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
         {liveConnectionProblem && (
           <View style={styles.liveConnectionNotice}>
             <Notice tone="error">{session.error ?? 'Connection lost. Game actions are disabled until the realtime session reconnects.'}</Notice>
@@ -659,7 +661,7 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
-            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} />
+            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} />
           </View>
         </ScrollView>
         </SafeAreaView>

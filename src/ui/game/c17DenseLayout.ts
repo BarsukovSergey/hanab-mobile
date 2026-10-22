@@ -90,16 +90,18 @@ export function hasC17AmbientRegionChanged(
 
 /**
  * A shell can finish measuring after a transiently constrained layout. Keep the largest
- * accepted envelope for that shell so temporary chrome changes cannot shrink the Ledger.
+ * accepted envelope for that shell unless visible notices explicitly constrain its height.
  */
 export function getC17AmbientEnvelope(
   current: { height: number; width: number },
   next: { height: number; width: number },
   sameShell: boolean,
+  allowHeightShrink = false,
 ): { height: number; width: number } {
   if (!sameShell) return next;
   return {
-    height: Math.max(current.height, next.height),
+    height: allowHeightShrink && Number.isFinite(next.height) && next.height > 0
+      ? next.height : Math.max(current.height, next.height),
     width: Math.max(current.width, next.width),
   };
 }

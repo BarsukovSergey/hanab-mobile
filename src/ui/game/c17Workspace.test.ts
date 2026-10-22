@@ -75,7 +75,7 @@ test('Live keeps a stable ScrollView root across rotation with eligible scrollin
   expect(appSource).toContain('const gameRootScrollable = !c17Workspace;');
   const liveRoot = appSource.match(/<SafeAreaView edges=\{\['bottom'\]\}[^>]*>\s*(<ScrollView[\s\S]*?<\/ScrollView>)\s*<\/SafeAreaView>/)?.[1] ?? '';
   expect(liveRoot).toContain('scrollEnabled={gameRootScrollable}');
-  expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} />');
+  expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} />');
   expect(liveRoot).not.toMatch(/\bkey=/);
   expect(appSource).not.toContain('const GameRoot');
   expect(appSource).not.toContain('<GameRoot');
@@ -110,4 +110,32 @@ test('tool changes retain the fixed active and idle Workbench geometry', () => {
   expect(c17ScreenSource).toContain('styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
   const workbench = c17ScreenSource.slice(c17ScreenSource.indexOf('const workbench ='), c17ScreenSource.indexOf('const workbench =') + 650);
   expect(workbench).toContain('height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0');
+});
+
+
+test('threads external height occupancy through the existing game components', () => {
+  const wrapper = readFileSync(resolve(__dirname, 'GameScreen.tsx'), 'utf8');
+  expect(appSource).toContain("const workspaceStatusVisible = !portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '';");
+  expect(appSource).toContain('const gameHeightConstrained = liveConnectionProblem || serverStatusMessage !== null || workspaceStatusVisible;');
+  expect(appSource).toContain('{workspaceStatusVisible && <Text');
+  expect(appSource).toContain('heightConstrained={gameHeightConstrained}');
+  expect(wrapper).toContain('heightConstrained = false');
+  expect(wrapper).toContain('<C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} />');
+  expect(c17ScreenSource).toContain('heightConstrained = false');
+  expect(c17ScreenSource).toContain('allowHeightShrink={heightConstrained || clientState.pause.active || noteWarning !== null}');
+  expect(c17ScreenSource).toMatch(/const envelope = portraitV2 \? getC17AmbientEnvelope\([\s\S]*?sameShell,\s*allowHeightShrink,\s*\) : next/);
+  const shell = c17ScreenSource.match(/const shellKey =[^;]+;/)?.[0] ?? '';
+  expect(shell).not.toMatch(/allowHeightShrink|heightConstrained|noteWarning|pause/);
+  expect(c17ScreenSource).not.toMatch(/<C17DenseWorkspace[^>]*\bkey=/);
+  expect(c17ScreenSource).not.toMatch(/<View onLayout=[^>]*\bkey=/);
+});
+
+test('replaces impossible portrait gameplay with a noninteractive warning using actual measured space', () => {
+  expect(c17ScreenSource).toContain('const portraitSizeTooSmall = shellMeasured && portraitV2');
+  expect(c17ScreenSource).toContain('getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0');
+  expect(c17ScreenSource).toContain('measuredBodyHeight: next.height');
+  const body = c17ScreenSource.slice(c17ScreenSource.indexOf('<View onLayout={portraitV2 ? captureAmbientBody'), c17ScreenSource.indexOf('</> : <View onLayout={captureAmbientBody}'));
+  expect(body).toMatch(/portraitSizeTooSmall \? <Text accessibilityRole="alert"[^>]*>Not enough space for gameplay\. Use a larger window\.<\/Text> : <>/);
+  expect(body).toMatch(/\{workbench\}\s*<\/>/);
+  expect(body).not.toMatch(/setNote|interactionDispatch|lobbyRuntime|scrollEnabled|\bkey=/);
 });
