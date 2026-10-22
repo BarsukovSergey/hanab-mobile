@@ -90,7 +90,7 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen({ presentationVisible = true, roomChildren }: { presentationVisible?: boolean; roomChildren?: RoomChildren }) {
+export function C17GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const orientation = width > height ? 'landscape' : 'portrait';
@@ -453,6 +453,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren }: { pr
 
   return <>
     <C17DenseWorkspace
+      allowHeightShrink={heightConstrained || clientState.pause.active || noteWarning !== null}
       gameLoadEpoch={gameLoadEpoch}
       actionSegments={actionSegments}
       reverseHands={reverseHands}
@@ -622,6 +623,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren }: { pr
 }
 
 function C17DenseWorkspace({
+  allowHeightShrink,
   gameLoadEpoch,
   actionSegments,
   reverseHands,
@@ -719,6 +721,7 @@ function C17DenseWorkspace({
   colorblindMode,
   realLifeMode,
 }: {
+  allowHeightShrink: boolean;
   gameLoadEpoch: number | null;
   actionSegments: readonly number[];
   reverseHands: boolean;
@@ -871,6 +874,7 @@ function C17DenseWorkspace({
   const [layoutMetrics, setLayoutMetrics] = useState({
     shellKey: '',
     ambientBodyHeight: 0,
+    measuredBodyHeight: 0,
     ambientBodyWidth: 0,
   });
   useEffect(() => {
@@ -889,6 +893,8 @@ function C17DenseWorkspace({
   const shellMeasured = layoutMetrics.shellKey === shellKey
     && layoutMetrics.ambientBodyHeight > 0
     && layoutMetrics.ambientBodyWidth > 0;
+  const portraitSizeTooSmall = shellMeasured && portraitV2
+    && getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0;
   const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
   const cardLaneWidth = getC17CardLaneWidth(
     layoutMetrics.ambientBodyWidth,
@@ -933,14 +939,16 @@ function C17DenseWorkspace({
         { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
         { height: next.height, width: next.width },
         sameShell,
+        allowHeightShrink,
       ) : next;
       if (sameShell && !hasC17AmbientRegionChanged(
         { height: currentMetrics.ambientBodyHeight, width: currentMetrics.ambientBodyWidth },
         envelope,
-      )) return currentMetrics;
+      ) && Math.abs(currentMetrics.measuredBodyHeight - next.height) < 0.5) return currentMetrics;
       return {
         shellKey,
         ambientBodyHeight: envelope.height,
+        measuredBodyHeight: next.height,
         ambientBodyWidth: envelope.width,
       };
     });
@@ -1466,6 +1474,7 @@ function C17DenseWorkspace({
     {portraitV2 ? <>
       <View style={styles.ledgerChrome}>{metricStrip}{tableResources}{lastActionPanel}</View>
     <View onLayout={portraitV2 ? captureAmbientBody : undefined} style={styles.workspaceBody}>
+      {portraitSizeTooSmall ? <Text accessibilityRole="alert" numberOfLines={2} style={{ color: theme.colors.text }}>Not enough space for gameplay. Use a larger window.</Text> : <>
       <View
         style={[
           styles.hands,
@@ -1486,6 +1495,7 @@ function C17DenseWorkspace({
 
       {portraitV2 && ownHandPosition === 'top' && <View style={{ flex: 1 }} />}
       {workbench}
+      </>}
     </View>
     </> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>
       {!shellMeasured ? null : !landscapeLayout.fits ? <View style={styles.landscapeFailure}>

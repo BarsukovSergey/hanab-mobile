@@ -305,3 +305,59 @@ describe('Slice 8a portrait geometry', () => {
     expect(getPortraitResourceRailFit(314, 6, 1)).toBe(true);
   });
 });
+
+
+describe('notice-constrained portrait measurements', () => {
+  test('opts into height shrink while preserving stable width and default transient protection', () => {
+    const current = { width: 300, height: 500 };
+    const next = { width: 290, height: 430 };
+    expect(getC17AmbientEnvelope(current, next, true)).toEqual(current);
+    expect(getC17AmbientEnvelope(current, next, true, true)).toEqual({ width: 300, height: 430 });
+    expect(getC17AmbientEnvelope(current, next, false, true)).toEqual(next);
+    expect(getC17AmbientEnvelope(current, next, false)).toEqual(next);
+    for (const height of [0, -1]) {
+      expect(getC17AmbientEnvelope(current, { width: 290, height }, true, true)).toEqual(current);
+    }
+  });
+
+  test('accepts repeated notice changes, grows on removal and resumes transient stabilization', () => {
+    let envelope = { width: 300, height: 500 };
+    for (const height of [430, 390, 460, 420]) {
+      envelope = getC17AmbientEnvelope(envelope, { width: 295, height }, true, true);
+      expect(envelope).toEqual({ width: 300, height });
+    }
+    envelope = getC17AmbientEnvelope(envelope, { width: 300, height: 500 }, true);
+    expect(envelope.height).toBe(500);
+    expect(getC17AmbientEnvelope(envelope, { width: 300, height: 430 }, true)).toEqual(envelope);
+    expect(hasC17AmbientRegionChanged(envelope,
+      getC17AmbientEnvelope(envelope, { width: 300, height: 499.6 }, true, true))).toBe(false);
+  });
+
+  test('recalculates the 2P Bottom inset and pins the unchanged Workbench inside the smaller body', () => {
+    const workbenchHeight = 156;
+    const heights = [500, 430];
+    const regions = heights.map((height) => getC17HandsRegionHeight(height, workbenchHeight));
+    expect(regions).toEqual([334, 264]);
+    expect(regions.map((region) => getC17TwoPlayerBottomTopInset(region, 189))).toEqual([122, 52]);
+    for (const bodyHeight of heights) {
+      const envelope = getC17AmbientEnvelope({ width: 300, height: 500 }, { width: 300, height: bodyHeight }, true, true);
+      const region = getC17HandsRegionHeight(envelope.height, workbenchHeight);
+      const fitted = layout({ opponentCount: 1, handsRegionHeight: region, workbenchHeight, portraitV2: true, cardsPerHand: 5 });
+      const inset = getC17TwoPlayerBottomTopInset(region, fitted.handsHeight);
+      const gap = region - inset - fitted.opponentRowHeight - fitted.ownRowHeight;
+      expect(gap).toBeGreaterThanOrEqual(5);
+      expect(gap).toBeLessThanOrEqual(28);
+      expect(fitted.handsHeight).toBeLessThanOrEqual(region);
+      expect(inset + fitted.opponentRowHeight + gap + fitted.ownRowHeight).toBe(region);
+      expect(region + workbenchHeight + 10).toBeLessThanOrEqual(bodyHeight);
+      expect(fitted.workbenchHeight).toBe(156);
+    }
+  });
+
+  test.each([140, 156, 176, 56])('detects bodies unable to reserve the %idp Workbench and margins', (workbenchHeight) => {
+    for (const bodyHeight of [0, workbenchHeight, workbenchHeight + 9, workbenchHeight + 10]) {
+      expect(getC17HandsRegionHeight(bodyHeight, workbenchHeight)).toBe(0);
+    }
+    expect(getC17HandsRegionHeight(workbenchHeight + 11, workbenchHeight)).toBe(1);
+  });
+});

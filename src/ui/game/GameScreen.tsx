@@ -10,7 +10,7 @@ export type RoomChildren = (landscapeRightWidth: number | null) => ReactNode;
  * Gameplay is only available after the live-game bootstrap has completed.
  * Never expose gameplay actions for malformed/unexpected room metadata.
  */
-export function GameScreen({ presentationVisible = true, roomChildren }: { presentationVisible?: boolean; roomChildren?: RoomChildren }) {
+export function GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean }) {
   const room = useAppSelector((state) => state.room.room);
   const liveRoom = room.kind === 'live_game' ? room : null;
   const clientState = liveRoom?.clientState ?? null;
@@ -31,5 +31,5 @@ export function GameScreen({ presentationVisible = true, roomChildren }: { prese
     );
   }
 
-  return <C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} />;
+  return <C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} />;
 }

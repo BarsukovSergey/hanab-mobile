@@ -8,7 +8,8 @@ test('C17 landscape omits the external workspace status while portrait and non-C
   const app = read('App.tsx');
   const statusRows = app.split('\n').filter((line) => line.includes('{workspacePresentation.status}</Text>'));
   expect(statusRows).toHaveLength(1);
-  expect(statusRows[0]).toContain("{!portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '' && <Text");
+  expect(statusRows[0]).toContain("{workspaceStatusVisible && <Text");
+  expect(app).toContain("const workspaceStatusVisible = !portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '';");
 });
 
 test('global navigation belongs to authenticated browsing and uses responsive geometry', () => {
@@ -58,7 +59,7 @@ test('focused rooms stay mounted in an App-owned layer while browsing has focus'
   expect(live).toContain('focusedRoomPresentation = (');
   expect(live).toContain('const gameRootScrollable = !c17Workspace;');
   expect(live).toContain('scrollEnabled={gameRootScrollable}');
-  expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} />');
+  expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} />');
   expect(live).toContain('const childVisible = roomPresentationVisible && roomChild !== null;');
   expect(live).toContain("readActive={roomPresentationVisible && roomChild === 'chat'}");
   expect(live).not.toMatch(/\breturn\s*\(\s*<KeyboardAvoidingView/);
