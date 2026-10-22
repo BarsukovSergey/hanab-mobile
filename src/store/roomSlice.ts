@@ -1673,6 +1673,9 @@ export const roomSlice = createSlice({
     });
     builder.addCase(sessionActions.connectionFailed, (state, action) => {
       if (state.connectionEpoch === action.payload.epoch) {
+        state.pendingRecovery = null;
+        state.recoveryJoinedConfirmed = false;
+        state.recoveryStagedGame = null;
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;
@@ -1688,6 +1691,9 @@ export const roomSlice = createSlice({
     });
     builder.addCase(sessionActions.connectionClosed, (state, action) => {
       if (state.connectionEpoch === action.payload.epoch) {
+        state.pendingRecovery = null;
+        state.recoveryJoinedConfirmed = false;
+        state.recoveryStagedGame = null;
         state.pendingCreate = null;
         state.pendingStart = null;
         state.pendingGameplayAction = null;

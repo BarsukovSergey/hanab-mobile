@@ -5,7 +5,7 @@ import { getFocusedRoomBackDecision, getRoomReturnPresentation } from './roomRet
 const pregame = (role: 'player' | 'spectator'): RoomState => ({
   kind: 'pregame', role, tableID: 1, data: { players: ['Alice', 'Bob'], maxPlayers: 5 },
 } as unknown as RoomState);
-const bootstrap = { kind: 'awaiting_game_bootstrap', tableID: 1 } as RoomState;
+const bootstrap = { kind: 'awaiting_game_bootstrap', tableID: 1, bootstrap: 'pending_c5' } as RoomState;
 const live = (changes: {
   finished?: boolean; active?: boolean; shared?: object | null; hypothetical?: object | null;
   sharedReplay?: boolean; role?: 'player' | 'spectator'; currentPlayerIndex?: number;
@@ -36,6 +36,14 @@ describe('room Return presentation', () => {
     expect(getRoomReturnPresentation(live({ finished: true, shared: {}, score: 25 }), false)).toEqual({ status: 'Finished · 25', action: 'Review game', behavior: 'focus-room' });
     expect(getRoomReturnPresentation(live({ finished: true }), false)).toEqual({ status: 'REPLAY', action: 'Return to review', behavior: 'focus-room' });
     expect(getRoomReturnPresentation(live({ finished: true, sharedReplay: true }), false)).toEqual({ status: 'SHARED REVIEW', action: 'Return to review', behavior: 'focus-room' });
+  });
+
+  test('failed bootstrap keeps Return and Back ownership with an honest error status', () => {
+    const failed = { ...bootstrap, bootstrap: { gameLoadEpoch: 1, phase: 'failed', historyActionCount: 0 } } as RoomState;
+    expect(getRoomReturnPresentation(failed, false)).toEqual({
+      status: 'Unable to load game', action: 'Return to room', behavior: 'focus-room',
+    });
+    expect(getFocusedRoomBackDecision(failed)).toBe('consume');
   });
 
   test('ordinary Live has a one-based human turn and only playable own turn is urgent', () => {
