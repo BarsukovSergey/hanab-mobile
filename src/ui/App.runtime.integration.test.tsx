@@ -1,10 +1,11 @@
 import React from 'react';
-import { AppState } from 'react-native';
+import { AppState, Text, TextInput, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
 
 import App from '../../App';
-import { bootstrap, FakeSession, welcome } from './testUtils/appRuntimeHarness';
+import { bootstrap, FakeSession, history, welcome } from './testUtils/appRuntimeHarness';
+import { makeInit } from '../protocol/gameProtocol.fixtures';
 import { ChatRuntime } from '../runtime/ChatRuntime';
 import { LobbyRuntime } from '../runtime/LobbyRuntime';
 import { TerminationRuntime } from '../runtime/terminationRuntime';
@@ -12,6 +13,7 @@ import { createAppStore, type AppStore } from '../store/store';
 import { BrowsingAppBar } from './BrowsingAppBar';
 import { BrowsingNavigation } from './BrowsingNavigation';
 import { ActionButton } from './designSystem';
+import { GameBootstrapStatus } from './GameBootstrapStatus';
 import { C17GameScreen } from './game/C17GameScreen';
 import { ClueComposer } from './game/ClueComposer';
 import { GameCard } from './game/GameCard';
@@ -118,6 +120,205 @@ function browsePeople() {
   act(() => people.props.onPress());
   expect(tree.root.findByType(BrowsingAppBar).props.title).toBe('People');
 }
+
+function terminalBootstrapRetry() {
+  expect(store.getState().session.phase).toBe('ready');
+  expect(store.getState().room.room).toMatchObject({
+    kind: 'awaiting_game_bootstrap', bootstrap: { phase: 'failed' },
+  });
+  expect(tree.root.findAllByType(C17GameScreen)).toHaveLength(0);
+  const alert = tree.root.findAllByType(View).find((node: { props: { accessibilityRole?: string } }) =>
+    node.props.accessibilityRole === 'alert');
+  expect(alert).toBeDefined();
+  expect(alert.findAllByType(Text).map((node: { props: { children: unknown } }) => node.props.children))
+    .toContain('Unable to load game');
+  expect(tree.root.findAllByType(Text).some((node: { props: { children: unknown } }) =>
+    node.props.children === 'Loading game…')).toBe(false);
+  expect(buttons('Retry')).toHaveLength(1);
+  const controls = buttons('Retry')[0].findAllByProps({
+    accessibilityRole: 'button', accessibilityLabel: 'Retry loading game',
+  });
+  expect(controls.length).toBeGreaterThan(0);
+  const retry = controls[0];
+  expect(retry.props).toMatchObject({
+    accessibilityRole: 'button', accessibilityLabel: 'Retry loading game', disabled: false,
+  });
+  return retry;
+}
+
+test('terminal bootstrap error Retry reconnects the mounted App and recovers only from fresh authority, ignoring stale callbacks and the old Play', async () => {
+  const openSocket = jest.spyOn(mockSession, 'openSocket');
+  const first = await mountLive();
+  const oldConnectionEpoch = store.getState().session.connectionEpoch;
+  selectCard(0);
+  pressButton('Play');
+  expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+  expect(first.sent.at(-1)).toBe('action {"tableID":123,"type":0,"target":0}');
+
+  // Let the real coordinator's history watchdog fail a new authoritative load.
+  // Capture callbacks so disposal alone cannot make the stale-event check pass.
+  const timers = jest.spyOn(globalThis, 'setTimeout');
+  let staleWatchdogs: Array<() => void>;
+  try {
+    act(() => first.emitMessage('tableStart {"tableID":123,"replay":false}'));
+    act(() => first.emitMessage(`init ${JSON.stringify(makeInit())}`));
+    staleWatchdogs = timers.mock.calls.filter(([, delay]) => delay === 15_000)
+      .map(([callback]) => callback as () => void);
+    expect(staleWatchdogs).toHaveLength(2);
+  } finally {
+    timers.mockRestore();
+  }
+  const staleMessages = first.snapshotMessages();
+  expect(staleMessages.length).toBeGreaterThan(0);
+  expect(store.getState().room.room).toMatchObject({ bootstrap: { phase: 'waiting_history' } });
+  expect(tree.root.findByType(GameBootstrapStatus)).toBeDefined();
+  expect(buttons('Retry')).toHaveLength(0);
+  act(() => jest.advanceTimersByTime(15_000));
+  const retry = terminalBootstrapRetry();
+  const failedRoom = store.getState().room.room;
+  const sentBeforeRetry = [...first.sent];
+  expect(first.readyState).toBe(1);
+  act(() => jest.advanceTimersByTime(60_000));
+  expect(store.getState().room.room).toBe(failedRoom);
+  expect(openSocket).toHaveBeenCalledTimes(1);
+  expect(first.sent).toEqual(sentBeforeRetry);
+
+  // Use the rendered accessible control, without calling the recovery API here.
+  act(() => retry.props.onPress());
+  expect(store.getState().session.phase).toBe('connecting');
+  expect(store.getState().session.connectionEpoch).toBeGreaterThan(oldConnectionEpoch);
+  expect(store.getState().room.room).toEqual({ kind: 'none' });
+  expect(first.readyState).toBe(3);
+  expect(first.snapshotMessages()).toHaveLength(0);
+  await act(async () => {});
+  const second = mockSession.sockets[1];
+  expect(openSocket).toHaveBeenCalledTimes(2);
+  act(() => second.emitOpen());
+  expect(store.getState().session.phase).toBe('openAwaitingWelcome');
+  expect(second.sent).toEqual([]);
+  expect(tree.root.findAllByType(C17GameScreen)).toHaveLength(0);
+
+  act(() => {
+    second.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}');
+    second.emitMessage('userList []');
+    second.emitMessage('tableList []');
+  });
+  expect(store.getState().session.phase).toBe('ready');
+  expect(store.getState().room.pendingRecovery).toEqual({ tableID: 123, role: 'player' });
+  expect(second.sent).toEqual(['tableReattend {"tableID":123}']);
+  act(() => second.emitMessage('tableStart {"tableID":123,"replay":false}'));
+  act(() => second.emitMessage(`init ${JSON.stringify(makeInit())}`));
+  expect(store.getState().room.room).toMatchObject({ bootstrap: { phase: 'waiting_history' } });
+  expect(tree.root.findAllByType(C17GameScreen)).toHaveLength(0);
+
+  function deliverStaleCallbacks() {
+    act(() => {
+      for (const callback of staleWatchdogs) callback();
+      for (const data of [
+        'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[999]}',
+        'tableStart {"tableID":123,"replay":false}',
+        `init ${JSON.stringify(makeInit())}`,
+        `gameActionList ${JSON.stringify(history())}`,
+        'gameAction {"tableID":123,"action":{"type":"turn","num":99,"currentPlayerIndex":1}}',
+      ]) {
+        for (const callback of staleMessages) callback({ data } as WebSocketMessageEvent);
+      }
+    });
+  }
+  const recoveringState = store.getState();
+  const recoveringFrames = [...second.sent];
+  deliverStaleCallbacks();
+  expect(store.getState()).toBe(recoveringState);
+  expect(second.sent).toEqual(recoveringFrames);
+  expect(tree.root.findAllByType(C17GameScreen)).toHaveLength(0);
+
+  act(() => second.emitMessage(`gameActionList ${JSON.stringify(history())}`));
+  expect(liveRoom()).toMatchObject({
+    tableID: 123, role: 'player', clientState: { ongoingGame: { turn: { currentPlayerIndex: 0 } } },
+  });
+  expect(failedRoom.kind).toBe('awaiting_game_bootstrap');
+  if (failedRoom.kind !== 'awaiting_game_bootstrap' || failedRoom.bootstrap === 'pending_c5') {
+    throw new Error('Expected a failed bootstrap generation');
+  }
+  expect(liveRoom().gameLoadEpoch).toBeGreaterThan(failedRoom.bootstrap.gameLoadEpoch);
+  expect(store.getState().room.connectionEpoch).toBe(store.getState().session.connectionEpoch);
+  expect(store.getState().room.pendingGameplayAction).toBeNull();
+  expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
+  expect(tree.root.findAllByType(GameBootstrapStatus)).toHaveLength(0);
+  expectDisarmed();
+  const recoveredState = store.getState();
+  deliverStaleCallbacks();
+  act(() => jest.advanceTimersByTime(60_000));
+  expect(store.getState()).toBe(recoveredState);
+  expect(openSocket).toHaveBeenCalledTimes(2);
+  expect(first.sent).toEqual(sentBeforeRetry);
+  expect(first.sent.filter((frame) => frame.startsWith('action '))).toHaveLength(1);
+  expect(second.sent).toEqual([
+    'tableReattend {"tableID":123}', 'getGameInfo1 {"tableID":123}',
+    'getGameInfo2 {"tableID":123}', 'loaded {"tableID":123}',
+  ]);
+});
+
+test('failed historical replay Retry in the mounted App settles in browsing when fresh welcome has no room, without recreating the replay', async () => {
+  const openSocket = jest.spyOn(mockSession, 'openSocket');
+  await act(async () => { tree = create(<Provider store={store} stabilityCheck="never"><App /></Provider>); });
+  const first = mockSession.sockets[0];
+  const noRoomWelcome = 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}';
+  act(() => {
+    first.emitOpen();
+    first.emitMessage(noRoomWelcome);
+    first.emitMessage('userList []');
+    first.emitMessage('tableList []');
+  });
+  pressButton('History');
+  pressButton('Open replay');
+  const input = tree.root.findAllByType(TextInput).find((node: { props: { placeholder?: string } }) =>
+    node.props.placeholder === 'Replay link or database ID');
+  expect(input).toBeDefined();
+  act(() => input.props.onChangeText('77'));
+  pressButton('Open');
+  expect(store.getState().history.pendingReplayCreate).toMatchObject({ databaseID: 77, visibility: 'solo' });
+  expect(first.sent.filter((frame) => frame.startsWith('replayCreate '))).toEqual([
+    'replayCreate {"source":"id","databaseID":77,"visibility":"solo"}',
+  ]);
+  act(() => first.emitMessage('tableStart {"tableID":123,"replay":true}'));
+  act(() => jest.advanceTimersByTime(15_000));
+  const retry = terminalBootstrapRetry();
+  const oldEpoch = store.getState().session.connectionEpoch;
+  const oldFrames = [...first.sent];
+  act(() => retry.props.onPress());
+  await act(async () => {});
+  const second = mockSession.sockets[1];
+  expect(first.readyState).toBe(3);
+  expect(store.getState().session.connectionEpoch).toBeGreaterThan(oldEpoch);
+  act(() => second.emitOpen());
+  expect(store.getState().session.phase).toBe('openAwaitingWelcome');
+  expect(second.sent).toEqual([]);
+  act(() => {
+    second.emitMessage(noRoomWelcome);
+    second.emitMessage('userList []');
+    second.emitMessage('tableList []');
+  });
+  expect(store.getState().session.phase).toBe('ready');
+  expect(store.getState().room.room).toEqual({ kind: 'none' });
+  expect(store.getState().room.pendingRecovery).toBeNull();
+  expect(store.getState().history.pendingReplayCreate).toBeNull();
+  expect(tree.root.findAllByType(GameBootstrapStatus)).toHaveLength(0);
+  expect(tree.root.findAllByType(C17GameScreen)).toHaveLength(0);
+  expect(buttons('Retry')).toHaveLength(0);
+  expect(tree.root.findByType(BrowsingNavigation)).toBeDefined();
+  expect(tree.root.findByType(BrowsingAppBar).props.returnPresentation).toBeNull();
+  const readyRoom = store.getState().room;
+  act(() => {
+    // A late replay transition has no current authoritative entry path.
+    second.emitMessage('tableStart {"tableID":123,"replay":true}');
+    jest.advanceTimersByTime(60_000);
+  });
+  expect(store.getState().room).toBe(readyRoom);
+  expect(openSocket).toHaveBeenCalledTimes(2);
+  expect(first.sent).toEqual(oldFrames);
+  expect(second.sent).toEqual([]);
+});
 
 test.each(['card', 'clue'] as const)('Home hides %s interaction, accepts authoritative updates, and Return stays disarmed', async (interaction) => {
   const socket = await mountLive();
