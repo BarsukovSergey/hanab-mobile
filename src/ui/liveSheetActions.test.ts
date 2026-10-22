@@ -63,7 +63,7 @@ test('C17 child host uses the allocated right column without changing allocator 
   expect(app).toContain("roomState.room.kind !== 'none' ? roomState.room.tableID : null");
 });
 
-test('keeps live-game header actions outlined, matched, and tall enough to tap', () => {
+test('keeps Live Home quiet, Review Browse outlined, and header actions tall enough to tap', () => {
   const headerStart = app.indexOf('<View style={[styles.headerActions');
   const headerEnd = app.indexOf('{liveConnectionProblem', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
@@ -74,12 +74,16 @@ test('keeps live-game header actions outlined, matched, and tall enough to tap',
   const [browse, chat, more] = buttons;
   expect(browse).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
   expect(browse).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
+  expect(browse).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
+  expect(browse).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
   expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
   expect(chat).toContain("onPress={() => setRoomChild('chat')}");
   expect(more).toContain('title="Menu"');
   expect(more).toContain("onPress={() => setRoomChild('menu')}");
   for (const button of buttons) {
     expect(button).toContain('compact');
+  }
+  for (const button of [chat, more]) {
     expect(button).toContain('tone="secondary"');
     expect(button).toContain('style={styles.liveHeaderAction}');
   }
