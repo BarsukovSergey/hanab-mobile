@@ -621,7 +621,7 @@ function AppContent() {
               <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
               <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
             </> : <>
-            <ActionButton compact title={workspacePresentation.review ? 'Browse' : 'Home'} tone="secondary" style={styles.liveHeaderAction} onPress={workspacePresentation.review ? browseFromRoom : homeFromLive} />
+            <ActionButton compact title={workspacePresentation.review ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review ? browseFromRoom : homeFromLive} />
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
             <ActionButton
               compact
@@ -918,13 +918,14 @@ const styles = StyleSheet.create({
   liveConnectionNotice: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', padding: 20 },
   centerCard: { alignSelf: 'center', maxWidth: 520, width: '100%' },
-  gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 7, paddingHorizontal: 10, paddingTop: 9 },
+  gameBar: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingBottom: 5, paddingHorizontal: 10, paddingTop: 5 },
   gameBarLandscape: { minHeight: 34, paddingBottom: 3, paddingHorizontal: 8, paddingTop: 5 },
   brandCopy: { flexShrink: 1, gap: 1, minWidth: 0 },
   gameIdentity: { fontSize: 18, fontWeight: '800', minWidth: 0 },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end' },
   headerActionsLandscape: { flex: 1, justifyContent: 'flex-end' },
   liveHeaderAction: { justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },
+  liveHeaderNavigation: { paddingHorizontal: 8 },
   menuActions: { gap: 7 },
   liveUserRow: { alignItems: 'flex-start', gap: 4, paddingVertical: 2 },
   menuScroll: { flex: 1, minHeight: 0 },
