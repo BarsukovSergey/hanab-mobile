@@ -744,6 +744,256 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+describe('terminal bootstrap recovery', () => {
+  const playerWelcome = 'welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}';
+  const tableStart = 'tableStart {"tableID":123,"replay":false}';
+  const init = `init ${JSON.stringify(makeInit())}`;
+  const history = 'gameActionList {"tableID":123,"list":[]}';
+
+  async function loadingPlayer() {
+    const ready = await makeReadyRuntime();
+    addJoinableTable(ready.store);
+    expect(ready.runtime.join(123)).toBe(true);
+    ready.socket.emitMessage(pregameFrame());
+    ready.socket.emitMessage('joined {"tableID":123}');
+    ready.socket.emitMessage(tableStart);
+    return ready;
+  }
+
+  test.each(['waiting_init', 'waiting_history', 'loaded send'] as const)(
+    '%s failure is terminal on a READY socket and never publishes partial LIVE or retries sends',
+    async (failure) => {
+      const { runtime, socket, store, session } = await loadingPlayer();
+      const published: string[] = [];
+      const unsubscribe = store.subscribe(() => published.push(store.getState().room.room.kind));
+      expect(runtime.retryGameBootstrap()).toBe(false);
+      if (failure !== 'waiting_init') socket.emitMessage(init);
+      if (failure === 'loaded send') {
+        socket.failSend = true;
+        socket.emitMessage(history);
+        socket.failSend = false;
+      } else {
+        jest.advanceTimersByTime(15_000);
+      }
+      expect(store.getState().room.room).toMatchObject({
+        kind: 'awaiting_game_bootstrap', bootstrap: { phase: 'failed' },
+      });
+      expect(store.getState().session.phase).toBe('ready');
+      expect(socket.readyState).toBe(1);
+      const sent = [...socket.sent];
+      socket.emitMessage(init);
+      socket.emitMessage(history);
+      socket.emitMessage('gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}');
+      jest.advanceTimersByTime(60_000);
+      await runtime.connect();
+      expect(session.openCalls).toBe(1);
+      expect(socket.sent).toEqual(sent);
+      expect(published).not.toContain('live_game');
+      expect(runtime.play(0)).toBe(false);
+      expect(runtime.discard(0)).toBe(false);
+      expect(runtime.rankClue(1, 1)).toBe(false);
+      unsubscribe();
+    },
+  );
+
+  test('Retry replaces a READY socket once and reboots only after fresh welcome, tableStart, init and history', async () => {
+    const { runtime, socket, store, session } = await loadingPlayer();
+    jest.advanceTimersByTime(15_000);
+    const next = new FakeSocket();
+    const opening = deferred<NetworkSocket>();
+    session.sockets.push(opening.promise);
+    expect(runtime.retryGameBootstrap()).toBe(true);
+    expect(socket.closeCalls).toHaveLength(1);
+    expect(store.getState().session).toMatchObject({ phase: 'connecting', connectionEpoch: 2 });
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(runtime.retryGameBootstrap()).toBe(false);
+    const connecting = runtime.connect();
+    expect(session.openCalls).toBe(2);
+    expect(runtime.play(0)).toBe(false);
+    opening.resolve(next);
+    await connecting;
+    next.emitOpen();
+    expect(next.sent).toEqual([]);
+    expect(runtime.retryGameBootstrap()).toBe(false);
+    next.emitMessage(playerWelcome);
+    expect(next.sent).toEqual(['tableReattend {"tableID":123}']);
+    expect(store.getState().room.pendingRecovery).toEqual({ tableID: 123, role: 'player' });
+    next.emitMessage(tableStart);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', bootstrap: { gameLoadEpoch: 2, phase: 'waiting_init' },
+    });
+    next.emitMessage(init);
+    expect(store.getState().room.room.kind).toBe('awaiting_game_bootstrap');
+    next.emitMessage(history);
+    expect(store.getState().room.room).toMatchObject({ kind: 'live_game', gameLoadEpoch: 2 });
+    next.emitMessage(init);
+    next.emitMessage(history);
+    expect(runtime.retryGameBootstrap()).toBe(false);
+    expect(next.sent).toEqual([
+      'tableReattend {"tableID":123}', 'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}', 'loaded {"tableID":123}',
+    ]);
+  });
+
+  test('obsolete watchdog and socket callbacks cannot advance or fail the new load', async () => {
+    const timers = jest.spyOn(globalThis, 'setTimeout');
+    const { runtime, socket, store, session } = await loadingPlayer();
+    const watchdog = timers.mock.calls.find(([, delay]) => delay === 15_000)![0] as () => void;
+    timers.mockRestore();
+    const messages = socket.snapshotMessageListeners();
+    const closes = socket.snapshotCloseListeners();
+    jest.advanceTimersByTime(15_000);
+    const next = new FakeSocket();
+    session.sockets.push(Promise.resolve(next));
+    runtime.retryGameBootstrap();
+    await runtime.connect();
+    next.emitOpen();
+    next.emitMessage(playerWelcome);
+    next.emitMessage(tableStart);
+    const before = store.getState();
+    watchdog();
+    for (const data of [playerWelcome, tableStart, init, history]) {
+      for (const callback of messages) callback({ data } as WebSocketMessageEvent);
+    }
+    for (const callback of closes) callback({ code: 1006 } as WebSocketCloseEvent);
+    expect(store.getState()).toBe(before);
+    expect(session.openCalls).toBe(2);
+    next.emitMessage(init);
+    next.emitMessage(history);
+    watchdog();
+    expect(store.getState().room.room).toMatchObject({ kind: 'live_game', gameLoadEpoch: 2 });
+    expect(next.closeCalls).toEqual([]);
+    expect(socket.sent).toEqual(['tableJoin {"tableID":123}', 'getGameInfo1 {"tableID":123}']);
+  });
+
+  test('a second failed bootstrap allows a new deliberate Retry without automatic sends', async () => {
+    const { runtime, store, session } = await loadingPlayer();
+    jest.advanceTimersByTime(15_000);
+    for (const epoch of [2, 3]) {
+      const next = new FakeSocket();
+      session.sockets.push(Promise.resolve(next));
+      expect(runtime.retryGameBootstrap()).toBe(true);
+      expect(runtime.retryGameBootstrap()).toBe(false);
+      await runtime.connect();
+      next.emitOpen();
+      next.emitMessage(playerWelcome);
+      next.emitMessage(tableStart);
+      next.emitMessage(init);
+      next.failSend = true;
+      next.emitMessage(history);
+      next.failSend = false;
+      expect(store.getState().room.room).toMatchObject({
+        kind: 'awaiting_game_bootstrap', bootstrap: { phase: 'failed', gameLoadEpoch: epoch },
+      });
+      jest.advanceTimersByTime(60_000);
+      expect(session.openCalls).toBe(epoch);
+      expect(next.sent).toEqual([
+        'tableReattend {"tableID":123}', 'getGameInfo1 {"tableID":123}', 'getGameInfo2 {"tableID":123}',
+      ]);
+    }
+  });
+
+  test('Retry follows a new spectator table and shadowing seat from welcome rather than the failed room', async () => {
+    const { runtime, store, session } = await loadingPlayer();
+    jest.advanceTimersByTime(15_000);
+    const next = new FakeSocket();
+    session.sockets.push(Promise.resolve(next));
+    runtime.retryGameBootstrap();
+    await runtime.connect();
+    next.emitOpen();
+    next.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[],"disconSpectatingTable":456,"disconShadowingSeat":1}');
+    next.emitMessage(tableStart);
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    next.emitMessage('tableStart {"tableID":456,"replay":false}');
+    next.emitMessage(`init ${JSON.stringify(makeInit({ tableID: 456, spectating: true, shadowing: true, ourPlayerIndex: 1 }))}`);
+    next.emitMessage('gameActionList {"tableID":456,"list":[]}');
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', tableID: 456, role: 'spectator',
+      clientState: { shadowing: true, metadata: { ourPlayerIndex: 1 } },
+    });
+    expect(next.sent).toEqual([
+      'tableSpectate {"tableID":456,"shadowingPlayerIndex":1}',
+      'getGameInfo1 {"tableID":456}', 'getGameInfo2 {"tableID":456}',
+    ]);
+  });
+
+  test.each(['solo', 'shared'] as const)('failed historical %s replay without new resume hints settles at no room without replay creation', async (visibility) => {
+    const { runtime, socket, store, session } = await makeReadyRuntime();
+    expect(runtime.watchReplayByID(77, visibility)).toBe(true);
+    socket.emitMessage('tableStart {"tableID":123,"replay":true}');
+    jest.advanceTimersByTime(15_000);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', expectedDatabaseID: 77, bootstrap: { phase: 'failed' },
+    });
+    const next = new FakeSocket();
+    session.sockets.push(Promise.resolve(next));
+    runtime.retryGameBootstrap();
+    await runtime.connect();
+    next.emitOpen();
+    next.emitMessage(welcomeFrame);
+    next.emitMessage('userList []');
+    next.emitMessage('tableList []');
+    // A late transition without a current server resume/entry path is ignored.
+    next.emitMessage('tableStart {"tableID":123,"replay":true}');
+    expect(store.getState().room.room).toEqual({ kind: 'none' });
+    expect(store.getState().room.pendingRecovery).toBeNull();
+    expect(store.getState().history.pendingReplayCreate).toBeNull();
+    expect(next.sent).toEqual([]);
+    expect(runtime.retryGameBootstrap()).toBe(false);
+  });
+
+  test.each(['open failure', 'welcome timeout', 'resume rejected', 'resume closed'] as const)(
+    'unsuccessful recovery (%s) leaves no stale pending room or partial LIVE state', async (failure) => {
+      const { runtime, store, session } = await loadingPlayer();
+      jest.advanceTimersByTime(15_000);
+      const next = new FakeSocket();
+      session.sockets.push(failure === 'open failure'
+        ? Promise.reject(new Error('Offline')) : Promise.resolve(next));
+      runtime.retryGameBootstrap();
+      await runtime.connect();
+      if (failure !== 'open failure') next.emitOpen();
+      if (failure === 'welcome timeout') jest.advanceTimersByTime(10_000);
+      if (failure === 'resume rejected' || failure === 'resume closed') {
+        next.emitMessage(playerWelcome);
+        next.emitMessage(pregameFrame());
+        expect(store.getState().room.recoveryStagedGame).not.toBeNull();
+        if (failure === 'resume rejected') next.emitMessage('warning {"warning":"Table no longer available"}');
+        else next.emitClose();
+      }
+      expect(store.getState().room).toMatchObject({
+        room: { kind: 'none' }, pendingRecovery: null,
+        recoveryJoinedConfirmed: false, recoveryStagedGame: null,
+      });
+      expect(runtime.retryGameBootstrap()).toBe(false);
+      expect(runtime.play(0)).toBe(false);
+      expect(next.sent).toEqual(failure.startsWith('resume') ? ['tableReattend {"tableID":123}'] : []);
+    },
+  );
+
+  test('an uncertain gameplay command is never resent by explicit bootstrap recovery', async () => {
+    const { runtime, socket, store, session } = await makeLiveRuntime('player');
+    expect(runtime.play(0)).toBe(true);
+    expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+    socket.emitMessage(tableStart);
+    jest.advanceTimersByTime(15_000);
+    const next = new FakeSocket();
+    session.sockets.push(Promise.resolve(next));
+    runtime.retryGameBootstrap();
+    await runtime.connect();
+    next.emitOpen();
+    next.emitMessage(playerWelcome);
+    next.emitMessage(tableStart);
+    next.emitMessage(init);
+    next.emitMessage(history);
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+    expect(next.sent).toEqual([
+      'tableReattend {"tableID":123}', 'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}', 'loaded {"tableID":123}',
+    ]);
+    expect(socket.sent.filter((frame) => frame.startsWith('action '))).toHaveLength(1);
+  });
+});
+
 describe('deterministic lobby runtime', () => {
   test('dispatches shutdown and maintenance updates into session state', async () => {
     const { socket, store } = await makeReadyRuntime();

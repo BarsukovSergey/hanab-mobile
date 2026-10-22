@@ -20,7 +20,8 @@ export function getRoomReturnPresentation(room: RoomState, recovering: boolean):
     action: 'Return to table', behavior: 'focus-room',
   };
   if (room.kind === 'awaiting_game_bootstrap') return {
-    status: 'Loading game', action: 'Return to room', behavior: 'focus-room',
+    status: room.bootstrap !== 'pending_c5' && room.bootstrap.phase === 'failed' ? 'Unable to load game' : 'Loading game',
+    action: 'Return to room', behavior: 'focus-room',
   };
   const { clientState } = room;
   if (clientState.replay.hypothetical !== null) return {

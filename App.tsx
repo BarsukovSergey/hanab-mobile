@@ -26,6 +26,7 @@ import { roomActions } from './src/store/roomSlice';
 import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { selectLobbyHydrated } from './src/store/store';
 import { AppErrorBoundary } from './src/ui/AppErrorBoundary';
+import { GameBootstrapStatus } from './src/ui/GameBootstrapStatus';
 import { Conversation } from './src/ui/Conversation';
 import { ChatPanel } from './src/ui/ChatPanel';
 import {
@@ -155,9 +156,10 @@ function AppContent() {
   const recoveringRoom = roomState.pendingRecovery !== null || (
     session.phase !== 'ready'
     && (roomState.room.kind !== 'none'
-      || presentationFocusMemory.current.preserveNextRoomEntry
-      || (presentationFocusMemory.current.previousRoomKind !== 'none'
-        && presentationFocusMemory.current.previousConnectionEpoch !== session.connectionEpoch))
+      || ((session.phase === 'connecting' || session.phase === 'openAwaitingWelcome')
+        && (presentationFocusMemory.current.preserveNextRoomEntry
+          || (presentationFocusMemory.current.previousRoomKind !== 'none'
+            && presentationFocusMemory.current.previousConnectionEpoch !== session.connectionEpoch))))
   );
   const returnPresentation = getRoomReturnPresentation(roomState.room, recoveringRoom);
   const browseFromRoom = () => {
@@ -720,7 +722,8 @@ function AppContent() {
   if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.pendingRecovery !== null) {
     content = <Panel><SectionHeading title="Reconnecting…" detail="Recovering the current room." /></Panel>;
   } else if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.room.kind === 'awaiting_game_bootstrap') {
-    content = <Panel><SectionHeading title="Loading game…" detail="Receiving the authoritative game state." /></Panel>;
+    content = <GameBootstrapStatus room={roomState.room}
+      onRetry={() => { lobbyRuntime.retryGameBootstrap(); }} onBrowse={browseFromRoom} />;
   } else if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.rematchTransition !== null) {
     content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
   } else if (probe === 'checking') {

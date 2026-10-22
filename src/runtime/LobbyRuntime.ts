@@ -150,6 +150,20 @@ export class LobbyRuntime {
     return this.connectionRuntime.connect();
   }
 
+  retryGameBootstrap(): boolean {
+    const room = this.store.getState().room.room;
+    if (room.kind !== 'awaiting_game_bootstrap'
+      || room.bootstrap === 'pending_c5'
+      || room.bootstrap.phase !== 'failed') return false;
+
+    // A READY socket can own a terminal failed load. Replace its ownership,
+    // invalidating bootstrap/timers before disposal, then use only fresh welcome
+    // resume hints. Never retain or resend the command that opened this room.
+    this.connectionRuntime.disconnect();
+    void this.connectionRuntime.connect();
+    return true;
+  }
+
   disconnect(): void {
     this.connectionRuntime.disconnect();
   }
