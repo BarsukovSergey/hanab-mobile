@@ -1149,7 +1149,6 @@ export const roomSlice = createSlice({
             : { type: 'replayEnter', segment },
         ));
       }
-      if (segment !== null) state.pendingGameplayAction = null;
     },
     sharedReplaySegmentReceived(
       state,

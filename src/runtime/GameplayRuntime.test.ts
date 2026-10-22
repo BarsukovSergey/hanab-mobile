@@ -267,7 +267,107 @@ describe('C7 authoritative gameplay runtime', () => {
     });
   });
 
-  test('a sent gameplay action is not replayed after connection replacement', async () => {
+  test.each(['play', 'discard', 'colorClue', 'rankClue'] as const)(
+    'pending %s survives Rewind navigation and blocks all gameplay after returning Live',
+    async (command) => {
+      const { runtime, socket, store } = await makeLive('player', { clueTokens: 7 });
+      const room = store.getState().room.room;
+      if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+      const gameBefore = room.clientState.ongoingGame;
+      const sentBefore = socket.sent.length;
+      const sent = command === 'colorClue'
+        ? runtime.colorClue(1, 0)
+        : command === 'rankClue'
+          ? runtime.rankClue(1, 3)
+          : runtime[command](0);
+      expect(sent).toBe(true);
+      const pending = store.getState().room.pendingGameplayAction;
+      expect(pending).toMatchObject({
+        connectionEpoch: store.getState().session.connectionEpoch,
+        tableID: room.tableID,
+        gameLoadEpoch: room.gameLoadEpoch,
+      });
+      const expectedFrame = {
+        play: 'action {"tableID":123,"type":0,"target":0}',
+        discard: 'action {"tableID":123,"type":1,"target":0}',
+        colorClue: 'action {"tableID":123,"type":2,"target":1,"value":0}',
+        rankClue: 'action {"tableID":123,"type":3,"target":1,"value":3}',
+      }[command];
+
+      for (const segment of [0, 1, 0, null]) {
+        store.dispatch(roomActions.reviewSegmentSelected({
+          tableID: room.tableID,
+          gameLoadEpoch: room.gameLoadEpoch,
+          segment,
+        }));
+        const current = store.getState().room.room;
+        if (current.kind !== 'live_game') throw new Error('Expected LIVE');
+        expect(current.clientState.replay.active).toBe(segment !== null);
+        expect(current.clientState.visibleState).toBe(segment === null
+          ? current.clientState.ongoingGame
+          : current.clientState.replay.states[segment]);
+        expect(current.clientState.ongoingGame).toBe(gameBefore);
+        expect(store.getState().room.pendingGameplayAction).toEqual(pending);
+        expect(runtime.play(0)).toBe(false);
+        expect(runtime.discard(0)).toBe(false);
+        expect(runtime.colorClue(1, 0)).toBe(false);
+        expect(runtime.rankClue(1, 3)).toBe(false);
+        expect(socket.sent.slice(sentBefore)).toEqual([expectedFrame]);
+        expect(store.getState().room.pendingGameplayAction).toEqual(pending);
+      }
+    },
+  );
+
+  test('authoritative completion clears pending during Rewind and Live uses the updated turn', async () => {
+    const { runtime, socket, store } = await makeLive();
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    const sentBefore = socket.sent.length;
+    expect(runtime.colorClue(1, 0)).toBe(true);
+    const pending = store.getState().room.pendingGameplayAction;
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+    expect(store.getState().room.pendingGameplayAction).toEqual(pending);
+
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"clue","clue":{"type":0,"value":0},"giver":0,"list":[5],"target":1,"turn":0}}',
+    );
+    expect(store.getState().room.pendingGameplayAction).toEqual(pending);
+    socket.emitMessage(
+      'gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}',
+    );
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+    const reviewing = store.getState().room.room;
+    if (reviewing.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(reviewing.clientState.replay).toMatchObject({ active: true, segment: 0 });
+    expect(reviewing.clientState.visibleState?.turn.currentPlayerIndex).toBe(0);
+    expect(reviewing.clientState.ongoingGame.turn.currentPlayerIndex).toBe(1);
+    expect(runtime.play(0)).toBe(false);
+
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: null,
+    }));
+    const live = store.getState().room.room;
+    if (live.kind !== 'live_game') throw new Error('Expected LIVE');
+    expect(live.clientState.replay.active).toBe(false);
+    expect(live.clientState.visibleState).toBe(live.clientState.ongoingGame);
+    expect(live.clientState.ongoingGame.turn.currentPlayerIndex).toBe(1);
+    expect(runtime.play(0)).toBe(false);
+    expect(runtime.discard(0)).toBe(false);
+    expect(runtime.colorClue(1, 0)).toBe(false);
+    expect(runtime.rankClue(1, 3)).toBe(false);
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'action {"tableID":123,"type":2,"target":1,"value":0}',
+    ]);
+  });
+
+  test('a sent gameplay action is not replayed after connection replacement during Rewind', async () => {
     const { session, runtime, socket: first, store } = await makeLive();
     const second = new FakeSocket();
     session.sockets.push(second);
@@ -277,7 +377,16 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(first.sent.slice(sentBefore)).toEqual([
       'action {"tableID":123,"type":0,"target":0}',
     ]);
-    expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected LIVE');
+    const pending = store.getState().room.pendingGameplayAction;
+    expect(pending).not.toBeNull();
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID,
+      gameLoadEpoch: room.gameLoadEpoch,
+      segment: 0,
+    }));
+    expect(store.getState().room.pendingGameplayAction).toEqual(pending);
 
     first.emitClose();
     expect(store.getState().room.pendingGameplayAction).toBeNull();
@@ -309,6 +418,9 @@ describe('C7 authoritative gameplay runtime', () => {
     socket.failSend = false;
     expect(runtime.play(0)).toBe(true);
     expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+    expect(socket.sent.slice(sentBefore.length)).toEqual([
+      'action {"tableID":123,"type":0,"target":0}',
+    ]);
   });
 
   test.each(['warning', 'error'] as const)('%s delegates current gameplay pending cleanup', async (command) => {
