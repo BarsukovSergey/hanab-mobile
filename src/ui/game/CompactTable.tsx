@@ -198,10 +198,9 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
   const stackWidth = Math.max(30, Math.min(40, (availableWidth - 42 - 28 - (lateralRail ? resourceRail : 0)) / Math.max(1, suits.length)));
   const stackHeight = landscape ? 30 : stackWidth / HANABI_TABLE_CARD_ASPECT_RATIO;
   const discard = getDiscardPresentation(game, cardIdentities);
-  const resourcePulse = (before: number | undefined, after: number) => landscape && before !== undefined && before !== after
+  const resourcePulse = (before: number | undefined, after: number) => before !== undefined && before !== after
     ? resourceFeedback?.segment ?? null : null;
-  const clueColor = !landscape ? theme.colors.text
-    : resourceFeedback?.clueCue === 'no-clues' ? '#ff5555'
+  const clueColor = resourceFeedback?.clueCue === 'no-clues' ? '#ff5555'
     : resourceFeedback?.clueCue === 'one-clue' ? '#ffd54f'
     : resourceFeedback?.clueCue === 'max-clues' ? '#aaff00' : theme.colors.text;
   const resources = <View style={{ minWidth: resourceRail, gap: 3, flexDirection: lateralRail ? 'column' : 'row', alignItems: 'center' }}>
@@ -214,7 +213,7 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
   </View>;
   return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4, ...(landscape ? { height: 92, flexShrink: 0 } : {}) }}>
     <View style={[styles.surface, { ...(landscape ? { height: 62, gap: 0 } : {}), padding: landscape ? 3 : 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.score, game.score)}><Text style={{ color: landscape && resourceFeedback?.lowScorePhase ? '#00ffff' : theme.colors.text, ...(landscape && resourceFeedback?.lowScorePhase && resourceFeedback.colorblindMode ? { textDecorationLine: 'underline' as const } : {}), fontSize: landscape ? 10 : 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text></AuthoritativePulse>
+      <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.score, game.score)}><Text style={{ color: resourceFeedback?.lowScorePhase ? '#00ffff' : theme.colors.text, ...(resourceFeedback?.lowScorePhase && resourceFeedback.colorblindMode ? { textDecorationLine: 'underline' as const } : {}), fontSize: landscape ? 10 : 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text></AuthoritativePulse>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <View style={{ flexDirection: 'row', gap: 2, flex: 1 }}>
           {suits.map((suit) => {
