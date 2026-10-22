@@ -4,20 +4,44 @@ import { describe, expect, it } from '@jest/globals';
 const c17 = readFileSync('src/ui/game/C17GameScreen.tsx', 'utf8');
 const paceModal = readFileSync('src/ui/game/PaceDetailsModal.tsx', 'utf8');
 
-describe('Eff and Pace HUD details', () => {
+describe('Efficiency and Pace HUD details', () => {
   it('C17 keeps both metrics inspectable', () => {
     const screen = c17;
-    expect(screen).toMatch(/label="Eff"[\s\S]*?onPress=\{\(\) => setEfficiencyDetailsOpen\(true\)\}/);
+    expect(screen).toMatch(/label="Efficiency"[\s\S]*?onPress=\{\(\) => setEfficiencyDetailsOpen\(true\)\}/);
     expect(screen).toMatch(/label="Pace"[\s\S]*?onPress=\{\(\) => setPaceDetailsOpen\(true\)\}/);
     expect(screen).toContain('accessibilityHint="Opens read-only efficiency calculation details"');
     expect(screen).toContain('accessibilityHint="Opens read-only Pace details"');
     expect(screen).toContain('<EfficiencyDetailsModal');
     expect(screen).toContain('<PaceDetailsModal');
-    expect(screen).toMatch(/onPress === undefined[\s\S]*?styles\.hudStat[\s\S]*?styles\.hudStatOutline[\s\S]*?styles\.hudStatInfo/);
+    expect(screen).toContain('accessibilityLabel={`Pace ${gameplayPresentation.pace}`}');
+    expect(screen).toContain('accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}');
+    expect(screen).toMatch(/<Pressable accessibilityHint=\{accessibilityHint\} accessibilityLabel=\{accessibilityLabel\}\s+accessibilityRole="button" hitSlop=\{6\} onPress=\{onPress\} style=\{styles\.hudStat\}>\s*\{contents\}\s*<View pointerEvents="none" style=\{\[styles\.hudStatOutline/);
     expect(screen).toContain('pointerEvents="none"');
     expect(screen).toContain('StyleSheet.absoluteFill');
     expect(screen).toMatch(/hudStat: \{[^}]*alignItems: 'center', minWidth: 34, position: 'relative'/);
     expect(screen).not.toMatch(/hudStat: \{[^}]*minHeight|hudStat: \{[^}]*padding|hudStat: \{[^}]*width/);
+  });
+
+  it('keeps the full FRE | MRE value and null formatting in the shared portrait/landscape strip', () => {
+    const metricStrip = c17.slice(c17.indexOf('const metricStrip = ('), c17.indexOf('const tableResources = ('));
+    expect(metricStrip).toContain('<HudStat label="Efficiency" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}');
+    expect(metricStrip).not.toContain('label="Eff"');
+    expect(c17).toContain("return value === null ? '-' : value.toFixed(2);");
+    expect(c17).toMatch(/portraitV2 \? <>\s*<View style=\{styles\.ledgerChrome\}>\{metricStrip\}/);
+    expect(c17).toMatch(/<View style=\{\[styles\.landscapeLiveColumn[^\n]*\n\s*\{metricStrip\}/);
+  });
+
+  it('places clickable badges beside the centered labels below values without adding metric height', () => {
+    const hudStat = c17.slice(c17.indexOf('function HudStat('), c17.indexOf('function formatEfficiency('));
+    expect(hudStat).toMatch(/styles\.hudValue[^\n]*>\{value\}<\/Text>\s*<View style=\{styles\.hudStatLabelRow\}>\s*<Text[^\n]*>\{label\}<\/Text>\s*\{onPress !== undefined && <View pointerEvents="none" style=\{\[styles\.hudStatInfo[^\n]*\n\s*<Text[^\n]*>i<\/Text>\s*<\/View>\}\s*<\/View>/);
+    expect(hudStat.match(/styles\.hudStatInfo,/g)).toHaveLength(1);
+    expect(c17).toContain("hudStatLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }");
+    expect(c17).toMatch(/hudStatInfo: \{[^}]*height: 10,[^}]*width: 10 \}/);
+    expect(c17).not.toMatch(/hudStatInfo: \{[^}]*(position:|right:|top:)/);
+    expect(c17).not.toMatch(/hudStatLabelRow: \{[^}]*(height:|width:|padding|margin)/i);
+    expect(c17).toContain("hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 }");
+    expect(c17).toContain("hudLabel: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }");
+    expect(c17).toContain('landscapeMetricStrip: { height: 34, flexShrink: 0, paddingVertical: 0 }');
   });
 
   it('uses baseline Pace risk colors and defaults for low or unavailable risk', () => {
@@ -28,7 +52,7 @@ describe('Eff and Pace HUD details', () => {
     expect(c17).toContain('getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)');
   });
 
-  it('colors Eff cyan only when the authoritative modifier flag applies', () => {
+  it('colors Efficiency cyan only when the authoritative modifier flag applies', () => {
     const colorBehavior = "gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined";
     expect(c17).toContain(colorBehavior);
   });
@@ -52,7 +76,7 @@ describe('Eff and Pace HUD details', () => {
 });
 
 
-it('portrait moves resources into CompactTable while retaining Turn, Pace and Eff at the top', () => {
+it('portrait moves resources into CompactTable while retaining Turn, Pace and Efficiency at the top', () => {
   const table = readFileSync('src/ui/game/CompactTable.tsx', 'utf8');
   const viewer = readFileSync('src/ui/game/DiscardViewer.tsx', 'utf8');
   const cards = readFileSync('src/ui/game/GameCard.tsx', 'utf8');
