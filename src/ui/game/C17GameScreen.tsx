@@ -52,6 +52,7 @@ import {
   getC17DenseLayout,
   getC17AmbientEnvelope,
   getC17HandsRegionHeight,
+  getC17TwoPlayerBottomTopInset,
   getC17HandRows,
   getC17WorkbenchHeight,
   hasC17AmbientRegionChanged,
@@ -1469,6 +1470,8 @@ function C17DenseWorkspace({
         style={[
           styles.hands,
           shellMeasured ? { height: portraitV2 && ownHandPosition === 'bottom' ? handsRegionHeight : layout.handsHeight, ...(portraitV2 && ownHandPosition === 'bottom' ? { justifyContent: 'space-between' as const } : {}), ...(portraitV2 && ownHandPosition === 'top' ? { flexDirection: 'column-reverse' as const } : {}) } : styles.handsPending,
+          shellMeasured && portraitV2 && opponents.length === 1 && ownHandPosition === 'bottom'
+            && { paddingTop: getC17TwoPlayerBottomTopInset(handsRegionHeight, layout.handsHeight) },
           !shellMeasured && styles.shellPending,
         ]}
       >

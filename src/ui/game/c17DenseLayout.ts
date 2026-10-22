@@ -75,6 +75,12 @@ export function getC17HandsRegionHeight(ambientBodyHeight: number, workbenchHeig
   return Math.max(0, ambientBodyHeight - workbenchHeight - HANDS_TOP_MARGIN - WORKBENCH_TOP_MARGIN);
 }
 
+/** Keep the 2P Bottom hand anchored while capping the inter-hand gap at 28dp. */
+export function getC17TwoPlayerBottomTopInset(handsRegionHeight: number, handsHeight: number): number {
+  const extra = Math.max(0, handsRegionHeight - handsHeight);
+  return Math.max(0, extra - (28 - HAND_ROW_GAP));
+}
+
 export function hasC17AmbientRegionChanged(
   current: { height: number; width: number },
   next: { height: number; width: number },
