@@ -1253,7 +1253,7 @@ function C17DenseWorkspace({
         accessibilityLabel={`Pace ${gameplayPresentation.pace}`}
         accessibilityHint="Opens read-only Pace details"
         onPress={() => setPaceDetailsOpen(true)} />
-      <HudStat label="Eff" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
+      <HudStat label="Efficiency" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
         valueColor={gameplayPresentation.appliesEfficiencyModifier ? '#00ffff' : undefined}
         accessibilityLabel={`Efficiency. Future required ${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)}, minimum required ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`}
         accessibilityHint="Opens read-only efficiency calculation details"
@@ -1585,7 +1585,12 @@ function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, valueEmphas
   const { theme } = useHanabTheme();
   const contents = <>
     <Text style={[styles.hudValue, valueEmphasized && styles.hudValueEmphasized, { color: valueColor ?? theme.colors.text }]}>{value}</Text>
-    <Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text>
+    <View style={styles.hudStatLabelRow}>
+      <Text style={[styles.hudLabel, { color: theme.colors.textMuted }]}>{label}</Text>
+      {onPress !== undefined && <View pointerEvents="none" style={[styles.hudStatInfo, { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.hudStatInfoText, { color: theme.colors.textMuted }]}>i</Text>
+      </View>}
+    </View>
   </>;
   return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey ?? null}>
     {onPress === undefined
@@ -1594,9 +1599,6 @@ function HudStat({ label, pulseEnabled, pulseKey, value, valueColor, valueEmphas
         accessibilityRole="button" hitSlop={6} onPress={onPress} style={styles.hudStat}>
         {contents}
         <View pointerEvents="none" style={[styles.hudStatOutline, { borderColor: theme.colors.borderStrong }]} />
-        <View pointerEvents="none" style={[styles.hudStatInfo, { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.hudStatInfoText, { color: theme.colors.textMuted }]}>i</Text>
-        </View>
       </Pressable>}
   </AuthoritativePulse>;
 }
@@ -1638,8 +1640,9 @@ const styles = StyleSheet.create({
   turn: { fontSize: 13, fontWeight: '900' },
   hGroupCue: { fontSize: 9, fontWeight: '700' },
   hudStat: { alignItems: 'center', minWidth: 34, position: 'relative' },
+  hudStatLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
   hudStatOutline: { ...StyleSheet.absoluteFill, borderRadius: 4, borderWidth: 1 },
-  hudStatInfo: { alignItems: 'center', borderRadius: 5, borderWidth: 1, height: 10, justifyContent: 'center', position: 'absolute', right: 0, top: 0, width: 10 },
+  hudStatInfo: { alignItems: 'center', borderRadius: 5, borderWidth: 1, height: 10, justifyContent: 'center', width: 10 },
   hudStatInfoText: { fontSize: 7, fontWeight: '900', lineHeight: 8 },
   hudValue: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
   hudValueEmphasized: { fontWeight: '900', textDecorationLine: 'underline' },

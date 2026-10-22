@@ -567,7 +567,7 @@ Portrait means `viewportWidth <= viewportHeight`. Slice 8a replaces the earlier 
 
 ```text
 [Home] <current variant> [Chat] [Menu]
-Turn → Pace → meaningful Eff/FRE
+Turn → Pace → meaningful Efficiency/FRE
 [Score / Fireworks] [Clues / Strikes] [Deck]
 [Discard Pile]
 [Last Action + Rewind + Empathy + RECENT ›]
@@ -579,7 +579,7 @@ Turn → Pace → meaningful Eff/FRE
 
 Home always opens the browsing Home root, sets presentation focus to browsing, and preserves attended room/runtime. It never means the previous browsing destination and never sends Leave/Unattend. Pregame Browse is unchanged. Current variant is always visible, including standard/default variants; fitting/ellipsis is allowed. Username and game/table id do not appear in the portrait Live header.
 
-Turn number, Pace and meaningful Eff/FRE stay near the top. No additional actor-name line is required; hand-row highlighting identifies the current player. Score is compactly shown as `Score 12 / 25` near real firework stacks. A read-only Deck with remaining count sits to their right. Bottom-Deck Blind-Play / deckPlays remains unsupported.
+Turn number, Pace and meaningful Efficiency/FRE stay near the top. No additional actor-name line is required; hand-row highlighting identifies the current player. Score is compactly shown as `Score 12 / 25` near real firework stacks. A read-only Deck with remaining count sits to their right. Bottom-Deck Blind-Play / deckPlays remains unsupported.
 
 Clues use a numeric count; Strikes use three compact square slots with active strikes marked. Keep resources beside fireworks when width meets `30dp * suitCount + 42dp deck + resourceRail + 28dp gaps/padding`, with `resourceRail = max(64, ceil(64 * min(fontScale, 1.5)))`. Otherwise move Clues/Strikes into their own compact row, preserving valid fireworks geometry.
 
@@ -618,7 +618,7 @@ Slice 8b implements one landscape topology, superseding the earlier A-preferred/
 ```text
 [Home]                 <current variant>                 [Chat] [Menu]
 +------------------------------+-----------------------------------+
-| HAND GRID                    | Mode / Turn · Pace · Eff/FRE      |
+| HAND GRID                    | Mode/Turn · Pace · Efficiency/FRE |
 |                              | Score / Fireworks · Deck          |
 | Equal-size real-card hands   | Clues / Strikes · Discard Pile     |
 | Deterministic seating        | Last Action · RECENT ›            |
@@ -664,7 +664,7 @@ Center the grid inside leftWidth. Readable hands take priority, then a valid rig
 
 | Region | Fixed envelope |
 |---|---|
-| Metric strip: mode/Turn, Pace, meaningful Eff/FRE | 34dp |
+| Metric strip: mode/Turn, Pace, meaningful Efficiency/FRE | 34dp |
 | Table/resources plus separate Discard Pile | 92dp |
 | Readable Last Action, RECENT ›, Rewind, Empathy | 68dp |
 | Three region gaps | 12dp |
