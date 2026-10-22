@@ -5,6 +5,7 @@ import {
   getC17DenseLayout,
   getC17AmbientEnvelope,
   getC17HandsRegionHeight,
+  getC17TwoPlayerBottomTopInset,
   getC17WorkbenchHeight,
   C17_SIDE_LABEL_LANE_WIDTH,
   C17_SIDE_LABEL_ROW_GAP,
@@ -237,6 +238,37 @@ describe('C17 dense portrait layout', () => {
 
 
 describe('Slice 8a portrait geometry', () => {
+  test.each([500, 900])('roomy 2P Bottom caps the gap at 28dp in a %idp region without moving own hand', (handsRegionHeight) => {
+    const result = layout({ portraitV2: true, opponentCount: 1, cardsPerHand: 5, handsRegionHeight });
+    const topInset = getC17TwoPlayerBottomTopInset(handsRegionHeight, result.handsHeight);
+    const ownHandTop = handsRegionHeight - result.ownRowHeight;
+    const opponentBottom = topInset + result.opponentRowHeight;
+
+    expect(topInset).toBeGreaterThan(0);
+    expect(ownHandTop - opponentBottom).toBe(28);
+    expect(topInset + result.handsHeight).toBeLessThanOrEqual(handsRegionHeight);
+    // Padding consumes spare space, leaving the own hand at the region's bottom.
+    expect(opponentBottom + 28 + result.ownRowHeight).toBe(handsRegionHeight);
+    expect(result.ownCardHeight).toBe(layout({ portraitV2: true, opponentCount: 1, cardsPerHand: 5, handsRegionHeight: 500 }).ownCardHeight);
+  });
+
+  test('tight 2P Bottom keeps minimum row spacing without overflow', () => {
+    const handsRegionHeight = 180;
+    const result = layout({ portraitV2: true, opponentCount: 1, cardsPerHand: 5, handsRegionHeight });
+    const topInset = getC17TwoPlayerBottomTopInset(handsRegionHeight, result.handsHeight);
+    const gap = handsRegionHeight - topInset - result.opponentRowHeight - result.ownRowHeight;
+
+    expect(topInset).toBe(0);
+    expect(gap).toBeGreaterThanOrEqual(5);
+    expect(gap).toBeLessThanOrEqual(28);
+    expect(result.opponentRowHeight + gap + result.ownRowHeight).toBe(handsRegionHeight);
+    expect(result.handsHeight).toBeLessThanOrEqual(handsRegionHeight);
+  });
+
+  test.each([-10, 0, 10, 23, 24])('2P inset accounts for %idp spare space and the existing 5dp gap', (extra) => {
+    expect(getC17TwoPlayerBottomTopInset(200 + extra, 200)).toBe(extra <= 23 ? 0 : 1);
+  });
+
   test.each([[780, 176], [640, 156], [639, 140]])('2P/3P height %i reserves %i without tool input', (height, expected) => {
     expect(getC17WorkbenchHeight(height, 1, true)).toBe(expected);
     expect(getC17WorkbenchHeight(height, 2, true)).toBe(expected);

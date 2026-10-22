@@ -92,4 +92,22 @@ test('Bottom places own hand immediately above the pinned Workbench in roomy she
   expect(c17ScreenSource).toContain("height: portraitV2 && ownHandPosition === 'bottom' ? handsRegionHeight : layout.handsHeight");
   expect(c17ScreenSource).toContain("ownHandPosition === 'bottom' ? { justifyContent: 'space-between'");
   expect(c17ScreenSource).toContain("portraitV2 && ownHandPosition === 'top' && <View style={{ flex: 1 }}");
+  expect(c17ScreenSource).toMatch(/shellMeasured && portraitV2 && opponents.length === 1 && ownHandPosition === 'bottom'\s*&& \{ paddingTop: getC17TwoPlayerBottomTopInset\(handsRegionHeight, layout.handsHeight\) \}/);
+  expect(c17ScreenSource).toMatch(/\{renderAnchoredHand\(\)\}\s*<\/View>\s*\{portraitV2 && ownHandPosition === 'top' && <View style=\{\{ flex: 1 \}\} \/>\}\s*\{workbench\}/);
+  expect(c17ScreenSource).toContain('hands: { gap: 5, marginTop: 5, minHeight: 0 }');
+});
+
+test('spacing adjustment leaves Top, 3P–6P and landscape paths unchanged', () => {
+  expect(c17ScreenSource).toContain("ownHandPosition === 'top' ? { flexDirection: 'column-reverse' as const } : {})");
+  const portraitHands = c17ScreenSource.slice(c17ScreenSource.indexOf('styles.hands,'), c17ScreenSource.indexOf('<OpponentViewport nestedScrollEnabled'));
+  expect(portraitHands.match(/paddingTop:/g)).toHaveLength(1);
+  const landscapeBody = c17ScreenSource.slice(c17ScreenSource.indexOf('</> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>'));
+  expect(landscapeBody).not.toContain('getC17TwoPlayerBottomTopInset(');
+});
+
+test('tool changes retain the fixed active and idle Workbench geometry', () => {
+  expect(c17ScreenSource).toContain('getC17WorkbenchHeight(viewportHeight, opponents.length, true)');
+  expect(c17ScreenSource).toContain('styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
+  const workbench = c17ScreenSource.slice(c17ScreenSource.indexOf('const workbench ='), c17ScreenSource.indexOf('const workbench =') + 650);
+  expect(workbench).toContain('height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0');
 });
