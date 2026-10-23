@@ -40,7 +40,7 @@ import { historyActions } from '../../store/historySlice';
 import type { AppStore } from '../../store/store';
 import type { IncrementalRejectionReason } from '../../store/sessionSlice';
 import { areTableOptionsSupported } from '../client/supportedVariants';
-import { encodeTableUnattendFrame } from '../../protocol/lobbyProtocol';
+import { encodeTableUnattendFrame, type ServerEvent } from '../../protocol/lobbyProtocol';
 
 type Role = 'player' | 'spectator';
 
@@ -60,7 +60,14 @@ type ActiveLoad = {
   clientState: State | null;
   timer: ReturnType<typeof setTimeout> | null;
   stagedPause: Pause | null;
+  stagedReplayLeader: string | null;
+  stagedReplaySegment: number | null;
+  stagedReplayEfficiencyMod: number | null;
 };
+
+type SharedReplayControl = Extract<ServerEvent, {
+  command: 'replayLeader' | 'replaySegment' | 'replayEfficiencyMod';
+}>;
 
 type SendFrame = (frame: string) => boolean;
 
@@ -189,6 +196,9 @@ export class GameBootstrapCoordinator {
       clientState: null,
       timer: null,
       stagedPause: null,
+      stagedReplayLeader: null,
+      stagedReplaySegment: null,
+      stagedReplayEfficiencyMod: null,
     };
     this.active = load;
     this.store.dispatch(roomActions.bootstrapStarted({
@@ -311,6 +321,19 @@ export class GameBootstrapCoordinator {
             : clientState.pause.playerIndex) as PlayerIndex,
         });
       }
+      // Replay pin 8be709c: command_get_game_info_1.go snapshots these controls
+      // in init; replay-action/set-leader commands broadcast later changes.
+      // Apply their latest values after history supplies segment states, before
+      // publishing LIVE, so the first exposed state has current permissions.
+      if (load.stagedReplayLeader !== null) {
+        clientState = stateReducer(clientState, { type: 'replayLeader', name: load.stagedReplayLeader });
+      }
+      if (load.stagedReplaySegment !== null && clientState.replay.states[load.stagedReplaySegment] !== undefined) {
+        clientState = stateReducer(clientState, { type: 'replaySharedSegment', segment: load.stagedReplaySegment });
+      }
+      if (load.stagedReplayEfficiencyMod !== null) {
+        clientState = stateReducer(clientState, { type: 'setEffMod', mod: load.stagedReplayEfficiencyMod });
+      }
     } catch {
       if (load.expectedReplaySource !== null) this.rejectHistoricalReplay(load);
       return false;
@@ -347,6 +370,35 @@ export class GameBootstrapCoordinator {
     event: IncrementalGameAction,
   ): boolean {
     return this.receiveIncrementalDetailed(connectionEpoch, event).accepted;
+  }
+
+  stageSharedReplayControl(connectionEpoch: number, event: SharedReplayControl): boolean {
+    const load = this.active;
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (
+      load === null
+      || load.connectionEpoch !== connectionEpoch
+      || load.tableID !== event.data.tableID
+      || load.phase !== 'waiting_history'
+      || !load.replay
+      || load.clientState === null
+      || load.clientState.replay.shared === null
+      || state.session.connectionEpoch !== connectionEpoch
+      || state.session.phase !== 'ready'
+      || state.room.connectionEpoch !== connectionEpoch
+      || room.kind !== 'awaiting_game_bootstrap'
+      || room.tableID !== load.tableID
+      || room.bootstrap === 'pending_c5'
+      || room.bootstrap.gameLoadEpoch !== load.gameLoadEpoch
+      || room.bootstrap.phase !== 'waiting_history'
+    ) return false;
+    switch (event.command) {
+      case 'replayLeader': load.stagedReplayLeader = event.data.name; break;
+      case 'replaySegment': load.stagedReplaySegment = event.data.segment; break;
+      case 'replayEfficiencyMod': load.stagedReplayEfficiencyMod = event.data.mod; break;
+    }
+    return true;
   }
 
   receivePause(connectionEpoch: number, event: Pause, receivedAtMs: number): boolean {

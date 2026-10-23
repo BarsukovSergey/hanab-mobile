@@ -23,7 +23,7 @@ const welcome = {
 beforeEach(() => { jest.useFakeTimers(); });
 afterEach(() => { jest.useRealTimers(); });
 
-function readyStore(role: 'player' | 'spectator') {
+function readyStore(role: 'player' | 'spectator', replay = false) {
   const store = createAppStore();
   store.dispatch(sessionActions.connectionStarted({ epoch: 1 }));
   store.dispatch(sessionActions.welcomeReceived({ epoch: 1, welcome }));
@@ -34,7 +34,7 @@ function readyStore(role: 'player' | 'spectator') {
   }
   store.dispatch(roomActions.tableStartReceived({
     epoch: 1,
-    tableStart: { tableID: 123, replay: false },
+    tableStart: { tableID: 123, replay },
   }));
   return store;
 }
@@ -58,6 +58,80 @@ function initialHistory() {
     ],
   });
 }
+
+function loadingReplayControls(replay = true, sharedReplay = true) {
+  const store = readyStore('spectator', replay);
+  const frames: string[] = [];
+  const coordinator = new GameBootstrapCoordinator(store, (frame) => { frames.push(frame); return true; });
+  coordinator.startFromAuthoritativeRoom(1);
+  const init = gameInitSchema.parse(makeInit({
+    replay, sharedReplay, spectating: !replay,
+    sharedReplayLeader: 'Bob', sharedReplaySegment: 0, sharedReplayEffMod: 0,
+  }));
+  return { store, frames, coordinator, init };
+}
+
+describe('shared replay bootstrap control ownership', () => {
+  const controlsForTable = (tableID: number) => [
+    { command: 'replayLeader', data: { tableID, name: 'Ada' } },
+    { command: 'replaySegment', data: { tableID, segment: 0 } },
+    { command: 'replayEfficiencyMod', data: { tableID, mod: 2 } },
+  ] as const;
+  const controls = controlsForTable(123);
+
+  test.each(['before init', 'private replay', 'Live', 'stale epoch', 'not ready', 'replaced room load', 'wrong table', 'failed load', 'invalidated load'] as const)(
+    '%s cannot stage controls', (scenario) => {
+      const { store, coordinator, init } = loadingReplayControls(scenario !== 'Live', scenario !== 'private replay' && scenario !== 'Live');
+      if (scenario !== 'before init') expect(coordinator.receiveInit(1, 1, init)).toBe(true);
+      if (scenario === 'not ready') store.dispatch(sessionActions.connectionClosed({ epoch: 1, error: null }));
+      if (scenario === 'failed load') jest.advanceTimersByTime(15_000);
+      if (scenario === 'invalidated load') coordinator.invalidate();
+      if (scenario === 'replaced room load') store.dispatch(roomActions.tableStartReceived({
+        epoch: 1, tableStart: { tableID: 123, replay: true },
+      }));
+      for (const event of scenario === 'wrong table' ? controlsForTable(999) : controls) {
+        expect(coordinator.stageSharedReplayControl(scenario === 'stale epoch' ? 2 : 1, event)).toBe(false);
+      }
+    },
+  );
+
+  test('a changed current connection blocks staging even when the captured load epoch matches', () => {
+    const { store, coordinator, init } = loadingReplayControls();
+    expect(coordinator.receiveInit(1, 1, init)).toBe(true);
+    store.dispatch(sessionActions.connectionStarted({ epoch: 2 }));
+    for (const control of controls) expect(coordinator.stageSharedReplayControl(1, control)).toBe(false);
+  });
+
+  test('load replacement drops staged values and rejects old history without extra commands', () => {
+    const { store, frames, coordinator, init } = loadingReplayControls();
+    expect(coordinator.receiveInit(1, 1, init)).toBe(true);
+    for (const control of controls) expect(coordinator.stageSharedReplayControl(1, control)).toBe(true);
+    store.dispatch(roomActions.tableStartReceived({ epoch: 1, tableStart: { tableID: 123, replay: true } }));
+    expect(coordinator.startFromAuthoritativeRoom(1)).toBe(2);
+    expect(coordinator.receiveInit(1, 2, init)).toBe(true);
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(false);
+    expect(coordinator.receiveHistory(1, 2, initialHistory())).toBe(true);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', gameLoadEpoch: 2,
+      clientState: { replay: { shared: { leader: 'Bob', amLeader: false } }, notes: { efficiencyModifier: 0 } },
+    });
+    expect(frames).toEqual([
+      'getGameInfo1 {"tableID":123}', 'getGameInfo2 {"tableID":123}',
+      'getGameInfo1 {"tableID":123}', 'getGameInfo2 {"tableID":123}',
+    ]);
+  });
+
+  test('an unavailable segment is ignored before publication while other controls still apply', () => {
+    const { store, coordinator, init } = loadingReplayControls();
+    expect(coordinator.receiveInit(1, 1, init)).toBe(true);
+    expect(coordinator.stageSharedReplayControl(1, { command: 'replaySegment', data: { tableID: 123, segment: 999 } })).toBe(true);
+    expect(coordinator.stageSharedReplayControl(1, controls[0])).toBe(true);
+    expect(coordinator.receiveHistory(1, 1, initialHistory())).toBe(true);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', clientState: { replay: { segment: 0, shared: { segment: 0, leader: 'Ada', amLeader: true } } },
+    });
+  });
+});
 
 describe('authoritative game bootstrap coordinator', () => {
   test('stages only the latest matching pause after init and normalizes unpause sentinel', () => {

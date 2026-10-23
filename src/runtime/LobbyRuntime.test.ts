@@ -676,6 +676,7 @@ async function makeSharedReplayRuntime(
   leader = 'Ada',
   playerNames: readonly string[] = ['Ada', 'Bob'],
   sharedReplay = true,
+  afterInit?: (socket: FakeSocket, store: ReturnType<typeof createAppStore>) => void,
 ) {
   const ready = await makeReadyRuntime();
   ready.store.dispatch(lobbyActions.tableReceived({
@@ -696,6 +697,7 @@ async function makeSharedReplayRuntime(
     spectating: !playerNames.includes('Ada'),
     options: { ...makeInit().options, numPlayers: playerNames.length },
   }))}`);
+  afterInit?.(ready.socket, ready.store);
   ready.socket.emitMessage(`gameActionList ${JSON.stringify({
     tableID: 123,
     list: [
@@ -723,6 +725,80 @@ async function makeSharedReplayRuntime(
   });
   return ready;
 }
+
+describe('shared replay controls during bootstrap', () => {
+  test('post-init server controls are reflected in the first published replay', async () => {
+    const published: Array<{ leader: string; amLeader: boolean; segment: number; mod: number }> = [];
+    let unsubscribe = () => {};
+    const { socket, store } = await makeSharedReplayRuntime('Bob', ['Ada', 'Bob'], true, (loadingSocket, loadingStore) => {
+      unsubscribe = loadingStore.subscribe(() => {
+        const room = loadingStore.getState().room.room;
+        if (room.kind !== 'live_game' || room.clientState.replay.shared === null) return;
+        published.push({
+          leader: room.clientState.replay.shared.leader,
+          amLeader: room.clientState.replay.shared.amLeader,
+          segment: room.clientState.replay.segment,
+          mod: room.clientState.notes.efficiencyModifier,
+        });
+      });
+      // The pinned server broadcasts these to active spectators before info2.
+      loadingSocket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+      loadingSocket.emitMessage('replayEfficiencyMod {"tableID":123,"mod":2}');
+      loadingSocket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    });
+    unsubscribe();
+    expect(published.length).toBeGreaterThan(0);
+    expect(published.every((state) => state.leader === 'Ada' && state.amLeader
+      && state.segment === 0 && state.mod === 2)).toBe(true);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'live_game', clientState: {
+        replay: { segment: 0, shared: { leader: 'Ada', amLeader: true, segment: 0 } },
+        notes: { efficiencyModifier: 2 },
+      },
+    });
+    expect(socket.sent.filter((frame) => frame.startsWith('replayAction') || frame.startsWith('loaded '))).toEqual([]);
+  });
+
+  test('no updates preserve init, and post-history controls retain their existing path', async () => {
+    const { socket, store } = await makeSharedReplayRuntime('Bob');
+    expect(store.getState().room.room).toMatchObject({
+      clientState: { replay: { segment: 1, shared: { leader: 'Bob', amLeader: false, segment: 1 } } },
+    });
+    const before = [...socket.sent];
+    socket.emitMessage('replaySegment {"tableID":123,"segment":0}');
+    socket.emitMessage('replayEfficiencyMod {"tableID":123,"mod":-1}');
+    socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}');
+    expect(store.getState().room.room).toMatchObject({
+      clientState: {
+        replay: { segment: 0, shared: { leader: 'Ada', amLeader: true, segment: 0 } },
+        notes: { efficiencyModifier: -1 },
+      },
+    });
+    expect(socket.sent).toEqual(before);
+  });
+
+  test('latest matching controls win without letting wrong-table updates replace them', async () => {
+    const { store } = await makeSharedReplayRuntime('Bob', ['Ada', 'Bob'], true, (socket) => {
+      for (const frame of [
+        'replayLeader {"tableID":123,"name":"Ada"}',
+        'replayLeader {"tableID":123,"name":"Bob"}',
+        'replaySegment {"tableID":123,"segment":1}',
+        'replaySegment {"tableID":123,"segment":0}',
+        'replayEfficiencyMod {"tableID":123,"mod":3}',
+        'replayEfficiencyMod {"tableID":123,"mod":0}',
+        'replayLeader {"tableID":999,"name":"Ada"}',
+        'replaySegment {"tableID":999,"segment":1}',
+        'replayEfficiencyMod {"tableID":999,"mod":5}',
+      ]) socket.emitMessage(frame);
+    });
+    expect(store.getState().room.room).toMatchObject({
+      clientState: {
+        replay: { segment: 0, shared: { leader: 'Bob', amLeader: false, segment: 0 } },
+        notes: { efficiencyModifier: 0 },
+      },
+    });
+  });
+});
 
 function getSentHypotheticalActions(
   frames: readonly string[],
