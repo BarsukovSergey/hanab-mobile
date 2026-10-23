@@ -1297,12 +1297,12 @@ function C17DenseWorkspace({
     <View style={{ alignSelf: 'flex-start' }}>
       {/* Intrinsic probe: same components/typography, unrestricted width and natural height.
           The second row covers large values; actual values above that envelope fail safely. */}
-      <View onLayout={(event) => measureMetric('actual', event)} style={[styles.hud, { alignSelf: 'flex-start', paddingVertical: 0 }]}>
+      <View testID="c17-metric-probe-actual" onLayout={(event) => measureMetric('actual', event)} style={[styles.hud, { alignSelf: 'flex-start', paddingVertical: 0 }]}>
         <TableScore game={game} landscape pulseEnabled={false} />
         <HudStat label="Pace" value={gameplayPresentation.pace} onPress={() => {}} />
         <HudStat label="Efficiency" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`} onPress={() => {}} />
       </View>
-      <View onLayout={(event) => measureMetric('maximum', event)} style={[styles.hud, { alignSelf: 'flex-start', paddingVertical: 0 }]}>
+      <View testID="c17-metric-probe-maximum" onLayout={(event) => measureMetric('maximum', event)} style={[styles.hud, { alignSelf: 'flex-start', paddingVertical: 0 }]}>
         <Text style={{ fontSize: 10, fontWeight: '700' }}>Score 999 / 999</Text>
         <HudStat label="Pace" value="+999" onPress={() => {}} />
         <HudStat label="Efficiency" value="999.99 | 999.99" onPress={() => {}} />
@@ -1546,10 +1546,10 @@ function C17DenseWorkspace({
       {workbench}
       </>}
     </View>
-    </> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>
+    </> : <View testID="c17-landscape-body" onLayout={captureAmbientBody} style={styles.landscapeBody}>
       {metricProbe}
       <View style={{ width: landscapeLayout.fits && metricsReady ? landscapeLayout.leftWidth : layoutMetrics.ambientBodyWidth, minHeight: 0 }}>
-        <View onLayout={(event) => setLeftHeaderHeight(event.nativeEvent.layout.height)}>
+        <View testID="c17-landscape-header" onLayout={(event) => setLeftHeaderHeight(event.nativeEvent.layout.height)}>
           {landscapeHeader}
           <View style={{ height: Math.ceil(30 * Math.max(1, fontScale)), paddingHorizontal: 7 }}>{temporalContext}</View>
         </View>

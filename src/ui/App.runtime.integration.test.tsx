@@ -100,6 +100,49 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test('landscape unread measurement preserves mounted hands, selection and attendance', async () => {
+  jest.spyOn(require('react-native-safe-area-context'), 'useSafeAreaFrame')
+    .mockReturnValue({ x: 0, y: 0, width: 960, height: 440 });
+  const socket = await mountLive();
+  const measured = (testID: string, width: number, height: number) => {
+    const node = tree.root.findAllByProps({ testID })
+      .find((candidate: { props: { onLayout?: unknown } }) => typeof candidate.props.onLayout === 'function');
+    expect(node).toBeDefined();
+    act(() => node.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+  };
+  // Test-supplied native layout events exercise ownership; these are not Android
+  // font measurements or physical safe-area acceptance.
+  measured('c17-landscape-body', 928, 400);
+  measured('c17-landscape-header', 78, 78);
+  measured('game-header-home', 48, 40);
+  measured('game-header-menu', 60, 40);
+  measured('game-header-chat-probe', 60, 40);
+  measured('c17-metric-probe-actual', 215, 29);
+  measured('c17-metric-probe-maximum', 270, 29);
+  const cards = () => tree.root.findAllByType(GameCard);
+  expect(cards()).toHaveLength(5);
+  const before = cards();
+  const beforeFrames = [...socket.sent];
+  act(() => before[0].props.onSelect());
+  const selectedBeforeChat = cards().map((node: { props: { selected: boolean } }) => node.props.selected);
+  act(() => socket.emitMessage('chat {"room":"table123","msg":"Layout regression","who":"Bob","source":"user","datetime":"2026-10-23T13:00:00Z"}'));
+  expect(store.getState().chat.unreadByRoom.table123).toBe(1);
+  expect(cards()).toEqual(before);
+  expect(cards().map((node: { props: { selected: boolean } }) => node.props.selected)).toEqual(selectedBeforeChat);
+  measured('game-header-chat-probe', 78, 40);
+  expect(cards()).toEqual(before);
+  const visibleChat = tree.root.findAllByProps({ testID: 'game-header-chat' })[0].findByType(ActionButton);
+  expect(visibleChat.props.title).toBe('Chat (1)');
+  act(() => visibleChat.props.onPress());
+  expect(store.getState().chat.unreadByRoom.table123 ?? 0).toBe(0);
+  expect(cards()).toEqual(before);
+  measured('game-header-chat-probe', 60, 40);
+  expect(cards()).toEqual(before);
+  expect(liveRoom().tableID).toBe(123);
+  expect(socket.sent.filter((frame: string) => frame.startsWith('action ')))
+    .toEqual(beforeFrames.filter((frame) => frame.startsWith('action ')));
+});
+
 function pregame(socket: FakeSession['sockets'][number]) {
   const stats = {
     numGames: 0,

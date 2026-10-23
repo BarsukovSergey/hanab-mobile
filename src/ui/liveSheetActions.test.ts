@@ -68,7 +68,7 @@ test('keeps Live Home quiet, Review Browse outlined, and header actions tall eno
   const headerEnd = app.indexOf('{liveConnectionProblem', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
   const normalHeader = headerActions.slice(headerActions.indexOf('</> : <>'));
-  const buttons = normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
+  const buttons = (normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? []).filter((button) => !button.includes('onPress={() => {}}'));
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
@@ -76,7 +76,7 @@ test('keeps Live Home quiet, Review Browse outlined, and header actions tall eno
   expect(browse).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
   expect(browse).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
   expect(browse).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
-  expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
+  expect(chat).toContain("title={headerDisplayedUnreadCount === 0 ? 'Chat' : `Chat (${headerDisplayedUnreadCount})`}");
   expect(chat).toContain("onPress={() => setRoomChild('chat')}");
   expect(more).toContain('title="Menu"');
   expect(more).toContain("onPress={() => setRoomChild('menu')}");

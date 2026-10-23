@@ -101,7 +101,7 @@ test('spacing adjustment leaves Top, 3P–6P and landscape paths unchanged', () 
   expect(c17ScreenSource).toContain("ownHandPosition === 'top' ? { flexDirection: 'column-reverse' as const } : {})");
   const portraitHands = c17ScreenSource.slice(c17ScreenSource.indexOf('styles.hands,'), c17ScreenSource.indexOf('<OpponentViewport nestedScrollEnabled'));
   expect(portraitHands.match(/paddingTop:/g)).toHaveLength(1);
-  const landscapeBody = c17ScreenSource.slice(c17ScreenSource.indexOf('</> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>'));
+  const landscapeBody = c17ScreenSource.slice(c17ScreenSource.indexOf('</> : <View testID="c17-landscape-body" onLayout={captureAmbientBody} style={styles.landscapeBody}>'));
   expect(landscapeBody).not.toContain('getC17TwoPlayerBottomTopInset(');
 });
 
@@ -134,7 +134,7 @@ test('replaces impossible portrait gameplay with a noninteractive warning using 
   expect(c17ScreenSource).toContain('const portraitSizeTooSmall = shellMeasured && portraitV2');
   expect(c17ScreenSource).toContain('getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0');
   expect(c17ScreenSource).toContain('measuredBodyHeight: next.height');
-  const body = c17ScreenSource.slice(c17ScreenSource.indexOf('<View onLayout={portraitV2 ? captureAmbientBody'), c17ScreenSource.indexOf('</> : <View onLayout={captureAmbientBody}'));
+  const body = c17ScreenSource.slice(c17ScreenSource.indexOf('<View onLayout={portraitV2 ? captureAmbientBody'), c17ScreenSource.indexOf('</> : <View testID="c17-landscape-body" onLayout={captureAmbientBody}'));
   expect(body).toMatch(/portraitSizeTooSmall \? <Text accessibilityRole="alert"[^>]*>Not enough space for gameplay\. Use a larger window\.<\/Text> : <>/);
   expect(body).toMatch(/\{workbench\}\s*<\/>/);
   expect(body).not.toMatch(/setNote|interactionDispatch|lobbyRuntime|scrollEnabled|\bkey=/);

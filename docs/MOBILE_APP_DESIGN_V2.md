@@ -667,6 +667,8 @@ The left column subtracts the measured left header plus a fixed 30dp × scaledFo
 
 The left width also reserves the native intrinsic Home/Chat/Menu widths (including the full unread count), 28dp for three gaps and horizontal padding, and a minimum identity slot of `ceil(48 * scaledFont)`. Pending header measurements do not expose gameplay. Impossible allocation retains Home/Chat/Menu in a full-width non-gameplay fallback header; controls must not overflow into an actionable right row. Header identity may ellipsize within its reserved slot.
 
+Unread updates measure the replacement Chat label in an inert probe while retaining the validated label/envelope. They do not invalidate every control or temporarily unmount the table. Mounted App regression tests supply layout events and check preserved card instances/selection across incoming chat, probe completion and clearing unread; supplied layout events are not native Android font evidence.
+
 ### Right Live column
 
 **2026-10-23 revision:** the following numeric envelopes record the previous Slice 8b baseline only and are not sufficient fit criteria for the revised composition. Measure full-size Score/Pace/Efficiency and worst supported Clue Composer with sticky Give/Close, card floor, font scaling and safe insets before accepting windows. Use the bounded size-failure path for impossible geometry; do not shrink metrics or hide mandatory controls.

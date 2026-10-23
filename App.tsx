@@ -148,7 +148,7 @@ function AppContent() {
     roomState.room.kind !== 'none'
     || roomState.pendingRecovery !== null
     || roomState.rematchTransition !== null;
-  const [headerControlWidths, setHeaderControlWidths] = useState<Record<string, { key: string; width: number }>>({});
+  const [headerControlWidths, setHeaderControlWidths] = useState<Record<string, { key: string; width: number; unreadCount?: number }>>({});
   const [presentationFocus, setPresentationFocus] = useState<'room' | 'browsing'>('browsing');
   const presentationFocusMemory = useRef<PresentationFocusMemory>({
     previousConnectionEpoch: session.connectionEpoch,
@@ -648,7 +648,11 @@ function AppContent() {
         </Pressable>}
       </View>;
     };
-    const headerWidthKey = `${fontScale}:${liveChatUnreadCount}`;
+    const headerWidthKey = `${fontScale}`;
+    // Keep the last validated label until its replacement has an intrinsic width.
+    // Only the inert probe remounts when unread changes; hands and tools stay mounted.
+    const headerDisplayedUnreadCount = headerControlWidths.chat?.key === headerWidthKey
+      ? headerControlWidths.chat.unreadCount ?? liveChatUnreadCount : liveChatUnreadCount;
     const measureHeaderControl = (name: string, measuredWidth: number) => setHeaderControlWidths((previous) =>
       previous[name]?.key === headerWidthKey && previous[name]?.width === measuredWidth ? previous
         : { ...previous, [name]: { key: headerWidthKey, width: measuredWidth } });
@@ -669,24 +673,37 @@ function AppContent() {
               <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
               <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
             </> : <>
-            <View key={`home-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('home', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
+            <View testID="game-header-home" key={`home-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('home', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
             <ActionButton compact title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive} />
             </View>
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, width > height && { minWidth: Math.ceil(48 * Math.max(1, fontScale)) }, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
-            <View key={`chat-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('chat', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
+            <View testID="game-header-chat" key={`chat-${headerWidthKey}`} style={{ flexShrink: 0 }}>
             <ActionButton
               compact
               disabled={roomChild !== null}
-              title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
+              title={headerDisplayedUnreadCount === 0 ? 'Chat' : `Chat (${headerDisplayedUnreadCount})`}
               tone="secondary"
               style={styles.liveHeaderAction}
               onPress={() => setRoomChild('chat')}
             />
             </View>
-            <View key={`menu-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('menu', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
+            <View testID="game-header-menu" key={`menu-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('menu', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
             <ActionButton compact disabled={roomChild !== null} title="Menu" accessibilityLabel={workspacePresentation.menuAccessibilityLabel} tone="secondary" style={styles.liveHeaderAction} onPress={() => setRoomChild('menu')} />
             </View>
             </>}
+          </View>
+          <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+            style={{ position: 'absolute', opacity: 0, width: 10000 }}>
+            <View testID="game-header-chat-probe" key={`chat-probe-${headerWidthKey}-${liveChatUnreadCount}`} style={{ alignSelf: 'flex-start' }}
+              onLayout={(event) => {
+                const measuredWidth = event.nativeEvent.layout.width;
+                setHeaderControlWidths((previous) => previous.chat?.key === headerWidthKey
+                  && previous.chat.width === measuredWidth && previous.chat.unreadCount === liveChatUnreadCount ? previous
+                  : { ...previous, chat: { key: headerWidthKey, width: measuredWidth, unreadCount: liveChatUnreadCount } });
+              }}>
+              <ActionButton compact title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
+                style={styles.liveHeaderAction} onPress={() => {}} />
+            </View>
           </View>
         </View>
     );
