@@ -16,7 +16,7 @@ import { ActionButton } from './designSystem';
 import { GameBootstrapStatus } from './GameBootstrapStatus';
 import { C17GameScreen } from './game/C17GameScreen';
 import { ClueComposer } from './game/ClueComposer';
-import { GameCard } from './game/GameCard';
+import { GameCard, VisibleHanabiCard } from './game/GameCard';
 import { NoteEditor } from './game/NoteEditor';
 import { getDisplayedHandOrders } from './game/gamePresentation';
 import { PregameScreen } from './screens/PregameScreen';
@@ -356,7 +356,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     expect(before).toHaveLength(5);
     const room = liveRoom();
     const order = getDisplayedHandOrders(room.clientState.visibleState!.hands[room.clientState.metadata.ourPlayerIndex!], store.getState().session.cardPresentationSettings.reverseHands)[0];
-    act(() => before[0].props.onDoublePress());
+    act(() => before[0].props.onLongPress());
     measured('note-editor-footer-probe', 150, 44);
     const editor = () => tree.root.findByType(NoteEditor);
     const field = () => editor().findByType(TextInput);
@@ -364,7 +364,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     expect(field().props.autoFocus).toBe(false);
     act(() => field().props.onChangeText('stable draft'));
     act(() => before[1].props.onSelect());
-    act(() => before[1].props.onDoublePress());
+    act(() => before[1].props.onLongPress());
     expect(field().props.value).toBe('stable draft');
     expect(tree.root.findAllByType(GameCard)).toEqual(before);
     expect(tree.root.findAllByType(GameCard).map((node: { props: { height: number } }) => node.props.height)).toEqual(sizes);
@@ -372,7 +372,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     act(() => expect(editor().props.backRef.current()).toBe(true));
     expect(editor().props.visible).toBe(false);
     expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
-    act(() => before[0].props.onDoublePress());
+    act(() => before[0].props.onLongPress());
     measured('note-editor-footer-probe', 150, 44);
     act(() => field().props.onChangeText('stable draft'));
     act(() => {
@@ -1058,4 +1058,26 @@ test('a peer rematch migrates room ownership while preserving browsing focus unt
     'getGameInfo2 {"tableID":456}',
     'loaded {"tableID":456}',
   ]);
+});
+
+
+test('opponent tap edits the exact order immediately without clue or gameplay sends', async () => {
+  const socket = await mountLive();
+  const card = tree.root.findAllByType(VisibleHanabiCard).find((node: any) => node.props.size === 'hand');
+  const before = [...socket.sent];
+  act(() => card.props.onPress());
+  const editor = tree.root.findByType(NoteEditor);
+  expect(editor.props.visible).toBe(true); expect(editor.props.editable).toBe(true);
+  expect(tree.root.findAllByType(ClueComposer)).toHaveLength(0);
+  expect(socket.sent).toEqual(before);
+});
+
+test('shared replay card tap retains read-only inspection and never opens the edit task', async () => {
+  const socket = await mountLive(true);
+  const card = tree.root.findAllByType(VisibleHanabiCard).find((node: any) => node.props.size === 'hand');
+  const before = [...socket.sent];
+  act(() => card.props.onPress());
+  expect(tree.root.findByType(NoteEditor).props.visible).toBe(false);
+  expect(tree.root.findAllByType(Text).some((node: any) => node.props.children === 'No replay notes')).toBe(true);
+  expect(socket.sent).toEqual(before);
 });

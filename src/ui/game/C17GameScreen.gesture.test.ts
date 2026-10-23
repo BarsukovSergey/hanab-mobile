@@ -14,7 +14,7 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   const screen = readC17Screen();
 
   expect(screen).toContain('delayLongPress={350}');
-  expect(screen).toContain('onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}');
+  expect(screen).toContain('onLongPress={() => takeWorkbenchTask(() => onEditNote(order))}');
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
@@ -43,7 +43,8 @@ test('C17 landscape shares real hand renderers and equal allocator card heights'
   expect(screen).toContain('index === seatingAnchorIndex ? renderAnchoredHand() : renderOpponentHand(index)');
   expect(screen).toContain('clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
-  expect(screen).toContain('onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order))');
+  expect(screen).not.toContain('onDoublePress');
+  expect(screen).toContain('onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onEditNote(order)),');
 });
 
 test('C17 ordinary note inspector keeps note controls without card-number labels or knowledge details', () => {
