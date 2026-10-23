@@ -527,10 +527,29 @@ export class LobbyRuntime {
     }
 
     if (decoded.event.command === 'gameAction') {
+      const failedRoom = this.store.getState().room.room;
       const result = this.gameBootstrap.receiveIncrementalDetailed(
         epoch,
         decoded.event.data,
       );
+      const current = this.store.getState();
+      const currentRoom = current.room.room;
+      if (
+        result.rejectionReason === 'reducer-failure'
+        && failedRoom.kind === 'live_game'
+        && !failedRoom.sharedReplay
+        && !failedRoom.clientState.finished
+        && currentRoom.kind === 'live_game'
+        && currentRoom.tableID === failedRoom.tableID
+        && currentRoom.gameLoadEpoch === failedRoom.gameLoadEpoch
+        && current.session.connectionEpoch === epoch
+        && current.room.connectionEpoch === epoch
+        && current.session.phase === 'ready'
+      ) {
+        // Invalidate before diagnostic dispatch: synchronous store subscribers
+        // must not send against a Live state that missed authoritative data.
+        this.connectionRuntime.invalidateCurrent(epoch, 'Unable to process server event (gameAction)');
+      }
       this.recordInboundDiagnostic(epoch, {
         command: decoded.event.command,
         classification: 'known',
