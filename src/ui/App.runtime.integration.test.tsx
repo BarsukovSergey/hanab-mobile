@@ -17,6 +17,8 @@ import { GameBootstrapStatus } from './GameBootstrapStatus';
 import { C17GameScreen } from './game/C17GameScreen';
 import { ClueComposer } from './game/ClueComposer';
 import { GameCard } from './game/GameCard';
+import { NoteEditor } from './game/NoteEditor';
+import { getDisplayedHandOrders } from './game/gamePresentation';
 import { PregameScreen } from './screens/PregameScreen';
 import type { SessionCheckResult } from '../network/types';
 import * as credentialAccounts from '../platform/credentialAccounts';
@@ -151,6 +153,74 @@ test('landscape unread measurement preserves mounted hands, selection and attend
     // restore a replacement implementation on a pre-existing mock function.
     // The safe-area mock's original implementation uses context hooks. Unmount
     // before restoring it so no mounted provider changes its hook structure.
+    if (tree) act(() => tree.unmount());
+    tree = undefined;
+    frameHook.mockImplementation(previousFrameImplementation);
+    Dimensions.set({ window: previousWindow, screen: previousScreen });
+  }
+});
+
+test('landscape note replacement preserves mounted cards, rejects switching, and saves only the owned order', async () => {
+  const frameHook = require('react-native-safe-area-context').useSafeAreaFrame;
+  const previousFrameImplementation = frameHook.getMockImplementation();
+  const previousWindow = Dimensions.get('window');
+  const previousScreen = Dimensions.get('screen');
+  frameHook.mockReturnValue({ x: 0, y: 0, width: 960, height: 440 });
+  try {
+    Dimensions.set({ window: { ...previousWindow, fontScale: 1 }, screen: { ...previousScreen, fontScale: 1 } });
+    const socket = await mountLive();
+    const measured = (testID: string, width: number, height: number) => {
+      const node = tree.root.findAllByProps({ testID })
+        .find((candidate: { props: { onLayout?: unknown } }) => typeof candidate.props.onLayout === 'function');
+      act(() => node.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+    };
+    measured('c17-landscape-body', 928, 400);
+    measured('c17-landscape-header', 72, 72);
+    measured('game-header-home', 48, 40);
+    measured('game-header-menu', 60, 40);
+    measured('game-header-chat-probe', 60, 40);
+    measured('c17-metric-probe-actual', 215, 29);
+    measured('c17-metric-probe-maximum', 270, 29);
+    const before = tree.root.findAllByType(GameCard);
+    const sizes = before.map((node: { props: { height: number } }) => node.props.height);
+    expect(before).toHaveLength(5);
+    const room = liveRoom();
+    const order = getDisplayedHandOrders(room.clientState.visibleState!.hands[room.clientState.metadata.ourPlayerIndex!], store.getState().session.cardPresentationSettings.reverseHands)[0];
+    act(() => before[0].props.onDoublePress());
+    measured('note-editor-footer-probe', 150, 44);
+    const editor = () => tree.root.findByType(NoteEditor);
+    const field = () => editor().findByType(TextInput);
+    expect(editor().props.visible).toBe(true);
+    expect(field().props.autoFocus).toBe(false);
+    act(() => field().props.onChangeText('stable draft'));
+    act(() => before[1].props.onSelect());
+    act(() => before[1].props.onDoublePress());
+    expect(field().props.value).toBe('stable draft');
+    expect(tree.root.findAllByType(GameCard)).toEqual(before);
+    expect(tree.root.findAllByType(GameCard).map((node: { props: { height: number } }) => node.props.height)).toEqual(sizes);
+    expect(socket.sent.filter((frame: string) => frame.startsWith('note ') || frame.startsWith('action '))).toEqual([]);
+    act(() => expect(editor().props.backRef.current()).toBe(true));
+    expect(editor().props.visible).toBe(false);
+    expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
+    act(() => before[0].props.onDoublePress());
+    measured('note-editor-footer-probe', 150, 44);
+    act(() => field().props.onChangeText('stable draft'));
+    act(() => {
+      socket.emitMessage(`gameAction ${JSON.stringify({ tableID: 123, action: { type: 'play', playerIndex: 0, order, suitIndex: 0, rank: 1 } })}`);
+      socket.emitMessage('gameAction {"tableID":123,"action":{"type":"draw","playerIndex":0,"order":10,"suitIndex":-1,"rank":-1}}');
+      socket.emitMessage('gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}');
+    });
+    expect(field().props.value).toBe('stable draft');
+    const save = tree.root.findAllByProps({ testID: 'note-editor-footer' })[0].findAllByType(ActionButton)
+      .find((node: { props: { title: string } }) => node.props.title === 'Save');
+    act(() => save.props.onPress());
+    expect(socket.sent.filter((frame: string) => frame.startsWith('note ')))
+      .toEqual([`note ${JSON.stringify({ tableID: 123, order, note: 'stable draft' })}`]);
+    expect(socket.sent.filter((frame: string) => frame.startsWith('action '))).toEqual([]);
+    expect(editor().props.visible).toBe(false);
+    expect(liveRoom().tableID).toBe(123);
+    expect(tree.root.findAllByType(GameCard)).toHaveLength(5);
+  } finally {
     if (tree) act(() => tree.unmount());
     tree = undefined;
     frameHook.mockImplementation(previousFrameImplementation);

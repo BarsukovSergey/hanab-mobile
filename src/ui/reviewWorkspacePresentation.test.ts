@@ -65,7 +65,7 @@ test('focused Review reuses mounted C17 and room children, with local Browse and
   const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const homeFromLive ='));
   expect(browse).toContain("setPresentationFocus('browsing')");
   expect(browse).not.toMatch(/lobbyRuntime|dispatch|setRoomChild|setBrowsing/);
-  expect(app).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
+  expect(app).toContain('<GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
   expect(app).toContain('{focusedRoomPresentation !== null && <View');
   expect(app).toContain("readActive={roomPresentationVisible && roomChild === 'chat'}");
 });

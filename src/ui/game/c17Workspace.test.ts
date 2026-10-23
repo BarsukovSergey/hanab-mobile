@@ -75,7 +75,7 @@ test('Live keeps a stable ScrollView root across rotation with eligible scrollin
   expect(appSource).toContain('const gameRootScrollable = !c17Workspace;');
   const liveRoot = appSource.match(/<SafeAreaView edges=\{\['bottom'\]\}[^>]*>\s*(<ScrollView[\s\S]*?<\/ScrollView>)\s*<\/SafeAreaView>/)?.[1] ?? '';
   expect(liveRoot).toContain('scrollEnabled={gameRootScrollable}');
-  expect(liveRoot).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
+  expect(liveRoot).toContain('<GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
   expect(liveRoot).not.toMatch(/\bkey=/);
   expect(appSource).not.toContain('const GameRoot');
   expect(appSource).not.toContain('<GameRoot');
@@ -120,7 +120,7 @@ test('threads external height occupancy through the existing game components', (
   expect(appSource).toContain('{workspaceStatusVisible && <Text');
   expect(appSource).toContain('heightConstrained={gameHeightConstrained}');
   expect(wrapper).toContain('heightConstrained = false');
-  expect(wrapper).toContain('<C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} landscapeHeader={landscapeHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
+  expect(wrapper).toContain('<C17GameScreen noteBackRef={noteBackRef} presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} landscapeHeader={landscapeHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
   expect(c17ScreenSource).toContain('heightConstrained = false');
   expect(c17ScreenSource).toContain('allowHeightShrink={heightConstrained || clientState.pause.active || noteWarning !== null}');
   expect(c17ScreenSource).toMatch(/const envelope = portraitV2 \? getC17AmbientEnvelope\([\s\S]*?sameShell,\s*allowHeightShrink,\s*\) : next/);

@@ -126,7 +126,7 @@ test('C17 uses ordinary side labels without confusing the current actor with a c
 
 test('C17 landscape pins ordinary card actions above locally scrolling notes', () => {
   const screen = readC17Screen();
-  const workbench = screen.slice(screen.indexOf('const workbench ='), screen.indexOf('return <View style={styles.workspace}>'));
+  const workbench = screen.slice(screen.indexOf('const workbench ='), screen.lastIndexOf('return <View style={styles.workspace}>'));
   expect(workbench.indexOf('{cardActions}')).toBeLessThan(workbench.indexOf('<WorkbenchViewport'));
   expect(screen).toContain('const cardActions = (');
   expect(screen).toContain('disabled={!canPlayCard} title="Play"');
@@ -185,7 +185,7 @@ test('C17 permits shared replay Hypothetical start for the replay leader', () =>
   const screen = readC17Screen();
   const canStartHypothetical = screen.slice(
     screen.indexOf('const canStartHypothetical'),
-    screen.indexOf('\n\n  return <>', screen.indexOf('const canStartHypothetical')),
+    screen.indexOf('\n  return <View style={styles.workspace}>', screen.indexOf('const canStartHypothetical')),
   );
 
   expect(canStartHypothetical).toContain('replay.shared === null || replay.shared.amLeader');

@@ -36,7 +36,7 @@ test('landscape Last Action preserves full accessible event/history and moves se
   expect(lastAction).toContain('ellipsizeMode="tail" numberOfLines={portraitV2 ? undefined : 1}');
   expect(lastAction).not.toContain('adjustsFontSizeToFit');
   expect(lastAction).toContain('{portraitV2 && <View');
-  const workbench = screen.slice(screen.indexOf('const workbench = ('), screen.indexOf('return <View style={styles.workspace}'));
+  const workbench = screen.slice(screen.indexOf('const workbench = ('), screen.lastIndexOf('return <View style={styles.workspace}'));
   expect(workbench).toContain('!portraitV2 || !shellMeasured || showWorkbench');
   expect(workbench).toContain('title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)}');
   expect(workbench).toContain('onPress={onToggleGlobalEmpathy}');

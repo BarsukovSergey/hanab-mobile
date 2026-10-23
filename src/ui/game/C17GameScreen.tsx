@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { RoomChildren } from './GameScreen';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AppState,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -93,7 +94,7 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
+export function C17GameScreen({ noteBackRef, presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { noteBackRef?: RefObject<(() => boolean) | null>; presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const orientation = width > height ? 'landscape' : 'portrait';
@@ -136,6 +137,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
     .map((_, index) => index) ?? [], [clientState]);
   const [interaction, interactionDispatch] = useReducer(gameplayInteractionReducer, initialGameplayInteractionState);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
+  const [notePane, setNotePane] = useState({ width: 0, height: 0 });
   const [discardViewerOpen, setDiscardViewerOpen] = useState(false);
   const [note, setNote] = useState('');
   const [noteWarning, setNoteWarning] = useState<string | null>(null);
@@ -270,20 +272,23 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
     : ['Playing card', 'Discarding card', 'Giving color clue', 'Giving rank clue'][pending.type];
 
   const inspectNote = (order: number) => {
-    if (!presentationVisible) return;
+    if (!presentationVisible || noteEditorOpen) return;
     setNote(clientState.notes.ourNotes[order]?.text ?? '');
     const outsideActionHand = !actionHand.some((actionOrder) => actionOrder === order);
     if (outsideActionHand) interactionDispatch({ type: 'disarm-gameplay' });
     interactionDispatch({ type: 'open-note', order });
   };
   const editNote = (order: number) => {
-    if (!presentationVisible) return;
+    if (!presentationVisible || noteEditorOpen) return;
+    interactionDispatch({ type: 'disarm-gameplay' });
     inspectNote(order);
     setNoteEditorOpen(true);
   };
-  const persistNote = (value: string) => noteCard !== null && lobbyRuntime.editNote(noteCard, value);
+  const persistNote = (value: string) => currentGameLoad && presentationVisible && notesEditable
+    && noteCard !== null && lobbyRuntime.editNote(noteCard, value);
   const saveNote = (value: string) => {
     if (persistNote(value)) {
+      Keyboard.dismiss();
       setNote(value);
       setNoteEditorOpen(false);
       setNoteWarning(getNoteImpossibilityWarning({
@@ -454,8 +459,10 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
     ? roomState.pendingReplaySuggestion
     : null;
 
-  return <>
+  return <View style={styles.workspace}>
     <C17DenseWorkspace
+      noteEditorOpen={noteEditorOpen}
+      onLandscapePaneChange={setNotePane}
       allowHeightShrink={heightConstrained || clientState.pause.active || noteWarning !== null}
       gameLoadEpoch={gameLoadEpoch}
       actionSegments={actionSegments}
@@ -544,7 +551,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
       onDismissReplaySuggestion={() => dispatch(roomActions.replaySuggestionCleared())}
       onScrubAction={jumpToAction}
       onSelectCard={(order) => {
-        if (!presentationVisible) return;
+        if (!presentationVisible || noteEditorOpen) return;
         if (editHypotheticalCards) {
           if (canHypotheticalControl && !hypotheticalOperationPending) setMorphOrder(order);
           return;
@@ -555,7 +562,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
         inspectNote(order);
       }}
       onSelectClueTarget={(playerIndex) => {
-        if (presentationVisible) interactionDispatch({ type: 'select-clue-target', playerIndex });
+        if (presentationVisible && !noteEditorOpen) interactionDispatch({ type: 'select-clue-target', playerIndex });
       }}
       onSelectRecentAction={jumpToAction}
       onToggleGlobalEmpathy={() => interactionDispatch({ type: 'toggle-global-empathy' })}
@@ -601,6 +608,8 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
       visible={presentationVisible && discardViewerOpen}
     />
     <NoteEditor
+      backRef={noteBackRef}
+      inlinePane={orientation === 'landscape' ? notePane : null}
       editable={notesEditable}
       onChange={setNote}
       onClose={() => setNoteEditorOpen(false)}
@@ -624,10 +633,12 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
       variantName={metadata.options.variantName}
       visible={presentationVisible && morphOrder !== null && editHypotheticalCards && canHypotheticalControl && !hypotheticalOperationPending}
     />
-  </>;
+  </View>;
 }
 
 function C17DenseWorkspace({
+  noteEditorOpen,
+  onLandscapePaneChange,
   allowHeightShrink,
   gameLoadEpoch,
   actionSegments,
@@ -728,6 +739,8 @@ function C17DenseWorkspace({
   colorblindMode,
   realLifeMode,
 }: {
+  noteEditorOpen: boolean;
+  onLandscapePaneChange: (pane: { width: number; height: number }) => void;
   allowHeightShrink: boolean;
   gameLoadEpoch: number | null;
   actionSegments: readonly number[];
@@ -1285,6 +1298,11 @@ function C17DenseWorkspace({
     && landscapeMetricsFit(landscapeLayout.rightWidth,
       Math.max(metricMeasurement.actual.width, metricMeasurement.maximum.width),
       Math.max(metricMeasurement.actual.height, metricMeasurement.maximum.height), fontScale);
+  const notePaneWidth = !portraitV2 && shellMeasured && landscapeLayout.fits && metricsReady ? landscapeLayout.rightWidth : 0;
+  useEffect(() => {
+    onLandscapePaneChange({ width: notePaneWidth, height: layoutMetrics.ambientBodyHeight });
+  }, [onLandscapePaneChange, notePaneWidth, layoutMetrics.ambientBodyHeight]);
+
   const measureMetric = (kind: 'actual' | 'maximum', event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setMetricMeasurement((previous) => {
@@ -1576,10 +1594,12 @@ function C17DenseWorkspace({
       {shellMeasured && landscapeLayout.fits && metricsReady && <View pointerEvents={presentationVisible ? 'auto' : 'none'}
         accessibilityElementsHidden={!presentationVisible} importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'}
         style={[styles.landscapeLiveColumn, { width: landscapeLayout.rightWidth }]}>
-        {metricStrip}
-        {tableResources}
-        {lastActionPanel}
-        {workbench}
+        {!noteEditorOpen && <>
+          {metricStrip}
+          {tableResources}
+          {lastActionPanel}
+          {workbench}
+        </>}
       </View>}
     </View>}
 

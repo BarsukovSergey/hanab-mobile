@@ -39,7 +39,7 @@ test('Hypothetical Edit cards is a persistent controller-only interaction mode',
   expect(screen).toContain('title={editHypotheticalCards ? \'Done editing\' : \'Edit cards\'}');
   expect(screen).toContain('if (!editHypotheticalCards) interactionDispatch({ type: \'disarm-gameplay\' });');
   expect(screen).toContain('setEditHypotheticalCards((active) => !active);');
-  expect(selection).toMatch(/if \(!presentationVisible\) return;\s*if \(editHypotheticalCards\) \{\s*if \(canHypotheticalControl && !hypotheticalOperationPending\) setMorphOrder\(order\);\s*return;/);
+  expect(selection).toMatch(/if \(!presentationVisible \|\| noteEditorOpen\) return;\s*if \(editHypotheticalCards\) \{\s*if \(canHypotheticalControl && !hypotheticalOperationPending\) setMorphOrder\(order\);\s*return;/);
   expect(selection).toContain("interactionDispatch({ type: 'select-card', order });");
   expect(selection).toContain('inspectNote(order);');
   expect(screen).toContain('const selectedCard = currentGameLoad && presentationVisible && !editHypotheticalCards && (isPlayingPlayer || canHypotheticalControl) ? interaction.selectedCard : null;');

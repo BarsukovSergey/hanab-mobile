@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Text, View } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { C17GameScreen } from './C17GameScreen';
@@ -10,7 +10,7 @@ export type RoomChildren = (landscapeRightWidth: number | null) => ReactNode;
  * Gameplay is only available after the live-game bootstrap has completed.
  * Never expose gameplay actions for malformed/unexpected room metadata.
  */
-export function GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
+export function GameScreen({ noteBackRef, presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { noteBackRef?: RefObject<(() => boolean) | null>; presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
   const room = useAppSelector((state) => state.room.room);
   const liveRoom = room.kind === 'live_game' ? room : null;
   const clientState = liveRoom?.clientState ?? null;
@@ -31,5 +31,5 @@ export function GameScreen({ presentationVisible = true, roomChildren, heightCon
     );
   }
 
-  return <C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} landscapeHeader={landscapeHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />;
+  return <C17GameScreen noteBackRef={noteBackRef} presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} landscapeHeader={landscapeHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />;
 }

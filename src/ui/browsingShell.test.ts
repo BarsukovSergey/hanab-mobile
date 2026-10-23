@@ -59,7 +59,7 @@ test('focused rooms stay mounted in an App-owned layer while browsing has focus'
   expect(live).toContain('focusedRoomPresentation = (');
   expect(live).toContain('const gameRootScrollable = !c17Workspace;');
   expect(live).toContain('scrollEnabled={gameRootScrollable}');
-  expect(live).toContain('<GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
+  expect(live).toContain('<GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
   expect(live).toContain('const childVisible = roomPresentationVisible && roomChild !== null;');
   expect(live).toContain("readActive={roomPresentationVisible && roomChild === 'chat'}");
   expect(live).not.toMatch(/\breturn\s*\(\s*<KeyboardAvoidingView/);
