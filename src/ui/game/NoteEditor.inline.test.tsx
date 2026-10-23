@@ -10,7 +10,7 @@ jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({
 jest.mock('../../store/hooks', () => ({ useAppSelector: () => ({ variantName: 'No Variant', turn: 5 }) }));
 jest.mock('../designSystem', () => ({
   useHanabTheme: () => ({ theme: { colors: {} } }),
-  useResponsiveLayout: () => ({ imeOcclusion: mockIme, systemInsets: { bottom: 16 } }),
+  useResponsiveLayout: () => ({ fontScale: 1, imeOcclusion: mockIme, systemInsets: { bottom: 16 } }),
   Field: (props: object) => require('react').createElement(require('react-native').TextInput, props),
   ActionButton: (props: { title: string }) => require('react').createElement(require('react-native').Text, {}, props.title),
 }));
@@ -29,9 +29,14 @@ afterEach(() => { if (tree) act(() => tree.unmount()); });
 function render(patch: Partial<typeof props> = {}) {
   props = { ...props, ...patch };
   act(() => { if (tree) tree.update(<NoteEditor {...props} />); else tree = create(<NoteEditor {...props} />); });
+  measureFooter();
+}
+function measureFooter(width = 150, height = 44) {
+  const probe = tree.root.findAllByProps({ testID: 'note-editor-footer-probe' })[0];
+  if (probe) act(() => probe.props.onLayout({ nativeEvent: { layout: { width, height } } }));
 }
 function field() { return tree.root.findByType(TextInput); }
-function button(title: string) { return tree.root.findAllByType(ActionButton).find((node: any) => node.props.title === title)!; }
+function button(title: string) { return tree.root.findAllByType(ActionButton).find((node: any) => node.props.title === title && node.props.disabled !== true)!; }
 
 test('opens editable without focus, keeps sticky Save/Cancel outside scrolling, and quick actions only edit the draft', () => {
   render();
@@ -84,5 +89,30 @@ test('portrait initial edit still waits for native presentation before autofocus
   act(() => tree.root.findByType(Modal).props.onRequestClose());
   expect(props.onChange).toHaveBeenLastCalledWith('old');
   expect(props.onClose).toHaveBeenCalledTimes(1);
+  expect(props.onSave).not.toHaveBeenCalled();
+});
+
+
+test('a native footer taller or wider than the IME window never exposes partial actions and retains the draft', () => {
+  render();
+  act(() => field().props.onChangeText('keep me'));
+  mockIme = 320;
+  render({ inlinePane: { width: 270, height: 324 } });
+  expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+  expect(button('Save')).toBeUndefined();
+  expect(tree.root.findAllByProps({ accessibilityRole: 'alert' }).length).toBeGreaterThan(0);
+  expect(props.onSave).not.toHaveBeenCalled();
+  mockIme = 0;
+  render({ inlinePane: { width: 504, height: 400 } });
+  measureFooter(300, 64); // supplied enlarged-font native envelope
+  expect(field().props.value).toBe('keep me');
+  mockIme = 380;
+  render();
+  measureFooter(300, 64);
+  expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+  mockIme = 0;
+  render();
+  measureFooter(300, 64);
+  expect(field().props.value).toBe('keep me');
   expect(props.onSave).not.toHaveBeenCalled();
 });

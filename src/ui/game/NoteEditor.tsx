@@ -15,7 +15,7 @@ import { composeQuickNote, type QuickNoteToken } from '../../game/selectors/note
 import { useAppSelector } from '../../store/hooks';
 import { ActionButton, Field, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { beginNoteEdit, normalizeSubmittedNote, prependTurnToNote } from './noteEditing';
-import { getNotePaneGeometry } from './notePaneGeometry';
+import { getNotePaneGeometry, notePaneFitsFooter } from './notePaneGeometry';
 import { getHumanTurnNumber } from './c17Temporal';
 
 const QUICK_TOKENS: readonly { label: string; token: QuickNoteToken }[] = [
@@ -56,13 +56,14 @@ export function NoteEditor({
 }) {
   const { theme } = useHanabTheme();
   const insets = useSafeAreaInsets();
-  const { imeOcclusion, systemInsets } = useResponsiveLayout();
+  const { imeOcclusion, systemInsets, fontScale } = useResponsiveLayout();
   const inline = inlinePane !== null;
   const paneGeometry = inlinePane === null ? null : getNotePaneGeometry(inlinePane, imeOcclusion, systemInsets.bottom);
   const [editing, setEditing] = useState(false);
   const [presentationReady, setPresentationReady] = useState(false);
   const [focusOnShow, setFocusOnShow] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [footerMeasurement, setFooterMeasurement] = useState({ key: '', width: 0, height: 0 });
   const lastSubmittedNote = useRef('');
   const sessionOpen = useRef(false);
   const sessionSavedValue = useRef(value);
@@ -144,6 +145,11 @@ export function NoteEditor({
     onClose();
   };
   const autofocusReady = !inline && editable && editing && presentationReady && focusOnShow;
+  const footerKey = `${fontScale}:${editable && editing}`;
+  const footerKeyRef = useRef(footerKey);
+  footerKeyRef.current = footerKey;
+  const footerMeasured = footerMeasurement.key === footerKey;
+  const footerFits = footerMeasured && paneGeometry !== null && notePaneFitsFooter(paneGeometry, footerMeasurement);
 
   useEffect(() => {
     if (!backRef || !inline || !visible || !presentationVisible) return;
@@ -152,6 +158,10 @@ export function NoteEditor({
     return () => { if (backRef.current === handleBack) backRef.current = null; };
   }, [backRef, inline, visible, presentationVisible, cancelAndClose]);
 
+  const footerContents = (probe: boolean) => <>
+    <ActionButton compact disabled={probe} title="Cancel" onPress={probe ? () => {} : cancelAndClose} />
+    {editable && editing && <ActionButton compact disabled={probe} title="Save" tone="primary" onPress={probe ? () => {} : submit} />}
+  </>;
   const sheet = <View style={[styles.sheet, inline && styles.inlineSheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
           <ScrollView
             bounces={false}
@@ -221,12 +231,25 @@ export function NoteEditor({
             </>}
           </ScrollView>
           {inline && <View testID="note-editor-footer" style={styles.inlineFooter}>
-            <ActionButton compact title="Cancel" onPress={cancelAndClose} />
-            {editable && editing && <ActionButton compact title="Save" tone="primary" onPress={submit} />}
+            {footerContents(false)}
           </View>}
         </View>;
   if (inline) return visible && presentationVisible && paneGeometry !== null
-    ? <View testID="note-editor-pane" style={[styles.inlinePane, paneGeometry]}>{sheet}</View> : null;
+    ? <>
+      <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+        key={footerKey} testID="note-editor-footer-probe" style={[styles.footerProbe, styles.inlineFooter]}
+        onLayout={(event) => {
+          if (footerKeyRef.current !== footerKey) return;
+          const { width, height } = event.nativeEvent.layout;
+          setFooterMeasurement((previous) => previous.key === footerKey && previous.width === width && previous.height === height
+            ? previous : { key: footerKey, width, height });
+        }}>{footerContents(true)}</View>
+      <View testID="note-editor-pane" style={[styles.inlinePane, paneGeometry]}>
+        {footerFits ? sheet : footerMeasured && <Text accessibilityRole="alert" style={{ color: theme.colors.text }}>
+          Not enough space for note actions. Hide the keyboard or rotate to continue.
+        </Text>}
+      </View>
+    </> : null;
   return <Modal
     animationType="slide"
     onRequestClose={cancelAndClose}
@@ -242,7 +265,8 @@ export function NoteEditor({
 }
 
 const styles = StyleSheet.create({
-  inlinePane: { position: 'absolute', right: 0, top: 0 },
+  inlinePane: { position: 'absolute', right: 0, top: 0, overflow: 'hidden' },
+  footerProbe: { position: 'absolute', alignSelf: 'flex-start', opacity: 0 },
   inlineSheet: { flex: 1, minHeight: 0, borderRadius: 8 },
   inlineScroll: { flex: 1, minHeight: 0 },
   inlineFooter: { flexShrink: 0, flexDirection: 'row', gap: 8, padding: 6 },

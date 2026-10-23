@@ -187,6 +187,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     const room = liveRoom();
     const order = getDisplayedHandOrders(room.clientState.visibleState!.hands[room.clientState.metadata.ourPlayerIndex!], store.getState().session.cardPresentationSettings.reverseHands)[0];
     act(() => before[0].props.onDoublePress());
+    measured('note-editor-footer-probe', 150, 44);
     const editor = () => tree.root.findByType(NoteEditor);
     const field = () => editor().findByType(TextInput);
     expect(editor().props.visible).toBe(true);
@@ -202,6 +203,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     expect(editor().props.visible).toBe(false);
     expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
     act(() => before[0].props.onDoublePress());
+    measured('note-editor-footer-probe', 150, 44);
     act(() => field().props.onChangeText('stable draft'));
     act(() => {
       socket.emitMessage(`gameAction ${JSON.stringify({ tableID: 123, action: { type: 'play', playerIndex: 0, order, suitIndex: 0, rank: 1 } })}`);
@@ -209,7 +211,9 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
       socket.emitMessage('gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}');
     });
     expect(field().props.value).toBe('stable draft');
-    pressButton('Save');
+    const save = tree.root.findAllByProps({ testID: 'note-editor-footer' })[0].findAllByType(ActionButton)
+      .find((node: { props: { title: string } }) => node.props.title === 'Save');
+    act(() => save.props.onPress());
     expect(socket.sent.filter((frame: string) => frame.startsWith('note ')))
       .toEqual([`note ${JSON.stringify({ tableID: 123, order, note: 'stable draft' })}`]);
     expect(socket.sent.filter((frame: string) => frame.startsWith('action '))).toEqual([]);

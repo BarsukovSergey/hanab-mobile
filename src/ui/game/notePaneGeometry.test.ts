@@ -1,7 +1,7 @@
 import { expect, test } from '@jest/globals';
 import { measureWindow } from '../responsiveSurface';
 import { getC17LandscapeLayout } from './c17LandscapeLayout';
-import { getNotePaneGeometry } from './notePaneGeometry';
+import { getNotePaneGeometry, notePaneFitsFooter } from './notePaneGeometry';
 
 test.each([2, 6])('%sP keeps its allocation in either rotation and subtracts IME only once', (playerCount) => {
   for (const [left, right, bottom] of [[28, 0, 0], [0, 28, 0], [24, 0, 16], [0, 24, 16]] as const) {
@@ -17,4 +17,13 @@ test.each([2, 6])('%sP keeps its allocation in either rotation and subtracts IME
     expect(getC17LandscapeLayout(input)).toEqual(layout);
     expect(layout.cardHeight).toBeGreaterThanOrEqual(68);
   }
+});
+
+test('native normal/enlarged footer needs its complete width and height under extreme IME', () => {
+  const small = getNotePaneGeometry({ width: 270, height: 340 }, 320, 0);
+  expect(small.height).toBe(20);
+  expect(notePaneFitsFooter(small, { width: 150, height: 44 })).toBe(false);
+  expect(notePaneFitsFooter({ width: 504, height: 63 }, { width: 300, height: 64 })).toBe(false);
+  expect(notePaneFitsFooter({ width: 299, height: 100 }, { width: 300, height: 64 })).toBe(false);
+  expect(notePaneFitsFooter({ width: 300, height: 64 }, { width: 300, height: 64 })).toBe(true);
 });
