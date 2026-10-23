@@ -24,6 +24,7 @@ function state(overrides: {
       room: {
         kind: 'live_game' as const,
         tableID: 123,
+        gameLoadEpoch: 7,
         role: overrides.role ?? 'player',
         sharedReplay: overrides.sharedReplay ?? false,
         clientState: {
@@ -67,6 +68,24 @@ describe('C14-B2 termination runtime', () => {
     expect(store.getState()).toBe(snapshot);
   });
 
+  test.each(['valid', 'rematch', 'same-table load', 'reconnect', 'review', 'finished'] as const)(
+    'captured confirmation rechecks ownership and eligibility: %s', (transition) => {
+      const { runtime, snapshot, calls } = harness();
+      const confirm = runtime.createTerminationConfirmation();
+      expect(confirm).not.toBeNull();
+      if (transition === 'rematch') snapshot.room.room.tableID = 456;
+      if (transition === 'same-table load') snapshot.room.room.gameLoadEpoch += 1;
+      if (transition === 'reconnect') {
+        snapshot.session.connectionEpoch += 1;
+        snapshot.room.connectionEpoch += 1;
+      }
+      if (transition === 'review') snapshot.room.room.clientState.replay.active = true;
+      if (transition === 'finished') snapshot.room.room.clientState.finished = true;
+      expect(confirm?.()).toBe(transition === 'valid');
+      expect(calls).toEqual(transition === 'valid' ? [['tableTerminate', { tableID: 123 }]] : []);
+    },
+  );
+
   test.each([
     ['not ready', { phase: 'closed' as const }],
     ['stale room epoch', { roomConnectionEpoch: 2 }],
@@ -80,6 +99,7 @@ describe('C14-B2 termination runtime', () => {
 
     expect(runtime.voteForTermination()).toBe(false);
     expect(runtime.terminateGame()).toBe(false);
+    expect(runtime.createTerminationConfirmation()).toBeNull();
     expect(calls).toEqual([]);
   });
 });

@@ -10,7 +10,8 @@ describe('termination controls', () => {
     expect(source).toContain("'Terminate game?'");
     expect(source).toContain("'This immediately ends the game for everyone.'");
     expect(source).toContain("{ text: 'Cancel', style: 'cancel' }");
-    expect(source).toContain("text: 'Terminate',\n              style: 'destructive',\n              onPress: () => { terminationRuntime.terminateGame(); }");
+    expect(source).toContain('const confirm = terminationRuntime.createTerminationConfirmation();');
+    expect(source).toContain("text: 'Terminate',\n                style: 'destructive',\n                onPress: () => { confirm(); }");
     expect(source).toContain('{ cancelable: false }');
   });
 

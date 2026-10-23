@@ -38,19 +38,23 @@ export function TerminationControls() {
         compact
         title="Terminate game"
         tone="danger"
-        onPress={() => Alert.alert(
-          'Terminate game?',
-          'This immediately ends the game for everyone.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Terminate',
-              style: 'destructive',
-              onPress: () => { terminationRuntime.terminateGame(); },
-            },
-          ],
-          { cancelable: false },
-        )}
+        onPress={() => {
+          const confirm = terminationRuntime.createTerminationConfirmation();
+          if (confirm === null) return;
+          Alert.alert(
+            'Terminate game?',
+            'This immediately ends the game for everyone.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Terminate',
+                style: 'destructive',
+                onPress: () => { confirm(); },
+              },
+            ],
+            { cancelable: false },
+          );
+        }}
       />
     </View>
   );
