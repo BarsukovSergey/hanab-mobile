@@ -69,6 +69,6 @@ test.each(['valid', 'same-table load', 'reconnect', 'different room'] as const)(
       const room = store.getState().room.room;
       expect(room.kind === 'live_game' && current.sent.at(-1)).toBe(`tableTerminate {"tableID":${room.kind === 'live_game' ? room.tableID : 0}}`);
     }
-    runtime.disconnect();
+    act(() => runtime.disconnect());
   },
 );
