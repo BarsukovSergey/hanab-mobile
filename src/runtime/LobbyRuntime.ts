@@ -572,6 +572,26 @@ export class LobbyRuntime {
       return;
     }
 
+    if (decoded.event.command === 'warning' || decoded.event.command === 'error') {
+      const state = this.store.getState();
+      const room = state.room.room;
+      const pending = state.room.pendingGameplayAction;
+      if (
+        this.connectionRuntime.isReady(epoch)
+        && state.session.connectionEpoch === epoch
+        && state.room.connectionEpoch === epoch
+        && room.kind === 'live_game'
+        && !room.clientState.finished
+        && pending?.connectionEpoch === epoch
+        && pending.tableID === room.tableID
+        && pending.gameLoadEpoch === room.gameLoadEpoch
+      ) {
+        // Generic responses have no request correlation. Rebuild uncertain gameplay
+        // from server history before any diagnostic subscriber can send again.
+        this.connectionRuntime.invalidateCurrent(epoch, 'Unable to confirm gameplay action');
+      }
+    }
+
     this.recordInboundDiagnostic(epoch, {
       command: decoded.event.command,
       classification: 'known',
