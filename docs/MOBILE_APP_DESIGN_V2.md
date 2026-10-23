@@ -1,5 +1,7 @@
 # Hanab Mobile — Design Specification v2
 
+**2026-10-23 bounded supersession:** [Post-RC2 UX polish](./2026-10-23-UX-POLISH.md) supersedes only the listed landscape, notes/gestures, Home/Exit Replay and finish-presentation clauses. Other decisions and all gameplay/network safety remain authoritative. This is a target contract, not physical acceptance.
+
 **Статус:** **ратифицированная** финальная спецификация перед реализацией (2026-09-28, merged via #142).  
 **Основа:** первый design architecture pass и зафиксированные решения этого refinement-прохода.
 
@@ -186,7 +188,7 @@ App bar, экранный toolbar и navigation имеют разных влад
 
 ### Основное решение
 
-**Обычный player Live: Back consumed. Обычный player Pregame: также consumed. Browsing открывается явной кнопкой `Browse`.**
+**Обычный player Live: Back consumed. Обычный player Pregame: также consumed. Browsing Home открывается явной кнопкой `Home` (revision 2026-10-23).**
 
 Для Pregame это предпочтительнее прежнего перехода по Back: состав и параметры могут меняться, запуск может начаться в любой момент, а одинаковое поведение до и после Start устраняет неожиданную смену значения системного жеста.
 
@@ -227,11 +229,11 @@ Back обрабатывает ближайший активный контекс
 
 ### Дополнительные правила
 
-В bare Live/Pregame Back не открывает диалог «Выйти?», не требует двойного нажатия и не запускает скрытый exit flow. Кнопка Browse остаётся видимой.
+В bare Live/Pregame Back не открывает диалог «Выйти?», не требует двойного нажатия и не запускает скрытый exit flow. Кнопка Home остаётся видимой.
 
 Начало и отмена системного Back gesture не выполняют команд. Предпросмотр перехода должен соответствовать реальному результату: bare Live не должен показывать будущий Home, если финальное действие будет consumed.
 
-Действия `Leave table`, `Unattend`, `Stop watching`, `Close review` остаются явными. Их подтверждение объясняет конкретное последствие. Unattend player не следует называть завершением партии.
+Действия `Leave table`, `Unattend`, `Stop watching`, `Close review` остаются явными. Where confirmation applies, it explains the consequence; the 2026-10-23 direct `Exit Replay` action requires no confirmation, including Shared leaders. Preserve destructive Terminate confirmation. Unattend player не следует называть завершением партии.
 
 ---
 
@@ -577,7 +579,7 @@ Turn → Pace → meaningful Efficiency/FRE
 [Workbench fixed at physical bottom above safe area]
 ```
 
-Home always opens the browsing Home root, sets presentation focus to browsing, and preserves attended room/runtime. It never means the previous browsing destination and never sends Leave/Unattend. Pregame Browse is unchanged. Current variant is always visible, including standard/default variants; fitting/ellipsis is allowed. Username and game/table id do not appear in the portrait Live header.
+Home always opens the browsing Home root, sets presentation focus to browsing, and preserves attended room/runtime. It never means the previous browsing destination and never sends Leave/Unattend. The 2026-10-23 delta extends this visible Home label/destination to Pregame and all focused game/review contexts. Current variant is always visible, including standard/default variants; fitting/ellipsis is allowed. Username and game/table id do not appear in the portrait Live header.
 
 Turn number, Pace and meaningful Efficiency/FRE stay near the top. No additional actor-name line is required; hand-row highlighting identifies the current player. Score is compactly shown as `Score 12 / 25` near real firework stacks. A read-only Deck with remaining count sits to their right. Bottom-Deck Blind-Play / deckPlays remains unsupported.
 
@@ -616,17 +618,16 @@ Hidden presentation still disarms selection/arming, closes discard inspection an
 Slice 8b implements one landscape topology, superseding the earlier A-preferred/B-fallback selection, separate enlarged own-hand anchor and 860 × 388 A/B example. Alternate landscape geometry and a preference/toggle remain future work.
 
 ```text
-[Home]                 <current variant>                 [Chat] [Menu]
 +------------------------------+-----------------------------------+
-| HAND GRID                    | Mode/Turn · Pace · Efficiency/FRE |
-|                              | Score / Fireworks · Deck          |
-| Equal-size real-card hands   | Clues / Strikes · Discard Pile     |
+| Home · variant/Replay · Chat/Menu | Score · Pace · Efficiency     |
+| HAND GRID                    | Fireworks · Clues · Strikes · Deck |
+| Equal-size real-card hands   | Relevant individual Discard Pile   |
 | Deterministic seating        | Last Action · RECENT ›            |
 |                              | Workbench                         |
 +------------------------------+-----------------------------------+
 ```
 
-The full-width single-row header uses portrait Home-to-browsing-Home behavior, preserving attended room/runtime. Always show the current variant, including standard/default; fitting/ellipsis is allowed. Chat/Menu keep existing actions; Slice 9 supplies their later geometry. No username, game/table id, Browse/More or turn clutter in the Live header. Pregame remains unchanged.
+The 2026-10-23 delta places the header only above the left hand grid; the right column starts at safe-content top. Home opens browsing Home, preserving attendance/runtime in all focused contexts. Always show current variant/Replay identity; variant fitting/ellipsis is allowed. Chat/Menu retain actions and unread/disabled states. No username, game/table id or turn clutter in the Live header.
 
 ### Deterministic grid
 
@@ -640,7 +641,7 @@ All hands use the same card height; own/observed hand is never enlarged. Use exi
 | 5P | Two paired opponent rows + centered own single row | Own row first/last |
 | 6P | 3 rows × 2 columns; never 2 rows × 3 columns | First/last cell |
 
-3P uses only 1 column × 3 rows. With the specified chrome, 1×3 already clears the 68dp card floor throughout every valid complete shell with body height ≥294dp. Below that height, the complete shell fails the right-column height gate.
+3P uses only 1 column × 3 rows. The former 294dp body threshold is a Slice 8b baseline, not proof of fit after the 2026-10-23 delta: measure the left-only header, card floor and worst-case right controls together.
 
 ### Pure geometry and elastic divider
 
@@ -651,8 +652,8 @@ Use HANABI_CARD_ASPECT_RATIO = 286 / 406. Card gap 3dp; hand-column gap 6dp; han
 Solve the largest integer vertical and horizontal card heights ≤112 fitting all rows and the widest row while reserving rightMin. cardHeight = min(verticalMax, horizontalMax, 112). Below 68 fails; older 42/46dp floors and compact summaries are not landscape solutions.
 
 - scaledFont = clamp(fontScale, 1, 1.5)
-- rightMin = 252 + ceil(48 × (scaledFont − 1))
-- rightComfort = 320 + ceil(32 × (scaledFont − 1))
+- Slice 8b baseline rightMin = 252 + ceil(48 × (scaledFont − 1)); the 2026-10-23 delta requires validating the complete full-size Score/Pace/Efficiency row and variant palettes, increasing reservation only if readable cards still fit.
+- Slice 8b baseline rightComfort = 320 + ceil(32 × (scaledFont − 1))
 - leftNeeded = actual widest grid-row width
 - maxRight = availableWidth − 8 − leftNeeded; fail if maxRight < rightMin
 - rightWidth = min(rightComfort, maxRight)
@@ -661,6 +662,8 @@ Solve the largest integer vertical and horizontal card heights ≤112 fitting al
 Center the grid inside leftWidth. Readable hands take priority, then a valid right minimum, then comfortable right width. Whitespace is allowed; no percentage split or card stretching merely to fill space.
 
 ### Right Live column
+
+**2026-10-23 revision:** the following numeric envelopes record the previous Slice 8b baseline only and are not sufficient fit criteria for the revised composition. Measure full-size Score/Pace/Efficiency and worst supported Clue Composer with sticky Give/Close, card floor, font scaling and safe insets before accepting windows. Use the bounded size-failure path for impossible geometry; do not shrink metrics or hide mandatory controls.
 
 | Region | Fixed envelope |
 |---|---|
@@ -672,9 +675,9 @@ Center the grid inside leftWidth. Readable hands take priority, then a valid rig
 
 Minimum body height is 294dp. Workbench height = min(128, bodyHeight − 34 − 92 − 68 − 12), pinned to the right-column bottom. Extra vertical space is allowed. Reserve H-group cue space inside the metric strip, fitting/truncating without changing height. The highlighted hand identifies the actor; no separate actor-name line.
 
-CompactTable uses explicit landscape-v2 / portrait-v2 modes, with legacy as the default. Keep Score n / max, real fireworks, read-only visual Deck/count, numeric Clues, three strike slots and relevant individual discard faces inside 92dp. Reuse the portrait discard selector: CardStatus.Trash relevance, duplicates individually, red max-clue blocked/yellow H-group double-discard cues, full DiscardViewer, and `No relevant cards` for nonempty all-trash piles. No deckPlays or ×2 aggregation.
+CompactTable uses explicit landscape-v2 / portrait-v2 modes, with legacy as the default. Landscape moves existing Score n / max to the first right row beside existing Pace/Efficiency, preserving full FRE | MRE, typography, details and low-score cues/pulse. Keep real fireworks, read-only visual Deck/count, numeric Clues and three strike slots below, without duplicate Score. Enlarge relevant discard faces only after mandatory Workbench fit. Reuse the portrait discard selector: CardStatus.Trash relevance, duplicates individually, red max-clue blocked/yellow H-group double-discard cues, full DiscardViewer, and `No relevant cards` for nonempty all-trash piles. No deckPlays or ×2 aggregation. Portrait is unchanged.
 
-Last Action wraps in a readable block, replacing the dense one-line ticker. Workbench idle is blank. The same fixed rectangle hosts card actions, dense two-row Clue palette with Close/Give, Note, Rewind/replay, Hypothetical and authoritative Played/Discarded/Misplayed face + Close feedback. Primary Play/Discard, clue commit and temporal/return-to-live controls stay accessible; long notes and secondary temporal/hypothetical details may scroll locally. Feedback retains Slice 8a lifetime and calm styling.
+Last Action is a one-line tappable summary with accessible detailed Recent/history. Workbench idle is blank. Its fixed envelope must fit worst supported two-row color/rank palettes (including >5 choices), with palette-only local scroll/wrap and always-reachable Close/Give. Card Play/Discard, Rewind/replay, Shared and Hypothetical controls remain accessible; tools do not resize hands. Landscape Note Editor replaces the normal right column without obscuring hands when IME is closed, enters edit without forced keyboard, and preserves one draft/order transaction with safe Save/Cancel under system/IME insets. Feedback retains Slice 8a lifetime and calm styling.
 
 ### Failure and lifecycle
 
@@ -750,7 +753,7 @@ Displayed recipient/context должен совпадать с send route. Те�
 
 Menu имеет измеренный непустой viewport. Header и Close не зависят от высоты внутреннего списка. В short-wide это боковая либо full-window поверхность, не низкий центральный Modal.
 
-Chat, Browse и Return to Live не прячутся исключительно в Menu.
+Chat, Home, direct Exit Replay where applicable, и Return to Live не прячутся исключительно в Menu.
 
 ---
 
@@ -823,6 +826,8 @@ Primary action — Review. Seed, Share, tags и Other Scores находятся 
 ```
 
 Live Rewind, dedicated replay, shared review и Hypothetical явно различаются текстом и controls.
+
+**2026-10-23 revision:** the review diagram's Browse becomes Home (always browsing Home, preserving attendance); replace persistent Result clutter with necessary temporal/shared anchors. Provide direct confirmation-free Exit Replay for ordinary/finished/shared review through safe authoritative departure, restoring supported browsing origin only after attendance confirmation. Failed sends must not claim exit; own ongoing Rewind Live never unattends. Show one restrained Game finished score/reason popup with Continue to replay only for a real observed active-to-finished transition, never historical load, reconnect rehydration, rotation or refocus. Preserve authoritative Last Action; no separate results page or persistent extra result banners.
 
 Локальное движение shared follower не выглядит как broadcast. `Follow leader` доступен непосредственно в review task, не только в Menu.
 
@@ -1057,7 +1062,7 @@ Navigation labels не отключаются ради экономии мест
 
 Экран имеет одного владельца system/IME occlusion. Не допускается суммировать padding нескольких SafeArea/keyboard wrappers.
 
-Short-wide editor получает full-height task surface, когда sheet больше не вмещает header, input и action. Внутренний scroll не может схлопнуться до нуля.
+Short-wide editor получает full-height task surface, когда sheet больше не вмещает header, input и action. Внутренний scroll не может схлопнуться до нуля. The 2026-10-23 landscape Note Editor replaces the right pane while IME is closed, without forced keyboard or hand reflow; temporary measured typing presentation is allowed when IME occludes that geometry, with Save/Cancel safe and the same draft preserved.
 
 Для note task обязательны идентичность карты, draft, Save и Back/Cancel. Для Chat — recipient/room, transcript и composer. Глобальная navigation в focused typing не конкурирует с ними.
 

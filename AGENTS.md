@@ -12,6 +12,7 @@ Do **not** read all of `docs/` by default. It contains current authority, eviden
 
 Authority precedence for current work:
 
+- `docs/2026-10-23-UX-POLISH.md` — bounded ratified post-RC2 UX delta; supersedes only its listed presentation/gesture/navigation clauses, without changing safety rules.
 - `docs/MOBILE_APP_DESIGN_V2.md` — app shell, information architecture, navigation, Back/Browse/Return, responsive classes, and the Phase 2 implementation sequence.
 - `docs/C17_UX_CONTRACT.md` — gameplay interaction semantics and the Table Ledger / Decision Workbench contract.
 - `docs/ARCHITECTURE.md` — server authority, networking, reconnect/epoch safety, dependency boundaries, and runtime ownership.

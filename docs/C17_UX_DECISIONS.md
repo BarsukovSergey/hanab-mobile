@@ -1,5 +1,7 @@
 # C17 UX Decisions
 
+**2026-10-23 bounded supersession:** [Post-RC2 UX polish](./2026-10-23-UX-POLISH.md) supersedes only the listed landscape, notes/gestures, Home/Exit Replay and finish-presentation clauses. Other decisions and all gameplay/network safety remain authoritative. This is a target contract, not physical acceptance.
+
 Date: 2026-09-11
 Status: **ratified**
 
@@ -31,7 +33,8 @@ Comparison pins remain backlog.
 
 **MODIFY TO WEB-LIKE EDITING.**
 
-- single tap reads; double tap edits;
+- no double tap: own tap selects, own hold opens notes; opponent tap edits immediately where eligible, otherwise inspects read-only;
+- landscape editor replaces the right pane without forced keyboard; Save/Cancel and stable draft remain safe under system/IME insets;
 - entering Edit on a non-empty note prepares `saved note | `;
 - Save commits and exits;
 - Android Back cancels the dirty draft and exits;
@@ -64,14 +67,14 @@ Off-turn planning, zero-token rehearsal, clue Compare, and clue pins are backlog
 
 ## D10 — Clue entry
 
-**RATIFIED.** Short tap on another player opens Clue only on our turn. Off-turn short tap does nothing. On our turn with zero clue tokens the disabled composer may open, but candidate/Give controls remain disabled. Remove the separate per-player Clue button. Entering Clue turns global empathy off.
+**REVISED 2026-10-23.** Explicit accessible `Clue` beside eligible opponent names opens/retargets the composer only on our turn with live eligibility. Card/row taps do not infer clue entry. Zero-token candidate/Give controls remain disabled. Entering Clue turns global empathy off; touched previews need legible high-contrast markers/highlighting. Worst-case variant palettes determine the stable Workbench envelope with always-reachable Close/Give.
 
 ## D11 — Empathy
 
 **MODIFY.** Remove persistent per-player empathy.
 
-- long-press/hold anywhere on a player row/hand, including cards, is transient empathy until release;
-- own hand supports the same temporary empathy;
+- opponent-row/card hold is transient empathy until release;
+- own-card hold is reserved for notes; preserve global empathy;
 - recognized long press consumes the short-tap action;
 - transient empathy clears on release/background/rotation/interruption;
 - global `All empathy` is a separate persistent toggle;
@@ -98,7 +101,7 @@ Deep Knowledge, compare/pins, and an optional global Toggle/Hold preference are 
 
 ## D14 — Replay / finished / shared review / Hypothetical
 
-**C17 MUST.** Live, Rewind, finished game, ordinary replay, shared review, and Hypothetical use the same C17 Table Ledger + Workbench model on target phone portrait. Do not route finished/replay back to LegacyGameScreen. Shared leader/follow/detach semantics and Hypothetical remain authoritative/upstream-owned.
+**C17 MUST.** Live, Rewind, finished game, ordinary replay, shared review, and Hypothetical use the same C17 Table Ledger + Workbench model on target phone portrait. Do not route finished/replay back to LegacyGameScreen. Shared leader/follow/detach semantics and Hypothetical remain authoritative/upstream-owned. The 2026-10-23 delta requires consistent attendance-preserving Home, direct confirmation-free Exit Replay (distinct from own Rewind Live), and a once-only observed-finish popup instead of redundant persistent result banners.
 
 ## D15 — Spectator
 
