@@ -25,6 +25,7 @@ import {
   canDiscardForVariant,
   getDisplayedClockString,
   getGameplayPresentation,
+  getGameTableSuits,
   getGameplayCardsPerHand,
   getGameplayClueChoicesForPlayer,
   hasClueTokenForVariant,
@@ -36,6 +37,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { ActionButton, Notice, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { getC17LandscapeLayout, getLandscapeMetricHeight, landscapeMetricsFit, C17_LANDSCAPE_REGION_GAP, C17_LANDSCAPE_COLUMN_GAP, C17_LANDSCAPE_ROW_GAP } from './c17LandscapeLayout';
+import { getLandscapeLastActionHeight } from './landscapeResources';
 import { C17RewindScrubber } from './C17RewindScrubber';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
 import { getPaceRiskColor, PaceDetailsModal } from './PaceDetailsModal';
@@ -915,6 +917,7 @@ function C17DenseWorkspace({
     leftHeaderHeight,
     leftHeaderMinWidth: landscapeHeaderMinWidth,
     metricRowWidth: metricMeasurement.shellKey === shellKey ? metricMeasurement.maximum.width : 0,
+    suitCount: getGameTableSuits(variantName, game).length,
     fontScale,
     playerCount: metadata.playerNames.length,
     cardsPerHand,
@@ -1314,17 +1317,17 @@ function C17DenseWorkspace({
       landscapeResourceFeedback={{ before: liveBefore, segment: livePulseSegment, clueCue: resourcePresentation.clueCue, lowScorePhase: hGroupStatus.lowScorePhase, colorblindMode }} dense tightChrome={usesDenseSideLabels} game={game} discardResourceCue={resourcePresentation.discardCue} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
   );
   const lastActionPanel = (
-    <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, !portraitV2 && styles.landscapeLastAction, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-      <View style={[styles.rowBetween, styles.lastActionHeader, !portraitV2 && styles.landscapeLastActionHeader]}>
+    <AuthoritativePulse enabled={livePulseEnabled} pulseKey={livePulseSegment}><View style={[styles.lastAction, !portraitV2 && styles.landscapeLastAction, !portraitV2 && { height: getLandscapeLastActionHeight(fontScale) }, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+      {portraitV2 && <View style={[styles.rowBetween, styles.lastActionHeader, !portraitV2 && styles.landscapeLastActionHeader]}>
         <Text numberOfLines={1} style={[styles.eyebrow, !portraitV2 && styles.grow, { color: theme.colors.textMuted }]}>{reviewActive ? `LAST ACTION · T${selectedTurn}` : 'LAST ACTION'}</Text>
         <View style={[styles.actionButtons, !portraitV2 && styles.landscapeActionButtons]}>
           {!reviewActive &&
             <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)} />}
           <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
         </View>
-      </View>
-      <Pressable disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={[styles.lastActionPressable, !portraitV2 && styles.landscapeLastActionSummary]}>
-        <Text adjustsFontSizeToFit={!portraitV2} minimumFontScale={0.8} numberOfLines={portraitV2 ? undefined : 2} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
+      </View>}
+      <Pressable accessibilityRole="button" accessibilityLabel={lastAction} accessibilityHint="Opens detailed Recent actions and history" disabled={!historyAvailable} onPress={() => setRecentOpen(true)} style={[styles.lastActionPressable, !portraitV2 && styles.landscapeLastActionSummary]}>
+        <Text ellipsizeMode="tail" numberOfLines={portraitV2 ? undefined : 1} style={[styles.lastActionText, { color: theme.colors.text }]}>{lastAction}</Text>
         <Text style={[styles.link, { color: historyAvailable ? theme.colors.accent : theme.colors.textMuted }]}>RECENT ›</Text>
       </Pressable>
     </View></AuthoritativePulse>
@@ -1364,13 +1367,17 @@ function C17DenseWorkspace({
   </>;
   const WorkbenchViewport = !portraitV2 && selectedTarget !== null && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null ? View : ScrollView;
   const workbench = (
-    (!shellMeasured || showWorkbench) ? <View style={[
+    (!portraitV2 || !shellMeasured || showWorkbench) ? <View style={[
       styles.workbench,
       { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderStrong },
       { height: layout.workbenchHeight, flexGrow: 0, flexShrink: 0 },
       !portraitV2 && { marginTop: 'auto' },
       !shellMeasured && styles.shellPending,
     ]}>
+      {!portraitV2 && <View style={[styles.landscapePrimaryControls, styles.actionButtons, styles.landscapeActionButtons]}>
+        {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)} />}
+        <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
+      </View>}
       {!portraitV2 && reviewActive && !finishedReplay && sharedReplay === null && <View style={styles.landscapePrimaryControls}>
           <Text style={[styles.eyebrow, { color: theme.colors.accent }]}>Rewind T{selectedTurn} · Live T{liveTurn}{newerActionCount > 0 ? ` · ${newerActionCount} NEW` : ''}</Text>
           <View style={styles.rowBetween}>
@@ -1384,7 +1391,7 @@ function C17DenseWorkspace({
       {showRewindScrubber && portraitV2 && <View style={styles.workbenchScrubber}>
         <C17RewindScrubber actionSegments={actionSegments} onSelectSegment={onScrubAction} selectedSegment={selectedActionSegment} />
       </View>}
-      {!portraitV2 && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null && <View style={styles.landscapePrimaryControls}>
+      {!portraitV2 && hypothetical === null && !reviewActive && !finishedReplay && sharedReplay === null && selectedActionCard !== null && <View style={styles.landscapePrimaryControls}>
         {cardActions}
       </View>}
       {!portraitV2 && hypothetical !== null && <View style={styles.landscapePrimaryControls}>{hypotheticalTaskControls}</View>}
@@ -1682,7 +1689,7 @@ const styles = StyleSheet.create({
   landscapeCards: { justifyContent: 'center' },
   landscapeLiveColumn: { gap: 4, minHeight: 0 },
   landscapeMetricStrip: { height: 34, flexShrink: 0, paddingVertical: 0 },
-  landscapeLastAction: { height: 68, flexShrink: 0, gap: 0, paddingVertical: 2 },
+  landscapeLastAction: { height: 28, minHeight: 0, flexShrink: 0, gap: 0, paddingVertical: 1 },
   landscapeLastActionHeader: { flexWrap: 'nowrap' },
   landscapeLastActionSummary: { flex: 1, minHeight: 0 },
   landscapeActionButtons: { flexWrap: 'nowrap' },

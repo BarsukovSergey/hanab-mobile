@@ -1,14 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
-import { describe, expect, jest, test } from '@jest/globals';
+import { afterEach, describe, expect, jest, test } from '@jest/globals';
 
 import type { GameState } from '../../game/bootstrap/types';
 import { getGameResourcePresentation } from '../../game/selectors/gameResourcePresentation';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { CompactTable, TableScore } from './CompactTable';
+import { VisibleHanabiCard } from './GameCard';
 
 // Inspect the actual JSX without mounting native cards or running animation effects.
 let mockAvailableWidth = 400;
+type DiscardFace = { order: number; suitIndex: number; rank: number; faded: boolean };
+let mockDiscard = { cards: [] as DiscardFace[], relevantCards: [] as DiscardFace[] };
+afterEach(() => { mockDiscard = { cards: [], relevantCards: [] }; });
 jest.mock('react', () => ({
   ...require('@jest/globals').jest.requireActual('react'),
   useState: () => [mockAvailableWidth, () => {}],
@@ -28,7 +32,7 @@ jest.mock('../../game/selectors/discardSummary', () => ({
   getDiscardSummary: () => ({ total: 0, suits: [] }),
 }));
 jest.mock('../../game/selectors/discardPresentation', () => ({
-  getDiscardPresentation: () => ({ cards: [], relevantCards: [] }),
+  getDiscardPresentation: () => mockDiscard,
 }));
 
 type Element = ReactElement<Record<string, unknown>>;
@@ -173,6 +177,24 @@ test('retains shared reduced-motion and pulse eligibility guards', () => {
   expect(pulse).toContain('!enabled || pulseKey === null || pulseKey === previousPulseKey.current || reduceMotion');
   expect(pulse).toContain('AccessibilityInfo.isReduceMotionEnabled()');
   expect(pulse).toContain("AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion)");
+});
+
+test('larger landscape discard faces preserve relevant duplicates and full-pile tap', () => {
+  const duplicate = { order: 31, suitIndex: 1, rank: 2, faded: false };
+  const second = { ...duplicate, order: 32 };
+  mockDiscard = { cards: [duplicate, second, { ...duplicate, order: 33, faded: true }], relevantCards: [duplicate, second] };
+  const onOpenDiscards = jest.fn();
+  const result = table('landscape-v2', { onOpenDiscards });
+  const faces = result.all.filter((node) => node.type === VisibleHanabiCard);
+  expect(faces.map((node) => node.key)).toEqual(['31', '32']);
+  expect(faces.map((node) => node.props.height)).toEqual([36, 36]);
+  const pile = result.all.find((node) => node.props.accessibilityLabel === 'Discard Pile')!;
+  (pile.props.onPress as () => void)();
+  expect(onOpenDiscards).toHaveBeenCalledTimes(1);
+  mockDiscard.relevantCards = [];
+  expect(table('landscape-v2').all.some((node) => text(node) === 'No relevant cards')).toBe(true);
+  mockDiscard.cards = [];
+  expect(table('landscape-v2').all.some((node) => text(node) === 'None')).toBe(true);
 });
 
 test('C17 supplies the same authoritative feedback through its shared orientation path', () => {

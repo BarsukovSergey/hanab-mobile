@@ -11,6 +11,7 @@ import { getCardSuitVisuals } from '../../game/selectors/cardVisuals';
 import { useAppSelector } from '../../store/hooks';
 import { useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { getPortraitResourceRailFit } from './c17DenseLayout';
+import { getLandscapeResourceEnvelope } from './landscapeResources';
 import { VisibleHanabiCard } from './GameCard';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
@@ -204,7 +205,8 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
   const suits = getGameTableSuits(variantName, game);
   const visuals = getCardSuitVisuals(variantName);
   const lateralRail = landscape || getPortraitResourceRailFit(availableWidth, suits.length, fontScale);
-  const resourceRail = landscape ? 58 : Math.max(64, Math.ceil(64 * Math.min(fontScale, 1.5)));
+  const landscapeEnvelope = getLandscapeResourceEnvelope(fontScale, suits.length);
+  const resourceRail = landscape ? landscapeEnvelope.resourceRail : Math.max(64, Math.ceil(64 * Math.min(fontScale, 1.5)));
   const stackWidth = Math.max(30, Math.min(40, (availableWidth - 42 - 28 - (lateralRail ? resourceRail : 0)) / Math.max(1, suits.length)));
   const stackHeight = landscape ? 30 : stackWidth / HANABI_TABLE_CARD_ASPECT_RATIO;
   const discard = getDiscardPresentation(game, cardIdentities);
@@ -221,8 +223,8 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
       </View>)}
     </View></AuthoritativePulse>
   </View>;
-  return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4, ...(landscape ? { height: 92, flexShrink: 0 } : {}) }}>
-    <View style={[styles.surface, { ...(landscape ? { height: 62, gap: 0 } : {}), padding: landscape ? 3 : 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+  return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4, ...(landscape ? { height: landscapeEnvelope.height, flexShrink: 0 } : {}) }}>
+    <View style={[styles.surface, { ...(landscape ? { height: landscapeEnvelope.rowHeight, gap: 0 } : {}), padding: landscape ? 3 : 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       {!landscape && <TableScore game={game} feedback={resourceFeedback} pulseEnabled={pulseEnabled} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <View style={{ flexDirection: 'row', gap: 2, flex: 1 }}>
@@ -239,7 +241,7 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
           })}
         </View>
         {lateralRail && resources}
-        <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)}><View accessible accessibilityLabel={`Deck ${game.cardsRemainingInTheDeck}`} style={{ width: landscape ? 34 : 42, minHeight: landscape ? 30 : 42, borderWidth: 1, borderRadius: 5, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+        <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.cardsRemainingInTheDeck, game.cardsRemainingInTheDeck)}><View accessible accessibilityLabel={`Deck ${game.cardsRemainingInTheDeck}`} style={{ width: landscape ? landscapeEnvelope.deckWidth : 42, minHeight: landscape ? 30 : 42, borderWidth: 1, borderRadius: 5, borderColor: theme.colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: theme.colors.text, fontSize: 10 }}>Deck</Text>
           <Text style={{ color: theme.colors.text, fontWeight: '700', ...(landscape ? { fontSize: 12 } : {}) }}>{game.cardsRemainingInTheDeck}</Text>
         </View></AuthoritativePulse>
@@ -247,12 +249,12 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
       {!lateralRail && resources}
     </View>
     <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseDiscard ?? null}>
-      <Pressable accessibilityRole="button" accessibilityLabel={discardResourceCue === 'blocked' ? 'Discard Pile. Unavailable because clues are at maximum' : discardResourceCue === 'double-discard' ? 'Discard Pile. Potential Double Discard' : 'Discard Pile'} onPress={onOpenDiscards} style={[styles.discard, landscape && { height: 26, padding: 2, flexDirection: 'row', alignItems: 'center', gap: 4 }, { backgroundColor: theme.colors.surfaceMuted, borderColor: discardResourceCue === 'blocked' ? '#ff5555' : discardResourceCue === 'double-discard' ? '#ffd54f' : theme.colors.border }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={discardResourceCue === 'blocked' ? 'Discard Pile. Unavailable because clues are at maximum' : discardResourceCue === 'double-discard' ? 'Discard Pile. Potential Double Discard' : 'Discard Pile'} onPress={onOpenDiscards} style={[styles.discard, landscape && { height: landscapeEnvelope.discardHeight, padding: 2, flexDirection: 'row', alignItems: 'center', gap: 4 }, { backgroundColor: theme.colors.surfaceMuted, borderColor: discardResourceCue === 'blocked' ? '#ff5555' : discardResourceCue === 'double-discard' ? '#ffd54f' : theme.colors.border }]}>
         <Text style={{ color: theme.colors.text, fontSize: landscape ? 10 : 11, fontWeight: '700' }}>Discard Pile</Text>
         {discard.cards.length === 0 ? <Text style={{ color: theme.colors.textMuted, ...(landscape ? { fontSize: 10 } : {}) }}>None</Text>
           : discard.relevantCards.length === 0 ? <Text style={{ color: theme.colors.textMuted, ...(landscape ? { fontSize: 10 } : {}) }}>No relevant cards</Text>
           : <ScrollView horizontal nestedScrollEnabled contentContainerStyle={{ gap: 3 }}>
-            {discard.relevantCards.map((card) => <VisibleHanabiCard key={card.order} height={landscape ? 20 : 32} rank={card.rank} suitIndex={card.suitIndex} variantName={variantName} />)}
+            {discard.relevantCards.map((card) => <VisibleHanabiCard key={card.order} height={landscape ? landscapeEnvelope.discardCardHeight : 32} rank={card.rank} suitIndex={card.suitIndex} variantName={variantName} />)}
           </ScrollView>}
       </Pressable>
     </AuthoritativePulse>

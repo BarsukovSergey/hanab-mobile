@@ -74,7 +74,7 @@ describe('card, divider and right-column envelopes', () => {
         expect(result.leftWidth + result.rightWidth + 8).toBeCloseTo(input.availableWidth);
         expect(result.rightMin).toBe(Math.ceil(252 * fontScale));
         expect(result.rightWidth).toBeGreaterThanOrEqual(result.rightMin);
-        expect(result.workbenchHeight).toBeGreaterThanOrEqual(88);
+        expect(result.workbenchHeight).toBeGreaterThanOrEqual(128);
       }
     }
   });
@@ -123,22 +123,22 @@ describe('card, divider and right-column envelopes', () => {
       expect(result.rightWidth).toBeLessThanOrEqual(result.rightComfort);
       expect(result.leftWidth + 8 + result.rightWidth).toBeCloseTo(1200);
       expect(result.gridWidth).toBeLessThanOrEqual(result.leftWidth);
-      expect(result.workbenchHeight).toBeGreaterThanOrEqual(88);
-      expect(result.workbenchHeight).toBeLessThanOrEqual(128);
+      expect(result.workbenchHeight).toBeGreaterThanOrEqual(128);
+      expect(result.workbenchHeight).toBeLessThanOrEqual(168);
     }
   });
   test('divider reserves minimum then grows right toward comfort without stretching cards', () => {
     const constrained = fit({ playerCount: 4, cardsPerHand: 4, availableWidth: 720 });
     expect(constrained.rightWidth).toBeLessThan(constrained.rightComfort);
     expect(fit({ availableWidth: 1200, availableHeight: 600 }).rightWidth).toBe(320);
-    expect(fit({ fontScale: 1.5 }).rightMin).toBe(378);
-    expect(fit({ fontScale: 1.5 }).rightComfort).toBe(378);
+    expect(fit({ fontScale: 1.5, availableHeight: 400 }).rightMin).toBe(378);
+    expect(fit({ fontScale: 1.5, availableHeight: 400 }).rightComfort).toBe(378);
     expect(fit({ fontScale: 2, availableHeight: 420 }).rightMin).toBe(504);
     expect(fit({ fontScale: 0.8 })).toEqual(fit({ fontScale: 1 }));
   });
-  test('Workbench reserves 88 to 128 and leaves extra height unused', () => {
-    expect(fit({ availableHeight: 294 }).workbenchHeight).toBe(88);
-    expect(fit({ availableHeight: 600 }).workbenchHeight).toBe(128);
+  test('Workbench reserves 128 to 168 and leaves extra height unused', () => {
+    expect(fit({ availableHeight: 294 }).workbenchHeight).toBe(128);
+    expect(fit({ availableHeight: 600 }).workbenchHeight).toBe(168);
   });
   test('short body, narrow width and capacity pressure fail explicitly', () => {
     expect(getC17LandscapeLayout({ ...envelope, availableHeight: 293 })).toEqual({ fits: false, reason: 'body-height' });
