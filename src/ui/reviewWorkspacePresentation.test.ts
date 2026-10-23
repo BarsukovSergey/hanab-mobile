@@ -53,10 +53,10 @@ describe('authoritative Review presentation', () => {
   });
 });
 
-test('focused Review reuses mounted C17 and room children, with local Browse and contextual Menu', () => {
+test('focused Review reuses mounted C17 and room children, with Home and contextual Menu', () => {
   const header = app.slice(app.indexOf('styles.gameBar,'), app.indexOf('{liveConnectionProblem'));
-  expect(header).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
-  expect(header).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
+  expect(header).toContain('title="Home"');
+  expect(header).toContain('onPress={homeFromLive}');
   expect(header).toContain('workspacePresentation.identity');
   expect(header).toContain('workspacePresentation.status');
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
@@ -65,7 +65,7 @@ test('focused Review reuses mounted C17 and room children, with local Browse and
   const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const homeFromLive ='));
   expect(browse).toContain("setPresentationFocus('browsing')");
   expect(browse).not.toMatch(/lobbyRuntime|dispatch|setRoomChild|setBrowsing/);
-  expect(app).toContain('<GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
+  expect(app).toContain('<GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} replayExit={width > height ? replayExit : undefined} />');
   expect(app).toContain('{focusedRoomPresentation !== null && <View');
   expect(app).toContain("readActive={roomPresentationVisible && roomChild === 'chat'}");
 });

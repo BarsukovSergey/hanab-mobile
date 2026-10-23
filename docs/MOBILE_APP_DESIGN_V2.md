@@ -686,6 +686,12 @@ Landscape Last Action is `ceil(28 * scaledFont)` with one ellipsized line, full 
 
 Workbench comfort is minimum + 40dp, capped by actual available height. For example a 294dp normal-font safe-content height fails the 302dp right minimum; it must show the noninteractive failure path, never a cropped Give. A synthetic 860 × 363dp, fontScale 1.5, eight-suit fixture with an 85dp measured left header fits all 2–6P templates at or above the 68dp card floor. These supplied geometry fixtures are not actual Android font/system measurements or device acceptance. Native metric/header gates and physical #251 checks still apply.
 
+### Home and owned Replay exit (post-RC2 PR6)
+
+Every focused room entry, including Pregame/bootstrap, uses Home and navigates to browsing Home without changing attendance. Replay origin is captured separately when entering a room, so Home does not erase a supported History origin. Direct Exit Replay is outside the portrait Workbench's small scrolling viewport and in the existing fixed landscape secondary row; the review Menu uses the same confirmation-free action. Own ongoing Rewind uses Live and never table-unattend. A Hypothetical branch within that ongoing game does not qualify for attendance Exit Replay.
+
+Replay exit captures table/load/connection ownership and checks current focused presentation plus existing READY/pending attendance gates. A successful send leaves the room present while awaiting authoritative own-user Lobby confirmation. Only confirmed departure restores History (when captured) or Home; failed sends, disconnects and superseded generations cancel presentation intent without claiming exit or retrying. Destructive live attendance/Terminate confirmation remains separate. PR5's blocked gesture proposal is not required for this navigation slice.
+
 ### Right Live column
 
 **2026-10-23 revision:** the following numeric envelopes record the previous Slice 8b baseline only and are not sufficient fit criteria for the revised composition. Measure full-size Score/Pace/Efficiency and worst supported Clue Composer with sticky Give/Close, card floor, font scaling and safe insets before accepting windows. Use the bounded size-failure path for impossible geometry; do not shrink metrics or hide mandatory controls.

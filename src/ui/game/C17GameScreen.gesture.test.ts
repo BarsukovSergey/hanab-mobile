@@ -157,7 +157,7 @@ test('C17 Workbench geometry is derived before any tool and keeps primary Rewind
   expect(screen).toContain('styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
   expect(screen).toContain('title="Previous" onLongPress={onReviewStart} onPress={onReviewBack}');
   expect(screen).toContain('title="Next" onLongPress={onReviewEnd} onPress={onReviewForward}');
-  expect(screen).toContain('title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"}');
+  expect(screen).toContain('title="Live"');
   expect(screen).toContain('title="Start Hypothetical"');
   expect(screen).toContain('getC17WorkbenchHeight(viewportHeight, opponents.length, true)');
   const allocator = screen.slice(screen.indexOf('const landscapeLayout ='), screen.indexOf('const layout: C17DenseLayout ='));

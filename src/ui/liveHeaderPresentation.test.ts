@@ -5,12 +5,12 @@ import { expect, test } from '@jest/globals';
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const header = app.slice(app.indexOf('styles.gameBar,'), app.indexOf('{liveConnectionProblem'));
 
-test('Live and own Rewind keep visible ghost Home; portrait Review keeps Browse; landscape Home preserves attendance', () => {
-  const navigation = header.match(/<ActionButton compact title=\{workspacePresentation\.review[^\n]+/u)?.[0];
+test('Live and own Rewind keep visible ghost Home; Review keeps Home; landscape Home preserves attendance', () => {
+  const navigation = header.match(/<ActionButton compact title="Home"[^\n]+/u)?.[0];
   expect(navigation).toBeDefined();
-  expect(navigation).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
+  expect(navigation).toContain("title=\"Home\"");
   expect(navigation).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
-  expect(navigation).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
+  expect(navigation).toContain('onPress={homeFromLive}');
   expect(navigation).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
 });
 

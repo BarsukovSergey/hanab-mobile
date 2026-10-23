@@ -102,6 +102,110 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test.each([false, true])('direct Exit Replay has no confirmation for shared leader=%s and waits for authority', async (leader) => {
+  const socket = await mountLive(true);
+  if (leader) act(() => socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}'));
+  const alert = jest.spyOn(Alert, 'alert');
+  const before = [...socket.sent];
+  expect(buttons('Home')).toHaveLength(1);
+  expect(buttons('Browse')).toHaveLength(0);
+  const exit = buttons('Exit Replay')[0].props.onPress;
+  act(() => { exit(); exit(); });
+  expect(alert).not.toHaveBeenCalled();
+  expect(socket.sent.slice(before.length)).toEqual(['tableUnattend {"tableID":123}']);
+  expect(liveRoom().tableID).toBe(123);
+  expect(store.getState().room.pendingUnattendTableID).toBe(123);
+  expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
+  act(() => socket.emitMessage('user {"userID":2,"name":"Bob","status":0,"hyphenated":false,"inactive":false}'));
+  expect(liveRoom().tableID).toBe(123);
+  act(() => socket.emitMessage('user {"userID":1,"name":"Ada","status":0,"hyphenated":false,"inactive":false}'));
+  expect(store.getState().room.room.kind).toBe('none');
+  expect(tree.root.findByType(BrowsingAppBar).props.title).toBe('Home');
+  expect(socket.sent.filter((frame: string) => frame.startsWith('action '))).toEqual([]);
+});
+
+test('own ongoing Rewind has Live rather than Exit Replay and never unattends', async () => {
+  const socket = await mountLive();
+  const before = [...socket.sent];
+  act(() => expect(mockRuntime.navigateReplaySegment(0)).toBe(true));
+  expect(liveRoom().clientState.replay.active).toBe(true);
+  expect(buttons('Exit Replay')).toHaveLength(0);
+  pressButton('Live');
+  expect(liveRoom().clientState.replay.active).toBe(false);
+  expect(socket.sent).toEqual(before);
+});
+
+test('a replay exit callback cannot retarget a newer load of the same table', async () => {
+  const socket = await mountLive(true);
+  const obsoleteExit = buttons('Exit Replay')[0].props.onPress;
+  const oldLoad = liveRoom().gameLoadEpoch;
+  act(() => bootstrap(socket, 123, true));
+  expect(liveRoom().gameLoadEpoch).toBeGreaterThan(oldLoad);
+  const before = [...socket.sent];
+  act(() => obsoleteExit());
+  expect(socket.sent).toEqual(before);
+  expect(store.getState().room.pendingUnattendTableID).toBeNull();
+  pressButton('Exit Replay');
+  expect(socket.sent.slice(before.length)).toEqual(['tableUnattend {"tableID":123}']);
+});
+
+test('hidden, failed-send and disconnected replay exits never falsely claim departure or retry', async () => {
+  const socket = await mountLive(true);
+  const exit = buttons('Exit Replay')[0].props.onPress;
+  const before = [...socket.sent];
+  pressButton('Home');
+  act(() => exit());
+  expect(socket.sent).toEqual(before);
+  returnToRoom();
+  const send = jest.spyOn(socket, 'send').mockImplementationOnce(() => { throw new Error('test send failure'); });
+  act(() => exit());
+  expect(liveRoom().tableID).toBe(123);
+  expect(store.getState().room.pendingUnattendTableID).toBeNull();
+  expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
+  send.mockRestore();
+  act(() => exit());
+  expect(store.getState().room.pendingUnattendTableID).toBe(123);
+  act(() => socket.emitClose());
+  const afterClose = [...socket.sent];
+  act(() => exit());
+  expect(socket.sent).toEqual(afterClose);
+  expect(store.getState().room.pendingUnattendTableID).toBeNull();
+  expect(liveRoom().tableID).toBe(123);
+  expect(store.getState().session.phase).toBe('closed');
+  expect(socket.sent.filter((frame: string) => frame.startsWith('tableUnattend '))).toHaveLength(1);
+});
+
+test('Home always opens Home but authoritative Exit Replay restores its captured History origin', async () => {
+  await act(async () => { tree = create(<Provider store={store} stabilityCheck="never"><App /></Provider>); });
+  const socket = mockSession.sockets[0];
+  act(() => {
+    socket.emitOpen();
+    socket.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}');
+    socket.emitMessage('userList []');
+    socket.emitMessage('tableList []');
+  });
+  act(() => tree.root.findByType(BrowsingNavigation).props.onNavigate('history'));
+  pressButton('Open replay');
+  const input = tree.root.findAllByType(TextInput).find((node: { props: { placeholder?: string } }) => node.props.placeholder === 'Replay link or database ID');
+  act(() => input.props.onChangeText('77'));
+  pressButton('Open');
+  act(() => {
+    socket.emitMessage('tableStart {"tableID":123,"replay":true}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({ replay: true, databaseID: 77, datetimeFinished: '2026-10-23T00:10:00Z' }))}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify(history(123, true))}`);
+  });
+  expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
+  const before = [...socket.sent];
+  pressButton('Home');
+  expect(tree.root.findByType(BrowsingAppBar).props.title).toBe('Home');
+  expect(socket.sent).toEqual(before);
+  returnToRoom();
+  pressButton('Exit Replay');
+  expect(liveRoom().tableID).toBe(123);
+  act(() => socket.emitMessage('user {"userID":1,"name":"Ada","status":0,"hyphenated":false,"inactive":false}'));
+  expect(tree.root.findByType(BrowsingAppBar).props.title).toBe('History');
+});
+
 test('landscape unread measurement preserves mounted hands, selection and attendance', async () => {
   const frameHook = require('react-native-safe-area-context').useSafeAreaFrame;
   const previousFrameImplementation = frameHook.getMockImplementation();
@@ -849,7 +953,7 @@ test('a peer rematch migrates room ownership while preserving browsing focus unt
   const oldLoad = liveRoom().gameLoadEpoch;
   expect(liveRoom().sharedReplay).toBe(true);
   const sentBeforeBrowse = socket.sent.length;
-  pressButton('Browse');
+  pressButton('Home');
   browsePeople();
 
   act(() => socket.emitMessage('boot {"TableID":123}'));

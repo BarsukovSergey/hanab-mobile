@@ -111,6 +111,51 @@ function withPending(result: ReturnType<typeof makeRuntime>, key: keyof typeof p
   });
 }
 
+describe('owned direct replay exit', () => {
+  test.each(['player', 'spectator'] as const)('%s exit is current-load/current-connection READY-only and pending-deduplicated', (role) => {
+    const { store, send, ready, runtime } = makeLive(role);
+    const active = store.getState().room.room;
+    if (active.kind !== 'live_game') throw new Error('fixture');
+    store.dispatch(roomActions.liveActionAccepted({ connectionEpoch: 1, tableID: 123, gameLoadEpoch: active.gameLoadEpoch,
+      expectedLiveActionCount: active.liveActionCount, acceptedAction: { type: 'gameOver', endCondition: 1, playerIndex: -1, votes: null },
+      clientState: { ...active.clientState, finished: true } }));
+    expect(store.getState().room.room).toMatchObject({ clientState: { finished: true } });
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('fixture');
+    const owner = { connectionEpoch: 1, gameLoadEpoch: room.gameLoadEpoch };
+    send.mockClear();
+    expect(runtime.unattendLiveGame(999, owner)).toBe(false);
+    expect(runtime.unattendLiveGame(123, { ...owner, gameLoadEpoch: owner.gameLoadEpoch + 1 })).toBe(false);
+    expect(runtime.unattendLiveGame(123, { ...owner, connectionEpoch: 2 })).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    ready.mockReturnValue(false);
+    expect(runtime.unattendLiveGame(123, owner)).toBe(false);
+    ready.mockReturnValue(true);
+    send.mockReturnValue(false);
+    expect(runtime.unattendLiveGame(123, owner)).toBe(false);
+    expect(store.getState().room.pendingUnattendTableID).toBeNull();
+    send.mockReturnValue(true).mockClear();
+    expect(runtime.unattendLiveGame(123, owner)).toBe(true);
+    expect(runtime.unattendLiveGame(123, owner)).toBe(false);
+    expect(send.mock.calls).toEqual([['tableUnattend {"tableID":123}']]);
+    expect(store.getState().room.room.kind).toBe('live_game');
+    store.dispatch(roomActions.unattendConfirmed({ epoch: 1 }));
+    expect(store.getState().room.room.kind).toBe('none');
+  });
+
+  test('ongoing Live and own Rewind cannot use the review exit path', () => {
+    const { store, runtime, send } = makeLive('player');
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('fixture');
+    const owner = { connectionEpoch: 1, gameLoadEpoch: room.gameLoadEpoch };
+    send.mockClear();
+    expect(runtime.unattendLiveGame(123, owner)).toBe(false);
+    store.dispatch(roomActions.reviewSegmentSelected({ tableID: 123, gameLoadEpoch: room.gameLoadEpoch, segment: 0 }));
+    expect(runtime.unattendLiveGame(123, owner)).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
 describe('RoomAttendanceRuntime collaborator', () => {
   test.each(['spectate', 'join', 'reattend', 'openLiveGameByID', 'openPregameByID'] as const)(
     '%s sends once, records intent only after sending, and preserves authoritative room', (method) => {

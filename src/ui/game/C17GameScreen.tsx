@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
-import type { RoomChildren } from './GameScreen';
+import type { ReplayExitControl, RoomChildren } from './GameScreen';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AppState,
@@ -94,7 +94,7 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen({ noteBackRef, presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { noteBackRef?: RefObject<(() => boolean) | null>; presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
+export function C17GameScreen({ replayExit, noteBackRef, presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { replayExit?: ReplayExitControl; noteBackRef?: RefObject<(() => boolean) | null>; presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const orientation = width > height ? 'landscape' : 'portrait';
@@ -461,6 +461,7 @@ export function C17GameScreen({ noteBackRef, presentationVisible = true, roomChi
 
   return <View style={styles.workspace}>
     <C17DenseWorkspace
+      replayExit={replayExit}
       noteEditorOpen={noteEditorOpen}
       onLandscapePaneChange={setNotePane}
       allowHeightShrink={heightConstrained || clientState.pause.active || noteWarning !== null}
@@ -637,6 +638,7 @@ export function C17GameScreen({ noteBackRef, presentationVisible = true, roomChi
 }
 
 function C17DenseWorkspace({
+  replayExit,
   noteEditorOpen,
   onLandscapePaneChange,
   allowHeightShrink,
@@ -739,6 +741,7 @@ function C17DenseWorkspace({
   colorblindMode,
   realLifeMode,
 }: {
+  replayExit?: ReplayExitControl;
   noteEditorOpen: boolean;
   onLandscapePaneChange: (pane: { width: number; height: number }) => void;
   allowHeightShrink: boolean;
@@ -1394,6 +1397,7 @@ function C17DenseWorkspace({
       !shellMeasured && styles.shellPending,
     ]}>
       {!portraitV2 && <View style={[styles.landscapePrimaryControls, styles.actionButtons, styles.landscapeActionButtons]}>
+        {replayExit !== undefined && <ActionButton compact disabled={replayExit.pending} title="Exit Replay" onPress={replayExit.onExit} />}
         {!reviewActive && <ActionButton compact disabled={!historyAvailable} title="Rewind" onPress={() => takeWorkbenchTask(onEnterRewind)} />}
         <ActionButton compact title={globalEmpathy ? 'Empathy ✓' : 'Empathy'} tone={globalEmpathy ? 'primary' : 'ghost'} onPress={onToggleGlobalEmpathy} />
       </View>}
@@ -1404,7 +1408,7 @@ function C17DenseWorkspace({
               <ActionButton compact disabled={!canReviewBack} title="Previous" onLongPress={onReviewStart} onPress={onReviewBack} />
               <ActionButton compact disabled={!canReviewForward} title="Next" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
-            <ActionButton compact title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"} tone="primary" onPress={onReturnLive} />
+            <ActionButton compact title="Live" tone="primary" onPress={onReturnLive} />
           </View>
       </View>}
       {showRewindScrubber && portraitV2 && <View style={styles.workbenchScrubber}>
@@ -1456,7 +1460,7 @@ function C17DenseWorkspace({
               <ActionButton compact disabled={!canReviewBack} title="Previous" onLongPress={onReviewStart} onPress={onReviewBack} />
               <ActionButton compact disabled={!canReviewForward} title="Next" onLongPress={onReviewEnd} onPress={onReviewForward} />
             </View>
-            <ActionButton compact title={portraitV2 ? `Exit · Live T${liveTurn}` : "Live"} tone="primary" onPress={onReturnLive} />
+            <ActionButton compact title="Live" tone="primary" onPress={onReturnLive} />
           </View>
           </>}
           {canStartHypothetical && <ActionButton compact title="Start Hypothetical" tone="primary" onPress={() => takeWorkbenchTask(onStartHypothetical)} />}

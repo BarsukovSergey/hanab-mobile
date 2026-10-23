@@ -158,7 +158,7 @@ export function PregameScreen({ backRef, onBrowse, onMessage, presentationVisibl
       {surface !== 'root' && <ActionButton compact title="Back" onPress={handleBack} />}
       <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{surface === 'root' ? 'Pregame' : surface === 'table-settings' ? 'Table settings' : surface === 'team-tools' ? 'Team tools' : surface === 'table-menu' ? 'Table menu' : 'Spectators'}</Text>
       {surface === 'root' && <View style={styles.actionsRow}>
-        <ActionButton compact title="Browse" onPress={onBrowse} />
+        <ActionButton compact title="Home" onPress={onBrowse} />
         <ActionButton compact title="Table menu" onPress={() => setSurface('table-menu')} />
       </View>}
     </View>

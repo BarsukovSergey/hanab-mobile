@@ -14,6 +14,6 @@ export function GameBootstrapStatus({ room, onRetry, onBrowse }: {
         detail="Retry reconnects to receive fresh game state. If the room cannot be restored, you will return to browsing." />
     </View> : <SectionHeading title="Loading game…" detail="Receiving the authoritative game state." />}
     {failed && <ActionButton title="Retry" accessibilityLabel="Retry loading game" tone="primary" onPress={onRetry} />}
-    <ActionButton title="Browse" onPress={onBrowse} />
+    <ActionButton title="Home" onPress={onBrowse} />
   </Panel>;
 }

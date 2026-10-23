@@ -1,3 +1,4 @@
+import type { ReplayExitOwner } from './replayExitEligibility';
 import type {
   NetworkSession,
   SessionCheckResult,
@@ -400,8 +401,8 @@ export class LobbyRuntime {
     return this.roomAttendanceRuntime.joinAsPlayer(password);
   }
 
-  unattendLiveGame(tableID: number): boolean {
-    return this.roomAttendanceRuntime.unattendLiveGame(tableID);
+  unattendLiveGame(tableID: number, expectedReview?: ReplayExitOwner): boolean {
+    return this.roomAttendanceRuntime.unattendLiveGame(tableID, expectedReview);
   }
 
   setSpectatorPerspective(shadowingPlayerIndex: number): boolean {

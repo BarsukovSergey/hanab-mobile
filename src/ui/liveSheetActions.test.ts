@@ -42,7 +42,9 @@ test('only destructive attendance confirmation sends unattend', () => {
   expect(roomChild).toContain("Alert.alert(label, 'Leave this table?'");
   expect(roomChild).toContain("{ text: 'Cancel', style: 'cancel' }");
   expect(roomChild).toMatch(/style: 'destructive', onPress: \(\) => \{\s*closeRoomChild\(\);\s*lobbyRuntime.unattendLiveGame\(liveTableID\)/);
-  expect(app.match(/lobbyRuntime.unattendLiveGame/g)).toHaveLength(1);
+  expect(app.match(/lobbyRuntime.unattendLiveGame/g)).toHaveLength(2);
+  expect(app).toContain('lobbyRuntime.unattendLiveGame(owner.tableID, owner)');
+  expect(roomChild).toContain('isReplayAttendanceRoom(roomState.room) ? <ActionButton title="Exit Replay"');
   expect(roomChild).toContain("'Unattend' : 'Stop watching'");
 });
 
@@ -63,17 +65,17 @@ test('C17 child host uses the allocated right column without changing allocator 
   expect(app).toContain("roomState.room.kind !== 'none' ? roomState.room.tableID : null");
 });
 
-test('keeps Live Home quiet, Review Browse outlined, and header actions tall enough to tap', () => {
+test('keeps Live Home quiet, Review Home outlined, and header actions tall enough to tap', () => {
   const headerStart = app.indexOf('<View style={[styles.headerActions');
-  const headerEnd = app.indexOf('{liveConnectionProblem', headerStart);
+  const headerEnd = app.indexOf('focusedRoomPresentation = (', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
   const normalHeader = headerActions.slice(headerActions.indexOf('</> : <>'));
   const buttons = (normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? []).filter((button) => !button.includes('onPress={() => {}}'));
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
-  expect(browse).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
-  expect(browse).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
+  expect(browse).toContain("title=\"Home\"");
+  expect(browse).toContain('onPress={homeFromLive}');
   expect(browse).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
   expect(browse).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
   expect(chat).toContain("title={headerDisplayedUnreadCount === 0 ? 'Chat' : `Chat (${headerDisplayedUnreadCount})`}");
@@ -106,14 +108,14 @@ test('uses explicit export feedback tone instead of inferring it from message te
 
 test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
   const header = app.slice(app.indexOf('const gameHeader = ('), app.indexOf('focusedRoomPresentation = ('));
-  expect(header).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
-  expect(header).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
+  expect(header).toContain("title=\"Home\"");
+  expect(header).toContain('onPress={homeFromLive}');
   expect(header).toContain('liveClientState.metadata.options.variantName');
   expect(header).toContain('title="Menu"');
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).not.toMatch(/More|username|YOUR TURN|LIVE T/);
   expect(header).toContain('workspacePresentation.identity');
-  expect(header).toContain("workspacePresentation.review && width <= height ? 'Browse' : 'Home'");
+  expect(header).toContain("title=\"Home\"");
 });
 
 test('portrait Chat replaces contents of the same Live header and has no second task header', () => {

@@ -20,6 +20,7 @@ import { HANAB_HTTP_BASE_URL, HANAB_PASSWORD_RESET_URL } from './src/config/hana
 import { createReplayExport } from './src/game/client/replayExport';
 import { replayExportActions } from './src/platform/replayExportActions';
 import { forgetAccount, getPasswordCredential, listRecentAccounts, rememberAccount, savePasswordCredential } from './src/platform/credentialAccounts';
+import { isReplayAttendanceRoom, type ReplayExitOwner } from './src/runtime/replayExitEligibility';
 import { chatRuntime, lobbyRuntime, networkSession } from './src/runtime/application';
 import { lobbyActions } from './src/store/lobbySlice';
 import { roomActions } from './src/store/roomSlice';
@@ -150,7 +151,21 @@ function AppContent() {
     || roomState.pendingRecovery !== null
     || roomState.rematchTransition !== null;
   const [headerControlWidths, setHeaderControlWidths] = useState<Record<string, { key: string; width: number; unreadCount?: number }>>({});
+  const roomBrowseOrigin = useRef<'home' | 'history'>('home');
+  const replayExitRequest = useRef<(ReplayExitOwner & { tableID: number; origin: 'home' | 'history' }) | null>(null);
+  const focusedReplayOwner = useRef<(ReplayExitOwner & { tableID: number }) | null>(null);
   const [presentationFocus, setPresentationFocus] = useState<'room' | 'browsing'>('browsing');
+  focusedReplayOwner.current = presentationFocus === 'room' && (roomChild === null || roomChild === 'menu')
+    && session.phase === 'ready' && roomState.room.kind === 'live_game' && isReplayAttendanceRoom(roomState.room)
+    ? { tableID: roomState.room.tableID, gameLoadEpoch: roomState.room.gameLoadEpoch, connectionEpoch: session.connectionEpoch } : null;
+  const exitReplay = (owner: ReplayExitOwner & { tableID: number }) => {
+    const current = focusedReplayOwner.current;
+    if (current === null || current.tableID !== owner.tableID || current.gameLoadEpoch !== owner.gameLoadEpoch
+      || current.connectionEpoch !== owner.connectionEpoch) return;
+    if (lobbyRuntime.unattendLiveGame(owner.tableID, owner)) {
+      replayExitRequest.current = { ...owner, origin: roomBrowseOrigin.current };
+    }
+  };
   const presentationFocusMemory = useRef<PresentationFocusMemory>({
     previousConnectionEpoch: session.connectionEpoch,
     previousRoomKind: 'none',
@@ -211,11 +226,29 @@ function AppContent() {
       roomMigrationPending: roomState.rematchTransition !== null,
       stableNoOwnedRoom,
     });
+    if (result.enteredRoom && !presentationFocusMemory.current.preserveNextRoomEntry) {
+      roomBrowseOrigin.current = browsing.destination === 'history' ? 'history' : 'home';
+    }
     presentationFocusMemory.current = result.memory;
     if (result.focus !== presentationFocus) setPresentationFocus(result.focus);
     if (result.enteredRoom) closeCreateTask();
-  }, [closeCreateTask, presentationFocus, roomState.room.kind, roomState.rematchTransition,
+  }, [browsing.destination, closeCreateTask, presentationFocus, roomState.room.kind, roomState.rematchTransition,
     session.connectionEpoch, stableNoOwnedRoom]);
+  useLayoutEffect(() => {
+    const request = replayExitRequest.current;
+    if (request === null) return;
+    if (session.phase !== 'ready' || request.connectionEpoch !== session.connectionEpoch
+      || roomState.rematchTransition !== null
+      || (roomState.room.kind !== 'none' && (roomState.room.kind !== 'live_game'
+        || roomState.room.tableID !== request.tableID || roomState.room.gameLoadEpoch !== request.gameLoadEpoch))) {
+      replayExitRequest.current = null;
+      return;
+    }
+    if (!stableNoOwnedRoom) return;
+    replayExitRequest.current = null;
+    setBrowsing((state) => navigateBrowsing(state, request.origin));
+    setPresentationFocus('browsing');
+  }, [roomState.room, roomState.rematchTransition, session.phase, session.connectionEpoch, stableNoOwnedRoom]);
   const liveChatUnreadCount = useAppSelector((state) => state.room.room.kind === 'live_game'
     ? state.chat.unreadByRoom[`table${state.room.room.tableID}`] ?? 0
     : 0);
@@ -468,6 +501,7 @@ function AppContent() {
         </View>
       );
     };
+    const liveGameLoadEpoch = roomState.room.gameLoadEpoch;
     const liveClientState = roomState.room.clientState;
     const workspacePresentation = getReviewWorkspacePresentation(roomState.room);
     const perspectiveEligible = roomState.room.role === 'spectator'
@@ -503,7 +537,7 @@ function AppContent() {
       && liveClientState.metadata.options.numPlayers === liveClientState.metadata.playerNames.length;
     const portraitChatOpen = roomChild === 'chat' && width <= height;
     const workspaceStatusVisible = !portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '';
-    const gameHeightConstrained = liveConnectionProblem || serverStatusMessage !== null || workspaceStatusVisible;
+    const gameHeightConstrained = liveConnectionProblem || serverStatusMessage !== null || workspaceStatusVisible || (width <= height && isReplayAttendanceRoom(roomState.room));
     const gameRootScrollable = !c17Workspace;
     const renderRoomChildren = (landscapeRightWidth: number | null) => {
       const landscape = landscapeRightWidth !== null;
@@ -555,7 +589,8 @@ function AppContent() {
                 <ActionButton title="Tags / replay tools >" onPress={() => setRoomChild('menu-tools')} />
                 <TerminationControls />
                 <ActionButton title="Settings >" onPress={() => setRoomChild('settings')} />
-                <ActionButton disabled={roomState.pendingUnattendTableID !== null}
+                {isReplayAttendanceRoom(roomState.room) ? <ActionButton title="Exit Replay" disabled={roomState.pendingUnattendTableID !== null || session.phase !== 'ready'}
+                  onPress={() => exitReplay({ tableID: liveTableID, gameLoadEpoch: liveGameLoadEpoch, connectionEpoch: session.connectionEpoch })} /> : <ActionButton disabled={roomState.pendingUnattendTableID !== null}
                   title={roomState.room.kind === 'live_game' && roomState.room.role === 'player' ? 'Unattend' : 'Stop watching'}
                   onPress={() => {
                     const label = roomState.room.kind === 'live_game' && roomState.room.role === 'player' ? 'Unattend' : 'Stop watching';
@@ -566,7 +601,7 @@ function AppContent() {
                         lobbyRuntime.unattendLiveGame(liveTableID);
                       } },
                     ]);
-                  }} />
+                  }} />}
               </> : roomChild === 'menu-participants' ? <>
                     <SectionHeading title={`Players (${liveClientState.metadata.playerNames.length})`} />
                     {liveClientState.metadata.playerNames.map((name, index) => renderLiveUser(name, `player-${index}-${name}`))}
@@ -650,6 +685,10 @@ function AppContent() {
         </Pressable>}
       </View>;
     };
+    const replayOwner = { tableID: liveTableID, gameLoadEpoch: roomState.room.gameLoadEpoch, connectionEpoch: session.connectionEpoch };
+    const replayExit = isReplayAttendanceRoom(roomState.room)
+      ? { onExit: () => exitReplay(replayOwner), pending: roomState.pendingUnattendTableID !== null || session.phase !== 'ready' } : undefined;
+    const portraitReplayExitVisible = width <= height && !portraitChatOpen && roomChild === null && replayExit !== undefined;
     const headerWidthKey = `${fontScale}`;
     // Keep the last validated label until its replacement has an intrinsic width.
     // Only the inert probe remounts when unread changes; hands and tools stay mounted.
@@ -676,7 +715,7 @@ function AppContent() {
               <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
             </> : <>
             <View testID="game-header-home" key={`home-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('home', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
-            <ActionButton compact title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive} />
+            <ActionButton compact title="Home" tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={homeFromLive} />
             </View>
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, width > height && { minWidth: Math.ceil(48 * Math.max(1, fontScale)) }, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
             <View testID="game-header-chat" key={`chat-${headerWidthKey}`} style={{ flexShrink: 0 }}>
@@ -714,6 +753,7 @@ function AppContent() {
       <View style={{ height, backgroundColor: theme.colors.background }}>
         <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
         {!c17HeaderOwned && gameHeader}
+        {portraitReplayExitVisible && <View style={{ paddingHorizontal: 10, paddingBottom: 4, alignItems: 'flex-start' }}><ActionButton compact title="Exit Replay" disabled={replayExit?.pending} onPress={() => replayExit?.onExit()} /></View>}
         {workspaceStatusVisible && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
         {liveConnectionProblem && (
           <View style={styles.liveConnectionNotice}>
@@ -741,7 +781,7 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17, width > height && { paddingTop: 0 }] : undefined}>
-            <GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />
+            <GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} replayExit={width > height ? replayExit : undefined} />
           </View>
         </ScrollView>
         </SafeAreaView>
@@ -774,7 +814,7 @@ function AppContent() {
         <View style={styles.focusedRoomShell}>
           {serverStatusMessage !== null && <Notice>{serverStatusMessage}</Notice>}
           {pregameReady ? <View style={[styles.flex, isRoomConversationChild(roomChild) && { display: 'none' }]}>
-            <PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom}
+            <PregameScreen backRef={pregameBackRef} onBrowse={homeFromLive}
               onMessage={(name) => setRoomChild({ kind: 'conversation', username: name, origin: null })}
               presentationVisible={roomPresentationVisible && !isRoomConversationChild(roomChild)} />
           </View> : pregameConnectionStatus}
@@ -801,7 +841,7 @@ function AppContent() {
     content = <Panel><SectionHeading title="Reconnecting…" detail="Recovering the current room." /></Panel>;
   } else if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.room.kind === 'awaiting_game_bootstrap') {
     content = <GameBootstrapStatus room={roomState.room}
-      onRetry={() => { lobbyRuntime.retryGameBootstrap(); }} onBrowse={browseFromRoom} />;
+      onRetry={() => { lobbyRuntime.retryGameBootstrap(); }} onBrowse={homeFromLive} />;
   } else if (presentationFocus === 'room' && focusedRoomPresentation === null && roomState.rematchTransition !== null) {
     content = <Panel><SectionHeading title="Starting rematch…" detail="Waiting for the new authoritative room state." /></Panel>;
   } else if (probe === 'checking') {

@@ -6,13 +6,13 @@ const screen = readFileSync(resolve(__dirname, 'PregameScreen.tsx'), 'utf8').rep
 const app = readFileSync(resolve(__dirname, '../../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('focused Pregame surface', () => {
-  test('only root header offers Browse beside Table menu without changing local task state', () => {
+  test('only root header offers Home beside Table menu without changing local task state', () => {
     const header = screen.slice(screen.indexOf('<View style={styles.header}>'), screen.indexOf('</View>', screen.indexOf('<View style={styles.header}>')) + 7);
     expect(header).toContain("{surface === 'root' && <View style={styles.actionsRow}>");
-    expect(header).toContain('title="Browse" onPress={onBrowse}');
+    expect(header).toContain('title="Home" onPress={onBrowse}');
     expect(header).toContain('title="Table menu"');
-    expect(screen.match(/title="Browse"/g)).toHaveLength(1);
-    expect(app).toContain('onBrowse={browseFromRoom}');
+    expect(screen.match(/title="Home"/g)).toHaveLength(1);
+    expect(app).toContain('onBrowse={homeFromLive}');
     const browse = app.slice(app.indexOf('const browseFromRoom ='), app.indexOf('const exitOwnRewind ='));
     expect(browse).toContain("setPresentationFocus('browsing')");
     expect(browse).not.toContain('lobbyRuntime');
@@ -22,7 +22,7 @@ describe('focused Pregame surface', () => {
     const end = app.indexOf('\n  let content: ReactNode;', start);
     const host = app.slice(start, end);
     expect(host).toContain("<SafeAreaView edges={['top', 'right', 'bottom', 'left']}");
-    expect(host).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom}');
+    expect(host).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={homeFromLive}');
     expect(host).not.toContain('<ScrollView');
     expect(host).toContain('presentationVisible={roomPresentationVisible && !isRoomConversationChild(roomChild)}');
     expect(host).not.toContain('<BrowsingNavigation');
