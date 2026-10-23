@@ -1250,7 +1250,7 @@ function C17DenseWorkspace({
   );
   const temporalContext = (
       <View style={styles.grow}>
-        <Text numberOfLines={1} style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
+        <Text numberOfLines={1} style={[styles.eyebrow, !portraitV2 && { lineHeight: 12, includeFontPadding: false }, { color: theme.colors.accent }]}>{sharedReplay !== null
           ? `SHARED REVIEW T${selectedTurn}`
           : hypothetical !== null
             ? 'HYPOTHETICAL'
@@ -1258,7 +1258,7 @@ function C17DenseWorkspace({
           ? finishedStatus
           : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
 
-        {hGroupStatus.currentPlayerCue !== null && <Text numberOfLines={1} style={[styles.hGroupCue, { color: theme.colors.textMuted }]}>
+        {hGroupStatus.currentPlayerCue !== null && <Text numberOfLines={1} style={[styles.hGroupCue, !portraitV2 && { lineHeight: 12, includeFontPadding: false }, { color: theme.colors.textMuted }]}>
           {hGroupStatus.currentPlayerCue === 'locked' ? 'Locked · may not be able to discard' : 'Potential Double Discard'}
         </Text>}
       </View>
@@ -1341,6 +1341,7 @@ function C17DenseWorkspace({
   );
   const hypotheticalTaskControls = (
     selectedTarget !== null ? <ClueComposer
+            boundedLandscape={!portraitV2}
             dense
             choices={clueChoices}
             variantName={variantName}
@@ -1494,6 +1495,7 @@ function C17DenseWorkspace({
             </Text>
           </View>}
         </> : selectedTarget !== null ? <ClueComposer
+          boundedLandscape={!portraitV2}
           dense={!portraitV2 || usesDenseSideLabels}
           choices={clueChoices}
           variantName={variantName}
@@ -1558,7 +1560,7 @@ function C17DenseWorkspace({
       <View style={{ width: landscapeLayout.fits && metricsReady ? landscapeLayout.leftWidth : layoutMetrics.ambientBodyWidth, minHeight: 0 }}>
         <View testID="c17-landscape-header" onLayout={(event) => setLeftHeaderHeight(event.nativeEvent.layout.height)}>
           {landscapeHeader}
-          <View style={{ height: Math.ceil(30 * Math.max(1, fontScale)), paddingHorizontal: 7 }}>{temporalContext}</View>
+          <View style={{ height: Math.ceil(24 * Math.max(1, fontScale)), paddingHorizontal: 7 }}>{temporalContext}</View>
         </View>
         {!shellMeasured ? null : !landscapeLayout.fits || !metricsReady ? <View style={styles.landscapeFailure}>
           <Text accessibilityRole="alert" style={{ color: theme.colors.text }}>This landscape size cannot fit the Live workspace. Rotate the device or use a larger window.</Text>
@@ -1693,8 +1695,8 @@ const styles = StyleSheet.create({
   landscapeLastActionHeader: { flexWrap: 'nowrap' },
   landscapeLastActionSummary: { flex: 1, minHeight: 0 },
   landscapeActionButtons: { flexWrap: 'nowrap' },
-  landscapePrimaryControls: { paddingHorizontal: 4, paddingVertical: 3, gap: 2 },
-  landscapeWorkbenchContent: { paddingHorizontal: 4, paddingVertical: 4, gap: 3 },
+  landscapePrimaryControls: { paddingHorizontal: 4, paddingVertical: 2, gap: 2 },
+  landscapeWorkbenchContent: { paddingHorizontal: 4, paddingVertical: 2, gap: 3 },
   landscapeFailure: { flex: 1, justifyContent: 'center', padding: 12 },
   workspaceBody: { flex: 1, minHeight: 0 },
   ledgerChrome: { gap: 5 },

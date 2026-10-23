@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, AppState, Text, TextInput, View } from 'react-native';
+import { Alert, AppState, Dimensions, Text, TextInput, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
 
@@ -103,8 +103,11 @@ function deferred<T>() {
 test('landscape unread measurement preserves mounted hands, selection and attendance', async () => {
   const frameHook = require('react-native-safe-area-context').useSafeAreaFrame;
   const previousFrameImplementation = frameHook.getMockImplementation();
+  const previousWindow = Dimensions.get('window');
+  const previousScreen = Dimensions.get('screen');
   frameHook.mockReturnValue({ x: 0, y: 0, width: 960, height: 440 });
   try {
+    Dimensions.set({ window: { ...previousWindow, fontScale: 1 }, screen: { ...previousScreen, fontScale: 1 } });
     const socket = await mountLive();
     const measured = (testID: string, width: number, height: number) => {
       const node = tree.root.findAllByProps({ testID })
@@ -146,7 +149,12 @@ test('landscape unread measurement preserves mounted hands, selection and attend
   } finally {
     // This hook is already jest.fn in the native mock; restoreAllMocks does not
     // restore a replacement implementation on a pre-existing mock function.
+    // The safe-area mock's original implementation uses context hooks. Unmount
+    // before restoring it so no mounted provider changes its hook structure.
+    if (tree) act(() => tree.unmount());
+    tree = undefined;
     frameHook.mockImplementation(previousFrameImplementation);
+    Dimensions.set({ window: previousWindow, screen: previousScreen });
   }
 });
 
@@ -164,6 +172,61 @@ function pregame(socket: FakeSession['sockets'][number]) {
   })}`);
   socket.emitMessage('joined {"tableID":123}');
 }
+
+test('landscape Clue preview preserves card geometry and only explicit Give can send once', async () => {
+  const frameHook = require('react-native-safe-area-context').useSafeAreaFrame;
+  const previousFrameImplementation = frameHook.getMockImplementation();
+  const previousWindow = Dimensions.get('window');
+  const previousScreen = Dimensions.get('screen');
+  frameHook.mockReturnValue({ x: 0, y: 0, width: 960, height: 440 });
+  try {
+    Dimensions.set({ window: { ...previousWindow, fontScale: 1 }, screen: { ...previousScreen, fontScale: 1 } });
+    const socket = await mountLive();
+    const measured = (testID: string, width: number, height: number) => {
+      const node = tree.root.findAllByProps({ testID })
+        .find((candidate: { props: { onLayout?: unknown } }) => typeof candidate.props.onLayout === 'function');
+      expect(node).toBeDefined();
+      act(() => node.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+    };
+    measured('c17-landscape-body', 928, 400);
+    measured('c17-landscape-header', 72, 72);
+    measured('game-header-home', 48, 40);
+    measured('game-header-menu', 60, 40);
+    measured('game-header-chat-probe', 60, 40);
+    measured('c17-metric-probe-actual', 215, 29);
+    measured('c17-metric-probe-maximum', 270, 29);
+    const cards = tree.root.findAllByType(GameCard);
+    const heights = cards.map((node: { props: { height: number } }) => node.props.height);
+    expect(cards).toHaveLength(5);
+    const beforeActions = socket.sent.filter((frame) => frame.startsWith('action '));
+    const target = tree.root.findAllByProps({ accessibilityLabel: 'Player Bob' })
+      .find((node: { props: { onPress?: unknown } }) => typeof node.props.onPress === 'function');
+    expect(target).toBeDefined();
+    act(() => target.props.onPress());
+    const composer = tree.root.findByType(ClueComposer);
+    expect(composer.props.boundedLandscape).toBe(true);
+    act(() => composer.props.onPreview('rank', 1));
+    expect(composer.props.preview.touchedOrders.length).toBeGreaterThan(0);
+    expect(socket.sent.filter((frame) => frame.startsWith('action '))).toEqual(beforeActions);
+    expect(tree.root.findAllByType(GameCard)).toEqual(cards);
+    expect(tree.root.findAllByType(GameCard).map((node: { props: { height: number } }) => node.props.height)).toEqual(heights);
+    const give = tree.root.findAllByProps({ accessibilityLabel: 'Give clue' })
+      .find((node: { props: { onPress?: unknown } }) => typeof node.props.onPress === 'function');
+    expect(give).toBeDefined();
+    expect(give.props.disabled).toBe(false);
+    act(() => { give.props.onPress(); give.props.onPress(); });
+    expect(socket.sent.filter((frame) => frame.startsWith('action ')).slice(beforeActions.length))
+      .toEqual(['action {"tableID":123,"type":3,"target":1,"value":1}']);
+    expect(liveRoom().tableID).toBe(123);
+  } finally {
+    // The safe-area mock's original implementation uses context hooks. Unmount
+    // before restoring it so no mounted provider changes its hook structure.
+    if (tree) act(() => tree.unmount());
+    tree = undefined;
+    frameHook.mockImplementation(previousFrameImplementation);
+    Dimensions.set({ window: previousWindow, screen: previousScreen });
+  }
+});
 
 function welcomeLobby(socket: FakeSession['sockets'][number]) {
   socket.emitOpen();

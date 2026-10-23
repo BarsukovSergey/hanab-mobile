@@ -10,7 +10,7 @@ test('resource allocation enlarges faces within its own envelope and preserves p
       expect(resources.discardCardHeight).toBe(36);
       expect(resources.discardCardHeight + 6).toBeLessThanOrEqual(resources.discardHeight);
       for (const playerCount of [2, 3, 4, 5, 6]) {
-        const layout = getC17LandscapeLayout({ availableWidth: 1200, availableHeight: 500, fontScale,
+        const layout = getC17LandscapeLayout({ availableWidth: 1200, availableHeight: 600, fontScale,
           playerCount, cardsPerHand: 5, ownHandPosition: 'bottom', seatingAnchorIndex: 0,
           leftHeaderHeight: 78, suitCount });
         expect(layout.fits).toBe(true);

@@ -202,9 +202,9 @@ test('ClueComposer leaves touched and invalid clues to card highlighting and dis
   expect(composer).toContain('isCluePreviewConfirmable(preview, allowEmptyClues, variantName)');
 });
 
-test('dense ClueComposer keeps a two-row palette beside explicit Close and Give actions', () => {
+test('dense ClueComposer keeps two palette rows and explicit Close/Give with a bounded landscape footer', () => {
   const composer = readClueComposer();
-  const denseComposer = composer.slice(composer.indexOf('{dense ? <View style={styles.denseLayout}>'), composer.indexOf(': <>', composer.indexOf('{dense ? <View style={styles.denseLayout}>')));
+  const denseComposer = composer.slice(composer.indexOf('{dense ? <View style={[styles.denseLayout,'), composer.indexOf(': <>', composer.indexOf('{dense ? <View style={[styles.denseLayout,')));
 
   expect(composer).toContain('dense?: boolean;');
   expect(denseComposer).not.toContain('targetName}</Text>');
