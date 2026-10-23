@@ -149,8 +149,12 @@ test('landscape unread measurement preserves mounted hands, selection and attend
   } finally {
     // This hook is already jest.fn in the native mock; restoreAllMocks does not
     // restore a replacement implementation on a pre-existing mock function.
+    // The safe-area mock's original implementation uses context hooks. Unmount
+    // before restoring it so no mounted provider changes its hook structure.
+    if (tree) act(() => tree.unmount());
+    tree = undefined;
     frameHook.mockImplementation(previousFrameImplementation);
-    act(() => Dimensions.set({ window: previousWindow, screen: previousScreen }));
+    Dimensions.set({ window: previousWindow, screen: previousScreen });
   }
 });
 
@@ -215,8 +219,12 @@ test('landscape Clue preview preserves card geometry and only explicit Give can 
       .toEqual(['action {"tableID":123,"type":3,"target":1,"value":1}']);
     expect(liveRoom().tableID).toBe(123);
   } finally {
+    // The safe-area mock's original implementation uses context hooks. Unmount
+    // before restoring it so no mounted provider changes its hook structure.
+    if (tree) act(() => tree.unmount());
+    tree = undefined;
     frameHook.mockImplementation(previousFrameImplementation);
-    act(() => Dimensions.set({ window: previousWindow, screen: previousScreen }));
+    Dimensions.set({ window: previousWindow, screen: previousScreen });
   }
 });
 
