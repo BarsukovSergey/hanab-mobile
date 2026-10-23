@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, Dimensions, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { Path, Svg } from 'react-native-svg';
 
 import type { CardKnowledgeViewModel } from '../../game/selectors/cardKnowledge';
@@ -13,8 +13,6 @@ import { UpstreamCardFace } from './UpstreamCardFace';
 import { hasUpstreamSvgPip, UpstreamPip } from './UpstreamPip';
 import { WebCardMarker } from './WebCardMarker';
 
-const DOUBLE_TAP_WINDOW_MS = 500;
-
 type GameCardProps = {
   position: number;
   knowledge: CardKnowledgeViewModel;
@@ -26,7 +24,6 @@ type GameCardProps = {
   height?: number;
   statePresentation?: CardStatePresentation | null;
   onSelect: () => void;
-  onDoublePress?: () => void;
   onLongPress?: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
@@ -35,21 +32,46 @@ type GameCardProps = {
 
 type VisibleCardSize = 'hand' | 'table' | 'mini';
 
-function useImmediateDoubleTap(onPress?: () => void, onDoublePress?: () => void) {
-  const lastTapAt = useRef(0);
-  return () => {
-    const now = Date.now();
-    if (
-      onDoublePress !== undefined
-      && lastTapAt.current > 0
-      && now - lastTapAt.current <= DOUBLE_TAP_WINDOW_MS
-    ) {
-      lastTapAt.current = 0;
-      onDoublePress();
-      return;
-    }
-    lastTapAt.current = now;
-    onPress?.();
+// Card responders own their taps; a nested card must never activate its hand row.
+function useCardPress(onPress?: () => void, onLongPress?: () => void, onPressIn?: () => void, onPressOut?: () => void) {
+  const consumed = useRef(false);
+  const holding = useRef(false);
+  const release = useRef(onPressOut);
+  release.current = onPressOut;
+  useEffect(() => {
+    const interrupt = () => {
+      consumed.current = true;
+      if (holding.current) { holding.current = false; release.current?.(); }
+    };
+    const app = AppState.addEventListener('change', state => { if (state !== 'active') interrupt(); });
+    const dimensions = Dimensions.addEventListener('change', interrupt);
+    return () => { interrupt(); app.remove(); dimensions.remove(); };
+  }, []);
+  return {
+    delayLongPress: onLongPress === undefined ? undefined : 350,
+    onPressIn: (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      consumed.current = false;
+      onPressIn?.();
+    },
+    onLongPress: onLongPress === undefined ? undefined : (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      if (consumed.current) return;
+      consumed.current = true;
+      holding.current = true;
+      onLongPress();
+    },
+    onPress: (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      if (!consumed.current) onPress?.();
+    },
+    onPressOut: (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      holding.current = false;
+      onPressOut?.();
+    },
+    onTouchCancel: () => { consumed.current = true; holding.current = false; onPressOut?.(); },
+    onBlur: () => { consumed.current = true; holding.current = false; onPressOut?.(); },
   };
 }
 
@@ -64,15 +86,13 @@ export function GameCard({
   height,
   statePresentation = null,
   onSelect,
-  onDoublePress,
   onLongPress,
   onPressIn,
   onPressOut,
   variantName,
 }: GameCardProps) {
   const { theme } = useHanabTheme();
-  const longPressed = useRef(false);
-  const handlePress = useImmediateDoubleTap(onSelect, onDoublePress);
+  const press = useCardPress(onSelect, onLongPress, onPressIn, onPressOut);
   const compactIndicator = height !== undefined && height < 80;
   const renderedCardHeight = height ?? 88 / (286 / 406);
   const geometry = getCardGeometry(renderedCardHeight);
@@ -81,23 +101,7 @@ export function GameCard({
     accessibilityLabel={`Card ${position + 1}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
     accessibilityState={{ selected }}
-    delayLongPress={onLongPress === undefined ? undefined : 350}
-    onLongPress={onLongPress === undefined ? undefined : () => {
-      longPressed.current = true;
-      onLongPress();
-    }}
-    onPress={() => {
-      if (longPressed.current) {
-        longPressed.current = false;
-        return;
-      }
-      handlePress();
-    }}
-    onPressIn={() => {
-      longPressed.current = false;
-      onPressIn?.();
-    }}
-    onPressOut={onPressOut}
+    {...press}
     style={({ pressed }) => [
       styles.cardTouch,
       height === undefined ? null : styles.sizedCardTouch,
@@ -126,7 +130,8 @@ export function GameCard({
         />
         {hasNote && <NoteIndicator compact={compactIndicator} />}
       </View>
-      {(previewMarker ?? clueMarker) !== null && <CluePointerMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
+      {(previewMarker ?? clueMarker) !== null && <CluePointerMarker preview={previewMarker !== null} height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
+      {previewMarker !== null && <View pointerEvents="none" testID="clue-preview-highlight" style={[styles.previewHighlight, { borderRadius: geometry.radius }]} />}
       {selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}
     </View>
   </Pressable>;
@@ -147,7 +152,6 @@ export function VisibleHanabiCard({
   statePresentation = null,
   faded = false,
   onPress,
-  onDoublePress,
   onLongPress,
   onPressIn,
   onPressOut,
@@ -168,7 +172,6 @@ export function VisibleHanabiCard({
   statePresentation?: CardStatePresentation | null;
   faded?: boolean;
   onPress?: () => void;
-  onDoublePress?: () => void;
   onLongPress?: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
@@ -176,8 +179,7 @@ export function VisibleHanabiCard({
   height?: number;
 }) {
   const { theme } = useHanabTheme();
-  const longPressed = useRef(false);
-  const handlePress = useImmediateDoubleTap(onPress, onDoublePress);
+  const press = useCardPress(onPress, onLongPress, onPressIn, onPressOut);
   const empathyActive = empathyKnowledge !== null;
   const faceSuitIndex = empathyActive ? empathyKnowledge.displaySuitIndex : suitIndex;
   const faceRank = empathyActive ? empathyKnowledge.displayRank : rank;
@@ -210,11 +212,11 @@ export function VisibleHanabiCard({
       presentation={statePresentation}
     />
     {hasNote && <NoteIndicator compact={compactIndicator} />}
-  </View>{(previewMarker ?? clueMarker) !== null && <CluePointerMarker height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}{selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}</View>;
+  </View>{(previewMarker ?? clueMarker) !== null && <CluePointerMarker preview={previewMarker !== null} height={renderedCardHeight} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}{previewMarker !== null && <View pointerEvents="none" testID="clue-preview-highlight" style={[styles.previewHighlight, { borderRadius: geometry.radius }]} />}
+      {selected && <View pointerEvents="none" style={[styles.selectionHalo, { borderRadius: geometry.radius, borderColor: theme.colors.accent }]} />}</View>;
 
   if (
     onPress === undefined
-    && onDoublePress === undefined
     && onLongPress === undefined
     && onPressIn === undefined
     && onPressOut === undefined
@@ -223,23 +225,7 @@ export function VisibleHanabiCard({
     accessibilityLabel={`${position === undefined ? '' : `Card ${position + 1}, `}${suit?.name ?? 'Unknown'} ${faceRank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
     accessibilityState={{ selected }}
-    delayLongPress={onLongPress === undefined ? undefined : 350}
-    onLongPress={onLongPress === undefined ? undefined : () => {
-      longPressed.current = true;
-      onLongPress();
-    }}
-    onPress={() => {
-      if (longPressed.current) {
-        longPressed.current = false;
-        return;
-      }
-      handlePress();
-    }}
-    onPressIn={() => {
-      longPressed.current = false;
-      onPressIn?.();
-    }}
-    onPressOut={onPressOut}
+    {...press}
     style={({ pressed }) => pressed && styles.pressed}
   >{content}</Pressable>;
 }
@@ -256,7 +242,6 @@ export function CompactHandCardSummary({
   clueMarker = null,
   previewMarker = null,
   onPress,
-  onDoublePress,
   onLongPress,
   onPressIn,
   onPressOut,
@@ -273,15 +258,13 @@ export function CompactHandCardSummary({
   clueMarker?: ClueCardMarker | null;
   previewMarker?: ClueCardMarker | null;
   onPress?: () => void;
-  onDoublePress?: () => void;
   onLongPress?: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
   height?: number;
 }) {
   const { theme } = useHanabTheme();
-  const longPressed = useRef(false);
-  const handlePress = useImmediateDoubleTap(onPress, onDoublePress);
+  const press = useCardPress(onPress, onLongPress, onPressIn, onPressOut);
   const empathyActive = empathyKnowledge !== null;
   const faceSuitIndex = empathyActive ? empathyKnowledge.displaySuitIndex : suitIndex;
   const faceRank = empathyActive ? empathyKnowledge.displayRank : rank;
@@ -298,23 +281,7 @@ export function CompactHandCardSummary({
   return <Pressable
     accessibilityLabel={`${position === undefined ? 'Card' : `Card ${position + 1}`}, ${suit?.name ?? 'Unknown'} ${faceRank ?? 'unknown'}${hasNote ? ', has note' : ''}`}
     accessibilityRole="button"
-    delayLongPress={onLongPress === undefined ? undefined : 350}
-    onLongPress={onLongPress === undefined ? undefined : () => {
-      longPressed.current = true;
-      onLongPress();
-    }}
-    onPress={() => {
-      if (longPressed.current) {
-        longPressed.current = false;
-        return;
-      }
-      handlePress();
-    }}
-    onPressIn={() => {
-      longPressed.current = false;
-      onPressIn?.();
-    }}
-    onPressOut={onPressOut}
+    {...press}
     style={({ pressed }) => [styles.compactSummaryTouch, pressed && styles.pressed]}
   >
     <View style={[
@@ -336,7 +303,7 @@ export function CompactHandCardSummary({
       {primaryMarker !== null && <View pointerEvents="none" style={styles.compactPrimaryMarker}><WebCardMarker kind={primaryMarker} /></View>}
       {annotationMarker !== null && <View pointerEvents="none" style={styles.compactAnnotationMarker}><WebCardMarker kind={annotationMarker} /></View>}
       {hasNote && <View pointerEvents="none" style={styles.compactNoteMarker}><WebCardMarker kind="note" /></View>}
-      {(previewMarker ?? clueMarker) !== null && <CluePointerMarker height={height} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
+      {(previewMarker ?? clueMarker) !== null && <CluePointerMarker preview={previewMarker !== null} height={height} marker={(previewMarker ?? clueMarker)!} variantName={variantName} />}
     </View>
   </Pressable>;
 }
@@ -408,10 +375,10 @@ function HiddenKnowledgeOverlay({ knowledge, variantName, height }: { knowledge:
   </View>;
 }
 
-function CluePointerMarker({ height, marker, variantName }: { height?: number; marker: ClueCardMarker; variantName: string }) {
+function CluePointerMarker({ height, marker, variantName, preview = false }: { height?: number; marker: ClueCardMarker; variantName: string; preview?: boolean }) {
   const arrowColor = marker.retouched ? '#737373' : '#ffffff';
   const cardHeight = height ?? 112;
-  const circleDiameter = clamp(Math.round(cardHeight * 0.12), 8, 11);
+  const circleDiameter = preview ? clamp(Math.round(cardHeight * 0.28), 22, 30) : clamp(Math.round(cardHeight * 0.12), 8, 11);
   const arrowTail = clamp(Math.round(cardHeight * 0.07), 4, 7);
   const pointerHeight = circleDiameter + arrowTail;
   const headBaseY = circleDiameter - 1;
@@ -421,7 +388,7 @@ function CluePointerMarker({ height, marker, variantName }: { height?: number; m
     ? getClueColorFill(variantName, marker.value) ?? '#ffffff'
     : '#111111';
   const center = circleDiameter / 2;
-  return <View pointerEvents="none" style={[styles.clueMarker, { height: pointerHeight, marginLeft: -center, width: circleDiameter }]}>
+  return <View pointerEvents="none" accessibilityLabel={preview ? `Clue preview ${marker.label}` : undefined} style={[styles.clueMarker, preview && styles.previewMarker, { height: pointerHeight, marginLeft: -center, width: circleDiameter }]}>
     <Svg height={pointerHeight} style={styles.clueArrow} viewBox={`0 0 ${circleDiameter} ${pointerHeight}`} width={circleDiameter}>
       <Path d={`M ${center - 3} 1 H ${center + 3} V ${headBaseY} L ${center} ${tipY} L ${center - 3} ${headBaseY} Z`} fill="#111111" />
       <Path d={`M ${center - 1.5} 2 H ${center + 1.5} V ${headBaseY + 1} L ${center} ${tipY - 2} L ${center - 1.5} ${headBaseY + 1} Z`} fill={arrowColor} />
@@ -430,8 +397,9 @@ function CluePointerMarker({ height, marker, variantName }: { height?: number; m
       styles.clueCircle,
       { backgroundColor: clueFill, borderRadius: circleDiameter / 2, height: circleDiameter, width: circleDiameter }, styles.clueBadge,
       marker.kind === 'rank' && styles.rankClueCircle,
+      preview && styles.previewBadge,
     ]}>
-      {marker.kind === 'rank' && <Text numberOfLines={1} style={[styles.rankClueText, { fontSize: rankFontSize, lineHeight: rankFontSize }]}>{marker.label}</Text>}
+      {(marker.kind === 'rank' || preview) && <Text numberOfLines={1} style={[styles.rankClueText, { fontSize: rankFontSize, lineHeight: rankFontSize }, preview && { maxWidth: circleDiameter, color: '#ffffff', textShadowColor: '#000000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }]}>{marker.kind === 'rank' ? marker.label : '?'}</Text>}
     </View>
   </View>;
 }
@@ -563,6 +531,9 @@ const styles = StyleSheet.create({
   compactPrimaryMarker: { bottom: 1, height: 8, left: 1, position: 'absolute', width: 8, zIndex: 10 },
   compactAnnotationMarker: { bottom: 1, height: 8, position: 'absolute', right: 1, width: 8, zIndex: 10 },
   compactNoteMarker: { height: 8, position: 'absolute', right: 1, top: 1, width: 8, zIndex: 10 },
+  previewHighlight: { position: 'absolute', top: 1, bottom: 1, left: 1, right: 1, borderWidth: 3, borderStyle: 'dashed', borderColor: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.16)', zIndex: 4 },
+  previewMarker: { top: 2 },
+  previewBadge: { borderWidth: 2, borderColor: '#111111' },
   clueMarker: { alignItems: 'center', left: '50%', position: 'absolute', top: -3, zIndex: 9 },
   clueArrow: { left: 0, position: 'absolute', top: 0 },
   clueBadge: { position: 'absolute', top: 0 },

@@ -276,6 +276,8 @@ export function C17GameScreen({ replayExit, noteBackRef, presentationVisible = t
     if (!presentationVisible || noteEditorOpen) return;
     interactionDispatch({ type: 'disarm-gameplay' });
     inspectNote(order);
+    if (hypotheticalActive || sessionPhase !== 'ready' || clientState.finished
+      || liveRoom.sharedReplay || clientState.notes.ourNotes[order] === undefined) return;
     setNoteEditorOpen(true);
   };
   const persistNote = (value: string) => currentGameLoad && presentationVisible && notesEditable
@@ -1091,7 +1093,7 @@ function C17DenseWorkspace({
               hasNote={hasAvailableNote(order)}
               height={layout.opponentCardHeight}
               knowledge={actionKnowledge}
-              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
+              onLongPress={() => takeWorkbenchTask(() => onEditNote(order))}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
               position={position}
@@ -1125,9 +1127,8 @@ function C17DenseWorkspace({
             clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata),
             previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)
               ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null,
-            onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order)),
             onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index),
-            onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order)),
+            onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onEditNote(order)),
             onPressOut: globalEmpathy ? undefined : () => onHoldEmpathy(null),
             position,
             rank: hypothetical === null ? card.rank : normalKnowledge.displayRank,
@@ -1150,8 +1151,9 @@ function C17DenseWorkspace({
       accessibilityRole="button"
       delayLongPress={350}
       disabled={globalEmpathy}
-      onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}
-      onPress={() => { if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
+      onPressIn={() => { longPressedOpponent.current = null; }}
+      onLongPress={() => { longPressedOpponent.current = seatingAnchorIndex; onHoldEmpathy(seatingAnchorIndex); }}
+      onPress={() => { if (longPressedOpponent.current === seatingAnchorIndex) { longPressedOpponent.current = null; return; } if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
       onPressOut={() => onHoldEmpathy(null)}
       style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, !portraitV2 && styles.landscapeHandCell, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: current === seatingAnchorIndex ? theme.colors.accent : theme.colors.border }]}
     >
@@ -1213,7 +1215,7 @@ function C17DenseWorkspace({
               hasNote={hasAvailableNote(order)}
               height={layout.ownCardHeight}
               onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
-              onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order))}
+              onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onEditNote(order))}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               position={position}
               previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
@@ -1233,8 +1235,7 @@ function C17DenseWorkspace({
             previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
               ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
             cardTopHeadroom={layout.cardTopHeadroom}
-            onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order))}
-            onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
+            onLongPress={() => takeWorkbenchTask(() => onEditNote(order))}
             onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
             onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
             position={position}
