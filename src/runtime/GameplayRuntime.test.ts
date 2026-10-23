@@ -423,7 +423,7 @@ describe('C7 authoritative gameplay runtime', () => {
     ]);
   });
 
-  test.each(['warning', 'error'] as const)('%s delegates current gameplay pending cleanup', async (command) => {
+  test.each(['warning', 'error'] as const)('%s recovers uncertain gameplay before releasing pending', async (command) => {
     const { runtime, socket, store } = await makeLive();
     const before = store.getState().room.room;
     expect(runtime.play(0)).toBe(true);
@@ -431,7 +431,9 @@ describe('C7 authoritative gameplay runtime', () => {
     expect(store.getState().room.pendingGameplayAction).toBeNull();
     expect(store.getState().room.room).toBe(before);
     expect(store.getState().lobby.notice).toEqual({ kind: command, message: 'Action rejected' });
-    expect(runtime.play(1)).toBe(true);
+    expect(store.getState().session.phase).toBe('failed');
+    expect(socket.readyState).toBe(3);
+    expect(runtime.play(1)).toBe(false);
   });
 
   test('review mode cannot emit gameplay and returning live restores command eligibility', async () => {
@@ -535,7 +537,7 @@ describe('C7 authoritative gameplay runtime', () => {
   });
 
   test.each(['warning', 'error'] as const)(
-    'current server %s clears pending without changing GameState',
+    'current server %s clears uncertain pending under failed connection ownership',
     async (command) => {
       const { runtime, socket, store } = await makeLive();
       const before = store.getState().room.room;
@@ -547,6 +549,8 @@ describe('C7 authoritative gameplay runtime', () => {
       expect(after.clientState).toBe(before.clientState);
       expect(after.liveActionCount).toBe(before.liveActionCount);
       expect(store.getState().room.pendingGameplayAction).toBeNull();
+      expect(store.getState().session.phase).toBe('failed');
+      expect(runtime.play(1)).toBe(false);
     },
   );
 

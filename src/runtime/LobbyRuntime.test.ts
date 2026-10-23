@@ -210,7 +210,7 @@ function historicalGame(id: number, optionChanges: Record<string, unknown> = {})
   };
 }
 
-async function makeReadyRuntime() {
+async function makeReadyRuntime(totalGames = 0) {
   const session = new FakeSession();
   const socket = new FakeSocket();
   session.sockets.push(Promise.resolve(socket));
@@ -218,7 +218,7 @@ async function makeReadyRuntime() {
   const runtime = new LobbyRuntime(session, store);
   await runtime.connect();
   socket.emitOpen();
-  socket.emitMessage(welcomeFrame);
+  socket.emitMessage(welcomeFrame.replace('"totalGames":0', `"totalGames":${totalGames}`));
   return { session, socket, store, runtime };
 }
 
@@ -639,8 +639,8 @@ function addJoinableTable(store: ReturnType<typeof createAppStore>, epoch = 1): 
   store.dispatch(lobbyActions.tableReceived({ epoch, table: joinableTable }));
 }
 
-async function makeLiveRuntime(role: 'player' | 'spectator') {
-  const ready = await makeReadyRuntime();
+async function makeLiveRuntime(role: 'player' | 'spectator', totalGames = 0, timed = false) {
+  const ready = await makeReadyRuntime(totalGames);
   if (role === 'player') {
     addJoinableTable(ready.store);
     ready.runtime.join(123);
@@ -653,6 +653,7 @@ async function makeLiveRuntime(role: 'player' | 'spectator') {
   ready.socket.emitMessage('tableStart {"tableID":123,"replay":false}');
   ready.socket.emitMessage(`init ${JSON.stringify(makeInit({
     spectating: role === 'spectator',
+    ...(timed ? { options: { ...makeInit().options, timed: true, timeBase: 120, timePerTurn: 20 } } : {}),
   }))}`);
   ready.socket.emitMessage(`gameActionList ${JSON.stringify({
     tableID: 123,
@@ -742,6 +743,163 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+});
+
+describe('uncorrelated gameplay responses (#222)', () => {
+  function emitRecoveredGame(socket: FakeSocket, actionProcessed = false, timed = false): void {
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      ...(timed ? { options: { ...makeInit().options, timed: true, timeBase: 120, timePerTurn: 20 } } : {}),
+    }))}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify({
+      tableID: 123,
+      list: [
+        ...Array.from({ length: 5 }, (_, order) => ({
+          type: 'draw', playerIndex: 0, order, suitIndex: -1, rank: -1,
+        })),
+        ...Array.from({ length: 5 }, (_, index) => ({
+          type: 'draw', playerIndex: 1, order: index + 5, suitIndex: index, rank: index + 1,
+        })),
+        { type: 'turn', num: 0, currentPlayerIndex: 0 },
+        ...(actionProcessed ? [{
+          type: 'clue', clue: { type: 1, value: 1 }, giver: 0,
+          list: [5], target: 1, turn: 0,
+        }] : []),
+        { type: 'status', clues: actionProcessed ? 7 : 8, score: 0, maxScore: 25 },
+        ...(actionProcessed ? [{ type: 'turn', num: 1, currentPlayerIndex: 1 }] : []),
+      ],
+    })}`);
+  }
+
+  test.each(['warning', 'error'] as const)(
+    'an uncorrelated %s with earlier history pending cannot release a gameplay send',
+    async (command) => {
+      const { runtime, socket, store } = await makeLiveRuntime('player', 20);
+      socket.emitMessage(`gameHistory ${JSON.stringify(
+        Array.from({ length: 10 }, (_, index) => historicalGame(index + 1)),
+      )}`);
+      expect(runtime.loadMoreHistory()).toBe(true);
+      expect(socket.sent.at(-1)).toBe('historyGet {"offset":10,"amount":10}');
+      expect(runtime.play(0)).toBe(true);
+      const sent = [...socket.sent];
+      const subscriberResults: boolean[] = [];
+      const observedPhases: string[] = [];
+      const unsubscribe = store.subscribe(() => {
+        // Check every observable dispatch, including the first frame diagnostic.
+        observedPhases.push(store.getState().session.phase);
+        subscriberResults.push(runtime.play(1), runtime.discard(1),
+          runtime.colorClue(1, 0), runtime.rankClue(1, 1));
+      });
+      // A history DB error can arrive after local action submission but before
+      // its turn result. An admin warning is independently uncorrelated too.
+      socket.emitMessage(`${command} ${JSON.stringify({ [command]: 'Request failed' })}`);
+      unsubscribe();
+      expect(runtime.play(1)).toBe(false);
+      expect(subscriberResults.length).toBeGreaterThan(0);
+      expect(observedPhases[0]).toBe('failed');
+      expect(subscriberResults.every((sentAction) => !sentAction)).toBe(true);
+      expect(socket.sent).toEqual(sent);
+      expect(socket.readyState).toBe(3);
+      expect(store.getState().session.phase).toBe('failed');
+      expect(store.getState().room.pendingGameplayAction).toBeNull();
+      expect(store.getState().history.pendingRequest).toBeNull();
+      expect(store.getState().lobby.notice).toEqual({ kind: command, message: 'Request failed' });
+    },
+  );
+
+  test.each([false, true])(
+    'fresh history resolves uncertain gameplay (server processed: %s) without replay',
+    async (actionProcessed) => {
+      const timed = !actionProcessed;
+      const { runtime, socket, store, session } = await makeLiveRuntime('player', 0, timed);
+      expect(runtime.rankClue(1, 1)).toBe(true);
+      const staleListeners = socket.snapshotMessageListeners();
+      const next = new FakeSocket();
+      session.sockets.push(Promise.resolve(next));
+      // Another player can pause a timed game after local submission but before
+      // the server processes our action, causing a genuine paused-game rejection.
+      if (!actionProcessed) socket.emitMessage('pause {"tableID":123,"active":true,"playerIndex":1}');
+      // The processed case models an independent admin notice before the action
+      // result was observed; it does not imply that the server rejected the clue.
+      socket.emitMessage(actionProcessed
+        ? 'warning {"warning":"Server notice"}'
+        : 'warning {"warning":"You cannot perform a game action when the game is paused."}');
+      expect(store.getState().session.phase).toBe('failed');
+      expect(runtime.play(1)).toBe(false);
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+      next.emitOpen();
+      next.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}');
+      // The other player resumed during reconnect; unchanged turn permits an
+      // explicit retry only in the genuinely rejected case.
+      emitRecoveredGame(next, actionProcessed, timed);
+      const room = store.getState().room.room;
+      if (room.kind !== 'live_game') throw new Error('Expected recovered Live');
+      expect(room.clientState.ongoingGame.turn.currentPlayerIndex).toBe(actionProcessed ? 1 : 0);
+      expect(next.sent).toEqual([
+        'tableReattend {"tableID":123}', 'getGameInfo1 {"tableID":123}',
+        'getGameInfo2 {"tableID":123}', 'loaded {"tableID":123}',
+      ]);
+      next.emitMessage('warning {"warning":"An unrelated notice"}');
+      expect(store.getState().session.phase).toBe('ready');
+      expect(session.openCalls).toBe(2);
+      expect(runtime.rankClue(1, 1)).toBe(!actionProcessed);
+      const pending = store.getState().room.pendingGameplayAction;
+      const sent = [...next.sent];
+      for (const command of ['warning', 'error']) {
+        for (const listener of staleListeners) {
+          listener({ data: `${command} ${JSON.stringify({ [command]: 'Old response' })}` } as WebSocketMessageEvent);
+        }
+      }
+      expect(store.getState().room.pendingGameplayAction).toBe(pending);
+      expect(store.getState().session.phase).toBe('ready');
+      expect(next.sent).toEqual(sent);
+      expect(next.closeCalls).toHaveLength(0);
+    },
+  );
+
+  test.each(['warning', 'error'] as const)(
+    'an accepted turn before a later %s preserves the READY connection',
+    async (command) => {
+      const { runtime, socket, store, session } = await makeLiveRuntime('player');
+      expect(runtime.rankClue(1, 1)).toBe(true);
+      socket.emitMessage('gameAction {"tableID":123,"action":{"type":"clue","clue":{"type":1,"value":1},"giver":0,"list":[5],"target":1,"turn":0}}');
+      socket.emitMessage('gameAction {"tableID":123,"action":{"type":"turn","num":1,"currentPlayerIndex":1}}');
+      expect(store.getState().room.pendingGameplayAction).toBeNull();
+      socket.emitMessage(`${command} ${JSON.stringify({ [command]: 'Later request failed' })}`);
+      expect(store.getState().session.phase).toBe('ready');
+      expect(socket.closeCalls).toHaveLength(0);
+      expect(session.openCalls).toBe(1);
+      expect(store.getState().lobby.notice).toEqual({ kind: command, message: 'Later request failed' });
+    },
+  );
+
+  test('a warning recovers an uncertain live action even while browsing Rewind', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    expect(runtime.play(0)).toBe(true);
+    const room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected Live');
+    store.dispatch(roomActions.reviewSegmentSelected({
+      tableID: room.tableID, gameLoadEpoch: room.gameLoadEpoch, segment: 0,
+    }));
+    socket.emitMessage('warning {"warning":"Request failed"}');
+    expect(store.getState().session.phase).toBe('failed');
+    expect(store.getState().room.pendingGameplayAction).toBeNull();
+    expect(socket.readyState).toBe(3);
+  });
+
+  test('partial action progress before its turn still requires authoritative recovery', async () => {
+    const { runtime, socket, store } = await makeLiveRuntime('player');
+    expect(runtime.rankClue(1, 1)).toBe(true);
+    socket.emitMessage('gameAction {"tableID":123,"action":{"type":"clue","clue":{"type":1,"value":1},"giver":0,"list":[5],"target":1,"turn":0}}');
+    expect(store.getState().room.pendingGameplayAction).not.toBeNull();
+    const sent = [...socket.sent];
+    // Admin warnings are emitted independently of the table-locked action batch.
+    socket.emitMessage('warning {"warning":"Server notice"}');
+    expect(store.getState().session.phase).toBe('failed');
+    expect(runtime.rankClue(1, 1)).toBe(false);
+    expect(socket.sent).toEqual(sent);
+  });
 });
 
 describe('current-game reducer failure investigation (#220)', () => {
