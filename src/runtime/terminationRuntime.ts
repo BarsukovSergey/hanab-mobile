@@ -26,6 +26,28 @@ export class TerminationRuntime {
     );
   }
 
+  /** Capture the prompt's owner; a delayed native callback must never retarget. */
+  createTerminationConfirmation(): (() => boolean) | null {
+    const tableID = this.currentTerminationTableID();
+    if (tableID === null) return null;
+    const state = this.store.getState();
+    const room = state.room.room;
+    if (room.kind !== 'live_game') return null;
+    const connectionEpoch = state.session.connectionEpoch;
+    const gameLoadEpoch = room.gameLoadEpoch;
+    return () => {
+      const current = this.store.getState();
+      const currentRoom = current.room.room;
+      if (
+        current.session.connectionEpoch !== connectionEpoch
+        || currentRoom.kind !== 'live_game'
+        || currentRoom.tableID !== tableID
+        || currentRoom.gameLoadEpoch !== gameLoadEpoch
+      ) return false;
+      return this.terminateGame();
+    };
+  }
+
   private currentTerminationTableID(): number | null {
     const state = this.store.getState();
     const room = state.room.room;
