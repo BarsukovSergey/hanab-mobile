@@ -43,6 +43,8 @@ import { C17RewindScrubber } from './C17RewindScrubber';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
 import { getPaceRiskColor, PaceDetailsModal } from './PaceDetailsModal';
 import { ClueComposer } from './ClueComposer';
+import { SideClueEntry } from './SideClueEntry';
+import { sideClueFits } from './sideClueLayout';
 import { CompactTable, TableScore } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
@@ -906,8 +908,6 @@ function C17DenseWorkspace({
   const shellMeasured = layoutMetrics.shellKey === shellKey
     && layoutMetrics.ambientBodyHeight > 0
     && layoutMetrics.ambientBodyWidth > 0;
-  const portraitSizeTooSmall = shellMeasured && portraitV2
-    && getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0;
   const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
   const cardLaneWidth = getC17CardLaneWidth(
     layoutMetrics.ambientBodyWidth,
@@ -950,6 +950,15 @@ function C17DenseWorkspace({
     mode: 'full-ledger', opponentCardHeight: 0, ownCardHeight: 0, cardTopHeadroom: 0,
     opponentRowHeight: 0, ownRowHeight: 0, handsHeight: 0, workbenchHeight: 0,
   };
+  const usesSideClue = sideClueFits({ portrait: portraitV2, playerCount: metadata.playerNames.length,
+    rowHeight: layout.opponentRowHeight, fontScale,
+    leftWidth: landscapeLayout.fits ? landscapeLayout.leftWidth : 0,
+    cardCellWidth: landscapeLayout.fits ? landscapeLayout.cellWidth : 0 });
+  const portraitSizeTooSmall = shellMeasured && portraitV2
+    && (getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0 || !usesSideClue);
+  const sideHandRows = usesSideLabelRows || usesSideClue;
+  // Paired landscape remains the independent #262 slice. Constrained 2?3P preserves its safe layout.
+  const legacyClueEntry = !portraitV2 && !usesSideClue;
   const OpponentViewport = portraitV2 && layout.opponentsScrollable ? ScrollView : View;
   const captureAmbientBody = ({ nativeEvent: { layout: next } }: LayoutChangeEvent) => {
     setLayoutMetrics((currentMetrics) => {
@@ -1017,6 +1026,11 @@ function C17DenseWorkspace({
     || selectedTarget !== null || selectedActionCard !== null || noteCard !== null || pendingText !== null;
   const showRewindScrubber = reviewActive;
   // Private hand renderers share card identity, knowledge, notes, gestures and pulses.
+  const renderHandLabel = (index: number, isActionHand: boolean, rowHeight: number, label: ReactNode) => usesSideClue && !isActionHand
+    ? <SideClueEntry key={`${fontScale}:${rowHeight}`} playerName={metadata.playerNames[index] ?? `Player ${index + 1}`} fontScale={fontScale}
+      availableHeight={rowHeight - 6} disabled={!canEnterClue}
+      onPress={() => takeWorkbenchTask(() => onSelectClueTarget(index))}>{label}</SideClueEntry>
+    : label;
   const renderOpponentHand = (index: number) => {
     const currentActor = current === index;
     const isActionHand = actionHandIndex === index;
@@ -1025,7 +1039,8 @@ function C17DenseWorkspace({
     const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
     return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={sourcePulse(index) ?? (!portraitV2 && current === index ? actorPulse : null)}><Pressable
       accessibilityLabel={`Player ${playerName}`}
-      accessibilityRole="button"
+      accessible={legacyClueEntry}
+      accessibilityRole={legacyClueEntry ? 'button' : undefined}
       delayLongPress={350}
       onPressIn={() => { longPressedOpponent.current = null; }}
       onLongPress={globalEmpathy ? undefined : () => {
@@ -1037,12 +1052,12 @@ function C17DenseWorkspace({
           longPressedOpponent.current = null;
           return;
         }
-        if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));
+        if (legacyClueEntry && canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));
       }}
       onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
       style={[
         styles.opponentRow,
-        usesSideLabelRows && styles.sideLabelRow,
+        sideHandRows && styles.sideLabelRow,
         { height: layout.opponentRowHeight },
         !portraitV2 && styles.landscapeHandCell,
         currentActor && (usesSideLabelRows
@@ -1051,8 +1066,9 @@ function C17DenseWorkspace({
         target && { borderColor: theme.colors.accent },
       ]}
     >
-      <View style={usesSideLabelRows ? styles.sideLabelLane : styles.opponentMeta}>
-        <View style={[styles.namePeekArea, usesSideLabelRows && styles.sideLabelPeekArea]}>
+      <View style={sideHandRows ? styles.sideLabelLane : styles.opponentMeta}>
+        {renderHandLabel(index, isActionHand, layout.opponentRowHeight, (
+          <View style={[styles.namePeekArea, usesSideClue && { height: Math.ceil(14 * Math.max(1, fontScale)) }, sideHandRows && styles.sideLabelPeekArea]}>
           {usesSideLabelRows && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
           <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
             {playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}
@@ -1064,8 +1080,9 @@ function C17DenseWorkspace({
             playerIndex={index}
           />}
         </View>
+        ))}
       </View>
-      <View style={[styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
+      <View style={[styles.opponentCards, sideHandRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
         {getDisplayedHandOrders(game.hands[index], reverseHands).map((order, position) => {
           const card = game.deck[order];
           if (card === undefined) return null;
@@ -1148,25 +1165,30 @@ function C17DenseWorkspace({
   const renderAnchoredHand = () => (
     <AuthoritativePulse enabled={livePulseEnabled} key={seatingAnchorIndex} pulseKey={sourcePulse(seatingAnchorIndex) ?? (!portraitV2 && current === seatingAnchorIndex ? actorPulse : null)}><Pressable
       accessibilityLabel={`Player ${metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}`}`}
-      accessibilityRole="button"
+      accessible={legacyClueEntry}
+      accessibilityRole={legacyClueEntry ? 'button' : undefined}
       delayLongPress={350}
       disabled={globalEmpathy}
       onPressIn={() => { longPressedOpponent.current = null; }}
       onLongPress={() => { longPressedOpponent.current = seatingAnchorIndex; onHoldEmpathy(seatingAnchorIndex); }}
-      onPress={() => { if (longPressedOpponent.current === seatingAnchorIndex) { longPressedOpponent.current = null; return; } if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
+      onPress={() => { if (longPressedOpponent.current === seatingAnchorIndex) { longPressedOpponent.current = null; return; } if (legacyClueEntry && canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
       onPressOut={() => onHoldEmpathy(null)}
-      style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, !portraitV2 && styles.landscapeHandCell, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: current === seatingAnchorIndex ? theme.colors.accent : theme.colors.border }]}
+      style={[styles.ownHand, sideHandRows && styles.sideLabelRow, !portraitV2 && styles.landscapeHandCell, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: current === seatingAnchorIndex ? theme.colors.accent : theme.colors.border }]}
     >
-      <View style={[styles.ownTitleLane, usesSideLabelRows && styles.sideLabelLane]}>
-        <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
+      <View style={[styles.ownTitleLane, sideHandRows && styles.sideLabelLane, usesSideClue && { height: 'auto' }]}>
+        {renderHandLabel(seatingAnchorIndex, anchoredIsActionHand, layout.ownRowHeight, (
+          <View style={[styles.namePeekArea, { width: '100%' }, usesSideClue && { height: Math.ceil(14 * Math.max(1, fontScale)) }]}>
+            <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
         {liveClock !== null && <C17LiveClockText
           clock={liveClock}
           paused={clockPaused}
           timed={metadata.options.timed === true}
           playerIndex={seatingAnchorIndex}
         />}
+          </View>
+        ))}
       </View>
-      <View style={[styles.ownCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
+      <View style={[styles.ownCards, sideHandRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
         {anchoredHand.map((order, position) => {
           const card = game.deck[order];
           if (card === undefined) return null;
@@ -1536,7 +1558,7 @@ function C17DenseWorkspace({
       importantForAccessibility={!portraitV2 || presentationVisible ? 'auto' : 'no-hide-descendants'}>
     {portraitV2 ? <>
       <View style={styles.ledgerChrome}>{metricStrip}{tableResources}{lastActionPanel}</View>
-    <View onLayout={portraitV2 ? captureAmbientBody : undefined} style={styles.workspaceBody}>
+    <View testID="c17-portrait-body" onLayout={portraitV2 ? captureAmbientBody : undefined} style={styles.workspaceBody}>
       {portraitSizeTooSmall ? <Text accessibilityRole="alert" numberOfLines={2} style={{ color: theme.colors.text }}>Not enough space for gameplay. Use a larger window.</Text> : <>
       <View
         style={[
@@ -1572,7 +1594,7 @@ function C17DenseWorkspace({
         </View> : <View pointerEvents={presentationVisible ? 'auto' : 'none'} accessibilityElementsHidden={!presentationVisible}
           importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'} style={[styles.landscapeGrid, { flex: 1 }]}>
           {landscapeLayout.rows.map((row, rowIndex) => <View key={rowIndex} style={styles.landscapeGridRow}>
-            {row.map((index) => <View key={index} style={{ width: landscapeLayout.cellWidth }}>
+            {row.map((index) => <View key={index} style={{ width: usesSideClue ? landscapeLayout.leftWidth : landscapeLayout.cellWidth }}>
               {index === seatingAnchorIndex ? renderAnchoredHand() : renderOpponentHand(index)}
             </View>)}
           </View>)}

@@ -18,6 +18,8 @@ import { C17GameScreen } from './game/C17GameScreen';
 import { ClueComposer } from './game/ClueComposer';
 import { GameCard, VisibleHanabiCard } from './game/GameCard';
 import { NoteEditor } from './game/NoteEditor';
+import { SideClueEntry } from './game/SideClueEntry';
+import { getSideClueSize } from './game/sideClueLayout';
 import { getDisplayedHandOrders } from './game/gamePresentation';
 import { PregameScreen } from './screens/PregameScreen';
 import type { SessionCheckResult } from '../network/types';
@@ -83,6 +85,22 @@ function liveRoom() {
   const room = store.getState().room.room;
   if (room.kind !== 'live_game') throw new Error(`Expected LIVE, got ${room.kind}`);
   return room;
+}
+
+function enterClue(playerName = 'Bob', portrait = true) {
+  const measure = (testID: string, width: number, height: number) => {
+    const node = tree.root.findAllByProps({ testID }).find((candidate: any) => typeof candidate.props.onLayout === 'function');
+    expect(node).toBeDefined();
+    act(() => node.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+  };
+  if (portrait) measure('c17-portrait-body', 370, 650);
+  const entry = tree.root.findAllByType(SideClueEntry).find((node: any) => node.props.playerName === playerName);
+  const size = getSideClueSize(entry.props.fontScale);
+  measure(`clue-entry-${playerName}`, size.width, size.height);
+  measure(`clue-entry-text-${playerName}`, 28, size.lineHeight);
+  const target = tree.root.findAllByProps({ testID: `clue-entry-${playerName}` }).find((node: any) => typeof node.props.onPress === 'function');
+  expect(target.props.disabled).toBe(false);
+  act(() => { target.props.onPressIn({ stopPropagation() {} }); target.props.onPress({ stopPropagation() {} }); });
 }
 
 function buttons(title: string) {
@@ -439,10 +457,7 @@ test('landscape Clue preview preserves card geometry and only explicit Give can 
     const heights = cards.map((node: { props: { height: number } }) => node.props.height);
     expect(cards).toHaveLength(5);
     const beforeActions = socket.sent.filter((frame) => frame.startsWith('action '));
-    const target = tree.root.findAllByProps({ accessibilityLabel: 'Player Bob' })
-      .find((node: { props: { onPress?: unknown } }) => typeof node.props.onPress === 'function');
-    expect(target).toBeDefined();
-    act(() => target.props.onPress());
+    enterClue('Bob', false);
     const composer = tree.root.findByType(ClueComposer);
     expect(composer.props.boundedLandscape).toBe(true);
     act(() => composer.props.onPreview('rank', 1));
@@ -905,8 +920,7 @@ test.each(['card', 'clue'] as const)('Home hides %s interaction, accepts authori
     expect(buttons('Play')).toHaveLength(1);
     expect(buttons('Play')[0].props.disabled).toBe(false);
   } else {
-    const target = tree.root.findAllByProps({ accessibilityLabel: 'Player Bob' })[0];
-    act(() => target.props.onPress());
+    enterClue();
     const composer = tree.root.findByType(ClueComposer);
     act(() => composer.props.onPreview('rank', 1));
     expect(tree.root.findByType(ClueComposer).props.previewState).toEqual({ type: 'rank', value: 1 });
@@ -1080,4 +1094,60 @@ test('shared replay card tap retains read-only inspection and never opens the ed
   expect(tree.root.findByType(NoteEditor).props.visible).toBe(false);
   expect(tree.root.findAllByType(Text).some((node: any) => node.props.children === 'No replay notes')).toBe(true);
   expect(socket.sent).toEqual(before);
+});
+
+
+test('portrait Clue is an explicit measured side target; row taps and holds never send', async () => {
+  const socket = await mountLive();
+  const before = [...socket.sent];
+  const row = tree.root.findAllByProps({ accessibilityLabel: 'Player Bob' })[0];
+  act(() => row.props.onPress());
+  expect(tree.root.findAllByType(ClueComposer)).toHaveLength(0);
+  act(() => { row.props.onPressIn(); row.props.onLongPress(); row.props.onPressOut(); row.props.onPress(); });
+  expect(tree.root.findAllByType(ClueComposer)).toHaveLength(0);
+  enterClue();
+  expect(tree.root.findByType(ClueComposer).props.targetName).toBe('Bob');
+  expect(socket.sent).toEqual(before);
+  act(() => tree.root.findByType(ClueComposer).props.onPreview('rank', 1));
+  expect(socket.sent).toEqual(before);
+});
+
+
+test('six-player portrait mounts five measured 48dp Clue controls in the existing side lanes', async () => {
+  const previousWindow = Dimensions.get('window'), previousScreen = Dimensions.get('screen');
+  Dimensions.set({ window: { ...previousWindow, fontScale: 1 }, screen: { ...previousScreen, fontScale: 1 } });
+  try {
+  await act(async () => { tree = create(<Provider store={store} stabilityCheck="never"><App /></Provider>); });
+  const socket = mockSession.sockets[0];
+  act(() => {
+    welcome(socket);
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    const init = makeInit();
+    socket.emitMessage(`init ${JSON.stringify({ ...init, playerNames: ['Ada', 'Bob', 'Carol', 'Dan', 'Eve', 'Frank'], options: { ...init.options, numPlayers: 6 } })}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify({ tableID: 123, list: [
+      ...Array.from({ length: 18 }, (_, order) => ({ type: 'draw', playerIndex: Math.floor(order / 3), order, suitIndex: order < 3 ? -1 : order % 5, rank: order < 3 ? -1 : order % 5 + 1 })),
+      { type: 'status', clues: 8, score: 0, maxScore: 25 }, { type: 'turn', num: 0, currentPlayerIndex: 0 },
+    ] })}`);
+  });
+  const measure = (testID: string, width: number, height: number) => {
+    const node = tree.root.findAllByProps({ testID }).find((candidate: any) => typeof candidate.props.onLayout === 'function');
+    expect(node).toBeDefined();
+    act(() => node.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+  };
+  measure('c17-portrait-body', 360, 420);
+  const before = [...socket.sent];
+  const sizes = tree.root.findAllByType(GameCard).map((node: any) => node.props.height);
+  for (const name of ['Bob', 'Carol', 'Dan', 'Eve', 'Frank']) {
+    measure(`clue-entry-${name}`, 62, 48); measure(`clue-entry-text-${name}`, 28, 14);
+    const control = tree.root.findAllByProps({ testID: `clue-entry-${name}` }).find((node: any) => typeof node.props.onPress === 'function');
+    expect(control.props.disabled).toBe(false);
+    act(() => { control.props.onPressIn({ stopPropagation() {} }); control.props.onPress({ stopPropagation() {} }); });
+    expect(tree.root.findByType(ClueComposer).props.targetName).toBe(name);
+    expect(tree.root.findAllByType(GameCard).map((node: any) => node.props.height)).toEqual(sizes);
+  }
+  expect(socket.sent).toEqual(before);
+  } finally {
+    if (tree) act(() => tree.unmount()); tree = undefined;
+    Dimensions.set({ window: previousWindow, screen: previousScreen });
+  }
 });

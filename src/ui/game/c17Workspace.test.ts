@@ -134,7 +134,7 @@ test('replaces impossible portrait gameplay with a noninteractive warning using 
   expect(c17ScreenSource).toContain('const portraitSizeTooSmall = shellMeasured && portraitV2');
   expect(c17ScreenSource).toContain('getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0');
   expect(c17ScreenSource).toContain('measuredBodyHeight: next.height');
-  const body = c17ScreenSource.slice(c17ScreenSource.indexOf('<View onLayout={portraitV2 ? captureAmbientBody'), c17ScreenSource.indexOf('</> : <View testID="c17-landscape-body" onLayout={captureAmbientBody}'));
+  const body = c17ScreenSource.slice(c17ScreenSource.indexOf('<View testID="c17-portrait-body" onLayout={portraitV2 ? captureAmbientBody'), c17ScreenSource.indexOf('</> : <View testID="c17-landscape-body" onLayout={captureAmbientBody}'));
   expect(body).toMatch(/portraitSizeTooSmall \? <Text accessibilityRole="alert"[^>]*>Not enough space for gameplay\. Use a larger window\.<\/Text> : <>/);
   expect(body).toMatch(/\{workbench\}\s*<\/>/);
   expect(body).not.toMatch(/setNote|interactionDispatch|lobbyRuntime|scrollEnabled|\bkey=/);
