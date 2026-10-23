@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { getC17LandscapeLayout, getLandscapeMetricHeight, landscapeMetricsFit, type C17LandscapeInput } from './c17LandscapeLayout';
 import { HANABI_CARD_ASPECT_RATIO } from './gameplayLayout';
 
-const envelope: C17LandscapeInput = { availableWidth: 860, availableHeight: 324, fontScale: 1,
+const envelope: C17LandscapeInput = { availableWidth: 860, availableHeight: 392, fontScale: 1,
   playerCount: 2, cardsPerHand: 5, seatingAnchorIndex: 0, ownHandPosition: 'bottom' };
 const fit = (changes: Partial<C17LandscapeInput> = {}) => {
   const result = getC17LandscapeLayout({ ...envelope, ...changes });
@@ -20,14 +20,14 @@ describe('deterministic landscape hand templates', () => {
     expect(result.cellWidth).toBeCloseTo(5 * 112 * HANABI_CARD_ASPECT_RATIO + 12 + 8);
     expect(fit({ ownHandPosition: 'top' }).rows).toEqual([[0], [1]]);
   });
-  test('3P uses 1x3 at the minimum valid complete-shell height', () => {
-    const result = fit({ playerCount: 3, availableHeight: 294 });
+  test('3P uses 1x3 at the minimum valid right-column height', () => {
+    const result = fit({ playerCount: 3, availableHeight: 302 });
     expect(result.template).toBe('1x3');
     expect(result.rows).toEqual([[1], [2], [0]]);
     expect(result.cardHeight).toBeGreaterThanOrEqual(68);
-    expect(fit({ playerCount: 3, availableHeight: 294, ownHandPosition: 'top' }).rows).toEqual([[0], [1], [2]]);
+    expect(fit({ playerCount: 3, availableHeight: 302, ownHandPosition: 'top' }).rows).toEqual([[0], [1], [2]]);
   });
-  test.each(['top', 'bottom'] as const)('3P own hand %s fails below the 294dp complete-shell floor', (ownHandPosition) => {
+  test.each(['top', 'bottom'] as const)('3P own hand %s fails below the measured right-column floor', (ownHandPosition) => {
     for (const availableHeight of [276, 293]) {
       expect(getC17LandscapeLayout({ ...envelope, playerCount: 3, availableHeight, ownHandPosition }))
         .toEqual({ fits: false, reason: 'body-height' });
@@ -48,11 +48,11 @@ describe('deterministic landscape hand templates', () => {
     expect(result.rows.filter((row) => row.length === 1)).toEqual([[0]]);
   });
   test('6P standard three-card capacity has three rows of two under vertical pressure', () => {
-    const result = fit({ playerCount: 6, cardsPerHand: 3, availableHeight: 294 });
+    const result = fit({ playerCount: 6, cardsPerHand: 3, availableHeight: 302 });
     expect(result.template).toBe('3x2');
     expect(result.rows).toEqual([[1, 2], [3, 4], [5, 0]]);
-    expect(result.cardHeight).toBe(73);
-    expect(result.gridHeight).toBeLessThanOrEqual(294);
+    expect(result.cardHeight).toBe(75);
+    expect(result.gridHeight).toBeLessThanOrEqual(302);
     expect(fit({ playerCount: 6, cardsPerHand: 3, ownHandPosition: 'top' }).rows[0]).toEqual([0, 1]);
   });
   test('seating remains relative to the server anchor', () => {
@@ -64,7 +64,7 @@ describe('card, divider and right-column envelopes', () => {
   test.each([2, 3, 4, 5, 6])('%iP measured left header uses only left height; safe edges are subtracted once', (playerCount) => {
     for (const fontScale of [1, 1.3, 1.5]) {
       for (const [left, right] of [[28, 48], [48, 28], [0, 24]]) {
-        const input = { ...envelope, availableWidth: 1000 - left! - right!, availableHeight: 440 - 24 - 24,
+        const input = { ...envelope, availableWidth: 1000 - left! - right!, availableHeight: 520 - 24 - 24,
           playerCount, cardsPerHand: playerCount < 4 ? 5 : playerCount === 6 ? 3 : 4,
           fontScale, leftHeaderHeight: 72 };
         const result = getC17LandscapeLayout(input);
@@ -74,14 +74,14 @@ describe('card, divider and right-column envelopes', () => {
         expect(result.leftWidth + result.rightWidth + 8).toBeCloseTo(input.availableWidth);
         expect(result.rightMin).toBe(Math.ceil(252 * fontScale));
         expect(result.rightWidth).toBeGreaterThanOrEqual(result.rightMin);
-        expect(result.workbenchHeight).toBeGreaterThanOrEqual(128);
+        expect(result.workbenchHeight).toBeGreaterThanOrEqual(136);
       }
     }
   });
 
   test('reports impossible left height and expanded capacity without inventing a topology', () => {
-    // Three rows at the 68dp floor need 278dp; a 48dp header needs 326dp total.
-    expect(getC17LandscapeLayout({ ...envelope, playerCount: 3, availableHeight: 324, leftHeaderHeight: 48 }))
+    // Three rows at the 68dp floor need 278dp; a 78dp header needs 356dp total.
+    expect(getC17LandscapeLayout({ ...envelope, playerCount: 3, availableHeight: 350, leftHeaderHeight: 78 }))
       .toEqual({ fits: false, reason: 'card-floor' });
     expect(getC17LandscapeLayout({ ...envelope, playerCount: 6, cardsPerHand: 8, leftHeaderHeight: 48 }).fits).toBe(false);
     expect(getC17LandscapeLayout({ ...envelope, leftHeaderHeight: NaN }).fits).toBe(false);
@@ -115,7 +115,7 @@ describe('card, divider and right-column envelopes', () => {
   });
   test.each([2, 3, 4, 5, 6])('%iP successful geometry respects every floor and bound', (playerCount) => {
     for (const fontScale of [0.8, 1, 1.25, 1.5, 2]) {
-      const result = fit({ playerCount, cardsPerHand: playerCount < 4 ? 5 : playerCount === 6 ? 3 : 4, fontScale, availableWidth: 1200, availableHeight: 420 });
+      const result = fit({ playerCount, cardsPerHand: playerCount < 4 ? 5 : playerCount === 6 ? 3 : 4, fontScale, availableWidth: 1200, availableHeight: 600 });
       expect(Number.isInteger(result.cardHeight)).toBe(true);
       expect(result.cardHeight).toBeGreaterThanOrEqual(68);
       expect(result.cardHeight).toBeLessThanOrEqual(112);
@@ -123,22 +123,22 @@ describe('card, divider and right-column envelopes', () => {
       expect(result.rightWidth).toBeLessThanOrEqual(result.rightComfort);
       expect(result.leftWidth + 8 + result.rightWidth).toBeCloseTo(1200);
       expect(result.gridWidth).toBeLessThanOrEqual(result.leftWidth);
-      expect(result.workbenchHeight).toBeGreaterThanOrEqual(128);
-      expect(result.workbenchHeight).toBeLessThanOrEqual(168);
+      expect(result.workbenchHeight).toBeGreaterThanOrEqual(136);
+      expect(result.workbenchHeight).toBeLessThanOrEqual(272);
     }
   });
   test('divider reserves minimum then grows right toward comfort without stretching cards', () => {
     const constrained = fit({ playerCount: 4, cardsPerHand: 4, availableWidth: 720 });
     expect(constrained.rightWidth).toBeLessThan(constrained.rightComfort);
     expect(fit({ availableWidth: 1200, availableHeight: 600 }).rightWidth).toBe(320);
-    expect(fit({ fontScale: 1.5, availableHeight: 400 }).rightMin).toBe(378);
-    expect(fit({ fontScale: 1.5, availableHeight: 400 }).rightComfort).toBe(378);
-    expect(fit({ fontScale: 2, availableHeight: 420 }).rightMin).toBe(504);
+    expect(fit({ fontScale: 1.5, availableHeight: 480 }).rightMin).toBe(378);
+    expect(fit({ fontScale: 1.5, availableHeight: 480 }).rightComfort).toBe(378);
+    expect(fit({ fontScale: 2, availableHeight: 600 }).rightMin).toBe(504);
     expect(fit({ fontScale: 0.8 })).toEqual(fit({ fontScale: 1 }));
   });
-  test('Workbench reserves 128 to 168 and leaves extra height unused', () => {
-    expect(fit({ availableHeight: 294 }).workbenchHeight).toBe(128);
-    expect(fit({ availableHeight: 600 }).workbenchHeight).toBe(168);
+  test('Workbench reserves the Clue envelope and secondary inspection space and leaves extra height unused', () => {
+    expect(fit({ availableHeight: 302 }).workbenchHeight).toBe(136);
+    expect(fit({ availableHeight: 600 }).workbenchHeight).toBe(176);
   });
   test('short body, narrow width and capacity pressure fail explicitly', () => {
     expect(getC17LandscapeLayout({ ...envelope, availableHeight: 293 })).toEqual({ fits: false, reason: 'body-height' });

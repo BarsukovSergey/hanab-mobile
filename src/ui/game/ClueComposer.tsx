@@ -1,14 +1,16 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { isCluePreviewConfirmable, type CluePreview } from '../../game/selectors/cluePreview';
 import type { GameplayClueChoices } from '../../game/selectors/gameplay';
 import { getClueColorFill } from '../../game/selectors/gameplay';
 import { ActionButton, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import type { GameplayCluePreviewState } from './gameplayInteraction';
+import { getLandscapeWorkbenchEnvelope } from './landscapeWorkbench';
 
 export function ClueComposer({
   targetName,
   dense = false,
+  boundedLandscape = false,
   variantName = 'No Variant',
   choices,
   enabled,
@@ -21,6 +23,7 @@ export function ClueComposer({
 }: {
   targetName: string | null;
   dense?: boolean;
+  boundedLandscape?: boolean;
   variantName?: string;
   choices: GameplayClueChoices | null;
   enabled: boolean;
@@ -32,7 +35,10 @@ export function ClueComposer({
   onConfirm: () => void;
 }) {
   const { theme } = useHanabTheme();
-  const { width, height } = useResponsiveLayout();
+  const { width, height, fontScale = 1 } = useResponsiveLayout();
+  const bounded = dense && boundedLandscape;
+  const envelope = getLandscapeWorkbenchEnvelope(fontScale);
+  const PaletteViewport = bounded ? ScrollView : View;
   const landscapePhone = width > height && height < 700;
   const allowEmptyClues = choices?.allowEmptyClues ?? false;
   const validPreview = isCluePreviewConfirmable(preview, allowEmptyClues, variantName);
@@ -55,9 +61,12 @@ export function ClueComposer({
     dense && styles.denseSurface,
     { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong },
   ]}>
-    {dense ? <View style={styles.denseLayout}>
-      <View style={styles.densePalette}>
-        <View style={[styles.choiceRow, styles.denseChoiceRow]}>{choices?.colors.map((choice) => {
+    {dense ? <View style={[styles.denseLayout, bounded && { height: envelope.composerHeight }]}>
+      <View style={[styles.densePalette, bounded && { height: envelope.paletteHeight }]}>
+        <PaletteViewport horizontal={bounded || undefined} nestedScrollEnabled={bounded || undefined} showsHorizontalScrollIndicator={false}
+          accessibilityHint={bounded ? 'Scroll horizontally for more color choices' : undefined}
+          contentContainerStyle={bounded ? [styles.choiceRow, styles.denseChoiceRow, { flexWrap: 'nowrap' }] : undefined}
+          style={bounded ? { height: envelope.choiceHeight, flexGrow: 0 } : [styles.choiceRow, styles.denseChoiceRow]}>{choices?.colors.map((choice) => {
           const selected = previewState?.type === 'color' && previewState.value === choice.value;
           return <Pressable
             accessibilityLabel={choice.label}
@@ -66,10 +75,13 @@ export function ClueComposer({
             hitSlop={{ top: 5, bottom: 5, left: 2, right: 2 }}
             key={`color-${choice.value}`}
             onPress={() => onPreview('color', choice.value)}
-            style={[styles.denseColorChoice, { borderColor: selected ? theme.colors.accent : '#111111' }, !enabled && styles.choiceDisabled]}
+            style={[styles.denseColorChoice, bounded && { height: envelope.choiceHeight, width: envelope.choiceHeight }, { borderColor: selected ? theme.colors.accent : '#111111' }, !enabled && styles.choiceDisabled]}
           ><View style={[styles.colorSwatch, { backgroundColor: getClueColorFill(variantName, choice.value) ?? '#ffffff' }]} /></Pressable>;
-        })}</View>
-        <View style={[styles.choiceRow, styles.denseChoiceRow]}>{choices?.ranks.map((choice) => {
+        })}</PaletteViewport>
+        <PaletteViewport horizontal={bounded || undefined} nestedScrollEnabled={bounded || undefined} showsHorizontalScrollIndicator={false}
+          accessibilityHint={bounded ? 'Scroll horizontally for more rank choices' : undefined}
+          contentContainerStyle={bounded ? [styles.choiceRow, styles.denseChoiceRow, { flexWrap: 'nowrap' }] : undefined}
+          style={bounded ? { height: envelope.choiceHeight, flexGrow: 0 } : [styles.choiceRow, styles.denseChoiceRow]}>{choices?.ranks.map((choice) => {
           const selected = previewState?.type === 'rank' && previewState.value === choice.value;
           const label = choice.label === 'Odd' ? 'O' : choice.label === 'Even' ? 'E' : choice.label;
           return <Pressable
@@ -79,16 +91,16 @@ export function ClueComposer({
             hitSlop={{ top: 5, bottom: 5, left: 2, right: 2 }}
             key={`rank-${choice.value}`}
             onPress={() => onPreview('rank', choice.value)}
-            style={[styles.denseRankChoice, { borderColor: selected ? theme.colors.accent : theme.colors.borderStrong }, !enabled && styles.choiceDisabled]}
-          ><Text style={[styles.denseRankChoiceText, { color: theme.colors.text }]}>{label}</Text></Pressable>;
-        })}</View>
+            style={[styles.denseRankChoice, bounded && { height: envelope.choiceHeight, minWidth: envelope.choiceHeight }, { borderColor: selected ? theme.colors.accent : theme.colors.borderStrong }, !enabled && styles.choiceDisabled]}
+          ><Text style={[styles.denseRankChoiceText, bounded && { includeFontPadding: false }, { color: theme.colors.text }]}>{label}</Text></Pressable>;
+        })}</PaletteViewport>
       </View>
-      <View style={styles.denseActionRail}>
-        <Pressable accessibilityRole="button" hitSlop={{ top: 2, bottom: 2, left: 6, right: 6 }} onPress={onClear} style={({ pressed }) => [styles.denseActionButton, styles.denseCloseButton, pressed && styles.denseActionPressed]}>
-          <Text style={[styles.denseActionText, { color: theme.colors.textMuted }]}>Close</Text>
+      <View style={[styles.denseActionRail, bounded && { width: Math.ceil(52 * Math.max(1, fontScale)), height: envelope.composerHeight }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close clue composer" hitSlop={{ top: 2, bottom: 2, left: 6, right: 6 }} onPress={onClear} style={({ pressed }) => [styles.denseActionButton, styles.denseCloseButton, bounded && { height: envelope.footerHeight, minHeight: envelope.footerHeight }, pressed && styles.denseActionPressed]}>
+          <Text style={[styles.denseActionText, bounded && { lineHeight: 14, includeFontPadding: false }, { color: theme.colors.textMuted }]}>Close</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" disabled={!confirmAllowed || !validPreview} hitSlop={{ top: 2, bottom: 2, left: 6, right: 6 }} onPress={onConfirm} style={({ pressed }) => [styles.denseActionButton, { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent }, !confirmAllowed || !validPreview ? styles.choiceDisabled : pressed && styles.denseActionPressed]}>
-          <Text style={[styles.denseActionText, { color: theme.colors.accentText }]}>Give</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Give clue" disabled={!confirmAllowed || !validPreview} hitSlop={{ top: 2, bottom: 2, left: 6, right: 6 }} onPress={onConfirm} style={({ pressed }) => [styles.denseActionButton, bounded && { height: envelope.footerHeight, minHeight: envelope.footerHeight }, { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent }, !confirmAllowed || !validPreview ? styles.choiceDisabled : pressed && styles.denseActionPressed]}>
+          <Text style={[styles.denseActionText, bounded && { lineHeight: 14, includeFontPadding: false }, { color: theme.colors.accentText }]}>Give</Text>
         </Pressable>
       </View>
     </View> : <>

@@ -3,7 +3,8 @@ import { HANABI_TABLE_CARD_ASPECT_RATIO } from './tableLayout';
 /** Same resource/discard composition for every player count and Workbench tool. */
 export function getLandscapeResourceEnvelope(fontScale: number, suitCount: number) {
   const scale = Math.max(1, fontScale);
-  const rowHeight = Math.ceil(44 * scale);
+  // Two native Deck label/value lines, or clue label + strike slots, plus chrome.
+  const rowHeight = Math.max(44, Math.ceil(32 * scale + 8));
   const discardHeight = Math.max(44, Math.ceil(16 * scale + 6));
   const resourceRail = Math.ceil(58 * scale);
   const deckWidth = Math.ceil(34 * scale);

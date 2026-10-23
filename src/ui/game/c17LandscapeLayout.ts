@@ -1,6 +1,7 @@
 import { getRelativeOpponentIndices } from './c17DenseLayout';
 import { HANABI_CARD_ASPECT_RATIO } from './gameplayLayout';
 import { getLandscapeLastActionHeight, getLandscapeResourceEnvelope } from './landscapeResources';
+import { getLandscapeWorkbenchEnvelope } from './landscapeWorkbench';
 
 export type C17LandscapeInput = {
   availableWidth: number;
@@ -47,9 +48,10 @@ export function getC17LandscapeLayout(input: C17LandscapeInput): C17LandscapeLay
   const fixedHeight = getLandscapeMetricHeight(input.fontScale)
     + getLandscapeResourceEnvelope(input.fontScale, input.suitCount ?? 5).height
     + getLandscapeLastActionHeight(input.fontScale) + 12;
-  if (input.availableHeight < fixedHeight + 128) return { fits: false, reason: 'body-height' };
+  const workbench = getLandscapeWorkbenchEnvelope(input.fontScale);
+  if (input.availableHeight < fixedHeight + workbench.minimumHeight) return { fits: false, reason: 'body-height' };
   const grid = getC17LandscapeHandGrid(input);
-  return grid.fits ? { ...grid, workbenchHeight: Math.min(168, input.availableHeight - fixedHeight) } : grid;
+  return grid.fits ? { ...grid, workbenchHeight: Math.min(workbench.comfortableHeight, input.availableHeight - fixedHeight) } : grid;
 }
 
 type HandGrid = Exclude<C17LandscapeLayout, { fits: true }>
