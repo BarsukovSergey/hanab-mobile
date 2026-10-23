@@ -645,10 +645,7 @@ function AppContent() {
         </Pressable>}
       </View>;
     };
-    focusedRoomPresentation = (
-      // Keep Live allocation stable through adjustResize; Chat consumes IME locally.
-      <View style={{ height, backgroundColor: theme.colors.background }}>
-        <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
+    const gameHeader = (
         <View style={[
           styles.gameBar,
           landscapePhone && styles.gameBarLandscape,
@@ -659,7 +656,7 @@ function AppContent() {
               <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
               <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
             </> : <>
-            <ActionButton compact title={workspacePresentation.review ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review ? browseFromRoom : homeFromLive} />
+            <ActionButton compact title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive} />
             <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
             <ActionButton
               compact
@@ -673,6 +670,12 @@ function AppContent() {
             </>}
           </View>
         </View>
+    );
+    focusedRoomPresentation = (
+      // Keep Live allocation stable through adjustResize; Chat consumes IME locally.
+      <View style={{ height, backgroundColor: theme.colors.background }}>
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
+        {!(c17Workspace && width > height) && gameHeader}
         {workspaceStatusVisible && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
         {liveConnectionProblem && (
           <View style={styles.liveConnectionNotice}>
@@ -691,6 +694,7 @@ function AppContent() {
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
           c17Workspace && styles.gameContainerC17,
+          c17Workspace && width > height && { paddingTop: 0 },
           { maxWidth: contentMaxWidth },
           ]}
           keyboardDismissMode="on-drag"
@@ -699,7 +703,7 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
-            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} />
+            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} />
           </View>
         </ScrollView>
         </SafeAreaView>

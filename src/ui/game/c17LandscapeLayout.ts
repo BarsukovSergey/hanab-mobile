@@ -9,6 +9,10 @@ export type C17LandscapeInput = {
   cardsPerHand: number;
   seatingAnchorIndex: number;
   ownHandPosition: 'top' | 'bottom';
+  /** Measured left header/context; already inside the safe-content window. */
+  leftHeaderHeight?: number;
+  /** Font-scaled native width of the fixed worst-value metric probe. */
+  metricRowWidth?: number;
 };
 
 export type C17LandscapeLayout =
@@ -36,9 +40,9 @@ export const C17_LANDSCAPE_ROW_GAP = 4;
 
 /** Only the window and authoritative seating/capacity envelope allocate geometry. */
 export function getC17LandscapeLayout(input: C17LandscapeInput): C17LandscapeLayout {
-  if (input.availableHeight < 294) return { fits: false, reason: 'body-height' };
+  if (input.availableHeight < getLandscapeMetricHeight(input.fontScale) + 92 + 68 + 12 + 88) return { fits: false, reason: 'body-height' };
   const grid = getC17LandscapeHandGrid(input);
-  return grid.fits ? { ...grid, workbenchHeight: Math.min(128, input.availableHeight - 34 - 92 - 68 - 12) } : grid;
+  return grid.fits ? { ...grid, workbenchHeight: Math.min(128, input.availableHeight - getLandscapeMetricHeight(input.fontScale) - 92 - 68 - 12) } : grid;
 }
 
 type HandGrid = Exclude<C17LandscapeLayout, { fits: true }>
@@ -48,15 +52,16 @@ type HandGrid = Exclude<C17LandscapeLayout, { fits: true }>
 export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
   const { availableWidth, availableHeight, fontScale, playerCount, cardsPerHand,
     seatingAnchorIndex, ownHandPosition } = input;
-  if (![availableWidth, availableHeight, fontScale].every(Number.isFinite)
+  if (![availableWidth, availableHeight, fontScale, input.leftHeaderHeight ?? 0, input.metricRowWidth ?? 0].every(Number.isFinite)
+    || fontScale <= 0 || (input.leftHeaderHeight ?? 0) < 0 || (input.metricRowWidth ?? 0) < 0
     || !Number.isInteger(playerCount) || playerCount < 2 || playerCount > 6
     || !Number.isInteger(cardsPerHand) || cardsPerHand < 1
     || !Number.isInteger(seatingAnchorIndex) || seatingAnchorIndex < 0 || seatingAnchorIndex >= playerCount) {
     return { fits: false, reason: 'invalid-envelope' };
   }
-  const scaledFont = Math.max(1, Math.min(1.5, fontScale));
-  const rightMin = 252 + Math.ceil(48 * (scaledFont - 1));
-  const rightComfort = 320 + Math.ceil(32 * (scaledFont - 1));
+  const scaledFont = Math.max(1, fontScale);
+  const rightMin = Math.max(Math.ceil(252 * scaledFont), Math.ceil(input.metricRowWidth ?? 0));
+  const rightComfort = Math.max(rightMin, 320 + Math.ceil(32 * (scaledFont - 1)));
   const opponents = getRelativeOpponentIndices(playerCount, seatingAnchorIndex);
   const sequence = ownHandPosition === 'top'
     ? [seatingAnchorIndex, ...opponents] : [...opponents, seatingAnchorIndex];
@@ -85,7 +90,7 @@ export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
       }
       return low;
     };
-    const verticalMax = largestFit((height) => gridHeight(height) <= availableHeight);
+    const verticalMax = largestFit((height) => gridHeight(height) + (input.leftHeaderHeight ?? 0) <= availableHeight);
     const horizontalMax = largestFit((height) => gridWidth(height) + C17_LANDSCAPE_REGION_GAP + rightMin <= availableWidth);
     const cardHeight = Math.min(verticalMax, horizontalMax, 112);
     if (cardHeight < 68) return { fits: false, reason: 'card-floor' };
@@ -105,4 +110,17 @@ export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
     case 5: return solve('2+2+1', ownSingle(paired(opponents)));
     default: return solve('3x2', paired(sequence));
   }
+}
+
+export function getLandscapeMetricHeight(fontScale: number): number {
+  return Math.ceil(34 * Math.max(1, fontScale));
+}
+
+/** Native intrinsic measurements include full values, labels, badges and row chrome.
+ * A failed measurement never clips an interactive row or changes hand geometry. */
+export function landscapeMetricsFit(rightWidth: number, measuredWidth: number, measuredHeight: number, fontScale: number): boolean {
+  return [rightWidth, measuredWidth, measuredHeight, fontScale].every(Number.isFinite)
+    && measuredWidth > 0 && measuredHeight > 0
+    && Math.ceil(measuredWidth) <= rightWidth
+    && Math.ceil(measuredHeight) <= getLandscapeMetricHeight(fontScale);
 }

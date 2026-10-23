@@ -180,6 +180,16 @@ export function CompactTable({
   </View>;
 }
 
+/** Shared authoritative Score face; landscape moves it without changing its cues. */
+export function TableScore({ game, feedback, pulseEnabled = true, landscape = false }: {
+  game: GameState; feedback?: LandscapeResourceFeedback; pulseEnabled?: boolean; landscape?: boolean;
+}) {
+  const { theme } = useHanabTheme();
+  const previous = feedback?.before?.score;
+  const pulseKey = previous !== undefined && previous !== game.score ? feedback?.segment ?? null : null;
+  return <AuthoritativePulse enabled={pulseEnabled} pulseKey={pulseKey}><Text style={{ color: feedback?.lowScorePhase ? '#00ffff' : theme.colors.text, ...(feedback?.lowScorePhase && feedback.colorblindMode ? { textDecorationLine: 'underline' as const } : {}), fontSize: landscape ? 10 : 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text></AuthoritativePulse>;
+}
+
 function V2Table({ landscape, game, variantName, cardIdentities, discardResourceCue, onOpenDiscards,
   fontScale, pulseDiscard, pulseEnabled, pulsePlay, resourceFeedback }: {
   landscape: boolean; game: GameState; variantName: string;
@@ -213,7 +223,7 @@ function V2Table({ landscape, game, variantName, cardIdentities, discardResource
   </View>;
   return <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ gap: 4, ...(landscape ? { height: 92, flexShrink: 0 } : {}) }}>
     <View style={[styles.surface, { ...(landscape ? { height: 62, gap: 0 } : {}), padding: landscape ? 3 : 6, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <AuthoritativePulse enabled={pulseEnabled} pulseKey={resourcePulse(resourceFeedback?.before?.score, game.score)}><Text style={{ color: resourceFeedback?.lowScorePhase ? '#00ffff' : theme.colors.text, ...(resourceFeedback?.lowScorePhase && resourceFeedback.colorblindMode ? { textDecorationLine: 'underline' as const } : {}), fontSize: landscape ? 10 : 12, fontWeight: '700' }}>Score {game.score} / {game.stats.maxScore}</Text></AuthoritativePulse>
+      {!landscape && <TableScore game={game} feedback={resourceFeedback} pulseEnabled={pulseEnabled} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <View style={{ flexDirection: 'row', gap: 2, flex: 1 }}>
           {suits.map((suit) => {

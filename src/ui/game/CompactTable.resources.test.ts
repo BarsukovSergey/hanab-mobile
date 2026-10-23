@@ -5,7 +5,7 @@ import { describe, expect, jest, test } from '@jest/globals';
 import type { GameState } from '../../game/bootstrap/types';
 import { getGameResourcePresentation } from '../../game/selectors/gameResourcePresentation';
 import { AuthoritativePulse } from './AuthoritativePulse';
-import { CompactTable } from './CompactTable';
+import { CompactTable, TableScore } from './CompactTable';
 
 // Inspect the actual JSX without mounting native cards or running animation effects.
 let mockAvailableWidth = 400;
@@ -38,6 +38,7 @@ const variantName = 'No Variant';
 function nodes(node: ReactNode): Element[] {
   if (Array.isArray(node)) return node.flatMap(nodes);
   if (!isValidElement<Record<string, unknown>>(node)) return [];
+  if (node.type === TableScore) return nodes(TableScore(node.props as Parameters<typeof TableScore>[0]));
   return [node, ...nodes(node.props.children as ReactNode)];
 }
 
@@ -59,6 +60,7 @@ function table(presentation: 'portrait-v2' | 'landscape-v2', overrides: Partial<
   const render = v2.type as (props: unknown) => Element;
   const root = render(v2.props);
   const all = nodes(root);
+  if (presentation === 'landscape-v2') all.push(...nodes(TableScore({ game: overrides.game ?? game(), feedback: overrides.landscapeResourceFeedback, pulseEnabled: overrides.pulseEnabled, landscape: true })));
   const clue = all.find((node) => text(node).startsWith('Clues '))!;
   const score = all.find((node) => text(node).startsWith('Score '))!;
   const pulses = all.filter((node) => node.type === AuthoritativePulse && nodes(node.props.children as ReactNode)
@@ -138,7 +140,7 @@ describe.each(['portrait-v2', 'landscape-v2'] as const)('%s resource semantics',
         before: { ...current, ...change }, segment: 17, clueCue: 'default', lowScorePhase: false, colorblindMode: false,
       } });
       expect(pulses.map((pulse) => pulse.props.pulseKey)).toEqual(
-        individualChanges.map((_, slot) => slot === index ? 17 : null),
+        (presentation === 'landscape-v2' ? [1, 2, 3, 0] : [0, 1, 2, 3]).map((slot) => slot === index ? 17 : null),
       );
     });
   });
@@ -152,6 +154,8 @@ test('retains distinct orientation geometry and responsive portrait resource pla
   expect(landscape.root.props.style).toMatchObject({ height: 92, flexShrink: 0 });
   expect(portrait.score.props.style).toMatchObject({ fontSize: 12 });
   expect(landscape.score.props.style).toMatchObject({ fontSize: 10 });
+  expect(nodes(landscape.root).filter((node) => text(node).startsWith('Score '))).toHaveLength(0);
+  expect(nodes(portrait.root).filter((node) => text(node).startsWith('Score '))).toHaveLength(1);
   expect(landscape.clue.props.numberOfLines).toBe(1);
   expect(portrait.clue.props.numberOfLines).toBeUndefined();
   const rail = (result: ReturnType<typeof table>) => result.all.find((node) =>

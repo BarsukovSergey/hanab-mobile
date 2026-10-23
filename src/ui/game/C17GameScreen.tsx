@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { RoomChildren } from './GameScreen';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
@@ -34,12 +35,12 @@ import { lobbyRuntime } from '../../runtime/application';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { roomActions } from '../../store/roomSlice';
 import { ActionButton, Notice, useHanabTheme, useResponsiveLayout } from '../designSystem';
-import { getC17LandscapeLayout, C17_LANDSCAPE_REGION_GAP, C17_LANDSCAPE_COLUMN_GAP, C17_LANDSCAPE_ROW_GAP } from './c17LandscapeLayout';
+import { getC17LandscapeLayout, getLandscapeMetricHeight, landscapeMetricsFit, C17_LANDSCAPE_REGION_GAP, C17_LANDSCAPE_COLUMN_GAP, C17_LANDSCAPE_ROW_GAP } from './c17LandscapeLayout';
 import { C17RewindScrubber } from './C17RewindScrubber';
 import { EfficiencyDetailsModal } from './EfficiencyDetailsModal';
 import { getPaceRiskColor, PaceDetailsModal } from './PaceDetailsModal';
 import { ClueComposer } from './ClueComposer';
-import { CompactTable } from './CompactTable';
+import { CompactTable, TableScore } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
 import { GameCard, VisibleHanabiCard } from './GameCard';
@@ -90,7 +91,7 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean }) {
+export function C17GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const orientation = width > height ? 'landscape' : 'portrait';
@@ -570,6 +571,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
       canEnterClue={enabled || hypotheticalEnabled}
       recentActions={recentActions}
       presentationVisible={presentationVisible}
+      landscapeHeader={landscapeHeader}
       roomChildren={roomChildren}
       result={result}
       reviewActive={!hypotheticalActive && (isFinishedReplay || replay.active || isSharedReplay)}
@@ -705,6 +707,7 @@ function C17DenseWorkspace({
   recentActions,
   presentationVisible,
   roomChildren,
+  landscapeHeader,
   result,
   reviewActive,
   finishedReplay,
@@ -805,6 +808,7 @@ function C17DenseWorkspace({
   recentActions: readonly C17TemporalEntry[];
   presentationVisible: boolean;
   roomChildren?: RoomChildren;
+  landscapeHeader?: ReactNode;
   result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
   finishedReplay: boolean;
@@ -900,9 +904,13 @@ function C17DenseWorkspace({
     layoutMetrics.ambientBodyWidth,
     usesSideLabelRows ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
   );
+  const [leftHeaderHeight, setLeftHeaderHeight] = useState(0);
+  const [metricMeasurement, setMetricMeasurement] = useState({ shellKey: '', actual: { width: 0, height: 0 }, maximum: { width: 0, height: 0 } });
   const landscapeLayout = getC17LandscapeLayout({
     availableWidth: layoutMetrics.ambientBodyWidth,
     availableHeight: layoutMetrics.ambientBodyHeight,
+    leftHeaderHeight,
+    metricRowWidth: metricMeasurement.shellKey === shellKey ? metricMeasurement.maximum.width : 0,
     fontScale,
     playerCount: metadata.playerNames.length,
     cardsPerHand,
@@ -1233,8 +1241,7 @@ function C17DenseWorkspace({
       </View>
     </Pressable></AuthoritativePulse>
   );
-  const metricStrip = (
-    <View style={[styles.hud, !portraitV2 && styles.landscapeMetricStrip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+  const temporalContext = (
       <View style={styles.grow}>
         <Text numberOfLines={1} style={[styles.eyebrow, { color: theme.colors.accent }]}>{sharedReplay !== null
           ? `SHARED REVIEW T${selectedTurn}`
@@ -1248,6 +1255,12 @@ function C17DenseWorkspace({
           {hGroupStatus.currentPlayerCue === 'locked' ? 'Locked · may not be able to discard' : 'Potential Double Discard'}
         </Text>}
       </View>
+  );
+  const metricStrip = (
+    <View style={[styles.hud, !portraitV2 && styles.landscapeMetricStrip, !portraitV2 && { height: getLandscapeMetricHeight(fontScale) }, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      {!portraitV2 && <TableScore game={game} landscape pulseEnabled={livePulseEnabled}
+        feedback={{ before: liveBefore, segment: livePulseSegment, clueCue: resourcePresentation.clueCue, lowScorePhase: hGroupStatus.lowScorePhase, colorblindMode }} />}
+      {portraitV2 && temporalContext}
       <HudStat label="Pace" value={gameplayPresentation.pace}
         valueColor={getPaceRiskColor(gameplayPresentation.paceRisk, theme.colors.text)}
         accessibilityLabel={`Pace ${gameplayPresentation.pace}`}
@@ -1260,6 +1273,38 @@ function C17DenseWorkspace({
         onPress={() => setEfficiencyDetailsOpen(true)} />
     </View>
   );
+  const metricsReady = metricMeasurement.shellKey === shellKey && landscapeLayout.fits
+    && metricMeasurement.actual.width > 0 && metricMeasurement.maximum.width > 0
+    && landscapeMetricsFit(landscapeLayout.rightWidth,
+      Math.max(metricMeasurement.actual.width, metricMeasurement.maximum.width),
+      Math.max(metricMeasurement.actual.height, metricMeasurement.maximum.height), fontScale);
+  const measureMetric = (kind: 'actual' | 'maximum', event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setMetricMeasurement((previous) => {
+      const current = previous.shellKey === shellKey ? previous
+        : { shellKey, actual: { width: 0, height: 0 }, maximum: { width: 0, height: 0 } };
+      return current[kind].width === width && current[kind].height === height
+        ? current : { ...current, [kind]: { width, height } };
+    });
+  };
+  const metricProbe = !portraitV2 && <View key={shellKey} pointerEvents="none" accessible={false}
+    accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+    style={{ position: 'absolute', opacity: 0, width: 10000 }}>
+    <View style={{ alignSelf: 'flex-start' }}>
+      {/* Intrinsic probe: same components/typography, unrestricted width and natural height.
+          The second row covers large values; actual values above that envelope fail safely. */}
+      <View onLayout={(event) => measureMetric('actual', event)} style={[styles.hud, { alignSelf: 'flex-start', paddingVertical: 0 }]}>
+        <TableScore game={game} landscape pulseEnabled={false} />
+        <HudStat label="Pace" value={gameplayPresentation.pace} onPress={() => {}} />
+        <HudStat label="Efficiency" value={`${formatEfficiency(gameplayPresentation.futureRequiredEfficiency)} | ${gameplayPresentation.minimumRequiredEfficiency.toFixed(2)}`} onPress={() => {}} />
+      </View>
+      <View onLayout={(event) => measureMetric('maximum', event)} style={[styles.hud, { alignSelf: 'flex-start', paddingVertical: 0 }]}>
+        <Text style={{ fontSize: 10, fontWeight: '700' }}>Score 999 / 999</Text>
+        <HudStat label="Pace" value="+999" onPress={() => {}} />
+        <HudStat label="Efficiency" value="999.99 | 999.99" onPress={() => {}} />
+      </View>
+    </View>
+  </View>;
   const tableResources = (
     <CompactTable presentation={portraitV2 ? 'portrait-v2' : 'landscape-v2'}
       landscapeResourceFeedback={{ before: liveBefore, segment: livePulseSegment, clueCue: resourcePresentation.clueCue, lowScorePhase: hGroupStatus.lowScorePhase, colorblindMode }} dense tightChrome={usesDenseSideLabels} game={game} discardResourceCue={resourcePresentation.discardCue} onOpenDiscards={onOpenDiscards} pulseDiscard={discardPulse} pulseEnabled={livePulseEnabled} pulsePlay={playPulse} variantName={variantName} />
@@ -1468,9 +1513,9 @@ function C17DenseWorkspace({
     </View> : <View style={[styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }, !portraitV2 && { marginTop: 'auto' }]} />
   );
   return <View style={styles.workspace}>
-    <View style={styles.workspace} pointerEvents={presentationVisible ? 'auto' : 'none'}
-      accessibilityElementsHidden={!presentationVisible}
-      importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'}>
+    <View style={styles.workspace} pointerEvents={!portraitV2 ? 'box-none' : presentationVisible ? 'auto' : 'none'}
+      accessibilityElementsHidden={portraitV2 && !presentationVisible}
+      importantForAccessibility={!portraitV2 || presentationVisible ? 'auto' : 'no-hide-descendants'}>
     {portraitV2 ? <>
       <View style={styles.ledgerChrome}>{metricStrip}{tableResources}{lastActionPanel}</View>
     <View onLayout={portraitV2 ? captureAmbientBody : undefined} style={styles.workspaceBody}>
@@ -1498,23 +1543,31 @@ function C17DenseWorkspace({
       </>}
     </View>
     </> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>
-      {!shellMeasured ? null : !landscapeLayout.fits ? <View style={styles.landscapeFailure}>
-        <Text style={{ color: theme.colors.text }}>This landscape size cannot fit the Live workspace. Rotate the device or use a larger window.</Text>
-      </View> : <>
-        <View style={[styles.landscapeGrid, { width: landscapeLayout.leftWidth }]}>
+      {metricProbe}
+      <View style={{ width: landscapeLayout.fits ? landscapeLayout.leftWidth : Math.max(0, layoutMetrics.ambientBodyWidth - Math.ceil(252 * Math.max(1, fontScale)) - C17_LANDSCAPE_REGION_GAP), minHeight: 0 }}>
+        <View onLayout={(event) => setLeftHeaderHeight(event.nativeEvent.layout.height)}>
+          {landscapeHeader}
+          <View style={{ height: Math.ceil(30 * Math.max(1, fontScale)), paddingHorizontal: 7 }}>{temporalContext}</View>
+        </View>
+        {!shellMeasured ? null : !landscapeLayout.fits || !metricsReady ? <View style={styles.landscapeFailure}>
+          <Text accessibilityRole="alert" style={{ color: theme.colors.text }}>This landscape size cannot fit the Live workspace. Rotate the device or use a larger window.</Text>
+        </View> : <View pointerEvents={presentationVisible ? 'auto' : 'none'} accessibilityElementsHidden={!presentationVisible}
+          importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'} style={[styles.landscapeGrid, { flex: 1 }]}>
           {landscapeLayout.rows.map((row, rowIndex) => <View key={rowIndex} style={styles.landscapeGridRow}>
             {row.map((index) => <View key={index} style={{ width: landscapeLayout.cellWidth }}>
               {index === seatingAnchorIndex ? renderAnchoredHand() : renderOpponentHand(index)}
             </View>)}
           </View>)}
-        </View>
-        <View style={[styles.landscapeLiveColumn, { width: landscapeLayout.rightWidth }]}>
-          {metricStrip}
-          {tableResources}
-          {lastActionPanel}
-          {workbench}
-        </View>
-      </>}
+        </View>}
+      </View>
+      {shellMeasured && landscapeLayout.fits && metricsReady && <View pointerEvents={presentationVisible ? 'auto' : 'none'}
+        accessibilityElementsHidden={!presentationVisible} importantForAccessibility={presentationVisible ? 'auto' : 'no-hide-descendants'}
+        style={[styles.landscapeLiveColumn, { width: landscapeLayout.rightWidth }]}>
+        {metricStrip}
+        {tableResources}
+        {lastActionPanel}
+        {workbench}
+      </View>}
     </View>}
 
     </View>

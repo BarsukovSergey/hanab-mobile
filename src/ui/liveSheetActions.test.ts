@@ -72,8 +72,8 @@ test('keeps Live Home quiet, Review Browse outlined, and header actions tall eno
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
-  expect(browse).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
-  expect(browse).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
+  expect(browse).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
+  expect(browse).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
   expect(browse).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
   expect(browse).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
   expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
@@ -105,9 +105,9 @@ test('uses explicit export feedback tone instead of inferring it from message te
 
 
 test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
-  const header = app.slice(app.indexOf('focusedRoomPresentation = ('), app.indexOf('{liveConnectionProblem'));
-  expect(header).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
-  expect(header).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
+  const header = app.slice(app.indexOf('const gameHeader = ('), app.indexOf('focusedRoomPresentation = ('));
+  expect(header).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
+  expect(header).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
   expect(header).toContain('liveClientState.metadata.options.variantName');
   expect(header).toContain('title="Menu"');
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
