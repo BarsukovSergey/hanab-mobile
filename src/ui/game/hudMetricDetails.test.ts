@@ -28,7 +28,7 @@ describe('Efficiency and Pace HUD details', () => {
     expect(metricStrip).not.toContain('label="Eff"');
     expect(c17).toContain("return value === null ? '-' : value.toFixed(2);");
     expect(c17).toMatch(/portraitV2 \? <>\s*<View style=\{styles\.ledgerChrome\}>\{metricStrip\}/);
-    expect(c17).toMatch(/<View style=\{\[styles\.landscapeLiveColumn[^\n]*\n\s*\{metricStrip\}/);
+    expect(c17).toMatch(/style=\{\[styles\.landscapeLiveColumn[^\n]*\n\s*\{metricStrip\}/);
   });
 
   it('places clickable badges beside the centered labels below values without adding metric height', () => {

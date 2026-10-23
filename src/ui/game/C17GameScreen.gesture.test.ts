@@ -137,7 +137,7 @@ test('C17 landscape uses a dedicated grid and fixed right semantic stack', () =>
   const screen = readC17Screen();
   expect(screen).toContain('style={styles.landscapeBody}');
   expect(screen).toContain('landscapeLayout.rows.map');
-  expect(screen).toContain('width: landscapeLayout.leftWidth');
+  expect(screen).toContain('width: landscapeLayout.fits && metricsReady ? landscapeLayout.leftWidth');
   expect(screen).toContain('width: landscapeLayout.rightWidth');
   expect(screen).toContain('landscapeMetricStrip: { height: 34');
   expect(screen).toContain('landscapeLastAction: { height: 68');

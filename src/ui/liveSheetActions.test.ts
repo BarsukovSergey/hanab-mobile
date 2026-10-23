@@ -68,15 +68,15 @@ test('keeps Live Home quiet, Review Browse outlined, and header actions tall eno
   const headerEnd = app.indexOf('{liveConnectionProblem', headerStart);
   const headerActions = app.slice(headerStart, headerEnd);
   const normalHeader = headerActions.slice(headerActions.indexOf('</> : <>'));
-  const buttons = normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? [];
+  const buttons = (normalHeader.match(/<ActionButton[\s\S]*?\/>/g) ?? []).filter((button) => !button.includes('onPress={() => {}}'));
 
   expect(buttons).toHaveLength(3);
   const [browse, chat, more] = buttons;
-  expect(browse).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
-  expect(browse).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
+  expect(browse).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
+  expect(browse).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
   expect(browse).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
   expect(browse).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
-  expect(chat).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
+  expect(chat).toContain("title={headerDisplayedUnreadCount === 0 ? 'Chat' : `Chat (${headerDisplayedUnreadCount})`}");
   expect(chat).toContain("onPress={() => setRoomChild('chat')}");
   expect(more).toContain('title="Menu"');
   expect(more).toContain("onPress={() => setRoomChild('menu')}");
@@ -105,15 +105,15 @@ test('uses explicit export feedback tone instead of inferring it from message te
 
 
 test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
-  const header = app.slice(app.indexOf('focusedRoomPresentation = ('), app.indexOf('{liveConnectionProblem'));
-  expect(header).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
-  expect(header).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
+  const header = app.slice(app.indexOf('const gameHeader = ('), app.indexOf('focusedRoomPresentation = ('));
+  expect(header).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
+  expect(header).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
   expect(header).toContain('liveClientState.metadata.options.variantName');
   expect(header).toContain('title="Menu"');
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).not.toMatch(/More|username|YOUR TURN|LIVE T/);
   expect(header).toContain('workspacePresentation.identity');
-  expect(header).not.toContain('width <= height');
+  expect(header).toContain("workspacePresentation.review && width <= height ? 'Browse' : 'Home'");
 });
 
 test('portrait Chat replaces contents of the same Live header and has no second task header', () => {

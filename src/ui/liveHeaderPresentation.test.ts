@@ -5,12 +5,12 @@ import { expect, test } from '@jest/globals';
 const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const header = app.slice(app.indexOf('styles.gameBar,'), app.indexOf('{liveConnectionProblem'));
 
-test('Live and own Rewind keep visible ghost Home; Review keeps secondary Browse and original handlers', () => {
+test('Live and own Rewind keep visible ghost Home; portrait Review keeps Browse; landscape Home preserves attendance', () => {
   const navigation = header.match(/<ActionButton compact title=\{workspacePresentation\.review[^\n]+/u)?.[0];
   expect(navigation).toBeDefined();
-  expect(navigation).toContain("title={workspacePresentation.review ? 'Browse' : 'Home'}");
+  expect(navigation).toContain("title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'}");
   expect(navigation).toContain("tone={workspacePresentation.review ? 'secondary' : 'ghost'}");
-  expect(navigation).toContain('onPress={workspacePresentation.review ? browseFromRoom : homeFromLive}');
+  expect(navigation).toContain('onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive}');
   expect(navigation).toContain('style={[styles.liveHeaderAction, styles.liveHeaderNavigation]}');
 });
 
@@ -30,9 +30,9 @@ test('portrait header uses 5dp vertical padding and landscape keeps its existing
 });
 
 test('variant and mode identity, Chat unread, Menu and portrait Table Chat return remain in the header', () => {
-  expect(header).toContain('<Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>');
+  expect(header).toContain('<Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, width > height && { minWidth: Math.ceil(48 * Math.max(1, fontScale)) }, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>');
   expect(app).toContain("gameIdentity: { fontSize: 18, fontWeight: '800', minWidth: 0 }");
-  expect(header).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
+  expect(header).toContain("title={headerDisplayedUnreadCount === 0 ? 'Chat' : `Chat (${headerDisplayedUnreadCount})`}");
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).toContain('title="Menu" accessibilityLabel={workspacePresentation.menuAccessibilityLabel} tone="secondary" style={styles.liveHeaderAction}');
   expect(header).toContain("onPress={() => setRoomChild('menu')}");

@@ -93,7 +93,7 @@ export default function App() {
 function AppContent() {
   const dispatch = useAppDispatch();
   const { theme } = useHanabTheme();
-  const { contentMaxWidth, width, height, windowClass, imeOcclusion } = useResponsiveLayout();
+  const { contentMaxWidth, width, height, fontScale, windowClass, imeOcclusion } = useResponsiveLayout();
   const landscapePhone = width > height && height < 700;
   const [probe, setProbe] = useState<ProbeStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('');
@@ -148,6 +148,7 @@ function AppContent() {
     roomState.room.kind !== 'none'
     || roomState.pendingRecovery !== null
     || roomState.rematchTransition !== null;
+  const [headerControlWidths, setHeaderControlWidths] = useState<Record<string, { key: string; width: number; unreadCount?: number }>>({});
   const [presentationFocus, setPresentationFocus] = useState<'room' | 'browsing'>('browsing');
   const presentationFocusMemory = useRef<PresentationFocusMemory>({
     previousConnectionEpoch: session.connectionEpoch,
@@ -496,6 +497,8 @@ function AppContent() {
       replayActive: roomState.room.clientState.replay.active,
       sharedReplay: roomState.room.sharedReplay,
     });
+    const c17HeaderOwned = c17Workspace && width > height
+      && liveClientState.metadata.options.numPlayers === liveClientState.metadata.playerNames.length;
     const portraitChatOpen = roomChild === 'chat' && width <= height;
     const workspaceStatusVisible = !portraitChatOpen && !(c17Workspace && width > height) && workspacePresentation.status !== '';
     const gameHeightConstrained = liveConnectionProblem || serverStatusMessage !== null || workspaceStatusVisible;
@@ -645,10 +648,21 @@ function AppContent() {
         </Pressable>}
       </View>;
     };
-    focusedRoomPresentation = (
-      // Keep Live allocation stable through adjustResize; Chat consumes IME locally.
-      <View style={{ height, backgroundColor: theme.colors.background }}>
-        <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
+    const headerWidthKey = `${fontScale}`;
+    // Keep the last validated label until its replacement has an intrinsic width.
+    // Only the inert probe remounts when unread changes; hands and tools stay mounted.
+    const headerDisplayedUnreadCount = headerControlWidths.chat?.key === headerWidthKey
+      ? headerControlWidths.chat.unreadCount ?? liveChatUnreadCount : liveChatUnreadCount;
+    const measureHeaderControl = (name: string, measuredWidth: number) => setHeaderControlWidths((previous) =>
+      previous[name]?.key === headerWidthKey && previous[name]?.width === measuredWidth ? previous
+        : { ...previous, [name]: { key: headerWidthKey, width: measuredWidth } });
+    const headerControlsReady = ['home', 'chat', 'menu'].every((name) =>
+      headerControlWidths[name]?.key === headerWidthKey && headerControlWidths[name]!.width > 0);
+    // Native action widths + three 4dp gaps + 16dp padding + a readable identity slot.
+    const landscapeHeaderMinWidth = headerControlsReady
+      ? ['home', 'chat', 'menu'].reduce((sum, name) => sum + headerControlWidths[name]!.width, 0) + 28 + Math.ceil(48 * Math.max(1, fontScale))
+      : 0;
+    const gameHeader = (
         <View style={[
           styles.gameBar,
           landscapePhone && styles.gameBarLandscape,
@@ -659,20 +673,45 @@ function AppContent() {
               <Text style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>Table chat</Text>
               <ActionButton compact title="Return to game" style={styles.liveHeaderAction} onPress={closeRoomChild} />
             </> : <>
-            <ActionButton compact title={workspacePresentation.review ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review ? browseFromRoom : homeFromLive} />
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
+            <View testID="game-header-home" key={`home-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('home', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
+            <ActionButton compact title={workspacePresentation.review && width <= height ? 'Browse' : 'Home'} tone={workspacePresentation.review ? 'secondary' : 'ghost'} style={[styles.liveHeaderAction, styles.liveHeaderNavigation]} onPress={workspacePresentation.review && width <= height ? browseFromRoom : homeFromLive} />
+            </View>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, width > height && { minWidth: Math.ceil(48 * Math.max(1, fontScale)) }, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>
+            <View testID="game-header-chat" key={`chat-${headerWidthKey}`} style={{ flexShrink: 0 }}>
             <ActionButton
               compact
               disabled={roomChild !== null}
-              title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
+              title={headerDisplayedUnreadCount === 0 ? 'Chat' : `Chat (${headerDisplayedUnreadCount})`}
               tone="secondary"
               style={styles.liveHeaderAction}
               onPress={() => setRoomChild('chat')}
             />
+            </View>
+            <View testID="game-header-menu" key={`menu-${headerWidthKey}`} onLayout={(event) => measureHeaderControl('menu', event.nativeEvent.layout.width)} style={{ flexShrink: 0 }}>
             <ActionButton compact disabled={roomChild !== null} title="Menu" accessibilityLabel={workspacePresentation.menuAccessibilityLabel} tone="secondary" style={styles.liveHeaderAction} onPress={() => setRoomChild('menu')} />
+            </View>
             </>}
           </View>
+          <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+            style={{ position: 'absolute', opacity: 0, width: 10000 }}>
+            <View testID="game-header-chat-probe" key={`chat-probe-${headerWidthKey}-${liveChatUnreadCount}`} style={{ alignSelf: 'flex-start' }}
+              onLayout={(event) => {
+                const measuredWidth = event.nativeEvent.layout.width;
+                setHeaderControlWidths((previous) => previous.chat?.key === headerWidthKey
+                  && previous.chat.width === measuredWidth && previous.chat.unreadCount === liveChatUnreadCount ? previous
+                  : { ...previous, chat: { key: headerWidthKey, width: measuredWidth, unreadCount: liveChatUnreadCount } });
+              }}>
+              <ActionButton compact title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}
+                style={styles.liveHeaderAction} onPress={() => {}} />
+            </View>
+          </View>
         </View>
+    );
+    focusedRoomPresentation = (
+      // Keep Live allocation stable through adjustResize; Chat consumes IME locally.
+      <View style={{ height, backgroundColor: theme.colors.background }}>
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
+        {!c17HeaderOwned && gameHeader}
         {workspaceStatusVisible && <Text style={{ backgroundColor: theme.colors.surface, color: theme.colors.textMuted, fontSize: 12, paddingHorizontal: 10, paddingBottom: 4 }}>{workspacePresentation.status}</Text>}
         {liveConnectionProblem && (
           <View style={styles.liveConnectionNotice}>
@@ -691,6 +730,7 @@ function AppContent() {
           styles.gameContainer,
           landscapePhone && styles.gameContainerLandscape,
           c17Workspace && styles.gameContainerC17,
+          c17Workspace && width > height && { paddingTop: 0 },
           { maxWidth: contentMaxWidth },
           ]}
           keyboardDismissMode="on-drag"
@@ -698,8 +738,8 @@ function AppContent() {
           scrollEnabled={gameRootScrollable}
         >
           {!c17Workspace && <LastClueNotice />}
-          <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17] : undefined}>
-            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} />
+          <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17, width > height && { paddingTop: 0 }] : undefined}>
+            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />
           </View>
         </ScrollView>
         </SafeAreaView>
