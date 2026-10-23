@@ -96,7 +96,7 @@ describe('App browsing ownership', () => {
     expect(app).toContain("presentationFocus === 'room' && focusedRoomPresentation === null && roomState.rematchTransition !== null");
     expect(app).toContain("if (roomState.room.kind === 'pregame') {");
     expect(app).toContain("const pregameReady = session.phase === 'ready' && hydrated;");
-    expect(app).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={browseFromRoom}');
+    expect(app).toContain('<PregameScreen backRef={pregameBackRef} onBrowse={homeFromLive}');
     expect(app).toContain('presentationVisible={roomPresentationVisible && !isRoomConversationChild(roomChild)}');
     expect(app).not.toContain('content = <PregameScreen />');
   });

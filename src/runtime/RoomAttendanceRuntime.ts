@@ -14,6 +14,8 @@ import {
   isSpectateEligible,
 } from './lobbyEligibility';
 
+import { canExitOwnedReplay, type ReplayExitOwner } from './replayExitEligibility';
+
 // Owns attendance commands; connection, reconnect recovery, and bootstrap stay in LobbyRuntime.
 export class RoomAttendanceRuntime {
   constructor(
@@ -235,13 +237,14 @@ export class RoomAttendanceRuntime {
     return this.store.getState().room.pendingRoleSwitch?.tableID === room.tableID;
   }
 
-  unattendLiveGame(tableID: number): boolean {
+  unattendLiveGame(tableID: number, expectedReview?: ReplayExitOwner): boolean {
     const state = this.store.getState();
     const room = state.room.room;
     if (
       room.kind !== 'live_game'
       || room.tableID !== tableID
       || state.room.pendingUnattendTableID !== null
+      || (expectedReview !== undefined && (!canExitOwnedReplay(state, tableID, expectedReview) || !this.isReadyCurrentRoom(tableID)))
     ) return false;
 
     const sent = this.sendEncoded(encodeTableUnattendFrame(tableID));
