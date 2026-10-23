@@ -665,6 +665,8 @@ PR1 (2026-10-23) replaces those baseline reservations with `scaledFont = max(1, 
 
 The left column subtracts the measured left header plus a fixed 30dp × scaledFont temporal/cue lane from its grid height. The right metric row reserves `ceil(34 * scaledFont)`; its natural measured height and width must fit before gameplay is exposed. Right body minimum remains metric height + 92 + 68 + 12 + 88 until PR3 revises the mandatory Clue envelope. Inputs are safe-content dimensions already measured under App's single system-inset owner; no second subtraction. Three 68dp card rows need 278dp before the left header: at a 48dp header, a 324dp safe-content height fails the 326dp minimum explicitly. These are deterministic geometry checks, not physical Android PASS.
 
+The left width also reserves the native intrinsic Home/Chat/Menu widths (including the full unread count), 28dp for three gaps and horizontal padding, and a minimum identity slot of `ceil(48 * scaledFont)`. Pending header measurements do not expose gameplay. Impossible allocation retains Home/Chat/Menu in a full-width non-gameplay fallback header; controls must not overflow into an actionable right row. Header identity may ellipsize within its reserved slot.
+
 ### Right Live column
 
 **2026-10-23 revision:** the following numeric envelopes record the previous Slice 8b baseline only and are not sufficient fit criteria for the revised composition. Measure full-size Score/Pace/Efficiency and worst supported Clue Composer with sticky Give/Close, card floor, font scaling and safe insets before accepting windows. Use the bounded size-failure path for impossible geometry; do not shrink metrics or hide mandatory controls.

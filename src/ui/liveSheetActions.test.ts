@@ -113,7 +113,7 @@ test('Live header retains Home variant Chat Menu outside portrait Chat', () => {
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
   expect(header).not.toMatch(/More|username|YOUR TURN|LIVE T/);
   expect(header).toContain('workspacePresentation.identity');
-  expect(header).not.toContain('width <= height');
+  expect(header).toContain("workspacePresentation.review && width <= height ? 'Browse' : 'Home'");
 });
 
 test('portrait Chat replaces contents of the same Live header and has no second task header', () => {

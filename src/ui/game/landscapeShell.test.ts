@@ -6,7 +6,7 @@ const c17 = readFileSync('src/ui/game/C17GameScreen.tsx', 'utf8').replace(/\r\n/
 
 test('App supplies the existing header into the landscape left pane without changing mounted game ownership', () => {
   expect(app).toContain('const gameHeader = (');
-  expect(app).toContain('{!(c17Workspace && width > height) && gameHeader}');
+  expect(app).toContain('{!c17HeaderOwned && gameHeader}');
   expect(app).toContain('landscapeHeader={gameHeader}');
   const left = c17.slice(c17.indexOf('{landscapeHeader}'), c17.indexOf('style={[styles.landscapeLiveColumn'));
   expect(left).toContain('{temporalContext}');

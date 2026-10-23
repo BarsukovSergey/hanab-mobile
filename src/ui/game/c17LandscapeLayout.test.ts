@@ -95,6 +95,24 @@ describe('card, divider and right-column envelopes', () => {
     expect(landscapeMetricsFit(378, 377.5, 51, 1.5)).toBe(true);
     expect(getLandscapeMetricHeight(2)).toBe(68);
   });
+
+  test('reserves a measured fixed-probe width only when the readable cards can fit beside it', () => {
+    const measured = fit({ metricRowWidth: 350.4 });
+    expect(measured.rightMin).toBe(351);
+    expect(measured.rightWidth).toBeGreaterThanOrEqual(351);
+    expect(getC17LandscapeLayout({ ...envelope, availableWidth: 500, metricRowWidth: 351 }).fits).toBe(false);
+  });
+
+  test('reserves native header actions and readable identity, failing before buttons can overlap metrics', () => {
+    const roomy = fit({ leftHeaderMinWidth: 500, leftHeaderHeight: 78 });
+    expect(roomy.leftWidth).toBeGreaterThanOrEqual(500);
+    expect(roomy.gridWidth).toBeLessThanOrEqual(roomy.leftWidth);
+    expect(getC17LandscapeLayout({ ...envelope, availableWidth: 720, leftHeaderMinWidth: 480 }))
+      .toEqual({ fits: false, reason: 'card-floor' });
+    // The 480dp action/identity fixture models enlarged labels and multi-digit unread;
+    // these are supplied native dimensions, not claimed Android font measurements.
+    expect(getC17LandscapeLayout({ ...envelope, leftHeaderMinWidth: NaN }).fits).toBe(false);
+  });
   test.each([2, 3, 4, 5, 6])('%iP successful geometry respects every floor and bound', (playerCount) => {
     for (const fontScale of [0.8, 1, 1.25, 1.5, 2]) {
       const result = fit({ playerCount, cardsPerHand: playerCount < 4 ? 5 : playerCount === 6 ? 3 : 4, fontScale, availableWidth: 1200, availableHeight: 420 });

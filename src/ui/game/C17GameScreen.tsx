@@ -91,7 +91,7 @@ const HAND_ROW_HORIZONTAL_PADDING = 4;
 const HAND_ROW_BORDER_WIDTH = 1;
 const HAND_CARD_GAP = 3;
 
-export function C17GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode }) {
+export function C17GameScreen({ presentationVisible = true, roomChildren, heightConstrained = false, landscapeHeader, landscapeHeaderMinWidth = 0 }: { presentationVisible?: boolean; roomChildren?: RoomChildren; heightConstrained?: boolean; landscapeHeader?: ReactNode; landscapeHeaderMinWidth?: number }) {
   const { theme } = useHanabTheme();
   const { width, height } = useResponsiveLayout();
   const orientation = width > height ? 'landscape' : 'portrait';
@@ -571,6 +571,7 @@ export function C17GameScreen({ presentationVisible = true, roomChildren, height
       canEnterClue={enabled || hypotheticalEnabled}
       recentActions={recentActions}
       presentationVisible={presentationVisible}
+      landscapeHeaderMinWidth={landscapeHeaderMinWidth}
       landscapeHeader={landscapeHeader}
       roomChildren={roomChildren}
       result={result}
@@ -708,6 +709,7 @@ function C17DenseWorkspace({
   presentationVisible,
   roomChildren,
   landscapeHeader,
+  landscapeHeaderMinWidth,
   result,
   reviewActive,
   finishedReplay,
@@ -809,6 +811,7 @@ function C17DenseWorkspace({
   presentationVisible: boolean;
   roomChildren?: RoomChildren;
   landscapeHeader?: ReactNode;
+  landscapeHeaderMinWidth: number;
   result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
   finishedReplay: boolean;
@@ -910,6 +913,7 @@ function C17DenseWorkspace({
     availableWidth: layoutMetrics.ambientBodyWidth,
     availableHeight: layoutMetrics.ambientBodyHeight,
     leftHeaderHeight,
+    leftHeaderMinWidth: landscapeHeaderMinWidth,
     metricRowWidth: metricMeasurement.shellKey === shellKey ? metricMeasurement.maximum.width : 0,
     fontScale,
     playerCount: metadata.playerNames.length,
@@ -1273,7 +1277,7 @@ function C17DenseWorkspace({
         onPress={() => setEfficiencyDetailsOpen(true)} />
     </View>
   );
-  const metricsReady = metricMeasurement.shellKey === shellKey && landscapeLayout.fits
+  const metricsReady = (landscapeHeader === undefined || landscapeHeaderMinWidth > 0) && metricMeasurement.shellKey === shellKey && landscapeLayout.fits
     && metricMeasurement.actual.width > 0 && metricMeasurement.maximum.width > 0
     && landscapeMetricsFit(landscapeLayout.rightWidth,
       Math.max(metricMeasurement.actual.width, metricMeasurement.maximum.width),
@@ -1544,7 +1548,7 @@ function C17DenseWorkspace({
     </View>
     </> : <View onLayout={captureAmbientBody} style={styles.landscapeBody}>
       {metricProbe}
-      <View style={{ width: landscapeLayout.fits ? landscapeLayout.leftWidth : Math.max(0, layoutMetrics.ambientBodyWidth - Math.ceil(252 * Math.max(1, fontScale)) - C17_LANDSCAPE_REGION_GAP), minHeight: 0 }}>
+      <View style={{ width: landscapeLayout.fits && metricsReady ? landscapeLayout.leftWidth : layoutMetrics.ambientBodyWidth, minHeight: 0 }}>
         <View onLayout={(event) => setLeftHeaderHeight(event.nativeEvent.layout.height)}>
           {landscapeHeader}
           <View style={{ height: Math.ceil(30 * Math.max(1, fontScale)), paddingHorizontal: 7 }}>{temporalContext}</View>

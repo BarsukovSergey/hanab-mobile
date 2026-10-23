@@ -11,6 +11,8 @@ export type C17LandscapeInput = {
   ownHandPosition: 'top' | 'bottom';
   /** Measured left header/context; already inside the safe-content window. */
   leftHeaderHeight?: number;
+  /** Native Home/Chat/Menu widths, padding/gaps and minimum readable identity. */
+  leftHeaderMinWidth?: number;
   /** Font-scaled native width of the fixed worst-value metric probe. */
   metricRowWidth?: number;
 };
@@ -52,8 +54,8 @@ type HandGrid = Exclude<C17LandscapeLayout, { fits: true }>
 export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
   const { availableWidth, availableHeight, fontScale, playerCount, cardsPerHand,
     seatingAnchorIndex, ownHandPosition } = input;
-  if (![availableWidth, availableHeight, fontScale, input.leftHeaderHeight ?? 0, input.metricRowWidth ?? 0].every(Number.isFinite)
-    || fontScale <= 0 || (input.leftHeaderHeight ?? 0) < 0 || (input.metricRowWidth ?? 0) < 0
+  if (![availableWidth, availableHeight, fontScale, input.leftHeaderHeight ?? 0, input.leftHeaderMinWidth ?? 0, input.metricRowWidth ?? 0].every(Number.isFinite)
+    || fontScale <= 0 || (input.leftHeaderHeight ?? 0) < 0 || (input.metricRowWidth ?? 0) < 0 || (input.leftHeaderMinWidth ?? 0) < 0
     || !Number.isInteger(playerCount) || playerCount < 2 || playerCount > 6
     || !Number.isInteger(cardsPerHand) || cardsPerHand < 1
     || !Number.isInteger(seatingAnchorIndex) || seatingAnchorIndex < 0 || seatingAnchorIndex >= playerCount) {
@@ -95,7 +97,7 @@ export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
     const cardHeight = Math.min(verticalMax, horizontalMax, 112);
     if (cardHeight < 68) return { fits: false, reason: 'card-floor' };
     const leftNeeded = gridWidth(cardHeight);
-    const maxRight = availableWidth - C17_LANDSCAPE_REGION_GAP - leftNeeded;
+    const maxRight = availableWidth - C17_LANDSCAPE_REGION_GAP - Math.max(leftNeeded, input.leftHeaderMinWidth ?? 0);
     if (maxRight < rightMin) return { fits: false, reason: 'card-floor' };
     const rightWidth = Math.min(rightComfort, maxRight);
     return { fits: true, template, rows, cardHeight, cardTopHeadroom: headroom(cardHeight),

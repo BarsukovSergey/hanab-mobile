@@ -30,7 +30,7 @@ test('portrait header uses 5dp vertical padding and landscape keeps its existing
 });
 
 test('variant and mode identity, Chat unread, Menu and portrait Table Chat return remain in the header', () => {
-  expect(header).toContain('<Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>');
+  expect(header).toContain('<Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gameIdentity, styles.flex, width > height && { minWidth: Math.ceil(48 * Math.max(1, fontScale)) }, { color: theme.colors.text }]}>{workspacePresentation.review || workspacePresentation.ownRewind ? workspacePresentation.identity : liveClientState.metadata.options.variantName}</Text>');
   expect(app).toContain("gameIdentity: { fontSize: 18, fontWeight: '800', minWidth: 0 }");
   expect(header).toContain("title={liveChatUnreadCount === 0 ? 'Chat' : `Chat (${liveChatUnreadCount})`}");
   expect(header).toContain("onPress={() => setRoomChild('chat')}");
