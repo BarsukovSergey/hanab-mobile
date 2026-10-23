@@ -135,6 +135,7 @@ function AppContent() {
   const settingsBackRef = useRef<(() => void) | null>(null);
   const historyBackRef = useRef<(() => void) | null>(null);
   const pregameBackRef = useRef<(() => void) | null>(null);
+  const noteBackRef = useRef<(() => boolean) | null>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [exportFeedback, setExportFeedback] = useState<{
     message: string;
@@ -327,6 +328,7 @@ function AppContent() {
         return true;
       }
       if (roomState.room.kind === 'live_game') {
+        if (noteBackRef.current?.()) return true;
         const decision = getFocusedRoomBackDecision(roomState.room);
         if (decision === 'return-live') exitOwnRewind();
         if (decision === 'browse-origin') setPresentationFocus('browsing');
@@ -739,7 +741,7 @@ function AppContent() {
         >
           {!c17Workspace && <LastClueNotice />}
           <View style={c17Workspace ? [styles.gameWorkspace, styles.gameWorkspaceC17, width > height && { paddingTop: 0 }] : undefined}>
-            <GameScreen presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />
+            <GameScreen noteBackRef={noteBackRef} presentationVisible={roomPresentationVisible && roomChild === null} roomChildren={renderRoomChildren} heightConstrained={gameHeightConstrained} landscapeHeader={gameHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />
           </View>
         </ScrollView>
         </SafeAreaView>

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,8 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { composeQuickNote, type QuickNoteToken } from '../../game/selectors/noteComposition';
 import { useAppSelector } from '../../store/hooks';
-import { ActionButton, Field, useHanabTheme } from '../designSystem';
+import { ActionButton, Field, useHanabTheme, useResponsiveLayout } from '../designSystem';
 import { beginNoteEdit, normalizeSubmittedNote, prependTurnToNote } from './noteEditing';
+import { getNotePaneGeometry } from './notePaneGeometry';
 import { getHumanTurnNumber } from './c17Temporal';
 
 const QUICK_TOKENS: readonly { label: string; token: QuickNoteToken }[] = [
@@ -34,10 +36,14 @@ export function NoteEditor({
   visible,
   presentationVisible = true,
   startEditing = false,
+  inlinePane = null,
+  backRef,
   onChange,
   onSave,
   onClose,
 }: {
+  inlinePane?: { width: number; height: number } | null;
+  backRef?: RefObject<(() => boolean) | null>;
   title: string;
   value: string;
   editable: boolean;
@@ -50,6 +56,9 @@ export function NoteEditor({
 }) {
   const { theme } = useHanabTheme();
   const insets = useSafeAreaInsets();
+  const { imeOcclusion, systemInsets } = useResponsiveLayout();
+  const inline = inlinePane !== null;
+  const paneGeometry = inlinePane === null ? null : getNotePaneGeometry(inlinePane, imeOcclusion, systemInsets.bottom);
   const [editing, setEditing] = useState(false);
   const [presentationReady, setPresentationReady] = useState(false);
   const [focusOnShow, setFocusOnShow] = useState(false);
@@ -83,8 +92,8 @@ export function NoteEditor({
     setDraft(initial);
     onChange(initial);
     setEditing(shouldEdit);
-    setFocusOnShow(shouldEdit && presentationVisible);
-  }, [editable, onChange, presentationVisible, startEditing, value, visible]);
+    setFocusOnShow(shouldEdit && presentationVisible && !inline);
+  }, [editable, inline, onChange, presentationVisible, startEditing, value, visible]);
 
   useEffect(() => {
     if (presentationVisible) return;
@@ -92,12 +101,16 @@ export function NoteEditor({
     setFocusOnShow(false);
   }, [presentationVisible]);
 
+  useEffect(() => {
+    if (inline) setFocusOnShow(false);
+  }, [inline]);
+
   const setDraftValue = (next: string) => {
     setDraft(next);
     onChange(next);
   };
   const submitValue = (nextValue: string) => {
-    if (!visible || !presentationVisible) return;
+    if (!visible || !presentationVisible || !editable) return;
     const normalized = normalizeSubmittedNote(nextValue);
     lastSubmittedNote.current = normalized;
     onSave(normalized);
@@ -120,34 +133,30 @@ export function NoteEditor({
     setDraft(next);
     onChange(next);
     setEditing(true);
-    setFocusOnShow(true);
+    setFocusOnShow(!inline);
   };
   const cancelAndClose = () => {
     if (!presentationVisible) return;
+    Keyboard.dismiss();
     setDraft(sessionSavedValue.current);
     onChange(sessionSavedValue.current);
     setEditing(false);
     onClose();
   };
-  const autofocusReady = editable && editing && presentationReady && focusOnShow;
+  const autofocusReady = !inline && editable && editing && presentationReady && focusOnShow;
 
-  return <Modal
-    animationType="slide"
-    onRequestClose={cancelAndClose}
-    onShow={() => setPresentationReady(true)}
-    statusBarTranslucent
-    transparent
-    visible={visible && presentationVisible}
-  >
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.keyboardAvoider}
-    >
-      <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
+  useEffect(() => {
+    if (!backRef || !inline || !visible || !presentationVisible) return;
+    const handleBack = () => { cancelAndClose(); return true; };
+    backRef.current = handleBack;
+    return () => { if (backRef.current === handleBack) backRef.current = null; };
+  }, [backRef, inline, visible, presentationVisible, cancelAndClose]);
+
+  const sheet = <View style={[styles.sheet, inline && styles.inlineSheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.borderStrong }]}>
           <ScrollView
             bounces={false}
-            contentContainerStyle={[styles.sheetContent, { paddingBottom: SHEET_CONTENT_BOTTOM_PADDING + insets.bottom }]}
+            style={inline ? styles.inlineScroll : undefined}
+            contentContainerStyle={[styles.sheetContent, inline ? { padding: 10, paddingBottom: 10 } : { paddingBottom: SHEET_CONTENT_BOTTOM_PADDING + insets.bottom }]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.header}>
@@ -155,18 +164,19 @@ export function NoteEditor({
                 <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>CARD NOTE</Text>
                 <Text numberOfLines={2} style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
               </View>
-              <ActionButton compact title="Close" tone="ghost" onPress={cancelAndClose} />
+              {!inline && <ActionButton compact title="Close" tone="ghost" onPress={cancelAndClose} />}
             </View>
+            {inline && <Text style={[styles.quickHint, { color: theme.colors.textMuted }]}>Save or Cancel before choosing another card.</Text>}
             <Field
               autoFocus={autofocusReady}
               blurOnSubmit={editing}
-              editable={editing}
+              editable={editable && editing}
               enterKeyHint={editing ? 'done' : undefined}
               key={autofocusReady ? 'editing-ready' : editing ? 'editing-pending' : 'readonly'}
               maxLength={editing ? 300 : undefined}
               multiline={!editing}
-              onChangeText={editing ? change : undefined}
-              onSubmitEditing={editing ? submit : undefined}
+              onChangeText={editable && editing ? change : undefined}
+              onSubmitEditing={editable && editing ? submit : undefined}
               placeholder={editing ? 'Add a private note' : 'No saved note on this card'}
               returnKeyType={editing ? 'done' : undefined}
               style={[styles.input, !editing && styles.readOnlyInput]}
@@ -205,18 +215,37 @@ export function NoteEditor({
               </View>
               <Text style={[styles.quickHint, { color: theme.colors.textMuted }]}>Quick actions update the draft only.</Text>
               <View style={styles.actions}>
-                <ActionButton title="Save" tone="primary" onPress={submit} />
+                {!inline && <ActionButton title="Save" tone="primary" onPress={submit} />}
                 <ActionButton disabled={draft.length === 0} title="Clear" onPress={() => setDraftValue('')} />
               </View>
             </>}
           </ScrollView>
-        </View>
-      </View>
+          {inline && <View testID="note-editor-footer" style={styles.inlineFooter}>
+            <ActionButton compact title="Cancel" onPress={cancelAndClose} />
+            {editable && editing && <ActionButton compact title="Save" tone="primary" onPress={submit} />}
+          </View>}
+        </View>;
+  if (inline) return visible && presentationVisible && paneGeometry !== null
+    ? <View testID="note-editor-pane" style={[styles.inlinePane, paneGeometry]}>{sheet}</View> : null;
+  return <Modal
+    animationType="slide"
+    onRequestClose={cancelAndClose}
+    onShow={() => setPresentationReady(true)}
+    statusBarTranslucent
+    transparent
+    visible={visible && presentationVisible}
+  >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoider}>
+      <View style={styles.backdrop}>{sheet}</View>
     </KeyboardAvoidingView>
   </Modal>;
 }
 
 const styles = StyleSheet.create({
+  inlinePane: { position: 'absolute', right: 0, top: 0 },
+  inlineSheet: { flex: 1, minHeight: 0, borderRadius: 8 },
+  inlineScroll: { flex: 1, minHeight: 0 },
+  inlineFooter: { flexShrink: 0, flexDirection: 'row', gap: 8, padding: 6 },
   keyboardAvoider: { flex: 1 },
   backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.58)', flex: 1, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, maxHeight: '100%' },

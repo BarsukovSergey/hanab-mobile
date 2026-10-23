@@ -8,7 +8,7 @@ describe('gameplay presentation visibility', () => {
   test('the gameplay wrapper passes visibility to the C17 implementation and denies interaction on invalid metadata', () => {
     const wrapper = read('GameScreen.tsx');
     expect(wrapper).toContain('presentationVisible = true');
-    expect(wrapper).toContain('<C17GameScreen presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} landscapeHeader={landscapeHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
+    expect(wrapper).toContain('<C17GameScreen noteBackRef={noteBackRef} presentationVisible={presentationVisible} roomChildren={roomChildren} heightConstrained={heightConstrained} landscapeHeader={landscapeHeader} landscapeHeaderMinWidth={landscapeHeaderMinWidth} />');
     expect(wrapper).not.toContain('LegacyGameScreen');
     expect(wrapper).toContain('pointerEvents="none"');
     expect(wrapper).toContain('unsupported or inconsistent player data');
