@@ -745,6 +745,133 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+describe('raw same-table bootstrap provenance (#223)', () => {
+  const start = 'tableStart {"tableID":123,"replay":false}';
+  function spectatorInit(shadow = -1): string {
+    return `init ${JSON.stringify(makeInit({
+      playerNames: ['Bob', 'Cy'], spectating: true,
+      shadowing: shadow >= 0, ourPlayerIndex: Math.max(0, shadow),
+    }))}`;
+  }
+  function spectatorHistory(shadow = -1): string {
+    return `gameActionList ${JSON.stringify({ tableID: 123, list: [
+      ...Array.from({ length: 10 }, (_, order) => {
+        const playerIndex = Math.floor(order / 5);
+        const hidden = playerIndex === shadow;
+        return { type: 'draw', playerIndex, order,
+          suitIndex: hidden ? -1 : order % 5,
+          rank: hidden ? -1 : playerIndex === 0 ? 1 : order % 5 + 1 };
+      }),
+      { type: 'status', clues: 8, score: 0, maxScore: 25 },
+      { type: 'turn', num: 0, currentPlayerIndex: 0 },
+    ] })}`;
+  }
+  async function spectator() {
+    const ready = await makeReadyRuntime();
+    ready.store.dispatch(lobbyActions.tableReceived({
+      epoch: 1, table: { ...runningTable, numPlayers: 2, players: ['Bob', 'Cy'] },
+    }));
+    expect(ready.runtime.spectate(123)).toBe(true);
+    ready.socket.emitMessage(start);
+    ready.socket.emitMessage(spectatorInit());
+    ready.socket.emitMessage(spectatorHistory());
+    return ready;
+  }
+  function expectShadowedSecondPlayer(store: ReturnType<typeof createAppStore>) {
+    const room = store.getState().room.room;
+    expect(room).toMatchObject({ kind: 'live_game', role: 'spectator', liveActionCount: 0,
+      clientState: { shadowing: true, metadata: { ourPlayerIndex: 1 } } });
+    if (room.kind !== 'live_game') throw new Error('Expected spectator Live');
+    expect(room.clientState.ongoingGame.deck[0]).toMatchObject({ suitIndex: 0, rank: 1 });
+    expect(room.clientState.ongoingGame.deck[5]).toMatchObject({ suitIndex: null, rank: null });
+  }
+
+  test('rapid perspective requests accept first init in the newer local load using latest server perspective', async () => {
+    const { runtime, socket, store } = await spectator();
+    const sentBefore = socket.sent.length;
+    expect(runtime.setSpectatorPerspective(0)).toBe(true);
+    expect(runtime.setSpectatorPerspective(1)).toBe(true);
+    // Both commands precede info1 A: the server updates perspective twice and
+    // queues both starts before either init. No wire field identifies load A/B.
+    socket.emitMessage(start);
+    socket.emitMessage(start);
+    expect(store.getState().room.room).toMatchObject({
+      kind: 'awaiting_game_bootstrap', bootstrap: { gameLoadEpoch: 3, phase: 'waiting_init' },
+    });
+    socket.emitMessage(spectatorInit(1)); // response to info1 A, now shadowing player 1
+    const waitingHistory = store.getState().room.room;
+    expect(waitingHistory).toMatchObject({ bootstrap: { gameLoadEpoch: 3, phase: 'waiting_history' } });
+    socket.emitMessage(spectatorInit(1)); // response to info1 B, ignored by phase
+    expect(store.getState().room.room).toBe(waitingHistory);
+    socket.emitMessage(spectatorHistory(1));
+    expectShadowedSecondPlayer(store);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":0}',
+      'tableSpectate {"tableID":123,"shadowingPlayerIndex":1}',
+      'getGameInfo1 {"tableID":123}', 'getGameInfo1 {"tableID":123}',
+      'getGameInfo2 {"tableID":123}',
+    ]);
+    expect(runtime.play(0)).toBe(false);
+    expect(store.getState().session.phase).toBe('ready');
+  });
+
+  test('history for a superseded load arriving before the new init is discarded', async () => {
+    const { runtime, socket, store } = await spectator();
+    expect(runtime.setSpectatorPerspective(0)).toBe(true);
+    socket.emitMessage(start); // info1 A
+    // Protocol-adversarial overlap: raw READY send while loading. The regular
+    // perspective UI/runtime method is blocked here; the server accepts this command.
+    expect(runtime.setSpectatorPerspective(1)).toBe(false);
+    expect(runtime.send('tableSpectate', { tableID: 123, shadowingPlayerIndex: 1 })).toBe(true);
+    socket.emitMessage(spectatorInit(0)); // enqueued before start B; sends info2 A
+    socket.emitMessage(start); // B was processed before info2 A; sends info1 B
+    const waitingInit = store.getState().room.room;
+    // info2 A follows perspective B on the wire, so its snapshot already reflects B.
+    socket.emitMessage(spectatorHistory(1));
+    expect(store.getState().room.room).toBe(waitingInit);
+    expect(waitingInit).toMatchObject({ bootstrap: { gameLoadEpoch: 3, phase: 'waiting_init' } });
+    socket.emitMessage(spectatorInit(1));
+    socket.emitMessage(spectatorHistory(1));
+    expectShadowedSecondPlayer(store);
+    expect(socket.sent.filter((frame) => frame.startsWith('getGameInfo2'))).toHaveLength(3);
+    expect(socket.sent.some((frame) => frame.startsWith('loaded '))).toBe(false);
+  });
+
+  test('unscoped replay action during rebuild is discarded; post-history snapshot restores the branch', async () => {
+    const { runtime, socket, store } = await makeSharedReplayRuntime('Bob');
+    const original = store.getState().room.room;
+    if (original.kind !== 'live_game') throw new Error('Expected shared replay');
+    const history = { tableID: 123, list: original.clientState.replay.actions };
+    const action = { type: 'clue', clue: { type: 1, value: 1 }, giver: 1,
+      list: [0], target: 0, ignoreNegative: false } as const;
+    const sentBefore = socket.sent.length;
+    socket.emitMessage('tableStart {"tableID":123,"replay":true}');
+    // Another leader's event can be queued after start but before info1/info2.
+    socket.emitMessage(`hypoStart {"TableID":123}`);
+    socket.emitMessage(`hypoAction ${JSON.stringify(JSON.stringify(action))}`);
+    socket.emitMessage(`init ${JSON.stringify(makeInit({
+      replay: true, sharedReplay: true, databaseID: 77,
+      datetimeFinished: '2026-08-31T00:10:00Z', sharedReplayLeader: 'Bob', sharedReplaySegment: 1,
+    }))}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify(history)}`);
+    let room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected rebuilt shared replay');
+    expect(room.clientState.replay.hypothetical).toBeNull();
+    // Pinned info2 emits this unscoped snapshot after history, not before it.
+    socket.emitMessage(`hypothetical ${JSON.stringify({
+      showDrawnCards: true, actions: [JSON.stringify(action)],
+    })}`);
+    room = store.getState().room.room;
+    if (room.kind !== 'live_game') throw new Error('Expected shared replay');
+    expect(room.clientState.replay.hypothetical?.actions).toEqual([action]);
+    expect(socket.sent.slice(sentBefore)).toEqual([
+      'getGameInfo1 {"tableID":123}', 'getGameInfo2 {"tableID":123}',
+    ]);
+    expect(runtime.play(0)).toBe(false);
+    expect(runtime.discard(0)).toBe(false);
+  });
+});
+
 describe('uncorrelated gameplay responses (#222)', () => {
   function emitRecoveredGame(socket: FakeSocket, actionProcessed = false, timed = false): void {
     socket.emitMessage('tableStart {"tableID":123,"replay":false}');
