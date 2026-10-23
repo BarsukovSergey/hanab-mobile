@@ -99,6 +99,13 @@ function AppContent() {
   const [statusMessage, setStatusMessage] = useState('');
   const [loginPending, setLoginPending] = useState(false);
   const [signOutPending, setSignOutPending] = useState(false);
+  const authOperation = useRef(0);
+  const beginAuthOperation = useCallback(() => {
+    const operation = ++authOperation.current;
+    setLoginPending(false);
+    setSignOutPending(false);
+    return () => authOperation.current === operation;
+  }, []);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [recentAccounts, setRecentAccounts] = useState<string[]>([]);
@@ -213,10 +220,18 @@ function AppContent() {
   const serverStatusMessage = session.authenticatedUser === null
     ? null : getServerStatusNoticeMessage(session.serverStatus);
 
-  const runProbe = useCallback(async () => {
+  const runProbe = useCallback(async (): Promise<void> => {
+    const isCurrent = beginAuthOperation();
     setProbe('checking');
     setStatusMessage('');
-    const result = await lobbyRuntime.checkSession();
+    const result = await lobbyRuntime.checkSession(isCurrent);
+    if (!isCurrent()) return;
+    if (result.kind === 'superseded') {
+      // A connection boundary can supersede a probe without another UI task.
+      // Ask for fresh HTTP evidence rather than interpreting the obsolete result.
+      void runProbe();
+      return;
+    }
     if (result.kind === 'valid') {
       setProbe('valid');
       void lobbyRuntime.connect();
@@ -226,7 +241,7 @@ function AppContent() {
       setProbe('indeterminate');
       setStatusMessage(result.error.message);
     }
-  }, []);
+  }, [beginAuthOperation]);
 
   useEffect(() => { void runProbe(); }, [runProbe]);
 
@@ -247,6 +262,7 @@ function AppContent() {
       lobbyRuntime.setAppActive(state === 'active');
     });
     return () => {
+      authOperation.current += 1;
       subscription.remove();
       lobbyRuntime.disconnect();
     };
@@ -330,18 +346,29 @@ function AppContent() {
     }
   };
 
-  const submitCredentials = async (loginUsername: string, loginPassword: string, offerCredentialSave: boolean) => {
+  const submitCredentials = async (
+    loginUsername: string, loginPassword: string, offerCredentialSave: boolean,
+    isCurrent = beginAuthOperation(),
+  ) => {
     setLoginPending(true);
     setStatusMessage('');
     try {
       await networkSession.submitLogin(loginUsername, loginPassword);
+      if (!isCurrent()) return;
       setPassword('');
-      const result = await lobbyRuntime.checkSession();
+      const result = await lobbyRuntime.checkSession(isCurrent);
+      if (!isCurrent()) return;
+      if (result.kind === 'superseded') {
+        void runProbe();
+        return;
+      }
       if (result.kind === 'valid') {
         if (offerCredentialSave) {
           const accounts = await rememberAccount(loginUsername);
+          if (!isCurrent()) return;
           if (accounts.length > 0) setRecentAccounts(accounts);
           await savePasswordCredential(loginUsername, loginPassword);
+          if (!isCurrent()) return;
         }
         setProbe('valid');
         setBrowsing(createBrowsingPresentation('home'));
@@ -354,24 +381,27 @@ function AppContent() {
           : 'Login was not accepted. Check your username and password.');
       }
     } catch (error) {
+      if (!isCurrent()) return;
       setPassword('');
       setShowManualLogin(true);
       setStatusMessage(error instanceof Error ? error.message : 'Login request failed');
     } finally {
-      setLoginPending(false);
+      if (isCurrent()) setLoginPending(false);
     }
   };
 
   const submitManualLogin = () => submitCredentials(username, password, true);
 
   const chooseRecentAccount = async (account: string) => {
+    const isCurrent = beginAuthOperation();
     setUsername(account);
     setPassword('');
     setStatusMessage('');
     setLoginPending(true);
     const result = await getPasswordCredential(account);
+    if (!isCurrent()) return;
     if (result.kind === 'credential') {
-      await submitCredentials(result.username, result.password, false);
+      await submitCredentials(result.username, result.password, false, isCurrent);
       return;
     }
     setLoginPending(false);
@@ -379,9 +409,15 @@ function AppContent() {
   };
 
   const signOut = async () => {
+    const isCurrent = beginAuthOperation();
     setSignOutPending(true);
     setStatusMessage('');
-    const result = await lobbyRuntime.signOut();
+    const result = await lobbyRuntime.signOut(isCurrent);
+    if (!isCurrent()) return;
+    if (result.kind === 'superseded') {
+      void runProbe();
+      return;
+    }
     if (result.kind === 'signedOut') {
       setProbe('missing');
       setBrowsing(createBrowsingPresentation('home'));

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState, Text, TextInput, View } from 'react-native';
+import { Alert, AppState, Text, TextInput, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
 
@@ -17,6 +17,9 @@ import { GameBootstrapStatus } from './GameBootstrapStatus';
 import { C17GameScreen } from './game/C17GameScreen';
 import { ClueComposer } from './game/ClueComposer';
 import { GameCard } from './game/GameCard';
+import { PregameScreen } from './screens/PregameScreen';
+import type { SessionCheckResult } from '../network/types';
+import * as credentialAccounts from '../platform/credentialAccounts';
 
 const { act, create } = require('react-test-renderer');
 
@@ -58,6 +61,7 @@ afterEach(() => {
   if (tree) act(() => tree.unmount());
   tree = undefined;
   mockRuntime.disconnect();
+  jest.restoreAllMocks();
   jest.useRealTimers();
 });
 
@@ -89,6 +93,227 @@ function pressButton(title: string) {
   expect(matches[0].props.disabled).not.toBe(true);
   act(() => matches[0].props.onPress());
 }
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function pregame(socket: FakeSession['sockets'][number]) {
+  const stats = {
+    numGames: 0,
+    variant: { numGames: 0, averageScore: 0, numStrikeouts: 0, bestScores: [] },
+  };
+  socket.emitMessage(`game ${JSON.stringify({
+    tableID: 123, name: 'Session probe room', owner: 1,
+    players: ['Ada', 'Bob'].map((name, index) => ({
+      index, name, you: index === 0, present: true, stats,
+    })),
+    options: makeInit().options, passwordProtected: false, maxPlayers: 5,
+  })}`);
+  socket.emitMessage('joined {"tableID":123}');
+}
+
+function welcomeLobby(socket: FakeSession['sockets'][number]) {
+  socket.emitOpen();
+  socket.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[]}');
+  socket.emitMessage('userList []');
+  socket.emitMessage('tableList []');
+}
+
+test('a late missing HTTP probe cannot reset the newer session reached through visible pregame Retry', async () => {
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  const first = mockSession.sockets[0];
+  act(() => { welcome(first); pregame(first); });
+  expect(store.getState().room.room.kind).toBe('pregame');
+  expect(tree.root.findByType(PregameScreen).props.presentationVisible).toBe(true);
+  act(() => first.emitClose());
+
+  const older = deferred<{ kind: 'missing' }>();
+  const newer = deferred<{ kind: 'valid' }>();
+  const check = jest.spyOn(mockSession, 'checkSession')
+    .mockImplementationOnce(() => older.promise)
+    .mockImplementationOnce(() => newer.promise);
+  // The focused pregame closed-connection panel retains its visible Retry
+  // while checking; these are two ordinary presses across separate renders.
+  pressButton('Retry');
+  expect(buttons('Retry')).toHaveLength(1);
+  pressButton('Retry');
+  expect(check).toHaveBeenCalledTimes(2);
+  await act(async () => { newer.resolve({ kind: 'valid' }); });
+  const second = mockSession.sockets[1];
+  act(() => { welcome(second); pregame(second); });
+  const current = store.getState();
+  expect(current.session.phase).toBe('ready');
+  expect(current.room.room.kind).toBe('pregame');
+
+  await act(async () => { older.resolve({ kind: 'missing' }); });
+
+  expect(store.getState()).toBe(current);
+  expect(second.readyState).toBe(1);
+  expect(tree.root.findByType(PregameScreen).props.presentationVisible).toBe(true);
+  expect(buttons('Login')).toHaveLength(0);
+});
+
+test('an older pregame probe cannot undo a newer manual login', async () => {
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  const first = mockSession.sockets[0];
+  act(() => { welcome(first); pregame(first); first.emitClose(); });
+  const older = deferred<SessionCheckResult>();
+  const check = jest.spyOn(mockSession, 'checkSession')
+    .mockImplementationOnce(() => older.promise)
+    .mockResolvedValueOnce({ kind: 'missing' });
+  pressButton('Retry');
+  await act(async () => { pressButton('Retry'); });
+  expect(buttons('Login')).toHaveLength(1);
+  act(() => {
+    tree.root.findByProps({ placeholder: 'Username', value: '' }).props.onChangeText('Bob');
+    tree.root.findByProps({ placeholder: 'Password', value: '' }).props.onChangeText('test-only-placeholder');
+  });
+  const login = jest.spyOn(mockSession, 'submitLogin');
+  await act(async () => { pressButton('Login'); });
+  expect(login).toHaveBeenCalledTimes(1);
+  expect(check).toHaveBeenCalledTimes(3);
+  const second = mockSession.sockets[1];
+  act(() => {
+    second.emitOpen();
+    second.emitMessage('welcome {"userID":2,"username":"Bob","totalGames":0,"playingAtTables":[]}');
+    second.emitMessage('userList []');
+    second.emitMessage('tableList []');
+  });
+  const current = store.getState();
+  expect(current.session.authenticatedUser?.username).toBe('Bob');
+  await act(async () => { older.resolve({ kind: 'missing' }); });
+  expect(store.getState()).toBe(current);
+  expect(second.readyState).toBe(1);
+  expect(buttons('Login')).toHaveLength(0);
+});
+
+test('a late valid initial probe cannot reopen the socket after App unmount', async () => {
+  const pending = deferred<SessionCheckResult>();
+  jest.spyOn(mockSession, 'checkSession').mockImplementation(() => pending.promise);
+  const open = jest.spyOn(mockSession, 'openSocket');
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  act(() => tree!.unmount());
+  tree = undefined;
+  await act(async () => { pending.resolve({ kind: 'valid' }); });
+  expect(open).not.toHaveBeenCalled();
+  expect(store.getState().session.phase).toBe('closed');
+});
+
+test('an unmounted probe cannot reset a remounted App with newer realtime authority', async () => {
+  const older = deferred<SessionCheckResult>();
+  jest.spyOn(mockSession, 'checkSession').mockImplementationOnce(() => older.promise);
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  act(() => tree!.unmount());
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  const socket = mockSession.sockets[0];
+  act(() => { welcome(socket); pregame(socket); });
+  const current = store.getState();
+  await act(async () => { older.resolve({ kind: 'missing' }); });
+  expect(store.getState()).toBe(current);
+  expect(socket.readyState).toBe(1);
+  expect(tree.root.findByType(PregameScreen).props.presentationVisible).toBe(true);
+});
+
+test('a current App probe superseded by reconnect obtains fresh HTTP evidence exactly once', async () => {
+  const older = deferred<SessionCheckResult>();
+  const newer = deferred<SessionCheckResult>();
+  const check = jest.spyOn(mockSession, 'checkSession')
+    .mockImplementationOnce(() => older.promise)
+    .mockImplementationOnce(() => newer.promise);
+  const open = jest.spyOn(mockSession, 'openSocket');
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  await act(async () => { await mockRuntime.connect(); });
+  const socket = mockSession.sockets[0];
+  act(() => welcomeLobby(socket));
+  await act(async () => { older.resolve({ kind: 'missing' }); });
+  expect(check).toHaveBeenCalledTimes(2);
+  expect(store.getState().session.phase).toBe('ready');
+  await act(async () => { newer.resolve({ kind: 'valid' }); });
+  expect(check).toHaveBeenCalledTimes(2);
+  expect(open).toHaveBeenCalledTimes(1);
+  expect(buttons('More')).toHaveLength(1);
+  expect(socket.readyState).toBe(1);
+});
+
+test.each(['HTTP login', 'credential save'] as const)(
+  'unmount during %s prevents later verification or reconnect', async (stage) => {
+    jest.spyOn(mockSession, 'checkSession').mockResolvedValueOnce({ kind: 'missing' });
+    const submit = deferred<void>();
+    const save = deferred<Awaited<ReturnType<typeof credentialAccounts.savePasswordCredential>>>();
+    const login = jest.spyOn(mockSession, 'submitLogin');
+    if (stage === 'HTTP login') login.mockImplementation(() => submit.promise);
+    else jest.spyOn(credentialAccounts, 'savePasswordCredential').mockImplementation(() => save.promise);
+    const check = jest.spyOn(mockSession, 'checkSession');
+    const open = jest.spyOn(mockSession, 'openSocket');
+    await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+    act(() => {
+      tree.root.findByProps({ placeholder: 'Username', value: '' }).props.onChangeText('Ada');
+      tree.root.findByProps({ placeholder: 'Password', value: '' }).props.onChangeText('test-only-placeholder');
+    });
+    await act(async () => { pressButton('Login'); });
+    expect(login).toHaveBeenCalledTimes(1);
+    const before = check.mock.calls.length;
+    act(() => tree!.unmount());
+    tree = undefined;
+    await act(async () => { submit.resolve(); save.resolve({ kind: 'unavailable' }); });
+    expect(check).toHaveBeenCalledTimes(before);
+    expect(open).not.toHaveBeenCalled();
+  },
+);
+
+test('unmount while choosing a recent account prevents obsolete credentials starting login', async () => {
+  jest.spyOn(mockSession, 'checkSession').mockResolvedValue({ kind: 'missing' });
+  jest.spyOn(credentialAccounts, 'listRecentAccounts').mockResolvedValue(['Ada']);
+  const credentials = deferred<Awaited<ReturnType<typeof credentialAccounts.getPasswordCredential>>>();
+  jest.spyOn(credentialAccounts, 'getPasswordCredential').mockImplementation(() => credentials.promise);
+  const login = jest.spyOn(mockSession, 'submitLogin');
+  await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+  pressButton('Ada');
+  act(() => tree!.unmount());
+  tree = undefined;
+  await act(async () => {
+    credentials.resolve({ kind: 'credential', username: 'Ada', password: 'test-only-placeholder' });
+  });
+  expect(login).not.toHaveBeenCalled();
+});
+
+test.each(['logout completion', 'logout verification'] as const)(
+  'unmount during %s protects a remounted App from obsolete sign-out followups', async (stage) => {
+    await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+    act(() => welcomeLobby(mockSession.sockets[0]));
+    const logout = deferred<void>();
+    const verification = deferred<SessionCheckResult>();
+    const check = jest.spyOn(mockSession, 'checkSession');
+    const submit = jest.spyOn(mockSession, 'logout');
+    if (stage === 'logout completion') submit.mockImplementation(() => logout.promise);
+    else check.mockImplementationOnce(() => verification.promise);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    pressButton('More');
+    pressButton('Settings');
+    pressButton('Account & security');
+    pressButton('Sign out');
+    const confirm = alert.mock.calls.at(-1)?.[2]?.find((button) => button.text === 'Sign out')?.onPress;
+    expect(confirm).toBeDefined();
+    await act(async () => { confirm!(); });
+    expect(submit).toHaveBeenCalledTimes(1);
+    act(() => tree!.unmount());
+    await act(async () => { tree = create(<Provider store={store}><App /></Provider>); });
+    const second = mockSession.sockets[1];
+    act(() => { welcome(second); pregame(second); });
+    const current = store.getState();
+    const calls = check.mock.calls.length;
+
+    await act(async () => { logout.resolve(); verification.resolve({ kind: 'missing' }); });
+
+    expect(check).toHaveBeenCalledTimes(calls);
+    expect(store.getState()).toBe(current);
+    expect(second.readyState).toBe(1);
+    expect(tree.root.findByType(PregameScreen).props.presentationVisible).toBe(true);
+  },
+);
 
 function selectCard(order: number) {
   const cards = tree.root.findAllByType(GameCard).filter((node: { props: { knowledge: { order: number } } }) => node.props.knowledge.order === order);
