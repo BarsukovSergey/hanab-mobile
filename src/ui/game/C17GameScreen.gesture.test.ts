@@ -18,9 +18,9 @@ test('C17 wires hold-only empathy and authoritative clue preview markers', () =>
   expect(screen).toContain('onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index)');
   expect(screen).toContain('previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)');
   expect(screen).toContain('getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices)');
-  expect(screen).toContain('styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }');
-  expect(screen).toContain('styles.ownCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }');
-  expect(screen).toContain('if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
+  expect(screen).toContain('styles.opponentCards, sideHandRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }');
+  expect(screen).toContain('styles.ownCards, sideHandRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }');
+  expect(screen).toContain('if (legacyClueEntry && canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
   const opponentStart = screen.indexOf('accessibilityLabel={`Player ${playerName}`}');
   const opponentRow = screen.slice(opponentStart, opponentStart + 1000);
   expect(opponentRow).not.toContain('disabled={globalEmpathy}');
@@ -233,7 +233,7 @@ test('C17 idle Workbench is blank and preserves its fixed rectangle', () => {
   expect(screen).not.toContain("Tap another player's hand to give a clue");
   expect(screen).toContain('styles.idleWorkbench, { height: layout.workbenchHeight, flex: 0, flexShrink: 0 }');
   expect(screen).toContain('canEnterClue={enabled || hypotheticalEnabled}');
-  expect(screen).toContain('if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
+  expect(screen).toContain('if (legacyClueEntry && canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));');
   expect(screen).toContain('const showWorkbench = workbenchFeedback !== null');
 });
 
