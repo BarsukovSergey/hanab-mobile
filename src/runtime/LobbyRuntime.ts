@@ -768,8 +768,12 @@ export class LobbyRuntime {
         break;
       case 'replaySegment':
       case 'replayLeader':
-      case 'suggestion':
       case 'replayEfficiencyMod':
+        if (!this.gameBootstrap.stageSharedReplayControl(epoch, event)) {
+          this.replayInteractionRuntime.receiveEvent(epoch, event);
+        }
+        break;
+      case 'suggestion':
       case 'hypothetical':
       case 'hypoStart':
       case 'hypoEnd':
