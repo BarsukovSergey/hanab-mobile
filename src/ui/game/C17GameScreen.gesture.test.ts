@@ -140,11 +140,11 @@ test('C17 landscape uses a dedicated grid and fixed right semantic stack', () =>
   expect(screen).toContain('width: landscapeLayout.fits && metricsReady ? landscapeLayout.leftWidth');
   expect(screen).toContain('width: landscapeLayout.rightWidth');
   expect(screen).toContain('landscapeMetricStrip: { height: 34');
-  expect(screen).toContain('landscapeLastAction: { height: 68');
+  expect(screen).toContain('landscapeLastAction: { height: 28');
   expect(screen).toContain("presentation={portraitV2 ? 'portrait-v2' : 'landscape-v2'}");
   const lastAction = screen.slice(screen.indexOf('const lastActionPanel ='), screen.indexOf('const cardActions ='));
   expect(lastAction).not.toContain('denseLastActionRow');
-  expect(lastAction).toContain('numberOfLines={portraitV2 ? undefined : 2}');
+  expect(lastAction).toContain('numberOfLines={portraitV2 ? undefined : 1}');
   expect(lastAction).toContain('RECENT ›');
   expect(lastAction).toContain('title="Rewind"');
   expect(lastAction).toContain("title={globalEmpathy ? 'Empathy ✓' : 'Empathy'}");

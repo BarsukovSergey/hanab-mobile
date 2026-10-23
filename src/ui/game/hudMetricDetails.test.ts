@@ -83,7 +83,7 @@ it('portrait moves resources into CompactTable while retaining Turn, Pace and Ef
   expect(c17).toContain("<CompactTable presentation={portraitV2 ? 'portrait-v2' : 'landscape-v2'}");
   expect(c17).toContain('landscapeMetricStrip: { height: 34');
   expect(c17).toContain('`LIVE T${liveTurn}`');
-  expect(c17).toContain('numberOfLines={portraitV2 ? undefined : 2}');
+  expect(c17).toContain('numberOfLines={portraitV2 ? undefined : 1}');
   expect(table).toContain('Score {game.score} / {game.stats.maxScore}');
   expect(table).toContain('[0, 1, 2].map');
   expect(table).toContain('getPortraitResourceRailFit(availableWidth, suits.length, fontScale)');
@@ -95,14 +95,14 @@ it('portrait moves resources into CompactTable while retaining Turn, Pace and Ef
 });
 
 
-it('CompactTable defaults to Legacy and packs landscape resources plus individual relevant discards into 92dp', () => {
+it('CompactTable defaults to Legacy and packs landscape resources and larger individual relevant discards from the shared envelope', () => {
   const table = readFileSync('src/ui/game/CompactTable.tsx', 'utf8');
   expect(table).toContain("presentation = 'legacy'");
   expect(table).toContain("presentation?: 'legacy' | 'portrait-v2' | 'landscape-v2'");
   const v2 = table.slice(table.indexOf('function V2Table('), table.indexOf('function compactSuitName('));
-  expect(v2).toContain('height: 92, flexShrink: 0');
-  expect(v2).toContain('height: 62, gap: 0');
-  expect(v2).toContain('height: 26');
+  expect(v2).toContain('height: landscapeEnvelope.height, flexShrink: 0');
+  expect(v2).toContain('height: landscapeEnvelope.rowHeight, gap: 0');
+  expect(v2).toContain('height: landscapeEnvelope.discardHeight');
   expect(v2).toContain('getDiscardPresentation(game, cardIdentities)');
   expect(v2).toContain('discard.relevantCards.map');
   expect(v2).toContain('key={card.order}');

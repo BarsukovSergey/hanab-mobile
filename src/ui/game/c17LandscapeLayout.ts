@@ -1,5 +1,6 @@
 import { getRelativeOpponentIndices } from './c17DenseLayout';
 import { HANABI_CARD_ASPECT_RATIO } from './gameplayLayout';
+import { getLandscapeLastActionHeight, getLandscapeResourceEnvelope } from './landscapeResources';
 
 export type C17LandscapeInput = {
   availableWidth: number;
@@ -15,6 +16,7 @@ export type C17LandscapeInput = {
   leftHeaderMinWidth?: number;
   /** Font-scaled native width of the fixed worst-value metric probe. */
   metricRowWidth?: number;
+  suitCount?: number;
 };
 
 export type C17LandscapeLayout =
@@ -42,9 +44,12 @@ export const C17_LANDSCAPE_ROW_GAP = 4;
 
 /** Only the window and authoritative seating/capacity envelope allocate geometry. */
 export function getC17LandscapeLayout(input: C17LandscapeInput): C17LandscapeLayout {
-  if (input.availableHeight < getLandscapeMetricHeight(input.fontScale) + 92 + 68 + 12 + 88) return { fits: false, reason: 'body-height' };
+  const fixedHeight = getLandscapeMetricHeight(input.fontScale)
+    + getLandscapeResourceEnvelope(input.fontScale, input.suitCount ?? 5).height
+    + getLandscapeLastActionHeight(input.fontScale) + 12;
+  if (input.availableHeight < fixedHeight + 128) return { fits: false, reason: 'body-height' };
   const grid = getC17LandscapeHandGrid(input);
-  return grid.fits ? { ...grid, workbenchHeight: Math.min(128, input.availableHeight - getLandscapeMetricHeight(input.fontScale) - 92 - 68 - 12) } : grid;
+  return grid.fits ? { ...grid, workbenchHeight: Math.min(168, input.availableHeight - fixedHeight) } : grid;
 }
 
 type HandGrid = Exclude<C17LandscapeLayout, { fits: true }>
@@ -58,11 +63,13 @@ export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
     || fontScale <= 0 || (input.leftHeaderHeight ?? 0) < 0 || (input.metricRowWidth ?? 0) < 0 || (input.leftHeaderMinWidth ?? 0) < 0
     || !Number.isInteger(playerCount) || playerCount < 2 || playerCount > 6
     || !Number.isInteger(cardsPerHand) || cardsPerHand < 1
+    || !Number.isInteger(input.suitCount ?? 5) || (input.suitCount ?? 5) < 1
     || !Number.isInteger(seatingAnchorIndex) || seatingAnchorIndex < 0 || seatingAnchorIndex >= playerCount) {
     return { fits: false, reason: 'invalid-envelope' };
   }
   const scaledFont = Math.max(1, fontScale);
-  const rightMin = Math.max(Math.ceil(252 * scaledFont), Math.ceil(input.metricRowWidth ?? 0));
+  const rightMin = Math.max(Math.ceil(252 * scaledFont), Math.ceil(input.metricRowWidth ?? 0),
+    getLandscapeResourceEnvelope(fontScale, input.suitCount ?? 5).minimumWidth);
   const rightComfort = Math.max(rightMin, 320 + Math.ceil(32 * (scaledFont - 1)));
   const opponents = getRelativeOpponentIndices(playerCount, seatingAnchorIndex);
   const sequence = ownHandPosition === 'top'
