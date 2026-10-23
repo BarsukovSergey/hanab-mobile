@@ -18,6 +18,7 @@ This directory mixes current product/technical authority with historical impleme
 
 For implementation tasks, use the narrowest applicable authority instead of reading every document:
 
+0. [2026-10-23-UX-POLISH.md](./2026-10-23-UX-POLISH.md) — bounded ratified post-RC2 UX delta for landscape, notes/gestures, Home/Exit Replay and finish presentation; supersedes only listed clauses, preserving safety rules.
 1. `MOBILE_APP_DESIGN_V2.md` — app shell, IA, navigation, Back/Browse/Return, room menus, responsive classes and Phase 2 slice order.
 2. `C17_UX_CONTRACT.md` / `C17_UX_DECISIONS.md` — gameplay interaction semantics.
 3. `ARCHITECTURE.md` — technical/runtime/network safety boundaries.
@@ -28,6 +29,7 @@ When shell/menu/landscape text in older C17 material conflicts with Mobile App D
 
 ## Current authority
 
+- [2026-10-23-UX-POLISH.md](./2026-10-23-UX-POLISH.md) — ratified bounded post-RC2 UX changes, per-slice delivery and physical QA gates.
 - `PRODUCT_ROADMAP.md` — current post-beta sequencing authority: stabilization, mobile app redesign implementation, product depth, review tools, and store readiness.
 - `MOBILE_APP_DESIGN_V2.md` — ratified mobile IA/navigation/responsive/product-design authority and incremental implementation contract.
 - `ARCHITECTURE.md` — technical boundaries: server authority, networking, reconnect safety, and upstream ownership.

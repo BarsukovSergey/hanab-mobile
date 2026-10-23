@@ -1,5 +1,7 @@
 # C17 Product & Gameplay UX Contract
 
+**2026-10-23 bounded supersession:** [Post-RC2 UX polish](./2026-10-23-UX-POLISH.md) supersedes only the listed landscape, notes/gestures, Home/Exit Replay and finish-presentation clauses. Other decisions and all gameplay/network safety remain authoritative. This is a target contract, not physical acceptance.
+
 Version: **1.2 — ratified product baseline**
 Date: 2026-09-11
 Scope: Android-first Hanab Mobile C17 product/gameplay UX
@@ -68,7 +70,7 @@ Historical 5P/6P density evidence remains useful engineering evidence, but it do
 
 ### Landscape / tablet
 
-C17 release requires safe, usable rotation/system-inset behavior and no broken gameplay. A dedicated two-column landscape/tablet composition and large-screen polish are backlog and do not block C17 phone-portrait release.
+Phone landscape is first-class under Mobile App Design v2 and the 2026-10-23 delta: left-only header/hand grid and a safe-top right control column, subject to measured fit. Large-screen polish remains separate.
 
 ## 5. Information hierarchy
 
@@ -87,7 +89,7 @@ Always visible when meaningful:
 - all hands/self-or-observed anchor;
 - active Workbench mode/target.
 
-Detailed statistics such as MRE remain one deliberate action away. Do not invent a mobile-only efficiency metric.
+Landscape keeps the full existing FRE | MRE value in the Efficiency metric row; additional metric details remain one deliberate action away. Do not invent a mobile-only efficiency metric.
 
 ## 6. Direct card actions
 
@@ -147,9 +149,9 @@ The authoritative live game is never mutated by inspection.
 
 ### Read/edit gestures
 
-- Single tap reads/inspects without opening the keyboard.
-- Double tap enters Edit note immediately and opens the keyboard.
-- Long-press is reserved for transient empathy where that gesture applies.
+- No double-tap mode. Own-card tap selects for separate Play/Discard; own-card hold opens note editing/inspection.
+- Opponent-card tap opens Edit immediately where eligible, otherwise read-only inspection; opponent hold remains transient empathy.
+- Landscape Edit replaces the right column and does not force the software keyboard open; portrait retains its keyboard behavior. Preserve stable draft/order and safe Save/Cancel under IME.
 
 ### Edit transaction
 
@@ -191,8 +193,8 @@ C17 has two modes:
 
 ### Transient per-hand empathy
 
-- Long-press/hold anywhere on a player row/hand, including cards, shows that hand in empathy until release.
-- The same applies to the local/observed hand.
+- Long-press/hold on another player row/hand, including cards, shows that hand in empathy until release.
+- Own-card hold opens notes instead; global empathy remains available.
 - A recognized long press consumes the gesture: release must not also fire the short-tap Clue/card action.
 - Temporary empathy clears on release and on background/rotation/interruption.
 - It works while live, while Rewinding, and while ClueComposer remains visible.
@@ -230,15 +232,15 @@ Clue planning is one visible composer, not a hidden parked draft.
 
 ### Entry
 
-- Short tap on another player opens ClueComposer only when it is our turn and live gameplay interaction is otherwise available.
-- Off-turn short tap does not open the composer.
-- On our turn with zero clue tokens, short tap may open the composer, but candidate controls/Give are disabled.
+- Explicit accessible `Clue` beside an eligible opponent name opens/retargets ClueComposer only on our turn when live interaction is otherwise available. Card/row taps do not infer clue entry.
+- Off-turn/read-only states do not expose active clue commitment.
+- On our turn with zero clue tokens, the composer may open, but candidate controls/Give are disabled.
 - Entering Clue turns global empathy off.
-- A separate per-player `Clue` button is not used.
+- Keep the visible per-player `Clue` affordance; its hit target must fit without reflowing hands.
 
 ### Candidate / retarget
 
-- Color/rank choices stay visible.
+- Color/rank palettes use two rows; worst supported variants determine a stable landscape Workbench reserve. Only the bounded palette may scroll/wrap; Close/Give always remain reachable.
 - Selecting a candidate previews authoritative touched cards directly in the target hand.
 - No textual slot list is required.
 - Changing candidate is one tap.
@@ -277,12 +279,14 @@ Live, live Rewind, finished game, ordinary replay, shared review, and Hypothetic
 
 Replay/finished requirements:
 
-- compact authoritative result/reason;
+- one restrained `Game finished` score/reason popup only on an observed active-game -> authoritative-finished transition; no popup on historical/bootstrap/reconnect loads and no separate result page or redundant persistent result banners;
 - same stable ordered hands/table/resources;
 - one authoritative-action timeline with scrubber + Back/Forward + long-press edge jumps;
 - empathy/knowledge at the selected temporal point;
 - no separate Before/After axis;
 - Quick rematch / Remake where authoritative eligibility permits.
+
+Direct `Exit Replay` ends ordinary/finished/shared review without confirmation through safe authoritative attendance handling; it is distinct from ongoing own Rewind `Live`. `Home` always opens browsing Home without changing attendance. Failed departure must not falsely claim exit.
 
 Shared review is C17 MUST:
 
