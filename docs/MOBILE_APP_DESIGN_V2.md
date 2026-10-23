@@ -328,7 +328,7 @@ Header измеряет title, Back и Return совместно. Если он�
 | Live, ход другого | `LIVE · Tn` + `Return to game` |
 | Live, наш ход | `YOUR TURN` + `Return to game` |
 | Пользователь ушёл в browsing из собственного Rewind | `Return to Live`; переход явно возвращает актуальное состояние и disarms |
-| Finished | `Finished · score` + `Review game` |
+| Finished | `REPLAY` or `SHARED REVIEW` + `Return to review`; final score/reason belongs to the once-only observed-finish popup |
 | Dedicated replay/shared review | `REPLAY` или `SHARED REVIEW` + `Return to review` |
 | Hypothetical | Явный `HYPOTHETICAL` + действие возврата в этот контекст |
 | Reconnecting | `Reconnecting` + Return к безопасной room surface; без устаревшего YOUR TURN |
@@ -691,6 +691,12 @@ Workbench comfort is minimum + 40dp, capped by actual available height. For exam
 Every focused room entry, including Pregame/bootstrap, uses Home and navigates to browsing Home without changing attendance. Replay origin is captured separately when entering a room, so Home does not erase a supported History origin. Direct Exit Replay is outside the portrait Workbench's small scrolling viewport and in the existing fixed landscape secondary row; the review Menu uses the same confirmation-free action. Own ongoing Rewind uses Live and never table-unattend. A Hypothetical branch within that ongoing game does not qualify for attendance Exit Replay.
 
 Replay exit captures table/load/connection ownership and checks current focused presentation plus existing READY/pending attendance gates. A successful send leaves the room present while awaiting authoritative own-user Lobby confirmation. Only confirmed departure restores History (when captured) or Home; failed sends, disconnects and superseded generations cancel presentation intent without claiming exit or retrying. Destructive live attendance/Terminate confirmation remains separate. PR5's blocked gesture proposal is not required for this navigation slice.
+
+### Observed finish presentation (post-RC2 PR7)
+
+A presentation-only observer keys its memory to connection/table/game-load ownership and arms from an observed active ongoing game. Authoritative `clientState.finished` after postgame reconciliation triggers one Game finished popup; the earlier gameOver action alone does not. The popup reads final Score/max from ongoing authority and reason from authoritative game history or the last gameOver action, independent of timeline position. Continue to replay and Android Back only dismiss; no command, rematch or gameplay mutation occurs.
+
+Initial historical/imported/shared finished hydration and reconnect/new-load seeding stay silent. Hidden, background or disconnected transitions consume the observation without a delayed popup on Return; rotation retains the same observer. A genuinely new active game-load lifetime may announce its own finish. The popup owns all four safe edges in its native window, dismisses an existing keyboard, scrolls explanatory content separately from Continue, and leaves ordinary Last Action/history, metric values and Replay/shared temporal anchors intact. Persistent Finished-score/FINAL-reason decorations are removed. Component/runtime tests are not physical Android acceptance; #251 remains open.
 
 ### Right Live column
 

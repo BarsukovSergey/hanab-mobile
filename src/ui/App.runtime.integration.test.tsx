@@ -102,6 +102,72 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function finishLiveGame(socket: FakeSession['sockets'][number], endCondition = 1) {
+  act(() => {
+    socket.emitMessage(`gameAction ${JSON.stringify({ tableID: 123, action: { type: 'gameOver', endCondition, playerIndex: 0, votes: null } })}`);
+    socket.emitMessage('gameAction {"tableID":123,"action":{"type":"playerTimes","playerTimes":[60000,60000],"duration":300000}}');
+  });
+  expect(liveRoom().clientState.finished).toBe(false);
+  act(() => {
+    socket.emitMessage(`gameHistory ${JSON.stringify([{
+      id: 77, options: makeInit().options, seed: 'p2v0s1', score: 0, numTurns: 0, endCondition,
+      datetimeStarted: '2026-08-31T00:00:00Z', datetimeFinished: '2026-10-23T00:05:00Z',
+      numGamesOnThisSeed: 1, playerNames: ['Ada', 'Bob'], incrementNumGames: true, tags: '',
+    }])}`);
+    socket.emitMessage(`cardIdentities ${JSON.stringify({ tableID: 123, cardIdentities: Array.from({ length: 10 }, (_, order) => ({ suitIndex: order % 5, rank: order % 5 + 1 })) })}`);
+    socket.emitMessage('finishOngoingGame {"tableID":123,"databaseID":77,"sharedReplayLeader":"Ada"}');
+  });
+  expect(liveRoom().clientState.finished).toBe(true);
+}
+
+test.each([[1, 'Normal completion'], [4, 'Terminated by player']] as Array<[number, string]>)('real authoritative finish %s announces once with final score/reason and sends nothing', async (condition, reason) => {
+  const socket = await mountLive();
+  const before = [...socket.sent];
+  expect(buttons('Continue to replay')).toHaveLength(0);
+  finishLiveGame(socket, condition);
+  expect(buttons('Continue to replay')).toHaveLength(1);
+  const popup = tree.root.findAllByProps({ testID: 'game-finished-popup' })[0];
+  expect(popup.findAllByProps({ accessibilityLabel: 'Final score 0 out of 25' }).length).toBeGreaterThan(0);
+  expect(popup.findAllByType(Text).some((node: { props: { children: unknown } }) => node.props.children === reason)).toBe(true);
+  expect(socket.sent).toEqual(before);
+  pressButton('Continue to replay');
+  act(() => socket.emitMessage('finishOngoingGame {"tableID":123,"databaseID":77,"sharedReplayLeader":"Ada"}'));
+  act(() => mockRuntime.navigateReplaySegment(0));
+  pressButton('Home'); returnToRoom();
+  expect(buttons('Continue to replay')).toHaveLength(0);
+  expect(socket.sent.filter((frame: string) => frame.startsWith('action '))).toEqual([]);
+});
+
+test('finished hydration and a finish observed while browsing do not announce on Return', async () => {
+  const socket = await mountLive();
+  pressButton('Home');
+  finishLiveGame(socket);
+  returnToRoom();
+  expect(buttons('Continue to replay')).toHaveLength(0);
+  // Rebootstrap an already-finished shared replay into the same mounted App.
+  act(() => bootstrap(socket, 123, true));
+  expect(buttons('Continue to replay')).toHaveLength(0);
+});
+
+test('a spectator observes an opponent finish once without creating a gameplay send', async () => {
+  await act(async () => { tree = create(<Provider store={store} stabilityCheck="never"><App /></Provider>); });
+  const socket = mockSession.sockets[0];
+  act(() => {
+    socket.emitOpen();
+    socket.emitMessage('welcome {"userID":3,"username":"Carol","totalGames":0,"playingAtTables":[],"disconSpectatingTable":123,"disconShadowingSeat":-1}');
+    socket.emitMessage('userList []'); socket.emitMessage('tableList []');
+    socket.emitMessage('tableStart {"tableID":123,"replay":false}');
+    socket.emitMessage(`init ${JSON.stringify(makeInit({ spectating: true }))}`);
+    socket.emitMessage(`gameActionList ${JSON.stringify(history())}`);
+  });
+  expect(liveRoom().role).toBe('spectator');
+  const before = [...socket.sent];
+  finishLiveGame(socket);
+  expect(buttons('Continue to replay')).toHaveLength(1);
+  pressButton('Continue to replay');
+  expect(socket.sent).toEqual(before);
+});
+
 test.each([false, true])('direct Exit Replay has no confirmation for shared leader=%s and waits for authority', async (leader) => {
   const socket = await mountLive(true);
   if (leader) act(() => socket.emitMessage('replayLeader {"tableID":123,"name":"Ada"}'));

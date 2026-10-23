@@ -13,7 +13,6 @@ export function getReviewWorkspacePresentation(room: Extract<RoomState, { kind: 
     if (replay.shared !== null) markers.push(replay.shared.amLeader ? 'Leader'
       : replay.shared.useSharedSegments ? 'Following leader' : 'Local view · Detached from leader');
   }
-  if (finished) markers.push(`Finished · ${room.clientState.ongoingGame.score}`);
   return {
     review,
     ownRewind,

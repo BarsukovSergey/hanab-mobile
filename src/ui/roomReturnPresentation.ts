@@ -37,8 +37,8 @@ export function getRoomReturnPresentation(room: RoomState, recovering: boolean):
     status: 'REPLAY', action: 'Return to review', behavior: 'focus-room',
   };
   if (clientState.finished && clientState.replay.shared !== null) return {
-    status: `Finished · ${clientState.ongoingGame.score}`,
-    action: 'Review game', behavior: 'focus-room',
+    status: 'SHARED REVIEW',
+    action: 'Return to review', behavior: 'focus-room',
   };
   if (getReviewWorkspacePresentation(room).review) return {
     status: getReviewWorkspacePresentation(room).identity, action: 'Return to review', behavior: 'focus-room',

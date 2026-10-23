@@ -33,7 +33,7 @@ describe('room Return presentation', () => {
   test('hypothetical, own Rewind, finished, solo replay, and shared review', () => {
     expect(getRoomReturnPresentation(live({ hypothetical: {} }), false)).toEqual({ status: 'HYPOTHETICAL', action: 'Return to hypothetical', behavior: 'focus-room' });
     expect(getRoomReturnPresentation(live({ active: true }), false)).toEqual({ status: 'REWIND', action: 'Return to Live', behavior: 'return-live' });
-    expect(getRoomReturnPresentation(live({ finished: true, shared: {}, score: 25 }), false)).toEqual({ status: 'Finished · 25', action: 'Review game', behavior: 'focus-room' });
+    expect(getRoomReturnPresentation(live({ finished: true, shared: {}, score: 25 }), false)).toEqual({ status: 'SHARED REVIEW', action: 'Return to review', behavior: 'focus-room' });
     expect(getRoomReturnPresentation(live({ finished: true }), false)).toEqual({ status: 'REPLAY', action: 'Return to review', behavior: 'focus-room' });
     expect(getRoomReturnPresentation(live({ finished: true, sharedReplay: true }), false)).toEqual({ status: 'SHARED REVIEW', action: 'Return to review', behavior: 'focus-room' });
   });
