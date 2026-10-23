@@ -120,7 +120,7 @@ function finishLiveGame(socket: FakeSession['sockets'][number], endCondition = 1
   expect(liveRoom().clientState.finished).toBe(true);
 }
 
-test.each([[1, 'Normal completion'], [4, 'Terminated by player']] as const)('real authoritative finish %s announces once with final score/reason and sends nothing', async (condition, reason) => {
+test.each([[1, 'Normal completion'], [4, 'Terminated by player']] as Array<[number, string]>)('real authoritative finish %s announces once with final score/reason and sends nothing', async (condition, reason) => {
   const socket = await mountLive();
   const before = [...socket.sent];
   expect(buttons('Continue to replay')).toHaveLength(0);
@@ -154,7 +154,7 @@ test('a spectator observes an opponent finish once without creating a gameplay s
   const socket = mockSession.sockets[0];
   act(() => {
     socket.emitOpen();
-    socket.emitMessage('welcome {"userID":3,"username":"Carol","totalGames":0,"playingAtTables":[],"disconSpectatingTable":123}');
+    socket.emitMessage('welcome {"userID":3,"username":"Carol","totalGames":0,"playingAtTables":[],"disconSpectatingTable":123,"disconShadowingSeat":-1}');
     socket.emitMessage('userList []'); socket.emitMessage('tableList []');
     socket.emitMessage('tableStart {"tableID":123,"replay":false}');
     socket.emitMessage(`init ${JSON.stringify(makeInit({ spectating: true }))}`);

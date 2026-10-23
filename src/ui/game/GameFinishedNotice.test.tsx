@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState, Modal, ScrollView } from 'react-native';
+import { AppState, Modal, ScrollView, type AppStateStatus } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
 import type { RoomState } from '../../store/roomSlice';
@@ -15,7 +15,7 @@ jest.mock('../designSystem', () => ({
 type Props = React.ComponentProps<typeof GameFinishedNotice>;
 let tree: ReturnType<typeof create>;
 let props: Props;
-let appListeners: Array<(state: string) => void>;
+let appListeners: Array<(state: AppStateStatus) => void>;
 const room = (finished = false) => ({ kind: 'live_game', tableID: 123, gameLoadEpoch: 1, sharedReplay: finished,
   gameHistory: finished ? { endCondition: 4 } : null,
   clientState: { finished, ongoingGame: { score: 22, stats: { maxScore: 25 } }, replay: {

@@ -33,7 +33,7 @@ test('historical/finished hydration, shared review and reconnect reseed without 
   expect(observeGameFinish(live.memory, { ...ended, owner: '2:123:2' }).show).toBe(false);
 });
 
-test.each([[1, 'Normal completion'], [2, 'Strikeout'], [3, 'Timeout'], [4, 'Terminated by player'], [10, 'Terminated by vote']] as const)(
+test.each([[1, 'Normal completion'], [2, 'Strikeout'], [3, 'Timeout'], [4, 'Terminated by player'], [10, 'Terminated by vote']] as Array<[number, string]>)(
   'authoritative reason %s and final ongoing score survive a scrubbed visible state', (endCondition, reason) => {
     const room = { gameHistory: { endCondition }, clientState: { ongoingGame: { score: 23, stats: { maxScore: 25 } },
       visibleState: { score: 4 }, replay: { actions: [{ type: 'gameOver', endCondition: 2 }] } } } as unknown as Extract<RoomState, { kind: 'live_game' }>;
