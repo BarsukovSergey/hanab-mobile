@@ -47,6 +47,7 @@ import { CompactTable, TableScore } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
 import { GameCard, VisibleHanabiCard } from './GameCard';
+import { GameFinishedNotice } from './GameFinishedNotice';
 import { NoteEditor } from './NoteEditor';
 import {
   type C17DenseLayout,
@@ -81,13 +82,6 @@ import { HypotheticalMorphModal } from './HypotheticalMorphModal';
 type C17ReviewSelection = {
   actionSegment: number;
   liveSegmentAtEntry: number;
-};
-
-const END_CONDITIONS: Record<number, string> = {
-  0: 'In progress', 1: 'Normal completion', 2: 'Strikeout', 3: 'Timeout',
-  4: 'Terminated by player', 5: 'Speedrun failed', 6: 'Idle timeout',
-  7: 'Character softlock', 8: 'All or Nothing failed',
-  9: 'All or Nothing softlock', 10: 'Terminated by vote',
 };
 
 const HAND_ROW_HORIZONTAL_PADDING = 4;
@@ -423,13 +417,6 @@ export function C17GameScreen({ replayExit, noteBackRef, presentationVisible = t
       segment: null,
     }));
   };
-  const gameOver = [...replay.actions].reverse().find((action) => action.type === 'gameOver');
-  const endCondition = liveRoom.gameHistory?.endCondition
-    ?? (gameOver?.type === 'gameOver' ? gameOver.endCondition : null);
-  const result = isFinishedReplay ? {
-    score: ongoingGame.score,
-    reason: endCondition === null ? null : END_CONDITIONS[endCondition] ?? `End condition ${endCondition}`,
-  } : null;
   const canQuickRematch = sessionPhase === 'ready'
     && isQuickRematchEligible(clientState, roomState.pendingRestartTableID)
     && (replay.shared === null || replay.shared.amLeader);
@@ -584,7 +571,6 @@ export function C17GameScreen({ replayExit, noteBackRef, presentationVisible = t
       landscapeHeaderMinWidth={landscapeHeaderMinWidth}
       landscapeHeader={landscapeHeader}
       roomChildren={roomChildren}
-      result={result}
       reviewActive={!hypotheticalActive && (isFinishedReplay || replay.active || isSharedReplay)}
       finishedReplay={isFinishedReplay}
       selectedActionSegment={reviewTemporal.selectedSegment}
@@ -634,6 +620,8 @@ export function C17GameScreen({ replayExit, noteBackRef, presentationVisible = t
       variantName={metadata.options.variantName}
       visible={presentationVisible && morphOrder !== null && editHypotheticalCards && canHypotheticalControl && !hypotheticalOperationPending}
     />
+    <GameFinishedNotice room={liveRoom} connectionEpoch={roomState.connectionEpoch}
+      ready={sessionPhase === 'ready' && currentGameLoad} presentationVisible={presentationVisible} />
   </View>;
 }
 
@@ -725,7 +713,6 @@ function C17DenseWorkspace({
   roomChildren,
   landscapeHeader,
   landscapeHeaderMinWidth,
-  result,
   reviewActive,
   finishedReplay,
   selectedActionSegment,
@@ -830,7 +817,6 @@ function C17DenseWorkspace({
   roomChildren?: RoomChildren;
   landscapeHeader?: ReactNode;
   landscapeHeaderMinWidth: number;
-  result: { score: number; reason: string | null } | null;
   reviewActive: boolean;
   finishedReplay: boolean;
   selectedActionSegment: number;
@@ -1028,10 +1014,6 @@ function C17DenseWorkspace({
   const showWorkbench = workbenchFeedback !== null || hypothetical !== null || reviewActive || finishedReplay || sharedReplay !== null
     || selectedTarget !== null || selectedActionCard !== null || noteCard !== null || pendingText !== null;
   const showRewindScrubber = reviewActive;
-  const finishedReason = result?.reason;
-  const finishedStatus = finishedReason === null || finishedReason === undefined
-    ? 'FINAL'
-    : `FINAL · ${finishedReason}`;
   // Private hand renderers share card identity, knowledge, notes, gestures and pulses.
   const renderOpponentHand = (index: number) => {
     const currentActor = current === index;
@@ -1271,7 +1253,7 @@ function C17DenseWorkspace({
           : hypothetical !== null
             ? 'HYPOTHETICAL'
           : finishedReplay
-          ? finishedStatus
+          ? `REPLAY T${selectedTurn}`
           : reviewActive ? `REWIND T${selectedTurn}` : `LIVE T${liveTurn}`}</Text>
 
         {hGroupStatus.currentPlayerCue !== null && <Text numberOfLines={1} style={[styles.hGroupCue, !portraitV2 && { lineHeight: 12, includeFontPadding: false }, { color: theme.colors.textMuted }]}>

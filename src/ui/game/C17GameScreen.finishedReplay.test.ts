@@ -26,7 +26,9 @@ test('C17 finished replay is an authoritative read-only timeline with available 
   expect(screen).toContain('isRestartToPregameEligible(clientState, roomState.pendingRestartTableID)');
   expect(screen).toContain('onQuickRematch={() => lobbyRuntime.quickRematch()}');
   expect(screen).toContain('onRemake={() => lobbyRuntime.restartToPregame()}');
-  expect(screen).toContain("const finishedStatus = finishedReason === null || finishedReason === undefined");
+  expect(screen).toContain('`REPLAY T${selectedTurn}`');
+  expect(screen).not.toContain('finishedStatus');
+  expect(screen).toContain('<GameFinishedNotice room={liveRoom}');
   expect(screen).not.toContain('FINAL SCORE');
   expect(screen).toContain('const showRewindScrubber = reviewActive;');
   expect(screen).toContain('<View style={styles.workbenchScrubber}>');

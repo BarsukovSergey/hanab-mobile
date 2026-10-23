@@ -41,14 +41,14 @@ describe('authoritative Review presentation', () => {
     expect(getRoomReturnPresentation(dedicated, false)).toEqual({ status: 'REPLAY #123', action: 'Return to review', behavior: 'focus-room' });
   });
 
-  test('finished result, shared leader/follow/local view and hypothetical are explicit text', () => {
-    expect(getReviewWorkspacePresentation(room({ finished: true })).status).toBe('Finished · 23');
+  test('finished result, shared leader/follow/local view and hypothetical are explicit text without redundant finished banners', () => {
+    expect(getReviewWorkspacePresentation(room({ finished: true })).status).toBe('');
     expect(getReviewWorkspacePresentation(room({ sharedReplay: true })).status).toBe('SHARED REVIEW');
     for (const [amLeader, useSharedSegments, marker] of [
       [true, true, 'Leader'], [false, true, 'Following leader'], [false, false, 'Local view · Detached from leader'],
     ] as const) {
       expect(getReviewWorkspacePresentation(room({ finished: true, hypothetical: {}, shared: { amLeader, useSharedSegments } })).status)
-        .toBe(`HYPOTHETICAL · SHARED REVIEW · ${marker} · Finished · 23`);
+        .toBe(`HYPOTHETICAL · SHARED REVIEW · ${marker}`);
     }
   });
 });
