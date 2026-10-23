@@ -21,6 +21,7 @@ type Input = {
   cardsPerHand: number;
   workbenchHeight?: number;
   portraitV2?: boolean;
+  sideLabelMinHeight?: number;
 };
 
 const OPPONENT_CARD_GAP = 3;
@@ -122,6 +123,7 @@ export function getC17DenseLayout({
   cardsPerHand,
   workbenchHeight = DEFAULT_WORKBENCH_HEIGHT,
   portraitV2 = false,
+  sideLabelMinHeight = 0,
 }: Input): C17DenseLayout {
   const opponents = Math.max(1, opponentCount);
   const capacity = Math.max(1, cardsPerHand);
@@ -131,7 +133,7 @@ export function getC17DenseLayout({
   if (portraitV2) {
     const widthFit = Math.min(opponentWidthFit, ownWidthFit);
     let cardHeight = Math.min(widthFit, opponents >= 3 ? 72 : widthFit);
-    const rowHeight = (height: number) => height + getCardTopHeadroom(height) + SIDE_LABEL_ROW_CHROME;
+    const rowHeight = (height: number) => Math.max(sideLabelMinHeight + SIDE_LABEL_ROW_CHROME, height + getCardTopHeadroom(height) + SIDE_LABEL_ROW_CHROME);
     const totalHeight = (height: number, rows: number) => rows * rowHeight(height) + Math.max(0, rows - 2) * OPPONENT_ROW_GAP + HAND_ROW_GAP;
     while (cardHeight > 1 && totalHeight(cardHeight, opponents + 1) > handsRegionHeight) cardHeight -= 1;
     const opponentsScrollable = opponents === 5 && cardHeight < MIN_DENSE_OPPONENT_CARD_HEIGHT;
