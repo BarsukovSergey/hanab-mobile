@@ -186,7 +186,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     expect(before).toHaveLength(5);
     const room = liveRoom();
     const order = getDisplayedHandOrders(room.clientState.visibleState!.hands[room.clientState.metadata.ourPlayerIndex!], store.getState().session.cardPresentationSettings.reverseHands)[0];
-    act(() => before[0].props.onDoublePress());
+    act(() => before[0].props.onLongPress());
     measured('note-editor-footer-probe', 150, 44);
     const editor = () => tree.root.findByType(NoteEditor);
     const field = () => editor().findByType(TextInput);
@@ -194,7 +194,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     expect(field().props.autoFocus).toBe(false);
     act(() => field().props.onChangeText('stable draft'));
     act(() => before[1].props.onSelect());
-    act(() => before[1].props.onDoublePress());
+    act(() => before[1].props.onLongPress());
     expect(field().props.value).toBe('stable draft');
     expect(tree.root.findAllByType(GameCard)).toEqual(before);
     expect(tree.root.findAllByType(GameCard).map((node: { props: { height: number } }) => node.props.height)).toEqual(sizes);
@@ -202,7 +202,7 @@ test('landscape note replacement preserves mounted cards, rejects switching, and
     act(() => expect(editor().props.backRef.current()).toBe(true));
     expect(editor().props.visible).toBe(false);
     expect(tree.root.findByType(C17GameScreen).props.presentationVisible).toBe(true);
-    act(() => before[0].props.onDoublePress());
+    act(() => before[0].props.onLongPress());
     measured('note-editor-footer-probe', 150, 44);
     act(() => field().props.onChangeText('stable draft'));
     act(() => {
@@ -269,7 +269,7 @@ test('landscape Clue preview preserves card geometry and only explicit Give can 
     const heights = cards.map((node: { props: { height: number } }) => node.props.height);
     expect(cards).toHaveLength(5);
     const beforeActions = socket.sent.filter((frame) => frame.startsWith('action '));
-    const target = tree.root.findAllByProps({ accessibilityLabel: 'Player Bob' })
+    const target = tree.root.findAllByProps({ accessibilityLabel: 'Clue Bob' })
       .find((node: { props: { onPress?: unknown } }) => typeof node.props.onPress === 'function');
     expect(target).toBeDefined();
     act(() => target.props.onPress());
@@ -735,7 +735,7 @@ test.each(['card', 'clue'] as const)('Home hides %s interaction, accepts authori
     expect(buttons('Play')).toHaveLength(1);
     expect(buttons('Play')[0].props.disabled).toBe(false);
   } else {
-    const target = tree.root.findAllByProps({ accessibilityLabel: 'Player Bob' })[0];
+    const target = tree.root.findAllByProps({ accessibilityLabel: 'Clue Bob' })[0];
     act(() => target.props.onPress());
     const composer = tree.root.findByType(ClueComposer);
     act(() => composer.props.onPreview('rank', 1));

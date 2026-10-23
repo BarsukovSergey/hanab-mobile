@@ -1,3 +1,4 @@
+import { getHandLabelGeometry } from './handLabelGeometry';
 import { getRelativeOpponentIndices } from './c17DenseLayout';
 import { HANABI_CARD_ASPECT_RATIO } from './gameplayLayout';
 import { getLandscapeLastActionHeight, getLandscapeResourceEnvelope } from './landscapeResources';
@@ -89,7 +90,7 @@ export function getC17LandscapeHandGrid(input: C17LandscapeInput): HandGrid {
     const cellWidth = (height: number) => cardsPerHand * height * HANABI_CARD_ASPECT_RATIO
       + (cardsPerHand - 1) * 3 + 8;
     const gridWidth = (height: number) => columns * cellWidth(height) + (columns - 1) * C17_LANDSCAPE_COLUMN_GAP;
-    const rowHeight = (height: number) => height + 18 + headroom(height);
+    const rowHeight = (height: number) => height + getHandLabelGeometry(fontScale).landscapeHeight + 4 + headroom(height);
     const gridHeight = (height: number) => rows.length * rowHeight(height) + (rows.length - 1) * C17_LANDSCAPE_ROW_GAP;
     const largestFit = (fits: (height: number) => boolean) => {
       let low = 0;

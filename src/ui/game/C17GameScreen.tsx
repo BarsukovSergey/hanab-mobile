@@ -47,6 +47,7 @@ import { CompactTable, TableScore } from './CompactTable';
 import { AuthoritativePulse } from './AuthoritativePulse';
 import { DiscardViewer } from './DiscardViewer';
 import { GameCard, VisibleHanabiCard } from './GameCard';
+import { getHandLabelGeometry } from './handLabelGeometry';
 import { NoteEditor } from './NoteEditor';
 import {
   type C17DenseLayout,
@@ -577,7 +578,7 @@ export function C17GameScreen({ noteBackRef, presentationVisible = true, roomChi
       seatingAnchorIndex={seatingAnchorIndex}
       pendingText={pendingText ?? null}
       pendingReplaySuggestion={pendingReplaySuggestion}
-      canEnterClue={enabled || hypotheticalEnabled}
+      canEnterClue={(enabled || hypotheticalEnabled) && hasClueTokenForVariant(game.clueTokens, metadata.options.variantName)}
       recentActions={recentActions}
       presentationVisible={presentationVisible}
       landscapeHeaderMinWidth={landscapeHeaderMinWidth}
@@ -918,9 +919,10 @@ function C17DenseWorkspace({
   const portraitSizeTooSmall = shellMeasured && portraitV2
     && getC17HandsRegionHeight(layoutMetrics.measuredBodyHeight, workbenchHeight) === 0;
   const handsRegionHeight = getC17HandsRegionHeight(layoutMetrics.ambientBodyHeight, workbenchHeight);
+  const handLabel = getHandLabelGeometry(fontScale);
   const cardLaneWidth = getC17CardLaneWidth(
     layoutMetrics.ambientBodyWidth,
-    usesSideLabelRows ? C17_SIDE_LABEL_LANE_WIDTH + C17_SIDE_LABEL_ROW_GAP : 0,
+    usesSideLabelRows ? handLabel.sideWidth + C17_SIDE_LABEL_ROW_GAP : 0,
   );
   const [leftHeaderHeight, setLeftHeaderHeight] = useState(0);
   const [metricMeasurement, setMetricMeasurement] = useState({ shellKey: '', actual: { width: 0, height: 0 }, maximum: { width: 0, height: 0 } });
@@ -938,6 +940,7 @@ function C17DenseWorkspace({
     ownHandPosition,
   });
   const layout: C17DenseLayout = portraitV2 ? getC17DenseLayout({
+    sideLabelMinHeight: handLabel.sideHeight,
     opponentCardLaneWidth: cardLaneWidth,
     handsRegionHeight,
     ownCardLaneWidth: cardLaneWidth,
@@ -1029,6 +1032,14 @@ function C17DenseWorkspace({
   const finishedStatus = finishedReason === null || finishedReason === undefined
     ? 'FINAL'
     : `FINAL · ${finishedReason}`;
+  const openCardNote = (order: number) => takeWorkbenchTask(() => {
+    if (readOnlyReplay || hypothetical !== null) onInspectNote(order);
+    else onEditNote(order);
+  });
+  const clueEntry = (index: number) => canPlayGameplay && index !== actionHandIndex ? <ActionButton
+    compact accessibilityLabel={`Clue ${metadata.playerNames[index] ?? `Player ${index + 1}`}`}
+    disabled={!canEnterClue} title="Clue" style={{ height: handLabel.actionHeight, minHeight: handLabel.actionHeight }}
+    onPress={() => takeWorkbenchTask(() => onSelectClueTarget(index))} /> : null;
   // Private hand renderers share card identity, knowledge, notes, gestures and pulses.
   const renderOpponentHand = (index: number) => {
     const currentActor = current === index;
@@ -1038,20 +1049,15 @@ function C17DenseWorkspace({
     const playerName = metadata.playerNames[index] ?? `Player ${index + 1}`;
     return <AuthoritativePulse enabled={livePulseEnabled} key={index} pulseKey={sourcePulse(index) ?? (!portraitV2 && current === index ? actorPulse : null)}><Pressable
       accessibilityLabel={`Player ${playerName}`}
-      accessibilityRole="button"
+      accessible={false}
       delayLongPress={350}
       onPressIn={() => { longPressedOpponent.current = null; }}
       onLongPress={globalEmpathy ? undefined : () => {
         longPressedOpponent.current = index;
         onHoldEmpathy(index);
       }}
-      onPress={() => {
-        if (longPressedOpponent.current === index) {
-          longPressedOpponent.current = null;
-          return;
-        }
-        if (canEnterClue && !isActionHand) takeWorkbenchTask(() => onSelectClueTarget(index));
-      }}
+      onTouchCancel={() => { longPressedOpponent.current = null; onHoldEmpathy(null); }}
+      onResponderTerminate={() => { longPressedOpponent.current = null; onHoldEmpathy(null); }}
       onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
       style={[
         styles.opponentRow,
@@ -1064,19 +1070,22 @@ function C17DenseWorkspace({
         target && { borderColor: theme.colors.accent },
       ]}
     >
-      <View style={usesSideLabelRows ? styles.sideLabelLane : styles.opponentMeta}>
-        <View style={[styles.namePeekArea, usesSideLabelRows && styles.sideLabelPeekArea]}>
+      <View style={usesSideLabelRows ? [styles.sideLabelLane, styles.noteTargetLabel, { width: handLabel.sideWidth }] : [styles.opponentMeta, { height: handLabel.landscapeHeight, flexDirection: 'row', gap: 4 }]}>
+        <View style={[styles.namePeekArea, { height: Math.ceil(14 * Math.max(1, fontScale)), ...(usesSideLabelRows ? {} : { flex: 1 }) }, usesSideLabelRows && styles.sideLabelPeekArea]}>
           {usesSideLabelRows && currentActor && <View style={[styles.currentActorDot, { backgroundColor: theme.colors.accent }]} />}
           <Text numberOfLines={1} style={[styles.opponentName, { color: currentActor ? theme.colors.accent : theme.colors.text }]}>
             {playerName}{!usesSideLabelRows && currentActor ? ' · TURN' : ''}
           </Text>
-          {liveClock !== null && <C17LiveClockText
+          {!usesSideLabelRows && liveClock !== null && <C17LiveClockText
             clock={liveClock}
             paused={clockPaused}
             timed={metadata.options.timed === true}
             playerIndex={index}
           />}
         </View>
+        {usesSideLabelRows && liveClock !== null && <C17LiveClockText
+          clock={liveClock} paused={clockPaused} timed={metadata.options.timed === true} playerIndex={index} />}
+        {clueEntry(index)}
       </View>
       <View style={[styles.opponentCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
         {getDisplayedHandOrders(game.hands[index], reverseHands).map((order, position) => {
@@ -1106,7 +1115,7 @@ function C17DenseWorkspace({
               hasNote={hasAvailableNote(order)}
               height={layout.opponentCardHeight}
               knowledge={actionKnowledge}
-              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(index)}
+              onLongPress={() => openCardNote(order)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
               position={position}
@@ -1140,9 +1149,8 @@ function C17DenseWorkspace({
             clueMarker: getCommittedClueMarkerForMetadata(committedClue, order, card.numPositiveClues, metadata),
             previewMarker: target && (cluePreview?.touchedOrders.includes(order) ?? false)
               ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null,
-            onDoublePress: readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order)),
             onLongPress: globalEmpathy ? undefined : () => onHoldEmpathy(index),
-            onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order)),
+            onPress: () => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : openCardNote(order),
             onPressOut: globalEmpathy ? undefined : () => onHoldEmpathy(null),
             position,
             rank: hypothetical === null ? card.rank : normalKnowledge.displayRank,
@@ -1162,15 +1170,16 @@ function C17DenseWorkspace({
   const renderAnchoredHand = () => (
     <AuthoritativePulse enabled={livePulseEnabled} key={seatingAnchorIndex} pulseKey={sourcePulse(seatingAnchorIndex) ?? (!portraitV2 && current === seatingAnchorIndex ? actorPulse : null)}><Pressable
       accessibilityLabel={`Player ${metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}`}`}
-      accessibilityRole="button"
+      accessible={false}
       delayLongPress={350}
-      disabled={globalEmpathy}
-      onLongPress={() => onHoldEmpathy(seatingAnchorIndex)}
-      onPress={() => { if (canEnterClue && !anchoredIsActionHand) takeWorkbenchTask(() => onSelectClueTarget(seatingAnchorIndex)); }}
+      disabled={!isSpectator || globalEmpathy}
+      onLongPress={isSpectator ? () => onHoldEmpathy(seatingAnchorIndex) : undefined}
+      onTouchCancel={() => onHoldEmpathy(null)}
+      onResponderTerminate={() => onHoldEmpathy(null)}
       onPressOut={() => onHoldEmpathy(null)}
       style={[styles.ownHand, usesSideLabelRows && styles.sideLabelRow, !portraitV2 && styles.landscapeHandCell, { height: layout.ownRowHeight, backgroundColor: theme.colors.surface, borderColor: current === seatingAnchorIndex ? theme.colors.accent : theme.colors.border }]}
     >
-      <View style={[styles.ownTitleLane, usesSideLabelRows && styles.sideLabelLane]}>
+      <View style={[styles.ownTitleLane, usesSideLabelRows ? [styles.sideLabelLane, styles.noteTargetLabel, { width: handLabel.sideWidth, height: handLabel.sideHeight }] : { height: handLabel.landscapeHeight }]}>
         <Text numberOfLines={1} style={[styles.ownTitle, { color: theme.colors.text }]}>{isSpectator ? metadata.playerNames[seatingAnchorIndex] ?? `Player ${seatingAnchorIndex + 1}` : usesSideLabelRows ? 'YOU' : 'YOUR HAND'}</Text>
         {liveClock !== null && <C17LiveClockText
           clock={liveClock}
@@ -1178,6 +1187,7 @@ function C17DenseWorkspace({
           timed={metadata.options.timed === true}
           playerIndex={seatingAnchorIndex}
         />}
+        {clueEntry(seatingAnchorIndex)}
       </View>
       <View style={[styles.ownCards, usesSideLabelRows && styles.sideLabelCards, !portraitV2 && styles.landscapeCards, { marginTop: layout.cardTopHeadroom }]}>
         {anchoredHand.map((order, position) => {
@@ -1227,8 +1237,8 @@ function C17DenseWorkspace({
               empathyKnowledge={empathyKnowledge}
               hasNote={hasAvailableNote(order)}
               height={layout.ownCardHeight}
-              onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
-              onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : takeWorkbenchTask(() => onInspectNote(order))}
+              onLongPress={isSpectator ? globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex) : () => openCardNote(order)}
+              onPress={() => editHypotheticalCards ? takeWorkbenchTask(() => onSelectCard(order)) : openCardNote(order)}
               onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
               position={position}
               previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
@@ -1248,8 +1258,7 @@ function C17DenseWorkspace({
             previewMarker={selectedTarget === seatingAnchorIndex && (cluePreview?.touchedOrders.includes(order) ?? false)
               ? getPreviewClueMarker(cluePreviewState, card.numPositiveClues, clueChoices) : null}
             cardTopHeadroom={layout.cardTopHeadroom}
-            onDoublePress={readOnlyReplay || hypothetical !== null ? undefined : () => takeWorkbenchTask(() => onEditNote(order))}
-            onLongPress={globalEmpathy ? undefined : () => onHoldEmpathy(seatingAnchorIndex)}
+            onLongPress={() => openCardNote(order)}
             onPressOut={globalEmpathy ? undefined : () => onHoldEmpathy(null)}
             onSelect={() => takeWorkbenchTask(() => onSelectCard(order))}
             position={position}
@@ -1750,6 +1759,7 @@ const styles = StyleSheet.create({
   opponents: { gap: 2 },
   opponentRow: { borderColor: 'transparent', borderRadius: 7, borderWidth: HAND_ROW_BORDER_WIDTH, paddingHorizontal: HAND_ROW_HORIZONTAL_PADDING, paddingVertical: 2 },
   compactOpponentRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  noteTargetLabel: { flexDirection: 'column', gap: 2, justifyContent: 'center' },
   sideLabelRow: { alignItems: 'center', flexDirection: 'row-reverse', gap: C17_SIDE_LABEL_ROW_GAP },
   opponentMeta: { height: 14, justifyContent: 'center', minWidth: 0 },
   compactOpponentNameLane: { flexShrink: 1, justifyContent: 'center', maxWidth: '36%', minWidth: 0 },
