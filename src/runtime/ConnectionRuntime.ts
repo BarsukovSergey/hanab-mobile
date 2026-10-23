@@ -139,6 +139,13 @@ export class ConnectionRuntime {
       && owned.socket.readyState === SOCKET_OPEN;
   }
 
+  /** Fail closed before domain diagnostics can notify synchronous subscribers. */
+  invalidateCurrent(epoch: number, error: string): void {
+    const owned = this.current;
+    if (owned === null || owned.epoch !== epoch) return;
+    this.failCurrent(owned, error);
+  }
+
   /** No queue: a failed or premature frame is dropped permanently. */
   send(frame: string): boolean {
     const owned = this.current;

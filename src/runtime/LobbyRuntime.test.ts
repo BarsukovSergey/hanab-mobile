@@ -746,7 +746,7 @@ afterEach(() => {
 
 describe('current-game reducer failure investigation (#220)', () => {
   // Synthetic, schema-valid input: No Variant cannot reduce a play with an unknown suit.
-  // These characterize the current risk; a fail-closed implementation should change them.
+  // A verified failure must synchronously invalidate the still-current Live connection.
   const rejectedPlay = {
     type: 'play', playerIndex: 0, order: 0, suitIndex: -1, rank: 1,
   } as const;
@@ -771,63 +771,85 @@ describe('current-game reducer failure investigation (#220)', () => {
   }
 
   test.each([false, true])(
-    'rejected current-table play permits a stale-card send (initial pending action: %s)',
+    'rejected current-table play fails closed and recovers without replay (initial pending: %s)',
     async (initiallyPending) => {
       const { session, socket, store, runtime } = await makeLiveRuntime('player');
       const before = store.getState().room.room;
-      expect(before).toMatchObject({
-        kind: 'live_game', tableID: 123, liveActionCount: 0,
-        clientState: { playing: true, finished: false, replay: { active: false } },
-      });
+      if (before.kind !== 'live_game') throw new Error('Expected LIVE');
+      const history = { tableID: 123, list: before.clientState.replay.actions };
       if (initiallyPending) expect(runtime.play(0)).toBe(true);
-      const pendingBefore = store.getState().room.pendingGameplayAction;
-      const sentBeforeFailure = [...socket.sent];
-
-      emitAction(socket, rejectedPlay);
-
-      expect(store.getState().session.gameActionDiagnostics).toEqual([{
-        tableID: 123, actionType: 'play', accepted: false, rejectionReason: 'reducer-failure',
-      }]);
-      expect(store.getState().session.protocolIssueCount).toBe(0);
-      expect(store.getState().room.room).toBe(before);
-      expect(store.getState().room.pendingGameplayAction).toBe(pendingBefore);
-      expect(store.getState().session.phase).toBe('ready');
-      expect(socket.sent).toEqual(sentBeforeFailure);
-
-      // Pending protects only an already-sent intent. Without it, even the immediate send succeeds.
-      expect(runtime.play(0)).toBe(!initiallyPending);
-      expect(store.getState().room.pendingGameplayAction).not.toBeNull();
-      finishPlay(socket);
-
-      const after = store.getState().room.room;
-      expect(after).toMatchObject({
-        kind: 'live_game', tableID: 123, liveActionCount: 3,
-        clientState: { ongoingGame: { score: 0, turn: { currentPlayerIndex: 0, turnNum: 0 } } },
-      });
-      if (after.kind !== 'live_game') throw new Error('Expected LIVE');
-      // Later accepted status/turn records neither repair the missed play nor retain pending.
-      expect(after.clientState.ongoingGame.hands[0]).toEqual([0, 1, 2, 3, 4, 10]);
-      expect(after.clientState.replay.actions.some((action) => action.type === 'play')).toBe(false);
-      expect(store.getState().room.pendingGameplayAction).toBeNull();
-      expect(store.getState().session.gameActionDiagnostics.slice(1)).toEqual(
-        ['status', 'draw', 'turn'].map((actionType) => ({
-          tableID: 123, actionType, accepted: true, rejectionReason: null,
-        })),
-      );
-
-      // No delayed invalidation or resynchronization rescues this state.
-      jest.advanceTimersByTime(60_000);
-      expect(session.openCalls).toBe(1);
-      expect(socket.closeCalls).toEqual([]);
-      expect(socket.sent.filter((frame) => frame.startsWith('getGameInfo')))
-        .toEqual(['getGameInfo1 {"tableID":123}', 'getGameInfo2 {"tableID":123}']);
-      expect(runtime.play(0)).toBe(true);
-      expect(socket.sent.filter((frame) => frame.startsWith('action '))).toEqual([
-        'action {"tableID":123,"type":0,"target":0}',
-        'action {"tableID":123,"type":0,"target":0}',
-      ]);
+      const sentBefore = [...socket.sent];
+      const staleMessages = socket.snapshotMessageListeners();
+      const second = new FakeSocket();
+      session.sockets.push(Promise.resolve(second));
+      {
+        const sendsFromSubscribers: boolean[] = [];
+        const unsubscribe = store.subscribe(() => {
+          if (store.getState().session.gameActionDiagnostics.length > 0) {
+            sendsFromSubscribers.push(runtime.play(0));
+          }
+        });
+        emitAction(socket, rejectedPlay);
+        unsubscribe();
+        expect(sendsFromSubscribers.length).toBeGreaterThan(0);
+        expect(sendsFromSubscribers.every((sent) => !sent)).toBe(true);
+        expect(store.getState().session.gameActionDiagnostics).toEqual([{
+          tableID: 123, actionType: 'play', accepted: false, rejectionReason: 'reducer-failure',
+        }]);
+        expect(store.getState().session.phase).toBe('failed');
+        expect(store.getState().room.room).toBe(before);
+        expect(store.getState().room.pendingGameplayAction).toBeNull();
+        expect(socket.closeCalls).toHaveLength(1);
+        expect(runtime.play(0)).toBe(false);
+        expect(runtime.discard(0)).toBe(false);
+        expect(runtime.rankClue(1, 1)).toBe(false);
+        // Repeated queued callbacks cannot reduce old data or start more recovery.
+        for (const callback of staleMessages) {
+          callback({ data: `gameAction ${JSON.stringify({ tableID: 123, action: rejectedPlay })}` } as WebSocketMessageEvent);
+        }
+        finishPlay(socket);
+        expect(store.getState().room.room).toBe(before);
+        expect(socket.sent).toEqual(sentBefore);
+        jest.advanceTimersByTime(1_000);
+        await runtime.connect();
+        expect(session.openCalls).toBe(2);
+        second.emitOpen();
+        expect(runtime.play(0)).toBe(false);
+        expect(second.sent).toEqual([]);
+        second.emitMessage('welcome {"userID":1,"username":"Ada","totalGames":0,"playingAtTables":[123]}');
+        expect(second.sent).toEqual(['tableReattend {"tableID":123}']);
+        second.emitMessage('tableStart {"tableID":123,"replay":false}');
+        second.emitMessage(`init ${JSON.stringify(makeInit())}`);
+        expect(runtime.play(0)).toBe(false);
+        second.emitMessage(`gameActionList ${JSON.stringify(history)}`);
+        expect(store.getState().room.room).toMatchObject({ kind: 'live_game', gameLoadEpoch: 2 });
+        expect(second.sent).toEqual([
+          'tableReattend {"tableID":123}', 'getGameInfo1 {"tableID":123}',
+          'getGameInfo2 {"tableID":123}', 'loaded {"tableID":123}',
+        ]);
+        // History, rather than the abandoned intent, re-establishes eligibility.
+        jest.advanceTimersByTime(60_000);
+        expect(session.openCalls).toBe(2);
+        expect(second.closeCalls).toEqual([]);
+        expect(runtime.play(0)).toBe(true);
+        expect(second.sent.at(-1)).toBe('action {"tableID":123,"type":0,"target":0}');
+      }
     },
   );
+
+  test('spectator Live reduction failure also invalidates; shared review does not trigger Live recovery', async () => {
+    const spectator = await makeLiveRuntime('spectator');
+    emitAction(spectator.socket, rejectedPlay);
+    expect(spectator.store.getState().session.phase).toBe('failed');
+    expect(spectator.socket.closeCalls).toHaveLength(1);
+    spectator.runtime.disconnect();
+
+    const review = await makeSharedReplayRuntime();
+    emitAction(review.socket, rejectedPlay);
+    expect(review.store.getState().session.gameActionDiagnostics.at(-1)?.rejectionReason).toBe('reducer-failure');
+    expect(review.store.getState().session.phase).toBe('ready');
+    expect(review.socket.closeCalls).toEqual([]);
+  });
 
   test('a reducible play followed by the same events removes the card and blocks its reuse', async () => {
     const { socket, store, runtime } = await makeLiveRuntime('player');
