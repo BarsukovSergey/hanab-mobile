@@ -2195,6 +2195,92 @@ describe('deterministic lobby runtime', () => {
     expect(store.getState().chat.messagesByRoom).toEqual({});
   });
 
+  test('only the newest HTTP probe can reset the session', async () => {
+    const { session, store, runtime } = await makeReadyRuntime();
+    const older = deferred<SessionCheckResult>();
+    const check = jest.spyOn(session, 'checkSession')
+      .mockImplementationOnce(() => older.promise);
+    const pending = runtime.checkSession();
+    await expect(runtime.checkSession()).resolves.toEqual({ kind: 'valid' });
+    const current = store.getState();
+    older.resolve({ kind: 'missing' });
+    await expect(pending).resolves.toEqual({ kind: 'superseded' });
+    expect(store.getState()).toBe(current);
+    expect(check).toHaveBeenCalledTimes(2);
+  });
+
+  test.each(['connect', 'disconnect', 'automatic reconnect'] as const)(
+    '%s supersedes a deferred HTTP probe before its missing result can reset authority',
+    async (boundary) => {
+      const { session, socket, store, runtime } = await makeReadyRuntime();
+      const older = deferred<SessionCheckResult>();
+      jest.spyOn(session, 'checkSession').mockImplementation(() => older.promise);
+      const pending = runtime.checkSession();
+      if (boundary === 'connect') await runtime.connect();
+      else if (boundary === 'disconnect') runtime.disconnect();
+      else {
+        session.sockets.push(Promise.resolve(new FakeSocket()));
+        socket.emitClose();
+        jest.advanceTimersByTime(1_000);
+        await Promise.resolve();
+      }
+      const current = store.getState();
+      older.resolve({ kind: 'missing' });
+      await expect(pending).resolves.toEqual({ kind: 'superseded' });
+      expect(store.getState()).toBe(current);
+    },
+  );
+
+  test('delivery ownership blocks late HTTP results without changing HTTP semantics', async () => {
+    const { session, socket, store, runtime } = await makeReadyRuntime();
+    const older = deferred<SessionCheckResult>();
+    const check = jest.spyOn(session, 'checkSession').mockImplementation(() => older.promise);
+    let active = true;
+    const pending = runtime.checkSession(() => active);
+    active = false;
+    const current = store.getState();
+    older.resolve({ kind: 'missing' });
+    await expect(pending).resolves.toEqual({ kind: 'superseded' });
+    await expect(runtime.checkSession(() => false)).resolves.toEqual({ kind: 'superseded' });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(store.getState()).toBe(current);
+    expect(socket.readyState).toBe(1);
+  });
+
+  test.each(['new connection', 'lost delivery ownership'] as const)(
+    'obsolete logout completion after %s cannot probe or reconnect', async (boundary) => {
+      const { session, store, runtime } = await makeReadyRuntime();
+      const logout = deferred<void>();
+      jest.spyOn(session, 'logout').mockImplementation(() => logout.promise);
+      const check = jest.spyOn(session, 'checkSession');
+      let active = true;
+      const pending = runtime.signOut(() => active);
+      if (boundary === 'new connection') {
+        session.sockets.push(Promise.resolve(new FakeSocket()));
+        await runtime.connect();
+      } else active = false;
+      const current = store.getState();
+      logout.resolve();
+      await expect(pending).resolves.toEqual({ kind: 'superseded' });
+      expect(check).not.toHaveBeenCalled();
+      expect(store.getState()).toBe(current);
+    },
+  );
+
+  test('a newer owner established during sign-out disposal prevents the obsolete logout request', async () => {
+    const { session, store, runtime } = await makeReadyRuntime();
+    const logout = jest.spyOn(session, 'logout');
+    session.sockets.push(Promise.resolve(new FakeSocket()));
+    const unsubscribe = store.subscribe(() => {
+      if (store.getState().session.phase !== 'closed') return;
+      void runtime.connect();
+    });
+    await expect(runtime.signOut()).resolves.toEqual({ kind: 'superseded' });
+    unsubscribe();
+    expect(logout).not.toHaveBeenCalled();
+    expect(store.getState().session.phase).toBe('connecting');
+  });
+
   test('logout stops the socket and fully resets authenticated state', async () => {
     const { session, socket, store, runtime } = await makeReadyRuntime();
     store.dispatch(lobbyActions.userReceived({

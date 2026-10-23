@@ -14,7 +14,7 @@ describe('account chooser security boundary', () => {
   });
 
   test('passes a retrieved password directly into login without assigning it to password state', () => {
-    expect(app).toContain('await submitCredentials(result.username, result.password, false)');
+    expect(app).toContain('await submitCredentials(result.username, result.password, false, isCurrent)');
     expect(app).not.toMatch(/setPassword\(result\.password\)/);
     expect(app).toContain("setShowManualLogin(true);");
     expect(app).toContain('const chooseRecentAccount');

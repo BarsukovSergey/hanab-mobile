@@ -58,7 +58,10 @@ const UNSUPPORTED_TABLE_WARNING = 'This table uses options that Hanab Mobile doe
 
 export type SignOutResult =
   | { kind: 'signedOut' }
+  | { kind: 'superseded' }
   | { kind: 'failed'; message: string; sessionValid: boolean };
+
+export type SessionProbeResult = SessionCheckResult | { kind: 'superseded' };
 
 function safeStatus(value: unknown, fallback: string): string {
   const message = value instanceof Error ? value.message : fallback;
@@ -66,6 +69,7 @@ function safeStatus(value: unknown, fallback: string): string {
 }
 
 export class LobbyRuntime {
+  private sessionOperationGeneration = 0;
   private readonly connectionRuntime: ConnectionRuntime;
   private readonly gameBootstrap: GameBootstrapCoordinator;
   private readonly gameplayRuntime: GameplayRuntime;
@@ -125,6 +129,7 @@ export class LobbyRuntime {
       {
         getPhase: () => store.getState().session.phase,
         onStarted: (epoch) => {
+          this.sessionOperationGeneration += 1;
           this.tableManagementRuntime.clearTransientState();
           this.gameBootstrap.invalidateConnection(epoch);
           store.dispatch(sessionActions.connectionStarted({ epoch }));
@@ -147,6 +152,7 @@ export class LobbyRuntime {
   }
 
   connect(): Promise<void> {
+    this.sessionOperationGeneration += 1;
     return this.connectionRuntime.connect();
   }
 
@@ -159,24 +165,40 @@ export class LobbyRuntime {
     // A READY socket can own a terminal failed load. Replace its ownership,
     // invalidating bootstrap/timers before disposal, then use only fresh welcome
     // resume hints. Never retain or resend the command that opened this room.
-    this.connectionRuntime.disconnect();
-    void this.connectionRuntime.connect();
+    this.disconnect();
+    void this.connect();
     return true;
   }
 
   disconnect(): void {
+    this.sessionOperationGeneration += 1;
     this.connectionRuntime.disconnect();
   }
 
-  async checkSession(): Promise<SessionCheckResult> {
-    const result = await this.networkSession.checkSession();
-    if (result.kind === 'missing') this.resetConfirmedMissingSession();
-    return result;
+  checkSession(ownsDelivery: () => boolean = () => true): Promise<SessionProbeResult> {
+    if (!ownsDelivery()) return Promise.resolve({ kind: 'superseded' });
+    return this.probeSession(this.beginSessionOperation(ownsDelivery));
   }
 
-  async signOut(): Promise<SignOutResult> {
+  private beginSessionOperation(ownsDelivery: () => boolean): () => boolean {
+    const generation = ++this.sessionOperationGeneration;
+    return () => generation === this.sessionOperationGeneration && ownsDelivery();
+  }
+
+  private async probeSession(isCurrent: () => boolean): Promise<SessionProbeResult> {
+    if (!isCurrent()) return { kind: 'superseded' };
+    const result = await this.networkSession.checkSession();
+    if (!isCurrent()) return { kind: 'superseded' };
+    if (result.kind === 'missing') this.resetConfirmedMissingSession();
+    return isCurrent() ? result : { kind: 'superseded' };
+  }
+
+  async signOut(ownsDelivery: () => boolean = () => true): Promise<SignOutResult> {
+    if (!ownsDelivery()) return { kind: 'superseded' };
     // Stop retry/socket ownership before the cookie-changing HTTP request.
-    this.disconnect();
+    const isCurrent = this.beginSessionOperation(ownsDelivery);
+    this.connectionRuntime.disconnect();
+    if (!isCurrent()) return { kind: 'superseded' };
     let logoutError: string | null = null;
     try {
       await this.networkSession.logout();
@@ -184,7 +206,9 @@ export class LobbyRuntime {
       logoutError = safeStatus(error, 'Logout request failed');
     }
 
-    const check = await this.checkSession();
+    if (!isCurrent()) return { kind: 'superseded' };
+    const check = await this.probeSession(isCurrent);
+    if (!isCurrent() || check.kind === 'superseded') return { kind: 'superseded' };
     if (check.kind === 'missing') {
       return { kind: 'signedOut' };
     }
